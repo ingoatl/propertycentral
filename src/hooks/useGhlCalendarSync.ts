@@ -13,6 +13,7 @@ export interface GhlAppointment {
   assigned_user_id: string | null;
   notes: string | null;
   location: string | null;
+  meeting_link: string | null;
   contact_id: string | null;
   contact_name: string | null;
   contact_email: string | null;

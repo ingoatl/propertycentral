@@ -207,6 +207,49 @@ serve(async (req) => {
         }
       }
 
+      // Extract meeting link from various GHL fields
+      let meetingLink: string | null = null;
+      const meetLinkSources = [
+        apt.meetUrl,
+        apt.conferenceUrl,
+        apt.hangoutLink,
+        apt.locationUrl,
+        apt.address as string,
+        apt.location as string,
+        apt.notes as string,
+        apt.title as string,
+        (contactDetails.customFields as Record<string, unknown>)?.meeting_link,
+        (contactDetails.customFields as Record<string, unknown>)?.zoom_link,
+        (contactDetails.customFields as Record<string, unknown>)?.google_meet,
+      ];
+      
+      for (const source of meetLinkSources) {
+        if (source && typeof source === 'string') {
+          // Google Meet
+          const meetMatch = source.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
+          if (meetMatch) {
+            meetingLink = meetMatch[0];
+            break;
+          }
+          // Zoom
+          const zoomMatch = source.match(/https:\/\/[\w.-]*zoom\.us\/[a-z0-9/?=&-]+/i);
+          if (zoomMatch) {
+            meetingLink = zoomMatch[0];
+            break;
+          }
+          // Teams
+          const teamsMatch = source.match(/https:\/\/teams\.microsoft\.com\/[a-z0-9/?=&-]+/i);
+          if (teamsMatch) {
+            meetingLink = teamsMatch[0];
+            break;
+          }
+        }
+      }
+
+      if (meetingLink) {
+        console.log(`[GHL Calendar Sync] Found meeting link: ${meetingLink}`);
+      }
+
       // Build enriched appointment
       const enrichedApt = {
         ghl_event_id: apt.id,
@@ -219,6 +262,7 @@ serve(async (req) => {
         assigned_user_id: apt.assignedUserId,
         notes: apt.notes || null,
         location: apt.address || null,
+        meeting_link: meetingLink,
         
         // Contact details from GHL
         contact_id: contactId,
