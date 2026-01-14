@@ -1979,6 +1979,22 @@ export function InboxView() {
         const isDone = doneGmailIds.has(email.id);
         const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
         
+        // Get AI insights for this email
+        const insight = emailInsightsMap.get(email.id);
+        const isPromotional = insight?.category === "promotional" || insight?.category === "newsletter";
+        const isActionRequired = insight?.action_required === true;
+        const aiPriority = insight?.priority as string | undefined;
+        
+        // Determine priority based on AI insights
+        let emailPriority: ConversationPriority = "normal";
+        if (isActionRequired || aiPriority === "urgent" || aiPriority === "high") {
+          emailPriority = "urgent";
+        } else if (aiPriority === "important") {
+          emailPriority = "important";
+        } else if (isPromotional) {
+          emailPriority = "low";
+        }
+        
         const emailAsComm: CommunicationItem = {
           id: `email-${email.id}`,
           type: "email",
@@ -1992,7 +2008,7 @@ export function InboxView() {
           contact_id: email.id,
           is_resolved: !isUnread,
           conversation_status: isDone ? "done" : "open",
-          priority: "normal",
+          priority: emailPriority,
           gmail_email: email, // Store reference to original email for rendering
         };
         
@@ -2012,7 +2028,8 @@ export function InboxView() {
     
     // Sort: open/awaiting at top (unfaded), then snoozed/done at bottom (faded)
     // Within each group, sort by priority then by date
-    const priorityOrder: Record<ConversationPriority, number> = { urgent: 0, important: 1, normal: 2, low: 3 };
+    // Promotional/low priority items sink to bottom within their status group
+    const priorityOrder: Record<ConversationPriority, number> = { urgent: 0, important: 1, normal: 2, low: 4 };
     const statusOrder: Record<string, number> = { open: 0, awaiting: 1, snoozed: 2, done: 3, archived: 4 };
     return sorted.sort((a, b) => {
       // First sort by status (open/awaiting at top, snoozed/done at bottom)
@@ -2020,7 +2037,7 @@ export function InboxView() {
       const bStatus = statusOrder[b.conversation_status || "open"] ?? 2;
       if (aStatus !== bStatus) return aStatus - bStatus;
       
-      // Then by priority
+      // Then by priority (urgent at top, low/promotional at bottom)
       const aPriority = priorityOrder[a.priority || "normal"];
       const bPriority = priorityOrder[b.priority || "normal"];
       if (aPriority !== bPriority) return aPriority - bPriority;
@@ -2028,7 +2045,7 @@ export function InboxView() {
       // Finally by date (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [enhancedCommunications, activeFilter, activeTab, filteredGmailEmails, doneGmailIds, readGmailIds, selectedEmailInboxView, currentUserId, userPhoneAssignments]);
+  }, [enhancedCommunications, activeFilter, activeTab, filteredGmailEmails, doneGmailIds, readGmailIds, selectedEmailInboxView, currentUserId, userPhoneAssignments, emailInsightsMap]);
 
   // Group "All" tab contacts by date for date separators
   const groupedByContactWithDates = useMemo(() => {
@@ -2102,11 +2119,15 @@ export function InboxView() {
   };
   
   const handleSelectMessage = (comm: CommunicationItem) => {
+    // Clear Gmail email selection to prevent conflicts
+    setSelectedGmailEmail(null);
     setSelectedMessage(comm);
     setShowMobileDetail(true);
   };
   
   const handleSelectGmailEmailMobile = (email: GmailEmail) => {
+    // Clear SMS message selection to prevent conflicts
+    setSelectedMessage(null);
     handleSelectGmailEmail(email);
     setShowMobileDetail(true);
   };
@@ -2554,7 +2575,10 @@ export function InboxView() {
                   {comms.map((comm) => {
                     const isDone = comm.conversation_status === "done";
                     const isSnoozed = comm.conversation_status === "snoozed";
-                    const shouldFade = isDone || isSnoozed;
+                    const isLowPriority = comm.priority === "low";
+                    const shouldFade = isDone || isSnoozed || isLowPriority;
+                    const isSelected = selectedMessage?.id === comm.id || 
+                      (comm.gmail_email && selectedGmailEmail?.id === comm.gmail_email.id);
                     return (
                     <div 
                       key={`${comm.id}-${comm.conversation_status}`}
@@ -2573,7 +2597,7 @@ export function InboxView() {
                           handleSelectMessage(comm);
                         }
                       }}
-                      className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${shouldFade ? "opacity-50" : ""}`}
+                      className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${isSelected ? "bg-primary/5" : "hover:bg-muted/30"} ${shouldFade ? "opacity-50" : ""}`}
                     >
                       {/* Status/Priority indicator line - done/snoozed take precedence */}
                       {isDone ? (
