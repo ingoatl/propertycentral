@@ -2418,6 +2418,9 @@ export type Database = {
       }
       lead_communications: {
         Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          assigned_to: string | null
           body: string
           call_duration: number | null
           call_recording_url: string | null
@@ -2448,6 +2451,9 @@ export type Database = {
           subject: string | null
         }
         Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
           body: string
           call_duration?: number | null
           call_recording_url?: string | null
@@ -2478,6 +2484,9 @@ export type Database = {
           subject?: string | null
         }
         Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
           body?: string
           call_duration?: number | null
           call_recording_url?: string | null
@@ -7443,6 +7452,53 @@ export type Database = {
             columns: ["default_role_id"]
             isOneToOne: false
             referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_notifications: {
+        Row: {
+          communication_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_read: boolean | null
+          link: string | null
+          message: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          communication_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          message?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          communication_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          message?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_notifications_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "lead_communications"
             referencedColumns: ["id"]
           },
         ]

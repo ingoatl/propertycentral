@@ -69,6 +69,8 @@ import { CallRecordingPlayer } from "./CallRecordingPlayer";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
 import { ConversationSummary } from "./ConversationSummary";
+import { TeamAssignmentDropdown } from "./TeamAssignmentDropdown";
+import { TeamNotificationBell } from "./TeamNotificationBell";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -1819,6 +1821,8 @@ export function InboxView() {
         {/* Filters row - compact horizontal scroll with help guide */}
         <div className="px-3 py-2 border-b overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-1.5 min-w-max">
+            {/* Notification bell */}
+            <TeamNotificationBell />
             {/* Admin inbox selector */}
             {activeTab !== "emails" && isAdmin && (
               <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
@@ -2460,6 +2464,11 @@ export function InboxView() {
                 </p>
               </div>
               <div className="flex items-center gap-1">
+                {/* Team Assignment */}
+                <TeamAssignmentDropdown
+                  communicationId={selectedMessage.id}
+                  contactName={selectedMessage.contact_name}
+                />
                 {/* Inbox Zero Quick Actions */}
                 <ConversationQuickActions
                   status={selectedMessage.conversation_status}
