@@ -149,6 +149,17 @@ export const NewSTROnboardingForm = () => {
         bedrooms: formData.bedrooms,
         bathrooms: formData.bathrooms,
         square_footage: formData.squareFootage,
+        year_built: formData.yearBuilt,
+        num_stories: formData.numStories,
+        has_basement: formData.hasBasement,
+        fenced_yard: formData.fencedYard,
+        ada_compliant: formData.adaCompliant,
+        pool_type: formData.poolType,
+        
+        // Nearby schools
+        elementary_school: formData.elementarySchool,
+        middle_school: formData.middleSchool,
+        high_school: formData.highSchool,
         
         // Rental strategy
         rental_strategy: formData.rentalStrategy,
