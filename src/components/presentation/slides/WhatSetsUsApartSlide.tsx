@@ -1,14 +1,13 @@
 import { SlideLayout } from "../SlideLayout";
-import { Brain, Users, Zap, Shield, Clock, Award, Sparkles } from "lucide-react";
+import { Brain, Users, Zap, Clock, Award, Sparkles } from "lucide-react";
 
 export function WhatSetsUsApartSlide() {
   const features = [
     { icon: Brain, title: "AI-Powered Optimization", desc: "Dynamic pricing that maximizes every single night", highlight: true },
     { icon: Users, title: "Exclusive Corporate Network", desc: "Access Fortune 500 tenants directly" },
     { icon: Zap, title: "Instant Strategy Switching", desc: "Adapt to market conditions seamlessly" },
-    { icon: Shield, title: "$3M Insurance Coverage", desc: "Complete protection for your property" },
     { icon: Clock, title: "24/7 Support", desc: "Always available when you need us" },
-    { icon: Award, title: "15+ Years Experience", desc: "Proven track record of success" },
+    { icon: Award, title: "10 Years Experience", desc: "Proven track record of success" },
   ];
 
   return (

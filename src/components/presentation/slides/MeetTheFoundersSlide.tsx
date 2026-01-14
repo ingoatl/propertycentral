@@ -14,14 +14,14 @@ export function MeetTheFoundersSlide() {
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-amber-400/30 transition-all duration-300 group">
             <div className="flex flex-col items-center text-center">
               <img
-                src="/images/ingo-headshot.png"
+                src="https://www.peachhausgroup.com/lovable-uploads/f48b3dd5-8cfd-4ed9-b7bb-5c1fc3e60e1d.png"
                 alt="Ingo Schaer"
                 className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-amber-400/30 mb-6 group-hover:border-amber-400 transition-all duration-300"
               />
               <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Ingo Schaer</h3>
               <p className="text-amber-400 font-medium mb-4">Founder & Automation Expert</p>
               <p className="text-white/60 text-sm md:text-base mb-6 leading-relaxed">
-                15+ years of entrepreneurship experience. Built and exited multiple businesses, 
+                10 years of entrepreneurship experience. Built and exited multiple businesses, 
                 now leading PeachHaus with a focus on scale, systems, and strategic automation.
               </p>
               <div className="flex items-center gap-4 mb-4">
