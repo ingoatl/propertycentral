@@ -106,7 +106,7 @@ interface CommunicationItem {
   contact_name: string;
   contact_phone?: string;
   contact_email?: string;
-  contact_type: "lead" | "owner" | "external" | "draft" | "personal" | "tenant";
+  contact_type: "lead" | "owner" | "external" | "draft" | "personal" | "tenant" | "email";
   contact_id: string;
   media_urls?: string[];
   status?: string;
@@ -120,6 +120,8 @@ interface CommunicationItem {
   priority?: ConversationPriority;
   conversation_status?: ConversationStatusType;
   snoozed_until?: string;
+  // Gmail email reference for rendering in All tab
+  gmail_email?: GmailEmail;
 }
 
 interface ConversationStatusRecord {
@@ -716,7 +718,7 @@ export function InboxView() {
   // Enhanced inbox selector state - "all" shows all emails, or specific user inbox
   const [selectedEmailInboxView, setSelectedEmailInboxView] = useState<InboxViewType>("all");
 
-  // Fetch Gmail inbox emails for ALL team members
+  // Fetch Gmail inbox emails for ALL team members - always fetch for All and Emails tabs
   const { data: gmailEmails = [], isLoading: isLoadingGmail } = useQuery({
     queryKey: ["gmail-inbox"],
     queryFn: async () => {
@@ -731,7 +733,7 @@ export function InboxView() {
       
       return (data?.emails || []) as GmailEmail[];
     },
-    enabled: activeTab === "emails",
+    enabled: activeTab === "emails" || activeTab === "all", // Fetch for both All and Emails tabs
     staleTime: 30000,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
@@ -751,7 +753,7 @@ export function InboxView() {
       }
       return data || [];
     },
-    enabled: activeTab === "emails",
+    enabled: activeTab === "emails" || activeTab === "all",
   });
 
   // Create lookup map for user labels
@@ -785,7 +787,7 @@ export function InboxView() {
       }
       return data || [];
     },
-    enabled: activeTab === "emails",
+    enabled: activeTab === "emails" || activeTab === "all",
     staleTime: 60000,
   });
 
@@ -1842,6 +1844,7 @@ export function InboxView() {
 
   // Group communications by contact (for "All" tab - show only latest message per contact)
   // Then group those by date for date separators
+  // Now includes Gmail emails merged with SMS/Calls
   const groupedByContact = useMemo(() => {
     if (activeTab !== "all") return null;
     
@@ -1867,6 +1870,7 @@ export function InboxView() {
       return true;
     });
     
+    // Add SMS/Call communications
     for (const comm of filteredComms) {
       // Create unique key based on contact phone, email, or id
       const key = comm.contact_phone ? normalizePhone(comm.contact_phone) : 
@@ -1874,6 +1878,46 @@ export function InboxView() {
       const existing = contactMap.get(key) || [];
       existing.push(comm);
       contactMap.set(key, existing);
+    }
+    
+    // Convert Gmail emails to CommunicationItem format and add to the map
+    // Only include if filter allows (skip for owner filter, status filters that don't match)
+    if (activeFilter === "all" || activeFilter === "open" || activeFilter === "unread") {
+      const filteredEmails = filteredGmailEmails.filter(email => {
+        // Skip done emails if filtering for open
+        if (activeFilter === "open" && doneGmailIds.has(email.id)) return false;
+        // For unread filter, only show unread emails
+        if (activeFilter === "unread" && (!email.labelIds?.includes('UNREAD') || readGmailIds.has(email.id))) return false;
+        return true;
+      });
+      
+      for (const email of filteredEmails) {
+        const isDone = doneGmailIds.has(email.id);
+        const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
+        
+        const emailAsComm: CommunicationItem = {
+          id: `email-${email.id}`,
+          type: "email",
+          direction: "inbound",
+          body: email.snippet || "",
+          subject: email.subject,
+          created_at: email.date,
+          contact_name: email.fromName || email.from?.split('@')[0] || "Unknown",
+          contact_email: email.from,
+          contact_type: "email",
+          contact_id: email.id,
+          is_resolved: !isUnread,
+          conversation_status: isDone ? "done" : "open",
+          priority: "normal",
+          gmail_email: email, // Store reference to original email for rendering
+        };
+        
+        // Use email address as key for grouping
+        const key = email.from?.toLowerCase() || email.id;
+        const existing = contactMap.get(key) || [];
+        existing.push(emailAsComm);
+        contactMap.set(key, existing);
+      }
     }
     
     // Return only the latest message per contact, sorted by priority then date
@@ -1900,7 +1944,7 @@ export function InboxView() {
       // Finally by date (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [enhancedCommunications, activeFilter, activeTab]);
+  }, [enhancedCommunications, activeFilter, activeTab, filteredGmailEmails, doneGmailIds, readGmailIds]);
 
   // Group "All" tab contacts by date for date separators
   const groupedByContactWithDates = useMemo(() => {
@@ -2290,7 +2334,10 @@ export function InboxView() {
                       <div 
                         key={`${comm.id}-${comm.conversation_status}`}
                         onClick={() => {
-                          if (comm.contact_type === "owner" && comm.owner_id) {
+                          if (comm.contact_type === "email" && comm.gmail_email) {
+                            // Handle email click - open email detail
+                            handleSelectGmailEmailMobile(comm.gmail_email);
+                          } else if (comm.contact_type === "owner" && comm.owner_id) {
                             setSelectedOwnerForDetail({
                               id: comm.owner_id,
                               name: comm.contact_name,
@@ -2323,6 +2370,8 @@ export function InboxView() {
                               ? "bg-gradient-to-br from-purple-500 to-purple-600" 
                               : comm.contact_type === "tenant"
                               ? "bg-gradient-to-br from-blue-500 to-blue-600"
+                              : comm.contact_type === "email"
+                              ? "bg-gradient-to-br from-blue-500 to-blue-600"
                               : "bg-gradient-to-br from-emerald-500 to-emerald-600"
                           }`}>
                             <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
@@ -2353,6 +2402,9 @@ export function InboxView() {
                               {/* Type indicator */}
                               {comm.type === "call" && (
                                 <Phone className="h-3 w-3 text-orange-500 flex-shrink-0" />
+                              )}
+                              {comm.type === "email" && (
+                                <Mail className="h-3 w-3 text-blue-500 flex-shrink-0" />
                               )}
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -3158,10 +3210,10 @@ export function InboxView() {
         )}
       </div>
 
-      {selectedMessage && selectedMessage.contact_phone && <SendSMSDialog open={showSmsReply} onOpenChange={setShowSmsReply} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" || selectedMessage.contact_type === "personal" || selectedMessage.contact_type === "tenant" ? "lead" : selectedMessage.contact_type} contactId={selectedMessage.contact_id} />}
-      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <SendEmailDialog open={showEmailReply} onOpenChange={setShowEmailReply} contactName={selectedMessage.contact_name} contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""} contactType={(selectedMessage.contact_type === "tenant" ? "lead" : selectedMessage.contact_type) as "lead" | "owner"} contactId={selectedMessage.contact_id} replyToSubject={selectedMessage.subject} replyToBody={selectedMessage.body} />}
+      {selectedMessage && selectedMessage.contact_phone && <SendSMSDialog open={showSmsReply} onOpenChange={setShowSmsReply} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" || selectedMessage.contact_type === "personal" || selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "lead" : selectedMessage.contact_type} contactId={selectedMessage.contact_id} />}
+      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <SendEmailDialog open={showEmailReply} onOpenChange={setShowEmailReply} contactName={selectedMessage.contact_name} contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""} contactType={(selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "lead" : selectedMessage.contact_type) as "lead" | "owner"} contactId={selectedMessage.contact_id} replyToSubject={selectedMessage.subject} replyToBody={selectedMessage.body} />}
       <ComposeEmailDialog open={showComposeEmail} onOpenChange={setShowComposeEmail} />
-      {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type === "tenant" ? "personal" : selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
+      {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "personal" : selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
       {selectedMessage && <ConversationNotes open={showNotes} onOpenChange={setShowNotes} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} contactName={selectedMessage.contact_name} />}
       
       {/* Lead Detail Modal */}
