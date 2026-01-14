@@ -2566,6 +2566,9 @@ export function InboxView() {
                             email: comm.contact_email,
                             phone: comm.contact_phone,
                           });
+                        } else if (comm.gmail_email) {
+                          // For Gmail emails in the All tab, select the Gmail email directly
+                          handleSelectGmailEmailMobile(comm.gmail_email);
                         } else {
                           handleSelectMessage(comm);
                         }

@@ -15,6 +15,62 @@ function normalizePhone(phone: string): string {
   return phone.startsWith("+") ? phone : `+${digits}`;
 }
 
+// Team member routing configuration
+interface TeamMember {
+  name: string;
+  aliases: string[];
+  userId: string;
+}
+
+// Detect which team member the caller wants to speak with from call transcript
+function detectTeamMemberFromTranscript(transcript: string, teamMembers: TeamMember[]): TeamMember | null {
+  if (!transcript) return null;
+  
+  const lowerTranscript = transcript.toLowerCase();
+  
+  // Common phrases indicating the caller wants a specific person
+  const intentPhrases = [
+    "speak with", "speak to", "talk to", "talk with", 
+    "reach", "looking for", "trying to reach", "connect me to",
+    "transfer to", "want to speak", "wanna speak", "need to speak",
+    "calling for", "is .* available", "can i speak"
+  ];
+  
+  for (const member of teamMembers) {
+    // Check for direct name mentions with intent phrases
+    const namePatterns = [member.name.toLowerCase(), ...member.aliases.map(a => a.toLowerCase())];
+    
+    for (const name of namePatterns) {
+      // Check if any intent phrase is followed by the name
+      for (const phrase of intentPhrases) {
+        const pattern = new RegExp(`${phrase}\\s+${name}`, "i");
+        if (pattern.test(lowerTranscript)) {
+          console.log(`Detected caller wants to speak with ${member.name} based on phrase: "${phrase} ${name}"`);
+          return member;
+        }
+      }
+      
+      // Check for "human:" line with name (caller says the name)
+      const humanLinePattern = new RegExp(`human:.*${name}`, "im");
+      if (humanLinePattern.test(lowerTranscript)) {
+        // Make sure it's in context of wanting to speak with them
+        const contextPatterns = [
+          new RegExp(`(speak|talk|reach|transfer|connect).*${name}`, "i"),
+          new RegExp(`${name}.*(please|available|there)`, "i"),
+        ];
+        for (const ctx of contextPatterns) {
+          if (ctx.test(lowerTranscript)) {
+            console.log(`Detected caller wants to speak with ${member.name} from human dialogue`);
+            return member;
+          }
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -265,6 +321,38 @@ serve(async (req) => {
       metadata.tenant_phone = tenantMatch.phone;
     }
 
+    // For calls, detect if caller mentioned a specific team member
+    let assignedToUserId: string | null = null;
+    if (commType === "call" && messageBody) {
+      // Fetch team members from user_gmail_labels (they have user assignments)
+      const { data: teamLabels } = await supabase
+        .from("user_gmail_labels")
+        .select("user_id, label_name");
+      
+      if (teamLabels && teamLabels.length > 0) {
+        // Build team members list with aliases
+        const teamMembers: TeamMember[] = teamLabels.map(label => ({
+          name: label.label_name,
+          aliases: [
+            label.label_name.toLowerCase(),
+            // Common misspellings/variations
+            ...(label.label_name.toLowerCase() === "anja" ? ["onion", "anya", "anja"] : []),
+            ...(label.label_name.toLowerCase() === "ingo" ? ["ingot", "ingo"] : []),
+            ...(label.label_name.toLowerCase() === "alex" ? ["alex", "alexander"] : []),
+          ],
+          userId: label.user_id,
+        }));
+        
+        const detectedMember = detectTeamMemberFromTranscript(messageBody, teamMembers);
+        if (detectedMember) {
+          assignedToUserId = detectedMember.userId;
+          metadata.auto_routed_to = detectedMember.name;
+          metadata.routing_reason = "caller_requested";
+          console.log(`Auto-routing call to ${detectedMember.name} (${detectedMember.userId})`);
+        }
+      }
+    }
+
     // Create lead_communications record
     const { data: comm, error: commError } = await supabase
       .from("lead_communications")
@@ -281,6 +369,8 @@ serve(async (req) => {
         call_duration: callDuration,
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
         metadata: Object.keys(metadata).length > 0 ? metadata : null,
+        assigned_to: assignedToUserId,
+        assigned_at: assignedToUserId ? new Date().toISOString() : null,
       })
       .select()
       .single();
@@ -290,7 +380,8 @@ serve(async (req) => {
       throw commError;
     }
 
-    console.log("Communication record created:", comm.id);
+    console.log("Communication record created:", comm.id, assignedToUserId ? `(routed to ${assignedToUserId})` : "(unassigned)");
+
 
     // Update lead if we found one
     if (lead) {
