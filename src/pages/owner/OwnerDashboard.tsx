@@ -270,28 +270,37 @@ export default function OwnerDashboard() {
     
     // Demo owner ID - always allow direct access without authentication
     const DEMO_OWNER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
     
-    if (token) {
+    // Check if this is the demo portal - set up session immediately for instant access
+    const isDemo = ownerIdParam === DEMO_OWNER_ID;
+    
+    if (isDemo) {
+      console.log("Demo portal detected - initializing immediately");
+      // Set demo session and admin access immediately to prevent any flash of "no access"
+      setIsAdminAccess(true);
+      setSession({
+        ownerId: DEMO_OWNER_ID,
+        ownerName: "Sara Thompson",
+        email: "sara.thompson@demo.com",
+        propertyId: DEMO_PROPERTY_ID,
+        propertyName: "3069 Rita Way Retreat",
+        secondOwnerName: "Michael Thompson",
+        secondOwnerEmail: "michael.thompson@demo.com",
+      });
+      // Load data in the background - don't block the UI
+      loadAllData(DEMO_OWNER_ID, null).catch(err => {
+        console.error("Demo data load error:", err);
+        // For demo, we can still show the UI even if data load fails
+        setLoading(false);
+      });
+    } else if (token) {
       setSessionToken(token);
       loadAllDataWithToken(token);
     } else if (ownerIdParam) {
-      // Admin/demo access - load data directly by owner ID (no token required)
-      console.log("Admin/Demo access mode - loading owner:", ownerIdParam);
+      // Admin access - load data directly by owner ID (no token required)
+      console.log("Admin access mode - loading owner:", ownerIdParam);
       setIsAdminAccess(true);
-      
-      // For demo owner, also set a temporary session immediately to prevent "no access" screen
-      if (ownerIdParam === DEMO_OWNER_ID) {
-        setSession({
-          ownerId: DEMO_OWNER_ID,
-          ownerName: "Sara Thompson",
-          email: "sara.thompson@demo.com",
-          propertyId: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-          propertyName: "3069 Rita Way Retreat",
-          secondOwnerName: "Michael Thompson",
-          secondOwnerEmail: "michael.thompson@demo.com",
-        });
-      }
-      
       loadAllData(ownerIdParam, null);
     } else {
       const storedSession = localStorage.getItem("owner_session");
@@ -677,7 +686,10 @@ export default function OwnerDashboard() {
     return data?.publicUrl;
   }, [property?.image_path, property?.id]);
 
-  if (loading) {
+  // For demo mode with session already set, don't block with loading screen - show dashboard with loading indicator
+  const isDemoWithSession = isAdminAccess && session?.ownerId === "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+  
+  if (loading && !isDemoWithSession) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-6 text-center p-8">
