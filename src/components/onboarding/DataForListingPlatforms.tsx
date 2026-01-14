@@ -26,6 +26,9 @@ interface ListingData {
   vrboUrl: string;
   directBookingWebsite: string;
   icalUrl: string;
+  bookingUrl: string;
+  furnishedFinderUrl: string;
+  zillowUrl: string;
   
   // Basic Info
   propertyAddress: string;
@@ -43,6 +46,13 @@ interface ListingData {
   bedrooms: string;
   bathrooms: string;
   sqft: string;
+  yearBuilt: string;
+  pool: string;
+  furnished: string;
+  maxOccupancy: string;
+  wifiSSID: string;
+  wifiPassword: string;
+  uniqueSellingPoints: string;
   
   // Pet Info
   petsAllowed: string;
@@ -65,12 +75,23 @@ interface ListingData {
   leaseTerm: string;
   noticeToVacate: string;
   
-  // Contact & Web
+  // Contact Information
   contactEmail: string;
+  contactPhone: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  primaryCleanerName: string;
+  primaryCleanerPhone: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
   
   // Assets
   propertyPhotos: string;
   listingDescriptions: string;
+  virtualTour: string;
+  floorplan: string;
+  videoTour: string;
 }
 
 export const DataForListingPlatforms = ({
@@ -146,31 +167,41 @@ export const DataForListingPlatforms = ({
       // Build listing data object - PRIORITIZE task values over property data
       const data: ListingData = {
         // Listing URLs first
-        airbnbUrl: getTaskValue("Airbnb") || "",
+        airbnbUrl: getTaskValue("Airbnb") || getTaskValue("Airbnb - 1 year Listing") || getTaskValue("Airbnb – 1-Year Listing") || "",
         vrboUrl: getTaskValue("VRBO") || "",
-        directBookingWebsite: getTaskValue("Direct Booking Website") || propertyData?.website_url || "",
+        directBookingWebsite: getTaskValue("Direct Booking Website") || getTaskValue("Direct Booking Page") || propertyData?.website_url || "",
         icalUrl: getTaskValue("iCal Feed URL") || propertyInfo?.ical_url || "",
+        bookingUrl: getTaskValue("Booking.com") || getTaskValue("Booking") || "",
+        furnishedFinderUrl: getTaskValue("Furnished Finder") || "",
+        zillowUrl: getTaskValue("Zillow") || "",
         
         propertyAddress: propertyData?.address || "",
         brandName: getTaskValue("Brand Name") || propertyData?.brand_name || "",
         rentalType: propertyData?.rental_type || "",
-        propertyTypeDetail: getTaskValue("Property Type Detail") || propertyData?.property_type_detail || "",
-        stories: getTaskValue("Stories") || propertyData?.stories || "",
-        parking: getTaskValue("Parking Type") ? `${getTaskValue("Parking Type")} - ${getTaskValue("Parking Capacity")} spaces` : (propertyData?.parking_type ? `${propertyData.parking_type} - ${propertyData.parking_spaces} spaces` : ""),
+        propertyTypeDetail: getTaskValue("Property Type Detail") || getTaskValue("House Type") || propertyData?.property_type_detail || "",
+        stories: getTaskValue("Stories") || getTaskValue("Number of Stories") || propertyData?.stories || "",
+        parking: getTaskValue("Parking Type") ? `${getTaskValue("Parking Type")} - ${getTaskValue("Parking Capacity") || getTaskValue("Parking Spaces")} spaces` : (propertyData?.parking_type ? `${propertyData.parking_type} - ${propertyData.parking_spaces} spaces` : ""),
         elementarySchool: getTaskValue("Elementary School") || propertyData?.elementary_school || "",
         middleSchool: getTaskValue("Middle School") || propertyData?.middle_school || "",
         highSchool: getTaskValue("High School") || propertyData?.high_school || "",
         adaCompliant: getTaskValue("ADA Compliant") || "",
-        basement: propertyData?.basement ? "Yes" : "No",
+        basement: getTaskValue("Basement") || (propertyData?.basement ? "Yes" : "No"),
         fencedYard: getTaskValue("Fenced Yard") || propertyData?.fenced_yard || "",
-        bedrooms: getTaskValue("Bedrooms") || propertyData?.bedrooms?.toString() || "",
-        bathrooms: getTaskValue("Bathrooms") || propertyData?.bathrooms?.toString() || "",
+        bedrooms: getTaskValue("Bedrooms") || getTaskValue("Number of Bedrooms") || propertyData?.bedrooms?.toString() || "",
+        bathrooms: getTaskValue("Bathrooms") || getTaskValue("Number of Bathrooms") || propertyData?.bathrooms?.toString() || "",
         sqft: getTaskValue("Square Footage") || propertyData?.sqft?.toString() || "",
+        yearBuilt: getTaskValue("Year Built") || "",
+        pool: getTaskValue("Pool") || getTaskValue("Pool/Hot Tub Information") || "",
+        furnished: getTaskValue("Furnished") || "",
+        maxOccupancy: getTaskValue("Max Occupancy") || "",
+        wifiSSID: getTaskValue("WiFi SSID") || "",
+        wifiPassword: getTaskValue("WiFi password") || "",
+        uniqueSellingPoints: getTaskValue("Unique Selling Points") || getTaskValue("Unique selling points of property") || "",
         
         petsAllowed: getTaskValue("Pets Allowed") || (propertyData?.pets_allowed ? "Yes" : "No"),
-        petRules: getTaskValue("Pet Rules") || propertyData?.pet_rules || "",
+        petRules: getTaskValue("Pet Rules") || getTaskValue("Pet policy") || propertyData?.pet_rules || "",
         maxPets: getTaskValue("Maximum Number of Pets") || propertyData?.max_pets?.toString() || "",
-        maxPetWeight: getTaskValue("Maximum Pet Weight (lbs)") || propertyData?.max_pet_weight?.toString() || "",
+        maxPetWeight: getTaskValue("Maximum Pet Weight (lbs)") || getTaskValue("Pet size restrictions") || propertyData?.max_pet_weight?.toString() || "",
         
         monthlyRent: getTaskValue("Monthly Rent") || (propertyData?.monthly_rent ? `$${propertyData.monthly_rent}` : ""),
         nightlyRate: getTaskValue("Nightly Rate") || (propertyData?.nightly_rate ? `$${propertyData.nightly_rate}` : ""),
@@ -185,10 +216,23 @@ export const DataForListingPlatforms = ({
         leaseTerm: getTaskValue("Lease Term") || propertyData?.lease_term || "",
         noticeToVacate: getTaskValue("Notice to Vacate") || propertyData?.notice_to_vacate || "",
         
+        // Contact Information - expanded
         contactEmail: getTaskValue("Contact Email") || propertyData?.contact_email || "",
+        contactPhone: getTaskValue("Contact Phone") || "",
+        ownerName: getTaskValue("Owner Name") || "",
+        ownerEmail: getTaskValue("Owner Email") || "",
+        ownerPhone: getTaskValue("Owner Phone") || "",
+        primaryCleanerName: getTaskValue("Primary cleaner name") || "",
+        primaryCleanerPhone: getTaskValue("Primary cleaner phone number") || "",
+        emergencyContactName: getTaskValue("Emergency Contact Name") || "",
+        emergencyContactPhone: getTaskValue("Emergency Contact Phone") || "",
         
-        propertyPhotos: getTaskValue("Upload professional photos") || getTaskValue("Link to existing photos") || "",
-        listingDescriptions: getTaskValue("Digital guidebook published") || ""
+        // Assets - expanded
+        propertyPhotos: getTaskValue("Upload professional photos") || getTaskValue("Link to existing photos") || getTaskValue("Existing Photos Link") || getTaskValue("Professional Photos") || "",
+        listingDescriptions: getTaskValue("Digital guidebook published") || getTaskValue("Listing Description") || "",
+        virtualTour: getTaskValue("Virtual Tour") || getTaskValue("Virtual walkthrough created/uploaded") || "",
+        floorplan: getTaskValue("Floorplan") || "",
+        videoTour: getTaskValue("Video Tour") || ""
       };
 
       console.log("Built listing data:", data);
@@ -303,6 +347,9 @@ export const DataForListingPlatforms = ({
                 <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Airbnb URL" value={listingData.airbnbUrl} />
                   <DataRow label="VRBO URL" value={listingData.vrboUrl} />
+                  <DataRow label="Booking.com URL" value={listingData.bookingUrl} />
+                  <DataRow label="Furnished Finder URL" value={listingData.furnishedFinderUrl} />
+                  <DataRow label="Zillow URL" value={listingData.zillowUrl} />
                   <DataRow label="Direct Booking Website" value={listingData.directBookingWebsite} />
                   <DataRow label="iCal Feed URL" value={listingData.icalUrl} />
                 </CardContent>
@@ -318,14 +365,21 @@ export const DataForListingPlatforms = ({
                   <DataRow label="Brand Name" value={listingData.brandName} />
                   <DataRow label="STR/MTR" value={listingData.rentalType} />
                   <DataRow label="House Type" value={listingData.propertyTypeDetail} />
-                  <DataRow label="Stories" value={listingData.stories} />
-                  <DataRow label="Parking" value={listingData.parking} />
                   <DataRow label="Bedrooms" value={listingData.bedrooms} />
                   <DataRow label="Bathrooms" value={listingData.bathrooms} />
                   <DataRow label="Square Footage" value={listingData.sqft} />
+                  <DataRow label="Stories" value={listingData.stories} />
+                  <DataRow label="Year Built" value={listingData.yearBuilt} />
+                  <DataRow label="Max Occupancy" value={listingData.maxOccupancy} />
+                  <DataRow label="Parking" value={listingData.parking} />
+                  <DataRow label="Pool/Hot Tub" value={listingData.pool} />
+                  <DataRow label="Furnished" value={listingData.furnished} />
                   <DataRow label="ADA Compliant" value={listingData.adaCompliant} />
                   <DataRow label="Basement" value={listingData.basement} />
                   <DataRow label="Fenced Yard" value={listingData.fencedYard} />
+                  <DataRow label="WiFi Network (SSID)" value={listingData.wifiSSID} />
+                  <DataRow label="WiFi Password" value={listingData.wifiPassword} />
+                  <DataRow label="Unique Selling Points" value={listingData.uniqueSellingPoints} />
                 </CardContent>
               </Card>
 
@@ -389,7 +443,15 @@ export const DataForListingPlatforms = ({
                   <CardTitle className="text-sm max-md:text-lg">Contact Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-0 px-4 max-md:px-4">
+                  <DataRow label="Owner Name" value={listingData.ownerName} />
+                  <DataRow label="Owner Email" value={listingData.ownerEmail} />
+                  <DataRow label="Owner Phone" value={listingData.ownerPhone} />
                   <DataRow label="Contact Email" value={listingData.contactEmail} />
+                  <DataRow label="Contact Phone" value={listingData.contactPhone} />
+                  <DataRow label="Primary Cleaner" value={listingData.primaryCleanerName} />
+                  <DataRow label="Cleaner Phone" value={listingData.primaryCleanerPhone} />
+                  <DataRow label="Emergency Contact" value={listingData.emergencyContactName} />
+                  <DataRow label="Emergency Phone" value={listingData.emergencyContactPhone} />
                 </CardContent>
               </Card>
 
@@ -400,6 +462,9 @@ export const DataForListingPlatforms = ({
                 </CardHeader>
                 <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Property Photos" value={listingData.propertyPhotos} />
+                  <DataRow label="Virtual Tour" value={listingData.virtualTour} />
+                  <DataRow label="Video Tour" value={listingData.videoTour} />
+                  <DataRow label="Floorplan" value={listingData.floorplan} />
                   <DataRow label="Listing Descriptions" value={listingData.listingDescriptions} />
                 </CardContent>
               </Card>
