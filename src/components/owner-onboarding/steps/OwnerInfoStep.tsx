@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OwnerOnboardingFormData } from '@/types/owner-onboarding';
-import { Home, User } from 'lucide-react';
+import { Home, User, GraduationCap } from 'lucide-react';
 
 interface StepProps {
   formData: OwnerOnboardingFormData;
@@ -347,6 +347,59 @@ export function OwnerInfoStep({ formData, updateFormData }: StepProps) {
                 id="ada_compliant"
                 checked={formData.ada_compliant}
                 onCheckedChange={(checked) => updateFormData({ ada_compliant: checked })}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Nearby Schools Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <GraduationCap className="w-5 h-5 text-primary" />
+            Nearby Schools
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Listing nearby schools helps attract families (optional)
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="elementary_school" className="text-sm font-medium">
+                Elementary School
+              </Label>
+              <Input
+                id="elementary_school"
+                value={formData.elementary_school}
+                onChange={(e) => updateFormData({ elementary_school: e.target.value })}
+                placeholder="e.g., Peachtree Elementary"
+                className="h-14 mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="middle_school" className="text-sm font-medium">
+                Middle School
+              </Label>
+              <Input
+                id="middle_school"
+                value={formData.middle_school}
+                onChange={(e) => updateFormData({ middle_school: e.target.value })}
+                placeholder="e.g., Sutton Middle"
+                className="h-14 mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="high_school" className="text-sm font-medium">
+                High School
+              </Label>
+              <Input
+                id="high_school"
+                value={formData.high_school}
+                onChange={(e) => updateFormData({ high_school: e.target.value })}
+                placeholder="e.g., North Atlanta High"
+                className="h-14 mt-1"
               />
             </div>
           </div>

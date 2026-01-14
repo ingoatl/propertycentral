@@ -106,20 +106,38 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   pool_type: { phase: 10, title: 'Pool' },
   property_features: { phase: 10, title: 'Property Features & Amenities' },
   neighbor_notes: { phase: 10, title: 'Neighbor Notes' },
+  
+  // Schools (both snake_case and camelCase for compatibility)
+  elementary_school: { phase: 10, title: 'Elementary School' },
+  middle_school: { phase: 10, title: 'Middle School' },
+  high_school: { phase: 10, title: 'High School' },
+  elementarySchool: { phase: 10, title: 'Elementary School' },
+  middleSchool: { phase: 10, title: 'Middle School' },
+  highSchool: { phase: 10, title: 'High School' },
 
   // Phase 11: Pricing & Financial
   rental_strategy: { phase: 11, title: 'Rental Strategy' },
+  rentalStrategy: { phase: 11, title: 'Rental Strategy' },
   target_guest_avatar: { phase: 11, title: 'Target Guest Avatar' },
+  targetGuestAvatar: { phase: 11, title: 'Target Guest Avatar' },
   pricing_goal: { phase: 11, title: 'Pricing Goal' },
+  pricingGoal: { phase: 11, title: 'Pricing Goal' },
   expected_adr: { phase: 11, title: 'Expected Nightly Rate' },
+  expectedAdr: { phase: 11, title: 'Expected Nightly Rate' },
   minimum_stay: { phase: 11, title: 'Minimum Stay' },
+  minimumStay: { phase: 11, title: 'Minimum Stay' },
   max_guests: { phase: 11, title: 'Maximum Guests' },
+  maxGuests: { phase: 11, title: 'Maximum Guests' },
 
   // Phase 12: House Rules & Policies
   house_rules: { phase: 12, title: 'House Rules' },
+  houseRules: { phase: 12, title: 'House Rules' },
   pet_policy: { phase: 12, title: 'Pet Policy' },
+  petPolicy: { phase: 12, title: 'Pet Policy' },
   pet_deposit: { phase: 12, title: 'Pet Fee' },
+  petDeposit: { phase: 12, title: 'Pet Fee' },
   pet_size_restrictions: { phase: 12, title: 'Pet Size Restrictions' },
+  petSizeRestrictions: { phase: 12, title: 'Pet Size Restrictions' },
 };
 
 const PHASE_TITLES: Record<number, string> = {
