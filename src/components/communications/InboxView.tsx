@@ -39,6 +39,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
+import { formatPhoneForDisplay } from "@/lib/phoneUtils";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -2934,7 +2935,7 @@ export function InboxView() {
             if (!open) setVoiceAICallerPhone(null);
           }}
           phoneNumber={voiceAICallerPhone || selectedMessage?.contact_phone || ""}
-          contactName={voiceAICallerPhone ? `Caller ${voiceAICallerPhone}` : selectedMessage?.contact_name || "Unknown"}
+          contactName={voiceAICallerPhone ? `Caller ${formatPhoneForDisplay(voiceAICallerPhone)}` : selectedMessage?.contact_name || "Unknown"}
           metadata={selectedMessage?.contact_type === "lead" ? { leadId: selectedMessage.contact_id } : undefined}
         />
       )}
