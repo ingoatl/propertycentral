@@ -120,14 +120,58 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     setSearchQuery("");
   };
 
-  const handleSelectContact = async (contact: ContactRecord) => {
+  const handleCallContact = async (contact: ContactRecord, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (contact.phone) {
       const cleanedPhone = cleanPhoneNumber(contact.phone);
       setPhoneNumber(cleanedPhone);
       setSelectedContact(contact);
       setView('dialer');
-      // Automatically initiate the call
       await makeCall(cleanedPhone);
+    }
+  };
+
+  const handleTextContact = async (contact: ContactRecord, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!contact.phone) {
+      toast.error("No phone number available");
+      return;
+    }
+
+    const message = prompt("Enter your message:");
+    if (!message) return;
+
+    setIsSendingSMS(true);
+    try {
+      let formattedPhone = cleanPhoneNumber(contact.phone);
+      if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
+        formattedPhone = '1' + formattedPhone;
+      }
+      formattedPhone = '+' + formattedPhone;
+
+      const { error } = await supabase.functions.invoke('send-review-sms', {
+        body: {
+          to: formattedPhone,
+          body: message,
+        }
+      });
+
+      if (error) throw error;
+      toast.success('SMS sent successfully');
+    } catch (error) {
+      console.error('Failed to send SMS:', error);
+      toast.error('Failed to send SMS');
+    } finally {
+      setIsSendingSMS(false);
+    }
+  };
+
+  const handleSelectContact = (contact: ContactRecord) => {
+    if (contact.phone) {
+      const cleanedPhone = cleanPhoneNumber(contact.phone);
+      setPhoneNumber(cleanedPhone);
+      setSelectedContact(contact);
+      setView('dialer');
     }
   };
 
@@ -235,7 +279,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                         onSelect={() => handleSelectContact(contact)}
                         className={cn(
                           "cursor-pointer",
-                          isMobile ? "py-4 px-3" : ""
+                          isMobile ? "py-4 px-3" : "py-2"
                         )}
                       >
                         <div className="flex items-center gap-3 flex-1">
@@ -250,21 +294,47 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={cn(
-                              "font-medium truncate",
-                              isMobile ? "text-base" : "text-sm"
-                            )}>{contact.name}</p>
-                            {contact.address && (
+                            <div className="flex items-center gap-2">
                               <p className={cn(
-                                "text-muted-foreground truncate",
-                                isMobile ? "text-sm" : "text-xs"
-                              )}>{contact.address}</p>
-                            )}
+                                "font-medium truncate",
+                                isMobile ? "text-base" : "text-sm"
+                              )}>{contact.name}</p>
+                              <span className={cn(
+                                "px-1.5 py-0.5 rounded text-xs shrink-0",
+                                contact.type === 'owner' ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"
+                              )}>{contact.type}</span>
+                            </div>
+                            <p className={cn(
+                              "text-muted-foreground",
+                              isMobile ? "text-sm" : "text-xs"
+                            )}>{formatPhoneForDisplay(contact.phone)}</p>
                           </div>
-                          <span className={cn(
-                            "text-muted-foreground shrink-0",
-                            isMobile ? "text-sm" : "text-xs"
-                          )}>{formatPhoneForDisplay(contact.phone)}</span>
+                          <div className="flex gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                "rounded-full bg-green-100 hover:bg-green-200 text-green-700",
+                                isMobile ? "h-10 w-10" : "h-8 w-8"
+                              )}
+                              onClick={(e) => handleCallContact(contact, e)}
+                              disabled={isConnecting}
+                            >
+                              <Phone className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                "rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700",
+                                isMobile ? "h-10 w-10" : "h-8 w-8"
+                              )}
+                              onClick={(e) => handleTextContact(contact, e)}
+                              disabled={isSendingSMS}
+                            >
+                              <MessageSquare className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+                            </Button>
+                          </div>
                         </div>
                       </CommandItem>
                     ))}
