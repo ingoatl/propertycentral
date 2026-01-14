@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Copy, Check, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface DataForListingPlatformsProps {
@@ -272,7 +272,7 @@ export const DataForListingPlatforms = ({
 
   return (
     <ResponsiveModal open={open} onOpenChange={onOpenChange}>
-      <ResponsiveModalContent className="max-w-4xl p-0">
+      <ResponsiveModalContent className="max-w-4xl p-0 h-[90vh] max-md:h-[95vh]">
         <ResponsiveModalHeader className="p-4 md:p-6 pb-2 flex-shrink-0">
           <ResponsiveModalTitle className="text-lg md:text-xl">
             Listing Data - {propertyName}
@@ -293,7 +293,7 @@ export const DataForListingPlatforms = ({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : listingData ? (
-          <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] max-md:max-h-[calc(95vh-160px)]">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 pb-6">
             <div className="space-y-4 max-md:space-y-3 px-4 md:px-6 pb-6">
               {/* Listing URLs - Priority Section */}
               <Card className="border-primary/20">
@@ -404,7 +404,7 @@ export const DataForListingPlatforms = ({
                 </CardContent>
               </Card>
             </div>
-          </ScrollArea>
+          </div>
         ) : (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             No listing data available
