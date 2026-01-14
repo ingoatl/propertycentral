@@ -32,6 +32,7 @@ interface EnhancedInboxSelectorProps {
   onViewChange: (view: InboxView) => void;
   currentUserId: string | null;
   className?: string;
+  isAdmin?: boolean; // Only admins can see "All Communications"
 }
 
 export function EnhancedInboxSelector({
@@ -39,6 +40,7 @@ export function EnhancedInboxSelector({
   onViewChange,
   currentUserId,
   className,
+  isAdmin = false,
 }: EnhancedInboxSelectorProps) {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -233,21 +235,24 @@ export function EnhancedInboxSelector({
           )}
         </DropdownMenuItem>
 
-        <DropdownMenuItem
-          onClick={() => {
-            onViewChange("all");
-            setIsOpen(false);
-          }}
-          className={cn("gap-2", selectedView === "all" && "bg-accent")}
-        >
-          <Users className="h-4 w-4" />
-          <span className="flex-1">All Communications</span>
-          {totalUnread > 0 && (
-            <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">
-              {totalUnread}
-            </Badge>
-          )}
-        </DropdownMenuItem>
+        {/* Only show "All Communications" option for admins */}
+        {isAdmin && (
+          <DropdownMenuItem
+            onClick={() => {
+              onViewChange("all");
+              setIsOpen(false);
+            }}
+            className={cn("gap-2", selectedView === "all" && "bg-accent")}
+          >
+            <Users className="h-4 w-4" />
+            <span className="flex-1">All Communications</span>
+            {totalUnread > 0 && (
+              <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">
+                {totalUnread}
+              </Badge>
+            )}
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuItem
           onClick={() => {
