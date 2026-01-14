@@ -309,7 +309,21 @@ serve(async (req) => {
       if (meetingLink) {
         console.log(`[GHL Calendar Sync] Final meeting link: ${meetingLink}`);
       } else {
-        console.log(`[GHL Calendar Sync] No meeting link found for event: ${apt.title || apt.id}`);
+        // Check if this is a video/virtual meeting type - use default link
+        const aptTitle = (apt.title as string || "").toLowerCase();
+        const calendarName = (apt.calendarName as string || "").toLowerCase();
+        const isVideoMeeting = aptTitle.includes('video') || aptTitle.includes('virtual') || 
+                               aptTitle.includes('online') || aptTitle.includes('discovery') ||
+                               aptTitle.includes('call') || aptTitle.includes('meeting') ||
+                               calendarName.includes('video') || calendarName.includes('virtual') ||
+                               calendarName.includes('discovery');
+        
+        if (isVideoMeeting) {
+          meetingLink = "https://meet.google.com/jww-deey-iaa";
+          console.log(`[GHL Calendar Sync] Using default meet link for video meeting: ${apt.title}`);
+        } else {
+          console.log(`[GHL Calendar Sync] No meeting link found for event: ${apt.title || apt.id}`);
+        }
       }
 
       // Build enriched appointment

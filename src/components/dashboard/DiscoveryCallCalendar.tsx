@@ -695,35 +695,100 @@ export function DiscoveryCallCalendar() {
   );
 }
 
-// Helper to extract Google Meet link from various sources
+// Default Google Meet link for video appointments
+const DEFAULT_VIDEO_MEETING_LINK = "https://meet.google.com/jww-deey-iaa";
+
+// Helper to format time in Eastern timezone with EST/EDT indicator
+function formatEasternTime(date: Date): string {
+  // Use Intl.DateTimeFormat for proper timezone handling
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short',
+  });
+  return formatter.format(date);
+}
+
+function formatEasternDateTime(date: Date): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short',
+  });
+  return formatter.format(date);
+}
+
+// Helper to extract Google Meet link from various sources - checks ALL possible GHL fields
 function extractMeetLink(appointment: GhlAppointment): string | null {
   // First check the dedicated meeting_link field from the sync
   if (appointment.meeting_link) {
     return appointment.meeting_link;
   }
   
-  // Fallback: search in other fields
-  const sources = [
+  // Extensive search through all possible GHL fields
+  // Cast to unknown first to avoid TypeScript strictness
+  const rawApt = appointment as unknown as Record<string, unknown>;
+  const sources: (string | undefined | null)[] = [
+    // Primary video conference fields
+    rawApt.meetUrl as string,
+    rawApt.conferenceUrl as string,
+    rawApt.hangoutLink as string,
+    rawApt.videoUrl as string,
+    rawApt.meetingUrl as string,
+    rawApt.zoomUrl as string,
+    rawApt.teamsUrl as string,
+    rawApt.joinUrl as string,
+    rawApt.calendarLink as string,
+    rawApt.video_conference_url as string,
+    // Standard text fields
     appointment.location,
     appointment.notes,
     appointment.title,
     appointment.lead_notes,
+    rawApt.description as string,
+    rawApt.internal_notes as string,
   ];
   
+  // Check calendarLinks object if present
+  if (rawApt.calendarLinks && typeof rawApt.calendarLinks === 'object') {
+    const calLinks = rawApt.calendarLinks as Record<string, unknown>;
+    sources.push(calLinks.hangoutLink as string, calLinks.meetUrl as string, calLinks.videoUrl as string);
+  }
+  
   for (const source of sources) {
-    if (source) {
+    if (source && typeof source === 'string') {
       // Match Google Meet links
       const meetMatch = source.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
       if (meetMatch) return meetMatch[0];
       
-      // Match Zoom links
-      const zoomMatch = source.match(/https:\/\/[\w.-]*zoom\.us\/[a-z0-9/?=&-]+/i);
+      // Match Zoom links (various formats)
+      const zoomMatch = source.match(/https:\/\/[\w.-]*zoom\.us\/(?:j|my|w)\/[a-z0-9/?=&-]+/i);
       if (zoomMatch) return zoomMatch[0];
       
       // Match Teams links
-      const teamsMatch = source.match(/https:\/\/teams\.microsoft\.com\/[a-z0-9/?=&-]+/i);
+      const teamsMatch = source.match(/https:\/\/teams\.(?:microsoft|live)\.com\/[a-z0-9/?=&-]+/i);
       if (teamsMatch) return teamsMatch[0];
+      
+      // Match Webex links
+      const webexMatch = source.match(/https:\/\/[\w.-]*webex\.com\/[a-z0-9/?=&-]+/i);
+      if (webexMatch) return webexMatch[0];
     }
+  }
+  
+  // For GHL appointments with video/virtual meeting type, use default meet link
+  const title = appointment.title?.toLowerCase() || '';
+  const calendarName = appointment.calendar_name?.toLowerCase() || '';
+  if (title.includes('video') || title.includes('virtual') || title.includes('online') ||
+      calendarName.includes('video') || calendarName.includes('virtual') || calendarName.includes('discovery')) {
+    return DEFAULT_VIDEO_MEETING_LINK;
   }
   
   return null;
@@ -806,8 +871,8 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
                   {appointment.title || "GHL Appointment"}
                 </span>
                 <p className="text-sm font-normal text-muted-foreground">
-                  {format(scheduledAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}
-                  {endTime && ` - ${format(endTime, "h:mm a")}`}
+                  {formatEasternDateTime(scheduledAt)}
+                  {endTime && ` - ${formatEasternTime(endTime)}`}
                 </p>
                 <Badge className="mt-1 bg-cyan-500 text-white">
                   <CalendarCheck className="h-3 w-3 mr-1" />
@@ -1230,7 +1295,7 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
                   )}
                 </span>
                 <p className="text-sm font-normal text-muted-foreground">
-                  {format(scheduledAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}
+                  {formatEasternDateTime(scheduledAt)}
                 </p>
                 {isInspection && (
                   <Badge className="mt-1 bg-amber-500 text-white">
