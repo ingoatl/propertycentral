@@ -13,6 +13,44 @@ const formatDate = (dateStr: string | null) => {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
+// Normalize phone to last 10 digits for comparison
+const normalizePhone = (phone: string | null | undefined): string => {
+  if (!phone) return "";
+  return phone.replace(/\D/g, "").slice(-10);
+};
+
+// Extract phone from any nested object structure
+const extractPhonesFromObject = (obj: any, phones: Set<string>): void => {
+  if (!obj || typeof obj !== 'object') return;
+  
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.length >= 10) {
+      // Check if this looks like a phone number
+      const digits = value.replace(/\D/g, '');
+      if (digits.length >= 10 && digits.length <= 15) {
+        phones.add(normalizePhone(value));
+      }
+    } else if (typeof value === 'object') {
+      extractPhonesFromObject(value, phones);
+    }
+  }
+};
+
+// Extract emails from any nested object structure
+const extractEmailsFromObject = (obj: any, emails: Set<string>): void => {
+  if (!obj || typeof obj !== 'object') return;
+  
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.includes('@') && value.includes('.')) {
+      emails.add(value.toLowerCase());
+    } else if (typeof value === 'object') {
+      extractEmailsFromObject(value, emails);
+    }
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -217,81 +255,149 @@ serve(async (req) => {
       );
     }
 
-    console.log("Searching for communications with:", { searchPhone, searchEmail, leadId, ownerId });
-
-    // Now fetch ALL communications - don't filter by lead_id/owner_id restrictions
-    // This captures all messages for this contact regardless of how they were linked
-    const { data: allComms, error: commsError } = await supabase
-      .from("lead_communications")
-      .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
-      .order("created_at", { ascending: true });
-
-    if (commsError) {
-      console.error("Error fetching communications:", commsError);
-      throw new Error("Failed to fetch communications");
-    }
-
-    console.log("Total communications in database:", allComms?.length || 0);
-
-    // Filter to find all messages related to this contact
-    const normalizePhone = (phone: string | null) => {
-      if (!phone) return "";
-      return phone.replace(/\D/g, "").slice(-10); // Last 10 digits
-    };
-
     const searchPhoneNormalized = normalizePhone(searchPhone);
     const searchEmailLower = searchEmail?.toLowerCase();
 
-    communications = (allComms || []).filter(comm => {
-      // Direct match by lead_id or owner_id
-      if (leadId && comm.lead_id === leadId) return true;
-      if (ownerId && comm.owner_id === ownerId) return true;
-
-      const meta = comm.metadata || {};
-      const ghlData = meta.ghl_data || {};
-
-      // Match by phone number in metadata - check multiple possible locations
-      if (searchPhoneNormalized) {
-        const phonesToCheck = [
-          meta.from_number,
-          meta.to_number,
-          meta.phone,
-          meta.contactPhone,
-          ghlData.contactPhone,
-          ghlData.from,
-          ghlData.to,
-        ];
-        
-        for (const phone of phonesToCheck) {
-          if (phone && normalizePhone(phone) === searchPhoneNormalized) {
-            return true;
-          }
-        }
-      }
-
-      // Match by email in metadata - check multiple possible locations
-      if (searchEmailLower) {
-        const emailsToCheck = [
-          meta.from_email,
-          meta.to_email,
-          meta.email,
-          meta.contactEmail,
-          ghlData.contactEmail,
-          ghlData.from,
-          ghlData.to,
-        ];
-        
-        for (const email of emailsToCheck) {
-          if (email && email.toLowerCase() === searchEmailLower) {
-            return true;
-          }
-        }
-      }
-
-      return false;
+    console.log("Searching for communications with:", { 
+      searchPhoneNormalized, 
+      searchEmailLower, 
+      leadId, 
+      ownerId 
     });
 
+    // STRATEGY: Use targeted queries instead of fetching all 
+    // Query 1: Direct match by lead_id or owner_id
+    if (leadId) {
+      const { data: directComms } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: true });
+      if (directComms?.length) {
+        communications.push(...directComms);
+      }
+    }
+    
+    if (ownerId) {
+      const { data: ownerComms } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+        .eq("owner_id", ownerId)
+        .order("created_at", { ascending: true });
+      if (ownerComms?.length) {
+        communications.push(...ownerComms);
+      }
+    }
+
+    // Query 2: Search by phone number in metadata (using JSONB containment)
+    if (searchPhoneNormalized) {
+      // Try multiple phone formats
+      const phoneFormats = [
+        `+1${searchPhoneNormalized}`,
+        searchPhoneNormalized,
+        `1${searchPhoneNormalized}`,
+      ];
+      
+      for (const phoneFormat of phoneFormats) {
+        // Search in metadata->ghl_data->contactPhone
+        const { data: phoneComms } = await supabase
+          .from("lead_communications")
+          .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+          .filter("metadata->ghl_data->>contactPhone", "ilike", `%${phoneFormat}%`)
+          .order("created_at", { ascending: true })
+          .limit(200);
+        if (phoneComms?.length) {
+          communications.push(...phoneComms);
+        }
+
+        // Search in metadata->from_number
+        const { data: fromComms } = await supabase
+          .from("lead_communications")
+          .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+          .filter("metadata->>from_number", "ilike", `%${phoneFormat}%`)
+          .order("created_at", { ascending: true })
+          .limit(200);
+        if (fromComms?.length) {
+          communications.push(...fromComms);
+        }
+
+        // Search in metadata->to_number
+        const { data: toComms } = await supabase
+          .from("lead_communications")
+          .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+          .filter("metadata->>to_number", "ilike", `%${phoneFormat}%`)
+          .order("created_at", { ascending: true })
+          .limit(200);
+        if (toComms?.length) {
+          communications.push(...toComms);
+        }
+      }
+    }
+
+    // Query 3: Search by email in metadata
+    if (searchEmailLower) {
+      const { data: emailComms } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+        .filter("metadata->ghl_data->>contactEmail", "ilike", `%${searchEmailLower}%`)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      if (emailComms?.length) {
+        communications.push(...emailComms);
+      }
+
+      // Also check from_email and to_email
+      const { data: fromEmailComms } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+        .filter("metadata->>from_email", "ilike", `%${searchEmailLower}%`)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      if (fromEmailComms?.length) {
+        communications.push(...fromEmailComms);
+      }
+
+      const { data: toEmailComms } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+        .filter("metadata->>to_email", "ilike", `%${searchEmailLower}%`)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      if (toEmailComms?.length) {
+        communications.push(...toEmailComms);
+      }
+    }
+
+    // Deduplicate by ID
+    const seenIds = new Set<string>();
+    communications = communications.filter(comm => {
+      if (seenIds.has(comm.id)) return false;
+      seenIds.add(comm.id);
+      return true;
+    });
+
+    // Sort by created_at
+    communications.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
     console.log("Matched communications:", communications.length);
+
+    // If still no communications, try a broader text search as fallback
+    if (communications.length === 0 && (searchPhoneNormalized || searchEmailLower)) {
+      console.log("No communications found with targeted queries, trying text search fallback...");
+      
+      const searchTerm = searchPhoneNormalized || searchEmailLower;
+      const { data: textSearchComms } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
+        .or(`metadata::text.ilike.%${searchTerm}%,body.ilike.%${searchTerm}%`)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      
+      if (textSearchComms?.length) {
+        communications = textSearchComms;
+        console.log("Text search fallback found:", communications.length);
+      }
+    }
 
     if (!communications || communications.length < 1) {
       return new Response(
@@ -299,7 +405,13 @@ serve(async (req) => {
           success: false, 
           error: "No messages found to summarize",
           messageCount: 0,
-          debug: { searchPhone, searchEmail, leadId, ownerId }
+          debug: { 
+            searchPhoneNormalized, 
+            searchEmailLower, 
+            leadId, 
+            ownerId,
+            queriesRun: "targeted phone/email/id queries + text search fallback"
+          }
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -323,6 +435,18 @@ serve(async (req) => {
         content = comm.subject.trim();
       }
       
+      // Check for transcript in metadata (Google Meet, calls, etc.)
+      const meta = comm.metadata || {};
+      if (!content && meta.transcript) {
+        content = meta.transcript;
+      }
+      if (!content && meta.transcription) {
+        content = meta.transcription;
+      }
+      if (!content && meta.call_transcript) {
+        content = meta.call_transcript;
+      }
+      
       // Add note about recording if available but no transcript
       if (!content && comm.call_recording_url) {
         content = "[Call recording available - no transcript]";
@@ -330,8 +454,8 @@ serve(async (req) => {
       
       if (content) {
         // Truncate very long messages to prevent token overflow
-        if (content.length > 1000) {
-          content = content.substring(0, 1000) + "...";
+        if (content.length > 1500) {
+          content = content.substring(0, 1500) + "...";
         }
         thread += `[${sender} - ${commType}]: ${content}\n\n`;
         contentCount++;
@@ -405,7 +529,7 @@ CONTACT CONTEXT:
 Name: ${contactName}
 Type: ${contactType}${contextInfo}
 
-CONVERSATION THREAD (${contentCount} messages, newest last):
+CONVERSATION THREAD (${contentCount} messages, oldest to newest):
 ${thread}
 
 GENERATE A COMPREHENSIVE SUMMARY with these 5 sections:
@@ -487,10 +611,9 @@ Return the 5 sections with the bold headers as shown above.`;
       .single();
 
     if (insertError) {
-      console.error("Error storing summary:", insertError);
+      console.error("Error saving summary:", insertError);
+      // Continue anyway, just return the summary
     }
-
-    console.log("Summary generated for:", contactName, "with", communications.length, "messages");
 
     return new Response(
       JSON.stringify({
@@ -498,17 +621,22 @@ Return the 5 sections with the bold headers as shown above.`;
         summary,
         messageCount: communications.length,
         contentCount,
-        contactName,
-        contactType,
         noteId: savedNote?.id,
+        context: {
+          leadStage: leadData?.stage,
+          isOwner: !!ownerData,
+          hasProperties: propertyData?.length > 0,
+          hasDiscoveryCall: discoveryCallData?.length > 0,
+          hasOnboarding: !!onboardingData,
+        },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
   } catch (error: unknown) {
-    console.error("Error summarizing conversation:", error);
+    console.error("Summary error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: message, success: false }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
