@@ -268,13 +268,30 @@ export default function OwnerDashboard() {
     const token = searchParams.get("token");
     const ownerIdParam = searchParams.get("owner");
     
+    // Demo owner ID - always allow direct access without authentication
+    const DEMO_OWNER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    
     if (token) {
       setSessionToken(token);
       loadAllDataWithToken(token);
     } else if (ownerIdParam) {
-      // Admin access - load data directly by owner ID (no token required)
-      console.log("Admin access mode - loading owner:", ownerIdParam);
+      // Admin/demo access - load data directly by owner ID (no token required)
+      console.log("Admin/Demo access mode - loading owner:", ownerIdParam);
       setIsAdminAccess(true);
+      
+      // For demo owner, also set a temporary session immediately to prevent "no access" screen
+      if (ownerIdParam === DEMO_OWNER_ID) {
+        setSession({
+          ownerId: DEMO_OWNER_ID,
+          ownerName: "Sara Thompson",
+          email: "sara.thompson@demo.com",
+          propertyId: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+          propertyName: "3069 Rita Way Retreat",
+          secondOwnerName: "Michael Thompson",
+          secondOwnerEmail: "michael.thompson@demo.com",
+        });
+      }
+      
       loadAllData(ownerIdParam, null);
     } else {
       const storedSession = localStorage.getItem("owner_session");
