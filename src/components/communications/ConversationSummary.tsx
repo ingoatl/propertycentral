@@ -139,18 +139,58 @@ export function ConversationSummary({
     return null;
   }
 
-  const formatBulletPoints = (text: string) => {
-    // Split by numbered bullets or just newlines
-    const lines = text.split(/\n/).filter(l => l.trim());
-    return lines.map((line, i) => {
-      // Remove leading numbers, bullets, etc.
-      const cleaned = line.replace(/^[\d\.\-\*\•]+\s*/, "").trim();
+  const formatSummaryContent = (text: string) => {
+    // Split by section headers (bold markdown)
+    const sections = text.split(/\*\*([^*]+)\*\*:?\s*/g).filter(s => s.trim());
+    
+    const result: JSX.Element[] = [];
+    for (let i = 0; i < sections.length; i += 2) {
+      const header = sections[i]?.trim();
+      const content = sections[i + 1]?.trim();
+      if (header && content) {
+        result.push(
+          <div key={i} className="mb-3 last:mb-0">
+            <div className="text-xs font-semibold text-primary mb-1">{header}</div>
+            <div className="text-sm text-foreground/80 leading-relaxed">{content}</div>
+          </div>
+        );
+      } else if (header) {
+        // Handle case where there's text without header (fallback for bullet format)
+        const cleanedLine = header.replace(/^[\d\.\-\*\•]+\s*/, "").trim();
+        if (cleanedLine) {
+          result.push(
+            <li key={i} className="text-sm text-foreground/80 leading-relaxed mb-1">
+              {cleanedLine}
+            </li>
+          );
+        }
+      }
+    }
+    
+    // If no sections found, fall back to line-by-line parsing
+    if (result.length === 0) {
+      const lines = text.split(/\n/).filter(l => l.trim());
       return (
-        <li key={i} className="text-sm text-foreground/80 leading-relaxed">
-          {cleaned}
-        </li>
+        <ul className="space-y-2 list-disc list-inside">
+          {lines.map((line, i) => {
+            const cleaned = line.replace(/^[\d\.\-\*\•]+\s*/, "").trim();
+            return (
+              <li key={i} className="text-sm text-foreground/80 leading-relaxed">
+                {cleaned}
+              </li>
+            );
+          })}
+        </ul>
       );
-    });
+    }
+    
+    // Check if we have list items vs structured sections
+    const hasListItems = result.some(r => r.type === 'li');
+    if (hasListItems) {
+      return <ul className="space-y-2 list-disc list-inside">{result}</ul>;
+    }
+    
+    return <div className="space-y-1">{result}</div>;
   };
 
   return (
@@ -209,10 +249,8 @@ export function ConversationSummary({
                 <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             ) : summary ? (
-              <div className="bg-background/50 rounded-lg p-3 border border-border/30">
-                <ul className="space-y-2 list-disc list-inside">
-                  {formatBulletPoints(summary.note)}
-                </ul>
+              <div className="bg-background/50 rounded-lg p-3 border border-border/30 max-h-[400px] overflow-y-auto">
+                {formatSummaryContent(summary.note)}
               </div>
             ) : (
               <div className="text-center py-3">

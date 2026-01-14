@@ -6,6 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper to format date nicely
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -30,59 +37,175 @@ serve(async (req) => {
     let contactType = "unknown";
     let searchPhone: string | null = null;
     let searchEmail: string | null = null;
+    let leadData: any = null;
+    let ownerData: any = null;
+    let propertyData: any = null;
+    let discoveryCallData: any = null;
+    let timelineData: any[] = [];
+    let onboardingData: any = null;
 
-    // First, determine the contact info we're working with
+    // First, determine the contact info we're working with AND fetch full context
     if (leadId) {
+      // Fetch comprehensive lead data
       const { data: lead } = await supabase
         .from("leads")
-        .select("name, phone, email")
+        .select(`
+          id, name, phone, email, stage, property_address, property_type,
+          opportunity_source, opportunity_value, notes, tags, 
+          ai_summary, ai_next_action, ai_qualification_score,
+          last_contacted_at, last_response_at, follow_up_paused,
+          owner_id, project_id, inspection_date, created_at
+        `)
         .eq("id", leadId)
         .single();
+      
       if (lead) {
+        leadData = lead;
         contactName = lead.name || "Lead";
         contactType = "lead";
         searchPhone = lead.phone;
         searchEmail = lead.email;
+
+        // Check if they're also an owner (already converted)
+        if (lead.owner_id) {
+          const { data: owner } = await supabase
+            .from("property_owners")
+            .select("id, name, service_type, has_payment_method, created_at")
+            .eq("id", lead.owner_id)
+            .single();
+          if (owner) {
+            ownerData = owner;
+          }
+        } else if (lead.email || lead.phone) {
+          // Check by email/phone match
+          let ownerQuery = supabase.from("property_owners").select("id, name, service_type, has_payment_method, created_at");
+          if (lead.email) {
+            ownerQuery = ownerQuery.eq("email", lead.email);
+          } else if (lead.phone) {
+            ownerQuery = ownerQuery.eq("phone", lead.phone);
+          }
+          const { data: matchedOwner } = await ownerQuery.maybeSingle();
+          if (matchedOwner) {
+            ownerData = matchedOwner;
+          }
+        }
+
+        // Fetch property info if owner exists
+        if (ownerData?.id) {
+          const { data: props } = await supabase
+            .from("properties")
+            .select("id, name, address, status, created_at")
+            .eq("owner_id", ownerData.id)
+            .limit(3);
+          if (props?.length) {
+            propertyData = props;
+          }
+        }
+
+        // Fetch discovery calls
+        const { data: discoveryCalls } = await supabase
+          .from("discovery_calls")
+          .select("id, scheduled_at, status, meeting_notes, service_interest, rental_strategy")
+          .eq("lead_id", leadId)
+          .order("scheduled_at", { ascending: false })
+          .limit(2);
+        if (discoveryCalls?.length) {
+          discoveryCallData = discoveryCalls;
+        }
+
+        // Fetch onboarding project if exists
+        if (lead.project_id) {
+          const { data: project } = await supabase
+            .from("onboarding_projects")
+            .select("id, status, phase, percent_complete, go_live_date")
+            .eq("id", lead.project_id)
+            .single();
+          if (project) {
+            onboardingData = project;
+          }
+        }
+
+        // Fetch recent timeline events
+        const { data: timeline } = await supabase
+          .from("lead_timeline")
+          .select("id, event_type, description, created_at")
+          .eq("lead_id", leadId)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        if (timeline?.length) {
+          timelineData = timeline;
+        }
       }
     } else if (ownerId) {
       const { data: owner } = await supabase
         .from("property_owners")
-        .select("name, phone, email")
+        .select("id, name, phone, email, service_type, has_payment_method, created_at")
         .eq("id", ownerId)
         .single();
       if (owner) {
+        ownerData = owner;
         contactName = owner.name || "Owner";
         contactType = "owner";
         searchPhone = owner.phone;
         searchEmail = owner.email;
+
+        // Fetch properties for this owner
+        const { data: props } = await supabase
+          .from("properties")
+          .select("id, name, address, status, created_at")
+          .eq("owner_id", ownerId)
+          .limit(3);
+        if (props?.length) {
+          propertyData = props;
+        }
       }
     } else if (contactPhone) {
       searchPhone = contactPhone;
       contactName = `Phone ${contactPhone}`;
       contactType = "external_phone";
       
-      // Try to find name from matching lead
+      // Try to find full lead data
       const { data: matchingLead } = await supabase
         .from("leads")
-        .select("name")
+        .select("id, name, stage, property_address, notes, owner_id")
         .eq("phone", contactPhone)
         .maybeSingle();
-      if (matchingLead?.name) {
-        contactName = matchingLead.name;
+      if (matchingLead) {
+        leadData = matchingLead;
+        contactName = matchingLead.name || contactName;
+        
+        if (matchingLead.owner_id) {
+          const { data: owner } = await supabase
+            .from("property_owners")
+            .select("id, name, service_type, has_payment_method")
+            .eq("id", matchingLead.owner_id)
+            .single();
+          if (owner) ownerData = owner;
+        }
       }
     } else if (contactEmail) {
       searchEmail = contactEmail;
       contactName = contactEmail;
       contactType = "external_email";
       
-      // Try to find name from matching lead
+      // Try to find full lead data
       const { data: matchingLead } = await supabase
         .from("leads")
-        .select("name")
+        .select("id, name, stage, property_address, notes, owner_id")
         .eq("email", contactEmail)
         .maybeSingle();
-      if (matchingLead?.name) {
-        contactName = matchingLead.name;
+      if (matchingLead) {
+        leadData = matchingLead;
+        contactName = matchingLead.name || contactName;
+        
+        if (matchingLead.owner_id) {
+          const { data: owner } = await supabase
+            .from("property_owners")
+            .select("id, name, service_type, has_payment_method")
+            .eq("id", matchingLead.owner_id)
+            .single();
+          if (owner) ownerData = owner;
+        }
       }
     } else {
       return new Response(
@@ -229,25 +352,83 @@ serve(async (req) => {
       );
     }
 
-    // Generate summary using AI
-    const summaryPrompt = `Summarize this conversation in exactly 3 concise bullet points:
+    // Build context summary for AI
+    let contextInfo = "";
+    
+    // Lead/Owner status context
+    if (leadData) {
+      const stageLabels: Record<string, string> = {
+        new_lead: "New Lead",
+        discovery_scheduled: "Discovery Call Scheduled",
+        discovery_completed: "Discovery Call Completed",
+        proposal_sent: "Proposal Sent",
+        contract_signed: "Contract Signed",
+        onboarding: "In Onboarding",
+        ops_handoff: "Operations Handoff (Active Client)"
+      };
+      contextInfo += `\n[LEAD STATUS]: Stage: ${stageLabels[leadData.stage] || leadData.stage}`;
+      if (leadData.property_address) contextInfo += `, Property: ${leadData.property_address}`;
+      if (leadData.property_type) contextInfo += ` (${leadData.property_type})`;
+      if (leadData.notes) contextInfo += `\nNotes: ${leadData.notes.substring(0, 200)}`;
+    }
+    
+    if (ownerData) {
+      contextInfo += `\n[OWNER STATUS]: ${contactName} IS ALREADY A CLIENT/OWNER`;
+      if (ownerData.service_type) contextInfo += `, Service: ${ownerData.service_type}`;
+      if (ownerData.has_payment_method) contextInfo += ` (Payment method on file)`;
+    }
+    
+    if (propertyData?.length) {
+      contextInfo += `\n[PROPERTIES]: ${propertyData.map((p: any) => p.address || p.name).join(", ")}`;
+    }
+    
+    if (discoveryCallData?.length) {
+      const call = discoveryCallData[0];
+      contextInfo += `\n[DISCOVERY CALL]: ${call.status} on ${formatDate(call.scheduled_at)}`;
+      if (call.meeting_notes) contextInfo += `. Notes: ${call.meeting_notes.substring(0, 150)}`;
+    }
+    
+    if (onboardingData) {
+      contextInfo += `\n[ONBOARDING]: ${onboardingData.phase || "In Progress"}, ${onboardingData.percent_complete || 0}% complete`;
+      if (onboardingData.go_live_date) contextInfo += `, Go-live: ${formatDate(onboardingData.go_live_date)}`;
+    }
+    
+    if (timelineData?.length) {
+      contextInfo += `\n[RECENT EVENTS]: `;
+      contextInfo += timelineData.slice(0, 3).map((t: any) => `${t.event_type}: ${t.description}`).join("; ");
+    }
 
-1. What they want/need
-2. What we've told them  
-3. What action is pending (if any)
+    // Generate summary using AI with comprehensive prompt
+    const summaryPrompt = `You are analyzing a conversation thread for a property management company (PeachHaus).
 
-CONVERSATION (${contentCount} messages):
+CONTACT CONTEXT:
+Name: ${contactName}
+Type: ${contactType}${contextInfo}
+
+CONVERSATION THREAD (${contentCount} messages, newest last):
 ${thread}
 
-RULES:
-- Be specific and actionable
-- Use their name "${contactName}" where relevant
-- If no action pending, say "No pending action"
-- Each bullet should be 1-2 sentences max
-- Write in present tense
-- Include details from calls, SMS, and emails
+GENERATE A COMPREHENSIVE SUMMARY with these 5 sections:
 
-Return ONLY the 3 bullet points, nothing else.`;
+1. **Client Status**: Is this person a lead or already a signed client/owner? What stage are they in?
+
+2. **What They Need**: What is this person looking for or asking about? Be specific about their property, situation, concerns.
+
+3. **What We've Communicated**: Key information we've provided - pricing discussed, documents requested, instructions given, deadlines mentioned.
+
+4. **Outstanding Items**: What are WE waiting on from them? (documents, responses, decisions) What are THEY waiting on from us?
+
+5. **Recommended Action**: What should we do next? Be specific and actionable. If no action needed, explain why.
+
+IMPORTANT RULES:
+- If they're already an owner/client, make that VERY CLEAR upfront
+- Include specific details: property addresses, dates, amounts, document names
+- Note any insurance docs, smart lock codes, or onboarding items mentioned
+- If they confirmed something (like "Submitted" or "Thank you"), note it
+- Be concise but thorough - each section 1-2 sentences
+- Write in present tense, use their name "${contactName}"
+
+Return the 5 sections with the bold headers as shown above.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -258,10 +439,10 @@ Return ONLY the 3 bullet points, nothing else.`;
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "You are a concise business conversation summarizer. Return only the requested format." },
+          { role: "system", content: "You are a thorough business conversation analyst. Provide actionable, specific summaries that help the team understand the full picture of each client relationship." },
           { role: "user", content: summaryPrompt },
         ],
-        max_tokens: 500,
+        max_tokens: 800,
         temperature: 0.3,
       }),
     });
