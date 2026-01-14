@@ -1800,6 +1800,39 @@ export type Database = {
         }
         Relationships: []
       }
+      gmail_email_status: {
+        Row: {
+          created_at: string | null
+          gmail_message_id: string
+          id: string
+          priority: string | null
+          snoozed_until: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          gmail_message_id: string
+          id?: string
+          priority?: string | null
+          snoozed_until?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          gmail_message_id?: string
+          id?: string
+          priority?: string | null
+          snoozed_until?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       gmail_oauth_tokens: {
         Row: {
           access_token: string

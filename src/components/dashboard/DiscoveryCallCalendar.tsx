@@ -41,6 +41,7 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
+import { CallDialog } from "@/components/communications/CallDialog";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   format,
@@ -802,8 +803,7 @@ interface GhlAppointmentDetailModalProps {
 
 function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetailModalProps) {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
-  const [showCallConfirm, setShowCallConfirm] = useState(false);
-  const [isCallingLead, setIsCallingLead] = useState(false);
+  const [showCallDialog, setShowCallDialog] = useState(false);
 
   if (!appointment) return null;
 
@@ -828,31 +828,6 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
   const googleMapsLink = propertyAddress
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(propertyAddress)}`
     : null;
-
-  const handleCallContact = async () => {
-    if (!contactPhone || !appointment.lead_id) return;
-    
-    setIsCallingLead(true);
-    try {
-      const { error } = await supabase.functions.invoke("elevenlabs-voice-call", {
-        body: {
-          leadId: appointment.lead_id,
-          message: `Hello ${contactName}, this is PeachHaus calling about your upcoming appointment. We're looking forward to speaking with you!`,
-        },
-      });
-
-      if (error) throw error;
-      toast.success(`Call initiated to ${contactName}`, {
-        description: `Calling ${contactPhone}`,
-      });
-    } catch (error: any) {
-      console.error("Error initiating call:", error);
-      toast.error("Failed to initiate call", { description: error.message });
-    } finally {
-      setIsCallingLead(false);
-      setShowCallConfirm(false);
-    }
-  };
 
   return (
     <>
@@ -998,7 +973,7 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
                   <div className="flex items-center gap-2">
                     <Phone className="h-3 w-3 text-muted-foreground" />
                     <span className="text-sm flex-1">{contactPhone}</span>
-                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setShowCallConfirm(true)}>
+                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setShowCallDialog(true)}>
                       <Phone className="h-3 w-3" />
                     </Button>
                   </div>
@@ -1012,7 +987,7 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
                     </Button>
                   )}
                   {contactPhone && (
-                    <Button variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setShowCallConfirm(true)}>
+                    <Button variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setShowCallDialog(true)}>
                       <Phone className="h-3 w-3 mr-1" /> Call
                     </Button>
                   )}
@@ -1100,54 +1075,27 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
         </DialogContent>
       </Dialog>
 
-      {/* Call Confirmation Dialog */}
-      <AlertDialog open={showCallConfirm} onOpenChange={setShowCallConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Phone className="h-5 w-5 text-primary" />
-              Call {contactName}?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>You're about to initiate a call to:</p>
-              <div className="p-3 rounded-lg bg-muted mt-2">
-                <p className="font-semibold">{contactName}</p>
-                <p className="text-primary font-medium">{contactPhone}</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isCallingLead}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCallContact}
-              disabled={isCallingLead || !appointment.lead_id}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isCallingLead ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Calling...
-                </>
-              ) : (
-                <>
-                  <Phone className="h-4 w-4 mr-2" />
-                  Yes, Call Now
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Call Dialog - Twilio-based calling */}
+      {contactPhone && (
+        <CallDialog
+          open={showCallDialog}
+          onOpenChange={setShowCallDialog}
+          contactName={contactName}
+          contactPhone={contactPhone}
+          contactType="lead"
+          contactAddress={propertyAddress}
+        />
+      )}
 
       {/* Email Dialog */}
-      {contactEmail && appointment.lead_id && (
+      {contactEmail && (
         <SendEmailDialog
           open={showEmailDialog}
           onOpenChange={setShowEmailDialog}
           contactName={contactName}
           contactEmail={contactEmail}
           contactType="lead"
-          contactId={appointment.lead_id}
+          contactId={appointment.lead_id || ""}
         />
       )}
     </>
