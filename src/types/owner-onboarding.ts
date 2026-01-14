@@ -1,5 +1,5 @@
 export interface OwnerOnboardingFormData {
-  // Step 1: Owner Info
+  // Step 1: Owner Info & Property Specifications
   owner_name: string;
   owner_email: string;
   owner_phone: string;
@@ -7,7 +7,19 @@ export interface OwnerOnboardingFormData {
   how_did_you_find_us: string;
   was_referred: boolean;
   referred_by: string;
-
+  
+  // Property Specifications (Step 1)
+  property_type: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  square_footage: number | null;
+  year_built: number | null;
+  num_stories: string;
+  max_occupancy: number | null;
+  has_basement: boolean;
+  fenced_yard: boolean;
+  ada_compliant: boolean;
+  pool_type: string;
   // Step 2: Access Details
   wifi_ssid: string;
   wifi_password: string;
@@ -40,7 +52,11 @@ export interface OwnerOnboardingFormData {
   existing_photos_link: string;
   airbnb_link: string;
   vrbo_link: string;
+  furnished_finder_link: string;
+  booking_com_link: string;
   other_listing_links: string;
+  current_nightly_rate: number | null;
+  current_cleaning_fee: number | null;
   pets_allowed: boolean;
   pet_deposit: string;
   pet_size_restrictions: string;
@@ -119,7 +135,7 @@ export interface UtilityInfo {
 }
 
 export const initialFormData: OwnerOnboardingFormData = {
-  // Step 1
+  // Step 1 - Owner Info
   owner_name: '',
   owner_email: '',
   owner_phone: '',
@@ -127,6 +143,19 @@ export const initialFormData: OwnerOnboardingFormData = {
   how_did_you_find_us: '',
   was_referred: false,
   referred_by: '',
+  
+  // Step 1 - Property Specifications
+  property_type: '',
+  bedrooms: null,
+  bathrooms: null,
+  square_footage: null,
+  year_built: null,
+  num_stories: '',
+  max_occupancy: null,
+  has_basement: false,
+  fenced_yard: false,
+  ada_compliant: false,
+  pool_type: '',
 
   // Step 2
   wifi_ssid: '',
@@ -166,7 +195,11 @@ export const initialFormData: OwnerOnboardingFormData = {
   existing_photos_link: '',
   airbnb_link: '',
   vrbo_link: '',
+  furnished_finder_link: '',
+  booking_com_link: '',
   other_listing_links: '',
+  current_nightly_rate: null,
+  current_cleaning_fee: null,
   pets_allowed: false,
   pet_deposit: '',
   pet_size_restrictions: '',

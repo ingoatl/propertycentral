@@ -66,6 +66,8 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string; phaseTitle?:
   // Phase 7 - Listings
   airbnb_link: { phase: 7, title: 'Airbnb', phaseTitle: 'Listings & Booking Platforms' },
   vrbo_link: { phase: 7, title: 'VRBO', phaseTitle: 'Listings & Booking Platforms' },
+  furnished_finder_link: { phase: 7, title: 'Furnished Finder', phaseTitle: 'Listings & Booking Platforms' },
+  booking_com_link: { phase: 7, title: 'Booking.com', phaseTitle: 'Listings & Booking Platforms' },
   other_listing_links: { phase: 7, title: 'Other Listing Links', phaseTitle: 'Listings & Booking Platforms' },
   
   // Phase 8 - Guest Materials
@@ -90,7 +92,18 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string; phaseTitle?:
   known_maintenance_issues: { phase: 9, title: 'Known Maintenance Issues', phaseTitle: 'Vendors & Maintenance' },
   smoke_co_detector_status: { phase: 9, title: 'Smoke/CO Detector Status', phaseTitle: 'Vendors & Maintenance' },
   
-  // Phase 10 - Property Details
+  // Phase 10 - Property Details/Specifications
+  property_type: { phase: 10, title: 'Property Type', phaseTitle: 'Property Details' },
+  bedrooms: { phase: 10, title: 'Bedrooms', phaseTitle: 'Property Details' },
+  bathrooms: { phase: 10, title: 'Bathrooms', phaseTitle: 'Property Details' },
+  square_footage: { phase: 10, title: 'Square Footage', phaseTitle: 'Property Details' },
+  year_built: { phase: 10, title: 'Year Built', phaseTitle: 'Property Details' },
+  num_stories: { phase: 10, title: 'Number of Stories', phaseTitle: 'Property Details' },
+  max_occupancy: { phase: 10, title: 'Max Occupancy', phaseTitle: 'Property Details' },
+  has_basement: { phase: 10, title: 'Basement', phaseTitle: 'Property Details' },
+  fenced_yard: { phase: 10, title: 'Fenced Yard', phaseTitle: 'Property Details' },
+  ada_compliant: { phase: 10, title: 'ADA Compliant', phaseTitle: 'Property Details' },
+  pool_type: { phase: 10, title: 'Pool', phaseTitle: 'Property Details' },
   unique_selling_points: { phase: 10, title: 'Unique Selling Points', phaseTitle: 'Property Details' },
   guest_avatar: { phase: 10, title: 'Primary Guest Avatar', phaseTitle: 'Property Details' },
   house_quirks: { phase: 10, title: 'House Quirks', phaseTitle: 'Property Details' },
@@ -102,6 +115,8 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string; phaseTitle?:
   
   // Phase 11 - Pricing
   average_daily_rate: { phase: 11, title: 'Nightly Rate', phaseTitle: 'Pricing & Revenue' },
+  current_nightly_rate: { phase: 11, title: 'Current Nightly Rate', phaseTitle: 'Pricing & Revenue' },
+  current_cleaning_fee: { phase: 11, title: 'Cleaning Fee', phaseTitle: 'Pricing & Revenue' },
   average_monthly_revenue: { phase: 11, title: 'Monthly Rent', phaseTitle: 'Pricing & Revenue' },
   
   // Phase 12 - Pets
