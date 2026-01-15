@@ -455,17 +455,34 @@ serve(async (req) => {
     }
 
     if (action === "test") {
-      // Send test to Ingo's phone
+      // Send test to Ingo's phone - use the REAL permission ask message
       const adminPhone = "+17709065022";
-      const testMessage = `🧪 Test SMS from PeachHaus Google Review system (via GHL from ${GOOGLE_REVIEWS_PHONE}). If you received this, the SMS integration is working! Reply to test inbound handling.`;
+      const testMessage = `Thanks again for the wonderful Airbnb review — it truly means a lot. Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
       
       console.log(`Sending test SMS to ${adminPhone} from ${GOOGLE_REVIEWS_PHONE} via GHL`);
+      
+      // Create a test review request for tracking purposes
+      const { data: testRequest, error: testRequestError } = await supabase
+        .from("google_review_requests")
+        .insert({
+          guest_phone: adminPhone,
+          workflow_status: "permission_asked",
+          permission_asked_at: new Date().toISOString(),
+          opted_out: false,
+        })
+        .select()
+        .single();
+      
+      if (testRequestError) {
+        console.log("Note: Could not create test request record:", testRequestError.message);
+      }
       
       const testResult = await sendSms(adminPhone, testMessage);
       
       await supabase.from("sms_log").insert({
+        request_id: testRequest?.id,
         phone_number: adminPhone,
-        message_type: "test",
+        message_type: "permission_ask",
         message_body: testMessage,
         ghl_message_id: testResult.messageId,
         status: testResult.success ? "sent" : "failed",
@@ -480,7 +497,7 @@ serve(async (req) => {
       console.log(`Test SMS sent successfully via GHL, message ID: ${testResult.messageId}`);
 
       return new Response(
-        JSON.stringify({ success: true, action: "test", messageId: testResult.messageId }),
+        JSON.stringify({ success: true, action: "test", messageId: testResult.messageId, requestId: testRequest?.id }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

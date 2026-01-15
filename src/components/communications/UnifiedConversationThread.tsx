@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 import { format, parseISO, isToday, isYesterday } from "date-fns";
-import { Phone, Mail, MessageSquare, Play, VoicemailIcon } from "lucide-react";
+import { Phone, Mail, MessageSquare, Play, Paperclip, FileIcon, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -12,6 +12,7 @@ interface ThreadMessage {
   subject?: string;
   created_at: string;
   media_urls?: string[];
+  attachments?: { name: string; url: string; type?: string }[];
   call_duration?: number;
   call_recording_url?: string;
   status?: string;
@@ -149,7 +150,7 @@ export function UnifiedConversationThread({
                       </div>
                     )}
 
-                    {/* MMS Images */}
+                    {/* MMS/SMS Images */}
                     {msg.media_urls && msg.media_urls.length > 0 && (
                       <div
                         className={`mb-2 grid gap-1.5 ${
@@ -180,6 +181,50 @@ export function UnifiedConversationThread({
                             />
                           </div>
                         ))}
+                      </div>
+                    )}
+
+                    {/* Email Attachments */}
+                    {msg.type === "email" && msg.attachments && msg.attachments.length > 0 && (
+                      <div className="mb-2 space-y-1">
+                        {msg.attachments.map((att, attIdx) => {
+                          const isImage = att.type?.startsWith("image/") || 
+                            /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
+                          
+                          if (isImage) {
+                            return (
+                              <div
+                                key={attIdx}
+                                className="relative overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity max-h-64"
+                                onClick={() => onImageClick(att.url)}
+                              >
+                                <img
+                                  src={att.url}
+                                  alt={att.name}
+                                  className="w-full h-full object-contain"
+                                  loading="lazy"
+                                />
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <a
+                              key={attIdx}
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs hover:opacity-80 transition-opacity ${
+                                isOutbound 
+                                  ? "bg-primary-foreground/10" 
+                                  : "bg-background"
+                              }`}
+                            >
+                              <Paperclip className="h-3 w-3 shrink-0" />
+                              <span className="truncate max-w-[180px]">{att.name}</span>
+                            </a>
+                          );
+                        })}
                       </div>
                     )}
 
