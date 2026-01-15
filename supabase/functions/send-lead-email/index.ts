@@ -20,6 +20,7 @@ interface EmailRequest {
   contactId: string;
   senderEmail?: string;
   senderName?: string;
+  attachments?: string[]; // Array of URLs to attach
 }
 
 // Team signatures based on email - using hosted images
@@ -91,10 +92,47 @@ serve(async (req) => {
   }
 
   try {
-    const { to, toName, subject, body, contactType, contactId, senderEmail, senderName }: EmailRequest = await req.json();
+    const { to, toName, subject, body, contactType, contactId, senderEmail, senderName, attachments }: EmailRequest = await req.json();
 
     if (!to || !subject || !body) {
       throw new Error("Missing required fields: to, subject, body");
+    }
+    
+    // Download attachments and convert to Resend format
+    const emailAttachments: { filename: string; content: string }[] = [];
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      console.log(`Processing ${attachments.length} attachments...`);
+      for (const url of attachments) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            const arrayBuffer = await response.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+            // Convert to base64
+            let binary = '';
+            for (let i = 0; i < uint8Array.length; i++) {
+              binary += String.fromCharCode(uint8Array[i]);
+            }
+            const base64Content = btoa(binary);
+            
+            // Extract filename from URL
+            const urlParts = url.split('/');
+            let filename = urlParts[urlParts.length - 1].split('?')[0];
+            // Decode URL-encoded characters
+            filename = decodeURIComponent(filename);
+            
+            emailAttachments.push({
+              filename: filename,
+              content: base64Content,
+            });
+            console.log(`Attachment processed: ${filename}`);
+          } else {
+            console.error(`Failed to fetch attachment: ${url}, status: ${response.status}`);
+          }
+        } catch (attachError) {
+          console.error(`Error processing attachment ${url}:`, attachError);
+        }
+      }
     }
 
     // Determine sender - use provided email or fallback to ingo
@@ -123,7 +161,8 @@ serve(async (req) => {
       .map((line: string) => (line.trim() ? `<p style="margin: 0 0 8px 0; text-align: left;">${line}</p>` : "<br/>"))
       .join("");
 
-    const emailResponse = await resend.emails.send({
+    // Build email options
+    const emailOptions: any = {
       from: `${fromName} <${fromEmail}>`,
       to: [to],
       subject: subject,
@@ -142,7 +181,15 @@ serve(async (req) => {
         </body>
         </html>
       `,
-    });
+    };
+    
+    // Add attachments if present
+    if (emailAttachments.length > 0) {
+      emailOptions.attachments = emailAttachments;
+      console.log(`Sending email with ${emailAttachments.length} attachments`);
+    }
+    
+    const emailResponse = await resend.emails.send(emailOptions);
 
     console.log("Email sent successfully:", emailResponse);
 
