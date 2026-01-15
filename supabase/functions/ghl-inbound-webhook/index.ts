@@ -285,9 +285,19 @@ serve(async (req) => {
     const contactName = fullName || firstName || "Lead";
     
     // Extract the "to" number (the GHL number that received the SMS)
-    // GHL may provide this in various locations
-    const toNumber = message.to || payload.to || payload.toNumber || message.phoneNumberId || null;
-    console.log("SMS routing - To number:", toNumber);
+    // GHL may provide this in various locations - check all possibilities
+    const toNumber = message.to || payload.to || payload.toNumber || message.phoneNumberId || 
+                     payload.phone_number_id || message.toNumber || payload.fromNumber ||
+                     message.from_number_id || null;
+    console.log("SMS routing - To number candidates:", {
+      messageTo: message.to,
+      payloadTo: payload.to,
+      payloadToNumber: payload.toNumber,
+      messagePhoneNumberId: message.phoneNumberId,
+      payloadPhoneNumberId: payload.phone_number_id,
+      fromNumberId: message.from_number_id,
+    });
+    console.log("SMS routing - Selected To number:", toNumber);
     
     // Extract phone digits for matching
     const normalizedPhone = normalizePhone(contactPhone);
@@ -296,8 +306,13 @@ serve(async (req) => {
     
     // ============================================
     // CHECK IF THIS IS A GOOGLE REVIEWS MESSAGE
+    // Also check if message originates from Google Reviews source tag
     // ============================================
-    if (isGoogleReviewsNumber(toNumber)) {
+    const isGoogleSource = payload.source === "GoogleReviews" || 
+                           payload.customField?.source === "GoogleReviews" ||
+                           (message.source && message.source.includes("Google"));
+    
+    if (isGoogleReviewsNumber(toNumber) || isGoogleSource) {
       console.log("=== GOOGLE REVIEWS CHANNEL (GHL) ===");
       
       const reviewResult = await processGoogleReviewReply(
