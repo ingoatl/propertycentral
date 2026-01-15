@@ -116,7 +116,8 @@ serve(async (req) => {
       leadId, 
       ownerId,
       includeCompanyKnowledge,
-      userInstructions 
+      userInstructions,
+      senderUserId
     } = await req.json();
 
     console.log("AI Message Assistant request:", { action, contactName, messageType, leadId, ownerId, hasUserInstructions: !!userInstructions });
@@ -131,6 +132,24 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Fetch sender's name from profiles table
+    let senderName = "The PeachHaus Team";
+    if (senderUserId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, email")
+        .eq("id", senderUserId)
+        .single();
+      
+      if (profile?.first_name) {
+        senderName = profile.first_name;
+      } else if (profile?.email) {
+        const emailName = profile.email.split('@')[0];
+        senderName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+      }
+    }
+    console.log("Using sender name:", senderName);
 
     // Fetch full conversation context if leadId or ownerId provided
     let fullContext = conversationContext || "";
@@ -371,7 +390,7 @@ CRITICAL RESPONSE RULES - FOLLOW EXACTLY:
 5. Be SPECIFIC - reference the exact thing they mentioned (property address, what they need, etc.)
 6. ${messageType === "sms" ? "Keep SMS under 200 characters when possible, max 300." : "Keep emails concise."}
 7. Never add sales pitches if they asked for something specific - just help them
-8. Sign off as: "- Ingo @ PeachHaus Group"`;
+8. Sign off as: "- ${senderName}"`;
 
     // DETECT SPECIFIC REQUEST TYPES from the most recent inbound message
     const lastInboundMessage = currentMessage || "";

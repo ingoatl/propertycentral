@@ -113,6 +113,7 @@ export function SendEmailDialog({
     setBody("");
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase.functions.invoke("suggest-email-reply", {
         body: {
           contactEmail,
@@ -120,6 +121,7 @@ export function SendEmailDialog({
           currentSubject: replyToSubject || "",
           incomingEmailBody: replyToBody || "",
           userInstructions: instructions || userInstructions || undefined,
+          senderUserId: user?.id,
         },
       });
 
@@ -131,7 +133,6 @@ export function SendEmailDialog({
       }
     } catch (err) {
       console.error("Failed to get AI suggestion:", err);
-      // Silently fail - user can still type manually
     } finally {
       setIsLoadingAI(false);
     }

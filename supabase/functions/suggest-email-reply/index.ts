@@ -76,7 +76,7 @@ serve(async (req) => {
   }
 
   try {
-    const { contactEmail, contactName, currentSubject, incomingEmailBody, userInstructions } = await req.json();
+    const { contactEmail, contactName, currentSubject, incomingEmailBody, userInstructions, senderUserId } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -87,6 +87,25 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // Fetch sender's name from profiles table
+    let senderName = "The PeachHaus Team";
+    if (senderUserId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, email")
+        .eq("id", senderUserId)
+        .single();
+      
+      if (profile?.first_name) {
+        senderName = profile.first_name;
+      } else if (profile?.email) {
+        // Extract name from email if no first_name
+        const emailName = profile.email.split('@')[0];
+        senderName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+      }
+    }
+    console.log("Using sender name:", senderName);
 
     // Step 1: Analyze sentiment and intent of the incoming email
     let sentiment = "neutral";
@@ -269,6 +288,11 @@ serve(async (req) => {
           }
         }
       }
+    } else {
+      // No owner or lead data - this is an external contact or new inquiry
+      propertyContext = `\n\nCONTACT STATUS: External contact / New inquiry
+This person is not yet in our system as a lead or owner. Respond professionally and helpfully.
+If they're asking about property management services, be informative and welcoming.`;
     }
 
     // Detect if email mentions meetings/calls
@@ -391,7 +415,9 @@ STRUCTURE:
 - First sentence = direct response to what they asked/said
 - ${intent === 'unsubscribe' || intent === 'decline' || intent === 'thank_you' ? '2-3 sentences MAX' : '2-3 short paragraphs MAX'}
 - End with an appropriate response to their situation
-- Sign off naturally: "Best," or "Thanks," followed by your name`;
+- Sign off naturally with: "Best,\n${senderName}"
+
+YOUR NAME FOR SIGNING: ${senderName}`;
 
     // Add user instructions context if provided
     const instructionsContext = userInstructions 
@@ -413,9 +439,9 @@ CRITICAL: ${userInstructions ? 'FOLLOW THE USER\'S INSTRUCTIONS above - incorpor
 - Looking for a document to forward → Acknowledge you'll watch for it
 - Visiting your city → Mention it if appropriate
 
-Draft a reply that shows you actually read their email. Start with "Hi ${contactName?.split(' ')[0] || 'there'},"`;
+Draft a reply that shows you actually read their email. Start with "Hi ${contactName?.split(' ')[0] || 'there'}," and end with "Best,\\n${senderName}"`;
 
-    console.log("Generating AI email suggestion for:", contactEmail, "isOwner:", isOwner, "intent:", intent, "sentiment:", sentiment);
+    console.log("Generating AI email suggestion for:", contactEmail, "isOwner:", isOwner, "intent:", intent, "sentiment:", sentiment, "senderName:", senderName);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
