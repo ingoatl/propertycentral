@@ -2176,6 +2176,10 @@ export function InboxView() {
           emailPriority = "low";
         }
         
+        // Promotional emails should automatically appear as "done" (green + faded)
+        // This declutters the inbox by visually de-emphasizing marketing emails
+        const effectiveStatus: ConversationStatusType = isDone ? "done" : (isPromotional ? "done" : "open");
+        
         const emailAsComm: CommunicationItem = {
           id: `email-${email.id}`,
           type: "email",
@@ -2188,7 +2192,7 @@ export function InboxView() {
           contact_type: "email",
           contact_id: email.id,
           is_resolved: !isUnread,
-          conversation_status: isDone ? "done" : "open",
+          conversation_status: effectiveStatus,
           priority: emailPriority,
           gmail_email: email, // Store reference to original email for rendering
         };
