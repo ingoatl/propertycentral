@@ -388,20 +388,35 @@ serve(async (req) => {
 
         if (!existingCall) {
           // Create discovery call entry
-          const { error: insertError } = await supabase
+          const { data: newCall, error: insertError } = await supabase
             .from("discovery_calls")
             .insert({
               lead_id: matchedLeadId,
               scheduled_at: new Date(apt.startTime as string).toISOString(),
               status: apt.appointmentStatus === "cancelled" ? "cancelled" : "scheduled",
-              meeting_type: "video",
+              meeting_type: meetingLink ? "video" : "phone",
+              google_meet_link: meetingLink || null,
               meeting_notes: apt.notes || `Synced from GHL Calendar: ${apt.calendarName}`,
-            });
+            })
+            .select()
+            .single();
 
           if (insertError) {
             console.error(`[GHL Calendar Sync] Error creating discovery call:`, insertError);
           } else {
             console.log(`[GHL Calendar Sync] Created discovery call for lead ${matchedLeadDetails?.name}`);
+            
+            // Auto-schedule Recall.ai bot for video calls
+            if (meetingLink && newCall?.id) {
+              try {
+                console.log(`[GHL Calendar Sync] Auto-scheduling Recall bot for new call: ${newCall.id}`);
+                await supabase.functions.invoke("recall-auto-schedule-bot", {
+                  body: { discoveryCallId: newCall.id },
+                });
+              } catch (recallError) {
+                console.error(`[GHL Calendar Sync] Failed to auto-schedule Recall bot:`, recallError);
+              }
+            }
           }
         }
       }
