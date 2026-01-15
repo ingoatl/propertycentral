@@ -1863,6 +1863,47 @@ export type Database = {
         }
         Relationships: []
       }
+      gmail_token_refresh_log: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          new_expires_at: string | null
+          old_expires_at: string | null
+          refresh_type: string
+          success: boolean
+          token_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          new_expires_at?: string | null
+          old_expires_at?: string | null
+          refresh_type: string
+          success?: boolean
+          token_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          new_expires_at?: string | null
+          old_expires_at?: string | null
+          refresh_type?: string
+          success?: boolean
+          token_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_token_refresh_log_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "gmail_oauth_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_calendar_tokens: {
         Row: {
           access_token: string
