@@ -48,7 +48,7 @@ const BookInspection = lazy(() => import("./pages/BookInspection"));
 const OnboardingPresentation = lazy(() => import("./pages/OnboardingPresentation"));
 const RescheduleCall = lazy(() => import("./pages/RescheduleCall"));
 
-// Optimized QueryClient with caching and stale time
+// Optimized QueryClient with caching and stale time configuration
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
