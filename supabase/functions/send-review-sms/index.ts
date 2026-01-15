@@ -40,7 +40,7 @@ serve(async (req) => {
   }
 
   try {
-    const { reviewId, action, requestId, forceTime, to, body } = await req.json();
+    const { reviewId, action, requestId, forceTime, to, body, testPhone } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -455,8 +455,16 @@ serve(async (req) => {
     }
 
     if (action === "test") {
-      // Send test to Ingo's phone - use the REAL permission ask message
-      const adminPhone = "+17709065022";
+      // Send test to specified phone or default to Ingo's phone
+      const adminPhone = testPhone ? formatPhoneE164(testPhone) : "+17709065022";
+      
+      // Look up which user owns this phone number for proper inbox routing
+      const { data: phoneAssignment } = await supabase
+        .from("user_phone_assignments")
+        .select("user_id, phone_assignment_id:id")
+        .eq("phone_number", adminPhone)
+        .eq("is_active", true)
+        .maybeSingle();
       
       // Get the most recent review with review_text to link with this test
       const { data: recentReview } = await supabase
@@ -502,6 +510,21 @@ serve(async (req) => {
         status: testResult.success ? "sent" : "failed",
         error_message: testResult.error,
       });
+      
+      // Also store in user_phone_messages if we found a user assignment
+      // This ensures it shows up in the right team member's inbox
+      if (phoneAssignment?.user_id) {
+        await supabase.from("user_phone_messages").insert({
+          user_id: phoneAssignment.user_id,
+          phone_assignment_id: phoneAssignment.phone_assignment_id,
+          from_number: GOOGLE_REVIEWS_PHONE,
+          to_number: adminPhone,
+          body: testMessage,
+          direction: "outbound",
+          status: testResult.success ? "sent" : "failed",
+          external_id: testResult.messageId,
+        });
+      }
 
       if (!testResult.success) {
         console.error(`Test SMS failed: ${testResult.error}`);
