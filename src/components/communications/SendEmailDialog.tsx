@@ -30,6 +30,8 @@ interface SendEmailDialogProps {
   contactId: string;
   replyToSubject?: string;
   replyToBody?: string;
+  gmailMessageId?: string;
+  onEmailSent?: () => void;
 }
 
 const SENDERS = [
@@ -84,6 +86,8 @@ export function SendEmailDialog({
   contactId,
   replyToSubject,
   replyToBody,
+  gmailMessageId,
+  onEmailSent,
 }: SendEmailDialogProps) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -165,6 +169,11 @@ export function SendEmailDialog({
       setBody("");
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
       queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["gmail-emails"] });
+      // Mark email as done after sending reply
+      if (onEmailSent) {
+        onEmailSent();
+      }
       onOpenChange(false);
     },
     onError: (error: any) => {
