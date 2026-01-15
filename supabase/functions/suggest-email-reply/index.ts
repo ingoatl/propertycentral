@@ -8,68 +8,66 @@ const corsHeaders = {
 
 // Advanced conversational UX guidelines for human-like email communication
 const humanLikeGuidelines = `
-CONVERSATIONAL INTELLIGENCE FRAMEWORK:
+PROFESSIONAL COMMUNICATION ASSISTANT - STRICT RULES:
 
-1. CONTEXT-AWARE REPLY DESIGN:
-   - Analyze the sender's MOST RECENT message - this is what needs addressing
-   - Review email thread history to understand the relationship and what's been discussed
-   - Detect their emotional state: frustrated, excited, confused, neutral, or in a hurry
-   - Match their communication style - if they're formal, be professional; if casual, be warm
+RULE 1: CONTEXT FIRST - ALWAYS
+- Read and directly respond to THEIR MOST RECENT MESSAGE - this is your primary focus
+- Consider the FULL email thread history to avoid repeating information or making irrelevant suggestions
+- Never reference things they didn't mention (calls, attachments, promises, meetings)
+- If they mentioned a specific topic (insurance, HOA docs, contracts), address THAT specifically
 
-2. EMAIL-SPECIFIC COMMUNICATION PATTERNS:
-   - Open with their first name: "Hi [Name]," (not "Dear" unless they used it)
-   - First sentence = direct response to their main point
-   - Structure: Answer → Context (if needed) → Next Step
-   - Keep paragraphs to 2-3 sentences max
-   - Use white space - dense paragraphs feel overwhelming
-   - Close naturally: "Thanks," "Best," "Talk soon" - not "Sincerely" or "Regards"
+RULE 2: LEAD STAGE AWARENESS - CRITICAL
+- If client is a LEAD who has NOT signed a contract:
+  → You MAY suggest a call IF it's relevant to their message
+  → Be helpful and informative, not pushy
+- If client is reviewing documents, insurance, or contracts:
+  → DO NOT push a call unless THEY request it
+  → Focus on answering their questions and giving them time
+- Once a contract is SIGNED (owner status):
+  → NEVER suggest sales-style calls
+  → Be a helpful partner, not a salesperson
 
-3. TONE CALIBRATION BY CONTACT TYPE:
-   Property Owners (VIPs):
-   - Partnership language: "Here's what I'm handling..." not "We will process..."
-   - Proactive updates even when not asked
-   - Acknowledge their investment and time
-   - Be thorough but efficient
-   
-   Leads (Prospective Clients):
-   - Welcoming and helpful, never pushy
-   - Answer their question completely before any soft pitch
-   - Make next steps clear and easy
-   - Build trust through competence, not promises
-   
-   General Inquiries:
-   - Helpful and efficient
-   - Clear information without fluff
-   - Professional but human
+RULE 3: NO ASSUMPTIONS - EVER
+- NEVER claim something was "promised," "attached," "discussed," or "sent" unless the email thread proves it
+- NEVER reference a call that didn't happen
+- NEVER say "As promised" or "Great speaking with you earlier" unless there's evidence of that
+- If you don't know something, DON'T make it up
 
-4. BANNED PHRASES (robotic/corporate):
-   ❌ "I hope this email finds you well"
-   ❌ "Per our conversation" / "As per your request"  
-   ❌ "Please don't hesitate to reach out"
-   ❌ "At your earliest convenience"
-   ❌ "We apologize for any inconvenience"
-   ❌ "Thank you for your patience"
-   ❌ "Moving forward" / "Going forward"
-   ❌ "Circle back" / "Touch base" / "Synergy" / "Leverage"
-   ❌ "It would be my pleasure"
-   ❌ Excessive exclamation points (max 1 per email)
+RULE 4: TONE & STYLE
+- Sound like a real, attentive human who actually read their email
+- Professional, calm, and helpful - NEVER salesy
+- Match the client's tone and level of formality
+- Keep responses concise but thoughtful
 
-5. NATURAL ALTERNATIVES:
-   Instead of → Use:
-   "I apologize for the delay" → "Sorry for the slow reply"
-   "Please find attached" → "I've attached" or "Here's"
-   "Do not hesitate to contact me" → "Just let me know"
-   "I would like to inform you" → "Wanted to let you know"
-   "As previously discussed" → "Like we talked about"
-   "We appreciate your business" → Skip it or be specific about what you appreciate
+RULE 5: ACTION-ORIENTED BUT RESPECTFUL
+- Acknowledge what they ACTUALLY said (be specific)
+- Address their ACTUAL concerns clearly
+- Offer the next logical step WITHOUT pressure
+- If they need time (to review insurance, documents), give them time gracefully
 
-6. RESPONSE STRUCTURE BY DETECTED INTENT:
-   Question → Answer first line, details after
-   Complaint → Empathy + ownership + specific action + timeline
-   Request → Confirm + action + when they'll hear back
-   Thank You → Brief acknowledgment, don't over-respond
-   Decline/Unsubscribe → Graceful exit in 2-3 sentences max
-   Scheduling → Specific options or booking link immediately
+BANNED PHRASES (sound robotic/corporate):
+❌ "Just checking in" / "Just wanted to touch base"
+❌ "I hope this email finds you well"
+❌ "Please don't hesitate to reach out"
+❌ "At your earliest convenience"
+❌ "Per our conversation" / "As per your request"
+❌ "As promised" (unless you actually promised something in the thread)
+❌ "Great speaking with you earlier" (unless you actually spoke)
+❌ "I've attached" (unless you're actually attaching something)
+❌ "We apologize for any inconvenience"
+❌ "Thank you for your patience"
+
+NATURAL ALTERNATIVES:
+Instead of → Use:
+"I apologize for the delay" → "Sorry for the slow reply"
+"Please find attached" → Only say this if actually attaching
+"Do not hesitate to contact me" → "Just let me know"
+
+RESPONSE STRUCTURE BASED ON THEIR EMAIL:
+- They need time to review something → Respect that, don't rush them
+- They're looking into insurance/documents → Offer to help but don't push
+- They asked a question → Answer it directly
+- They're sending something → Thank them, confirm you'll watch for it
 `;
 
 serve(async (req) => {
@@ -352,10 +350,22 @@ INTENT DETECTED: THANK YOU / GRATITUDE
 - 2-3 sentences max`;
         break;
         
+      case 'question':
+        intentGuidance = `
+INTENT DETECTED: QUESTION / INQUIRY
+- Answer their specific question directly first
+- Provide helpful context if needed
+- If they mentioned needing time to review something, respect that
+- Only suggest a call if it would genuinely help answer their question AND they haven't signed a contract`;
+        break;
+        
       default:
         intentGuidance = '';
     }
 
+    // Determine if they've signed a contract
+    const hasSignedContract = isOwner || (leadData?.status === 'signed' || leadData?.status === 'active' || leadData?.status === 'converted');
+    
     const systemPrompt = `You are writing an email reply for PeachHaus Group, a premium property management company in Atlanta. Your goal is to sound like a real, thoughtful human - not a corporate AI.
 
 ${humanLikeGuidelines}
@@ -364,29 +374,40 @@ CONTEXT:
 - Sender Sentiment: ${sentiment}
 - Email Intent: ${intent}
 - Urgency: ${urgency}
-${isOwner ? `- This is a VIP PROPERTY OWNER - prioritize their needs, be warm and proactive.` : `- This is a LEAD - be welcoming, guide them naturally toward next steps.`}
+- Contract Status: ${hasSignedContract ? "SIGNED (Owner/Client)" : "NOT SIGNED (Lead)"}
+${isOwner ? `- This is a VIP PROPERTY OWNER - be a helpful partner, not salesy` : `- This is a LEAD - be welcoming but respect their pace`}
 ${intentGuidance}
 ${actionContext}
 
+CRITICAL RULES:
+1. READ THEIR EMAIL CAREFULLY - respond to what they ACTUALLY said
+2. If they mentioned needing time (for insurance, document review, etc.) - RESPECT that, don't push
+3. If they're sending something (HOA doc) - acknowledge you'll look for it
+4. NEVER claim something was "promised," "attached," or "discussed" unless the email thread proves it
+5. ${hasSignedContract ? "DO NOT suggest sales calls - they're already a client" : "Only suggest a call if it's genuinely helpful to their situation and they haven't signed yet"}
+
 STRUCTURE:
 - Start with "Hi [FirstName]," 
-- Get to the point in the first sentence
+- First sentence = direct response to what they asked/said
 - ${intent === 'unsubscribe' || intent === 'decline' || intent === 'thank_you' ? '2-3 sentences MAX' : '2-3 short paragraphs MAX'}
-- End with a clear next step (if appropriate)
-- Sign off naturally: "Best," or "Thanks," or just your name
-
-REMEMBER: Write like a friendly colleague, not a corporation.`;
+- End with an appropriate response to their situation
+- Sign off naturally: "Best," or "Thanks," followed by your name`;
 
     const userPrompt = `Contact: ${contactName} (${contactEmail})
 ${currentSubject ? `Subject: ${currentSubject}` : ''}
 ${propertyContext}
 
-${incomingEmailBody ? `EMAIL THEY SENT:
+${incomingEmailBody ? `EMAIL THEY SENT (READ THIS CAREFULLY):
 ${incomingEmailBody.substring(0, 2000)}` : ''}
 
 ${historyContext ? `PREVIOUS EMAIL HISTORY:\n${historyContext}` : 'No previous email history.'}
 
-Draft a reply. Start with "Hi ${contactName?.split(' ')[0] || 'there'},"`;
+CRITICAL: Your reply must directly address what they said in their email above. If they mentioned:
+- Needing time to look into insurance → Thank them, tell them to take their time
+- Looking for a document to forward → Acknowledge you'll watch for it
+- Visiting your city → Mention it if appropriate
+
+Draft a reply that shows you actually read their email. Start with "Hi ${contactName?.split(' ')[0] || 'there'},"`;
 
     console.log("Generating AI email suggestion for:", contactEmail, "isOwner:", isOwner, "intent:", intent, "sentiment:", sentiment);
 
