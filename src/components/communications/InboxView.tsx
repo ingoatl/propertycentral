@@ -903,8 +903,10 @@ export function InboxView() {
           .limit(100);
         
         // Filter by user assignment - only show messages assigned to the target user
-        // Do NOT show unassigned messages to everyone - they should only appear in admin "all" view
+        // CRITICAL: Messages with NO assignment (all null) should ONLY appear in admin "all" view
+        // This prevents unrouted messages from appearing in every user's personal inbox
         if (!viewAllInboxes && targetUserId) {
+          // Only include messages explicitly assigned to this user
           commsQuery = commsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_user_id.eq.${targetUserId}`);
         }
         

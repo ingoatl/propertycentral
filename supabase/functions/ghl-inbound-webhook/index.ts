@@ -80,17 +80,40 @@ async function findLastOutboundSender(supabase: any, contactPhone: string): Prom
     const match = recentOutbound[0];
     console.log("Found recent outbound in user_phone_messages:", match);
     
-    // Get the assignment details to verify it's personal
-    const { data: assignment } = await supabase
-      .from("user_phone_assignments")
-      .select("id, user_id, display_name, phone_type")
-      .eq("id", match.phone_assignment_id)
-      .eq("is_active", true)
-      .single();
+    // If we have a phone_assignment_id, verify it's personal
+    if (match.phone_assignment_id) {
+      const { data: assignment } = await supabase
+        .from("user_phone_assignments")
+        .select("id, user_id, display_name, phone_type")
+        .eq("id", match.phone_assignment_id)
+        .eq("is_active", true)
+        .single();
+        
+      if (assignment && assignment.phone_type === "personal") {
+        console.log("Reverse lookup SUCCESS - found personal assignment:", assignment);
+        return { userId: assignment.user_id, assignmentId: assignment.id, displayName: assignment.display_name };
+      }
+    }
+    
+    // Even if no phone_assignment_id, we have a user_id - try to find their personal phone
+    if (match.user_id) {
+      const { data: userAssignment } = await supabase
+        .from("user_phone_assignments")
+        .select("id, user_id, display_name, phone_type")
+        .eq("user_id", match.user_id)
+        .eq("phone_type", "personal")
+        .eq("is_active", true)
+        .limit(1)
+        .single();
+        
+      if (userAssignment) {
+        console.log("Reverse lookup SUCCESS - found user's personal assignment:", userAssignment);
+        return { userId: userAssignment.user_id, assignmentId: userAssignment.id, displayName: userAssignment.display_name };
+      }
       
-    if (assignment && assignment.phone_type === "personal") {
-      console.log("Reverse lookup SUCCESS - found personal assignment:", assignment);
-      return { userId: assignment.user_id, assignmentId: assignment.id, displayName: assignment.display_name };
+      // Last resort: return user_id without assignment (for assigned_user_id routing only)
+      console.log("Reverse lookup - found user_id but no personal assignment, routing to user anyway:", match.user_id);
+      return { userId: match.user_id, assignmentId: null, displayName: null };
     }
   }
   
@@ -484,11 +507,17 @@ serve(async (req) => {
       console.log("SMS routing - Attempting reverse lookup for contact:", normalizedPhone);
       const sender = await findLastOutboundSender(supabase, normalizedPhone);
       
-      if (sender.userId && sender.assignmentId) {
+      if (sender.userId) {
         assignedUserId = sender.userId;
-        routedPhoneAssignmentId = sender.assignmentId;
-        isPersonalPhoneMessage = true;
-        console.log("SMS routing - Reverse lookup SUCCESS, routing to user:", assignedUserId);
+        // Only set as personal phone message if we have both userId AND assignmentId
+        if (sender.assignmentId) {
+          routedPhoneAssignmentId = sender.assignmentId;
+          isPersonalPhoneMessage = true;
+          console.log("SMS routing - Reverse lookup SUCCESS with assignment, routing to user:", assignedUserId);
+        } else {
+          // We have a user but no personal phone assignment - still route to their inbox via assigned_user_id
+          console.log("SMS routing - Reverse lookup found user but no assignment, routing via assigned_user_id:", assignedUserId);
+        }
       } else {
         console.log("SMS routing - Reverse lookup found no sender, goes to shared inbox only");
       }
