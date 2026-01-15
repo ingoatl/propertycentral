@@ -368,11 +368,74 @@ serve(async (req) => {
     // ============================================
     
     // Look up which team member owns this receiving number for routing
+    // GHL often doesn't tell us which number received the message, so we try multiple methods:
+    // 1. If toNumber is available, look up who owns that phone number
+    // 2. Otherwise, check the last OUTBOUND message to this contact to see which user sent it
+    // 3. Fall back to checking GHL contact's assigned user (if available in payload)
     let assignedUserId: string | null = null;
+    
     if (toNumber) {
       assignedUserId = await findPhoneOwner(supabase, toNumber);
-      console.log("SMS routing - Assigned user:", assignedUserId);
+      console.log("SMS routing - Found user by toNumber:", assignedUserId);
     }
+    
+    // If we couldn't find user by toNumber, check recent outbound messages to this contact
+    if (!assignedUserId) {
+      // Check user_phone_messages for recent outbound to this contact
+      const { data: recentOutbound } = await supabase
+        .from("user_phone_messages")
+        .select("user_id, phone_assignment_id")
+        .eq("to_number", normalizedPhone)
+        .eq("direction", "outbound")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (recentOutbound?.user_id) {
+        assignedUserId = recentOutbound.user_id;
+        console.log("SMS routing - Found user by recent outbound:", assignedUserId);
+        
+        // Also get the phone assignment to know which phone they use
+        if (recentOutbound.phone_assignment_id) {
+          const { data: assignment } = await supabase
+            .from("user_phone_assignments")
+            .select("phone_number")
+            .eq("id", recentOutbound.phone_assignment_id)
+            .maybeSingle();
+          
+          if (assignment?.phone_number && !toNumber) {
+            // Set toNumber based on the phone assignment used previously
+            console.log("SMS routing - Inferred toNumber from previous outbound:", assignment.phone_number);
+          }
+        }
+      }
+    }
+    
+    // If still no user found, check lead_communications for recent outbound
+    if (!assignedUserId) {
+      const { data: recentLeadOutbound } = await supabase
+        .from("lead_communications")
+        .select("assigned_to, assigned_user_id, recipient_user_id")
+        .ilike("metadata->>unmatched_phone", `%${last10Digits}%`)
+        .eq("direction", "outbound")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (recentLeadOutbound) {
+        assignedUserId = recentLeadOutbound.assigned_user_id || recentLeadOutbound.assigned_to || recentLeadOutbound.recipient_user_id;
+        console.log("SMS routing - Found user by lead communications:", assignedUserId);
+      }
+    }
+    
+    // Final fallback: check GHL payload for assigned user field
+    if (!assignedUserId && (payload.assignedTo || payload.assignedUserId || payload.user_id)) {
+      const ghlAssignedId = payload.assignedTo || payload.assignedUserId || payload.user_id;
+      // Try to map GHL user ID to our user ID (you might need a mapping table for this)
+      console.log("SMS routing - GHL assigned user:", ghlAssignedId);
+    }
+    
+    console.log("SMS routing - Final assigned user:", assignedUserId);
     
     // Extract media URLs from MMS attachments - check ALL possible locations
     const mediaUrls: string[] = [];
@@ -504,29 +567,71 @@ serve(async (req) => {
         .single();
 
       // Also store in user_phone_messages if routed to a specific team member
-      if (assignedUserId && toNumber) {
-        const { data: phoneAssignment } = await supabase
-          .from("user_phone_assignments")
-          .select("id")
-          .eq("phone_number", normalizePhone(toNumber))
-          .eq("is_active", true)
-          .maybeSingle();
+      // This ensures messages appear in their personal inbox
+      if (assignedUserId) {
+        // Try to find the phone assignment for this user (their personal phone)
+        let phoneAssignmentId: string | null = null;
+        let resolvedToNumber = toNumber;
         
-        if (phoneAssignment) {
+        if (toNumber) {
+          const { data: phoneAssignment } = await supabase
+            .from("user_phone_assignments")
+            .select("id")
+            .eq("phone_number", normalizePhone(toNumber))
+            .eq("is_active", true)
+            .maybeSingle();
+          phoneAssignmentId = phoneAssignment?.id || null;
+        }
+        
+        // If no toNumber known, look up the user's personal phone assignment
+        if (!phoneAssignmentId) {
+          const { data: userPhoneAssignment } = await supabase
+            .from("user_phone_assignments")
+            .select("id, phone_number")
+            .eq("user_id", assignedUserId)
+            .eq("phone_type", "personal")
+            .eq("is_active", true)
+            .maybeSingle();
+          
+          if (userPhoneAssignment) {
+            phoneAssignmentId = userPhoneAssignment.id;
+            resolvedToNumber = userPhoneAssignment.phone_number;
+            console.log("Using user's personal phone assignment:", userPhoneAssignment.phone_number);
+          }
+        }
+        
+        // Store the message if we have a phone assignment
+        if (phoneAssignmentId) {
           await supabase
             .from("user_phone_messages")
             .insert({
               user_id: assignedUserId,
-              phone_assignment_id: phoneAssignment.id,
+              phone_assignment_id: phoneAssignmentId,
               direction: "inbound",
               from_number: normalizedPhone,
-              to_number: normalizePhone(toNumber),
+              to_number: resolvedToNumber ? normalizePhone(resolvedToNumber) : null,
               body: messageBody,
               media_urls: mediaUrls.length > 0 ? mediaUrls : null,
               status: "received",
               external_id: ghlContactId,
             });
           console.log("Unmatched message stored in user_phone_messages for user:", assignedUserId);
+        } else {
+          // Even without phone assignment, store with just user_id
+          await supabase
+            .from("user_phone_messages")
+            .insert({
+              user_id: assignedUserId,
+              phone_assignment_id: null,
+              direction: "inbound",
+              from_number: normalizedPhone,
+              to_number: null,
+              body: messageBody,
+              media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+              status: "received",
+              external_id: ghlContactId,
+            });
+          console.log("Unmatched message stored in user_phone_messages (no assignment) for user:", assignedUserId);
         }
       }
 
@@ -575,24 +680,45 @@ serve(async (req) => {
 
     // Also store in user_phone_messages if this is routed to a specific team member
     // This ensures messages show up in team member inboxes
-    if (assignedUserId && toNumber) {
-      // Find the phone assignment for this number
-      const { data: phoneAssignment } = await supabase
-        .from("user_phone_assignments")
-        .select("id")
-        .eq("phone_number", normalizePhone(toNumber))
-        .eq("is_active", true)
-        .maybeSingle();
+    if (assignedUserId) {
+      let phoneAssignmentId: string | null = null;
+      let resolvedToNumber = toNumber;
       
-      if (phoneAssignment) {
+      if (toNumber) {
+        const { data: phoneAssignment } = await supabase
+          .from("user_phone_assignments")
+          .select("id")
+          .eq("phone_number", normalizePhone(toNumber))
+          .eq("is_active", true)
+          .maybeSingle();
+        phoneAssignmentId = phoneAssignment?.id || null;
+      }
+      
+      // If no toNumber known, look up the user's personal phone assignment
+      if (!phoneAssignmentId) {
+        const { data: userPhoneAssignment } = await supabase
+          .from("user_phone_assignments")
+          .select("id, phone_number")
+          .eq("user_id", assignedUserId)
+          .eq("phone_type", "personal")
+          .eq("is_active", true)
+          .maybeSingle();
+        
+        if (userPhoneAssignment) {
+          phoneAssignmentId = userPhoneAssignment.id;
+          resolvedToNumber = userPhoneAssignment.phone_number;
+        }
+      }
+      
+      if (phoneAssignmentId) {
         const { error: userMsgError } = await supabase
           .from("user_phone_messages")
           .insert({
             user_id: assignedUserId,
-            phone_assignment_id: phoneAssignment.id,
+            phone_assignment_id: phoneAssignmentId,
             direction: "inbound",
             from_number: normalizedPhone,
-            to_number: normalizePhone(toNumber),
+            to_number: resolvedToNumber ? normalizePhone(resolvedToNumber) : null,
             body: messageBody,
             media_urls: mediaUrls.length > 0 ? mediaUrls : null,
             status: "received",
@@ -603,6 +729,27 @@ serve(async (req) => {
           console.error("Error storing to user_phone_messages:", userMsgError);
         } else {
           console.log("Message also stored in user_phone_messages for user:", assignedUserId);
+        }
+      } else {
+        // Even without phone assignment, store with just user_id
+        const { error: userMsgError } = await supabase
+          .from("user_phone_messages")
+          .insert({
+            user_id: assignedUserId,
+            phone_assignment_id: null,
+            direction: "inbound",
+            from_number: normalizedPhone,
+            to_number: null,
+            body: messageBody,
+            media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+            status: "received",
+            external_id: ghlContactId,
+          });
+        
+        if (userMsgError) {
+          console.error("Error storing to user_phone_messages:", userMsgError);
+        } else {
+          console.log("Message stored in user_phone_messages (no assignment) for user:", assignedUserId);
         }
       }
     }
