@@ -66,7 +66,7 @@ import { EmailActionModal } from "./EmailActionModal";
 import { InboxZeroGuide } from "./InboxZeroGuide";
 import { ConversationQuickActions } from "./ConversationQuickActions";
 import { PriorityBadge } from "./PriorityBadge";
-import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript, extractCallerNameFromTranscript } from "./VoiceAIBadge";
+import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript, extractCallerNameFromTranscript, extractMentionedTeamMember } from "./VoiceAIBadge";
 import { CallRecordingPlayer } from "./CallRecordingPlayer";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 
@@ -922,6 +922,25 @@ export function InboxView() {
               tenantMap.set(normalized, { id: t.id, name: t.tenant_name, phone: t.tenant_phone, email: t.tenant_email });
             }
           });
+          
+          // Team member name to ID mapping for Voice AI routing
+          const teamMemberIds: Record<string, string> = {
+            'alex': 'fbd13e57-3a59-4c53-bb3b-14ab354b3420',
+            'anja': 'b2f495ac-2062-446e-bfa0-2197a82114c1',
+            'ingo': '8f7c8f43-536f-4587-99dc-5086c144a045',
+            'chris': 'c4d6b107-70cd-487f-884c-0400edaf9f6f',
+            'christian': 'c4d6b107-70cd-487f-884c-0400edaf9f6f',
+            'catherine': '925a186d-ed85-42a2-9388-7032c315f239',
+          };
+          
+          // Reverse lookup: ID to name
+          const idToName: Record<string, string> = {
+            'fbd13e57-3a59-4c53-bb3b-14ab354b3420': 'alex',
+            'b2f495ac-2062-446e-bfa0-2197a82114c1': 'anja',
+            '8f7c8f43-536f-4587-99dc-5086c144a045': 'ingo',
+            'c4d6b107-70cd-487f-884c-0400edaf9f6f': 'chris',
+            '925a186d-ed85-42a2-9388-7032c315f239': 'catherine',
+          };
 
           for (const comm of allComms) {
             const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null } | null;
@@ -945,6 +964,20 @@ export function InboxView() {
               const callerPhone = extractCallerPhoneFromTranscript(comm.body);
               // Extract the caller's actual name from the transcript conversation
               const callerName = extractCallerNameFromTranscript(comm.body);
+              // Check if a specific team member was mentioned in the call
+              const mentionedMember = extractMentionedTeamMember(comm.body);
+              
+              // Filter by team member mention when viewing a specific user's inbox
+              if (!viewAllInboxes && targetUserId) {
+                const targetMemberName = idToName[targetUserId]?.toLowerCase();
+                if (mentionedMember) {
+                  // Only include if the mentioned member matches the target user
+                  if (mentionedMember.toLowerCase() !== targetMemberName) {
+                    continue; // Skip this item - it's for a different team member
+                  }
+                }
+              }
+              
               // Use the caller's name if found, otherwise use "PeachHaus Receptionist" to indicate it was AI-handled
               contactName = callerName || "PeachHaus Receptionist";
               contactPhone = callerPhone || metadata?.unmatched_phone || metadata?.ghl_data?.contactPhone;

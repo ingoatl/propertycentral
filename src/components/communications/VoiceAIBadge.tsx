@@ -127,6 +127,51 @@ export function extractCallerNameFromTranscript(body: string): string | null {
   return null;
 }
 
+// Helper to extract mentioned team member names from Voice AI transcript
+// This finds if a caller asked to speak with a specific team member like "Alex", "Anja", etc.
+export function extractMentionedTeamMember(body: string): string | null {
+  if (!body) return null;
+  
+  // Known team members (case-insensitive matching)
+  const teamMembers = ['alex', 'anja', 'ingo', 'chris', 'christian', 'catherine'];
+  
+  // Patterns that indicate the caller wants to speak to someone specific
+  const mentionPatterns = [
+    // "connect me to Alex" or "transfer to Anja"
+    /(?:connect|transfer|speak|talk)\s+(?:me\s+)?(?:to|with)\s+(\w+)/gi,
+    // "is Alex available" or "can I speak with Ingo"
+    /(?:is|can\s+I\s+speak\s+with|looking\s+for)\s+(\w+)\s+(?:available|there|around)?/gi,
+    // "I'm looking for Alex" or "I need to reach Anja"
+    /(?:looking\s+for|need\s+to\s+reach|trying\s+to\s+reach)\s+(\w+)/gi,
+    // "Alex please" or "Ingo, please"
+    /\b(\w+)[,]?\s*please\b/gi,
+    // Direct reference in transcript like "human:Alex" or "bot:...Alex..."
+    /(?:human|bot|user):\s*.*\b(alex|anja|ingo|chris|christian|catherine)\b/gi,
+  ];
+  
+  for (const pattern of mentionPatterns) {
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(body)) !== null) {
+      const name = match[1]?.toLowerCase().trim();
+      if (teamMembers.includes(name)) {
+        // Return properly capitalized
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      }
+    }
+  }
+  
+  // Also do a simple scan for team member names in the body
+  const bodyLower = body.toLowerCase();
+  for (const member of teamMembers) {
+    if (bodyLower.includes(member)) {
+      return member.charAt(0).toUpperCase() + member.slice(1);
+    }
+  }
+  
+  return null;
+}
+
 export function VoiceAIBadge({ callerPhone, agentName, onCallBack, compact = false }: VoiceAIBadgeProps) {
   if (compact) {
     return (
