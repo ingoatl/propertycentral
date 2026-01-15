@@ -285,19 +285,10 @@ serve(async (req) => {
     const contactName = fullName || firstName || "Lead";
     
     // Extract the "to" number (the GHL number that received the SMS)
-    // GHL may provide this in various locations - check all possibilities
+    // GHL workflow payloads often don't include this - we'll detect by checking for pending review requests
     const toNumber = message.to || payload.to || payload.toNumber || message.phoneNumberId || 
-                     payload.phone_number_id || message.toNumber || payload.fromNumber ||
-                     message.from_number_id || null;
-    console.log("SMS routing - To number candidates:", {
-      messageTo: message.to,
-      payloadTo: payload.to,
-      payloadToNumber: payload.toNumber,
-      messagePhoneNumberId: message.phoneNumberId,
-      payloadPhoneNumberId: payload.phone_number_id,
-      fromNumberId: message.from_number_id,
-    });
-    console.log("SMS routing - Selected To number:", toNumber);
+                     payload.phone_number_id || message.toNumber || message.from_number_id || null;
+    console.log("SMS routing - To number:", toNumber);
     
     // Extract phone digits for matching
     const normalizedPhone = normalizePhone(contactPhone);
@@ -306,13 +297,32 @@ serve(async (req) => {
     
     // ============================================
     // CHECK IF THIS IS A GOOGLE REVIEWS MESSAGE
-    // Also check if message originates from Google Reviews source tag
+    // Since GHL doesn't always tell us which number received the message,
+    // we check if this phone has a PENDING Google review request
     // ============================================
+    const { data: pendingReviewRequest } = await supabase
+      .from("google_review_requests")
+      .select("id")
+      .ilike("guest_phone", `%${last10Digits}`)
+      .in("workflow_status", ["permission_asked", "pending"])
+      .eq("opted_out", false)
+      .limit(1)
+      .maybeSingle();
+    
+    const hasPendingGoogleReview = !!pendingReviewRequest;
+    const isGoogleReviewsToNumber = isGoogleReviewsNumber(toNumber);
     const isGoogleSource = payload.source === "GoogleReviews" || 
                            payload.customField?.source === "GoogleReviews" ||
-                           (message.source && message.source.includes("Google"));
+                           (message.source && String(message.source).includes("Google"));
     
-    if (isGoogleReviewsNumber(toNumber) || isGoogleSource) {
+    console.log("Google Reviews routing check:", {
+      hasPendingGoogleReview,
+      isGoogleReviewsToNumber,
+      isGoogleSource,
+      last10Digits
+    });
+    
+    if (hasPendingGoogleReview || isGoogleReviewsToNumber || isGoogleSource) {
       console.log("=== GOOGLE REVIEWS CHANNEL (GHL) ===");
       
       const reviewResult = await processGoogleReviewReply(
@@ -331,9 +341,16 @@ serve(async (req) => {
         );
       }
       
-      // Even if not handled by review flow, we still processed it
+      // Even if not handled by review flow, we still processed it - log to Google Reviews inbox
+      await supabase.from("sms_log").insert({
+        phone_number: normalizedPhone,
+        message_type: "inbound_unmatched_reviews",
+        message_body: messageBody,
+        status: "received",
+      });
+      
       return new Response(
-        JSON.stringify({ success: true, message: "Google reviews channel - no pending request" }),
+        JSON.stringify({ success: true, message: "Google reviews channel - logged for processing" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
