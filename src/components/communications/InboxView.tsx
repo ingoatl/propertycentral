@@ -2281,10 +2281,9 @@ export function InboxView() {
           </div>
         )}
 
-        {/* Filters row - compact horizontal scroll with help guide */}
-        <div className="relative">
-          <div className="px-2 sm:px-3 py-2 border-b overflow-x-auto scrollbar-hide">
-          <div className="flex items-center gap-1.5 min-w-max">
+        {/* Filters row - compact with dropdown for filters */}
+        <div className="px-2 sm:px-3 py-2 border-b">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {/* Notification bell */}
             <TeamNotificationBell />
             {/* Admin inbox selector - for SMS/Calls */}
@@ -2305,7 +2304,7 @@ export function InboxView() {
                       <Plus className="h-4 w-4" />
                       <span className="hidden sm:inline">Compose</span>
                     </Button>
-                    <div className="w-px h-5 bg-border mx-1" />
+                    <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
                   </>
                 )}
                 {/* Enhanced Inbox Selector - filter emails by team member, "All" only for admins */}
@@ -2317,7 +2316,7 @@ export function InboxView() {
                 />
                 {activeTab === "emails" && (
                   <>
-                    <div className="w-px h-5 bg-border mx-1" />
+                    <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
                     {/* AI Category Filter */}
                     <EmailCategoryFilter 
                       selectedCategory={selectedEmailCategory}
@@ -2334,50 +2333,82 @@ export function InboxView() {
               </>
             )}
             
-            {/* Quick filters for chats/calls - Inbox Zero workflow */}
+            {/* Quick filters for chats/calls - Dropdown instead of horizontal buttons */}
             {activeTab !== "emails" && (
               <>
-                {(["all", "open", "urgent", "awaiting", "snoozed", "done", "owners"] as FilterType[]).map((filter) => {
-                  const filterConfig: Record<FilterType, { label: string; icon?: any; color?: string }> = {
-                    all: { label: "All" },
-                    open: { label: "Open", icon: Inbox, color: "bg-blue-500" },
-                    urgent: { label: "Urgent", icon: Zap, color: "bg-red-500" },
-                    awaiting: { label: "Awaiting", icon: Clock, color: "bg-cyan-500" },
-                    snoozed: { label: "Snoozed", icon: Clock, color: "bg-amber-500" },
-                    done: { label: "Done", icon: CheckCheck, color: "bg-green-500" },
-                    owners: { label: "Owners", color: "bg-purple-500" },
-                    unread: { label: "Unread" },
-                  };
-                  const config = filterConfig[filter];
-                  const Icon = config.icon;
-                  
-                  return (
-                    <button 
-                      key={filter} 
-                      onClick={() => setActiveFilter(filter)} 
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                        activeFilter === filter 
-                          ? config.color 
-                            ? `${config.color} text-white` 
-                            : "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
-                      }`}
+                {/* Filter dropdown for mobile-friendly access */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 h-8"
                     >
-                      {Icon && <Icon className="h-3 w-3" />}
-                      <span className="hidden xs:inline sm:inline">{config.label}</span>
-                      {/* Show icon-only on very small screens */}
-                      {!Icon && <span>{config.label}</span>}
-                    </button>
-                  );
-                })}
+                      {(() => {
+                        const filterConfig: Record<FilterType, { label: string; icon?: any; dotColor?: string }> = {
+                          all: { label: "All", icon: Inbox },
+                          open: { label: "Open", icon: MessageSquare, dotColor: "bg-blue-500" },
+                          urgent: { label: "Priority", icon: Zap, dotColor: "bg-red-500" },
+                          awaiting: { label: "Awaiting", icon: Clock, dotColor: "bg-cyan-500" },
+                          snoozed: { label: "Snoozed", icon: Clock, dotColor: "bg-amber-500" },
+                          done: { label: "Done", icon: CheckCheck, dotColor: "bg-green-500" },
+                          owners: { label: "Owners", icon: User, dotColor: "bg-purple-500" },
+                          unread: { label: "Unread", icon: MessageSquare },
+                        };
+                        const config = filterConfig[activeFilter];
+                        const Icon = config.icon;
+                        return (
+                          <>
+                            {config.dotColor && (
+                              <span className={`w-2 h-2 rounded-full ${config.dotColor}`} />
+                            )}
+                            {Icon && <Icon className="h-4 w-4" />}
+                            <span>{config.label}</span>
+                          </>
+                        );
+                      })()}
+                      <Filter className="h-3.5 w-3.5 ml-1 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48">
+                    {(["all", "open", "urgent", "awaiting", "snoozed", "done", "owners"] as FilterType[]).map((filter) => {
+                      const filterConfig: Record<FilterType, { label: string; icon?: any; dotColor?: string }> = {
+                        all: { label: "All", icon: Inbox },
+                        open: { label: "Open", icon: MessageSquare, dotColor: "bg-blue-500" },
+                        urgent: { label: "Priority", icon: Zap, dotColor: "bg-red-500" },
+                        awaiting: { label: "Awaiting", icon: Clock, dotColor: "bg-cyan-500" },
+                        snoozed: { label: "Snoozed", icon: Clock, dotColor: "bg-amber-500" },
+                        done: { label: "Done", icon: CheckCheck, dotColor: "bg-green-500" },
+                        owners: { label: "Owners", icon: User, dotColor: "bg-purple-500" },
+                        unread: { label: "Unread", icon: MessageSquare },
+                      };
+                      const config = filterConfig[filter];
+                      const Icon = config.icon;
+                      
+                      return (
+                        <DropdownMenuItem
+                          key={filter}
+                          onClick={() => setActiveFilter(filter)}
+                          className={`gap-2 ${activeFilter === filter ? "bg-accent" : ""}`}
+                        >
+                          {config.dotColor && (
+                            <span className={`w-2 h-2 rounded-full ${config.dotColor}`} />
+                          )}
+                          {Icon && <Icon className="h-4 w-4" />}
+                          <span className="flex-1">{config.label}</span>
+                          {activeFilter === filter && (
+                            <CheckCheck className="h-4 w-4 text-primary" />
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 {/* Inbox Zero Help Guide */}
                 <InboxZeroGuide />
               </>
             )}
           </div>
-          </div>
-          {/* Right fade indicator for overflow */}
-          <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none border-b" />
         </div>
 
         {/* Message List - Clean, content-first cards */}
