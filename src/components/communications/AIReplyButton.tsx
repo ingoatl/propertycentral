@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp } from "lucide-react";
+import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
 
@@ -36,8 +36,10 @@ export function AIReplyButton({
   const [generatedReply, setGeneratedReply] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedReply, setEditedReply] = useState("");
+  const [showContextInput, setShowContextInput] = useState(false);
+  const [userInstructions, setUserInstructions] = useState("");
 
-  const handleGenerateReply = async () => {
+  const handleGenerateReply = async (withInstructions?: string) => {
     setIsGenerating(true);
     setGeneratedReply(null);
 
@@ -63,6 +65,7 @@ export function AIReplyButton({
           leadId: contactType === "lead" ? contactId : undefined,
           ownerId: contactType === "owner" ? contactId : undefined,
           includeCompanyKnowledge: true,
+          userInstructions: withInstructions || userInstructions || undefined,
         },
       });
 
@@ -72,11 +75,11 @@ export function AIReplyButton({
       if (data?.message) {
         setGeneratedReply(data.message);
         setEditedReply(data.message);
-        toast.success("AI reply generated!");
+        setShowContextInput(false);
+        setUserInstructions("");
       }
     } catch (error: any) {
       console.error("AI reply generation error:", error);
-      toast.error(`Failed to generate reply: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -96,6 +99,8 @@ export function AIReplyButton({
     setGeneratedReply(null);
     setIsEditing(false);
     setEditedReply("");
+    setShowContextInput(false);
+    setUserInstructions("");
   };
 
   const handleEdit = () => {
@@ -109,7 +114,6 @@ export function AIReplyButton({
     const newReply = (isEditing ? editedReply : generatedReply || "") + scheduleText;
     setEditedReply(newReply);
     setIsEditing(true);
-    toast.success("Added scheduling link!");
   };
 
   const handleAddIncomeAnalysis = () => {
@@ -117,8 +121,48 @@ export function AIReplyButton({
     const newReply = (isEditing ? editedReply : generatedReply || "") + incomeText;
     setEditedReply(newReply);
     setIsEditing(true);
-    toast.success("Added income analysis offer!");
   };
+
+  // Show context input panel
+  if (showContextInput && !generatedReply) {
+    return (
+      <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+          <MessageSquare className="h-4 w-4" />
+          <span>What would you like to say?</span>
+        </div>
+        
+        <Textarea
+          value={userInstructions}
+          onChange={(e) => setUserInstructions(e.target.value)}
+          placeholder="Enter context or key points for the AI to include in the reply... e.g. 'Tell them we can do a walkthrough next Tuesday, and ask about their move-in timeline'"
+          className="min-h-[80px] text-sm bg-background resize-y"
+          autoFocus
+        />
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => handleGenerateReply()}
+            disabled={isGenerating || !userInstructions.trim()}
+            className="gap-2"
+          >
+            {isGenerating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            Generate Reply
+          </Button>
+          
+          <Button variant="ghost" size="sm" onClick={handleCancel} className="gap-2">
+            <X className="h-3.5 w-3.5" />
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (generatedReply) {
     return (
@@ -171,7 +215,7 @@ export function AIReplyButton({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             size="sm"
             onClick={handleSend}
@@ -193,6 +237,19 @@ export function AIReplyButton({
             </Button>
           )}
           
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setShowContextInput(true);
+              setGeneratedReply(null);
+            }} 
+            className="gap-2"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            Regenerate with Context
+          </Button>
+          
           <Button variant="ghost" size="sm" onClick={handleCancel} className="gap-2">
             <X className="h-3.5 w-3.5" />
             Cancel
@@ -203,26 +260,40 @@ export function AIReplyButton({
   }
 
   return (
-    <Button
-      variant="default"
-      size="sm"
-      onClick={handleGenerateReply}
-      disabled={isGenerating}
-      className="gap-1.5 h-8 px-3 text-xs sm:text-sm sm:gap-2 sm:px-4 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 whitespace-nowrap flex-shrink-0"
-    >
-      {isGenerating ? (
-        <>
-          <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
-          <span className="hidden sm:inline">Generating...</span>
-          <span className="sm:hidden">AI...</span>
-        </>
-      ) : (
-        <>
-          <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Reply with AI</span>
-          <span className="sm:hidden">AI Reply</span>
-        </>
-      )}
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button
+        variant="default"
+        size="sm"
+        onClick={() => handleGenerateReply()}
+        disabled={isGenerating}
+        className="gap-1.5 h-8 px-3 text-xs sm:text-sm sm:gap-2 sm:px-4 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 whitespace-nowrap flex-shrink-0"
+      >
+        {isGenerating ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+            <span className="hidden sm:inline">Generating...</span>
+            <span className="sm:hidden">AI...</span>
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Reply with AI</span>
+            <span className="sm:hidden">AI Reply</span>
+          </>
+        )}
+      </Button>
+      
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowContextInput(true)}
+        disabled={isGenerating}
+        className="gap-1.5 h-8 px-3 text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
+        title="Generate AI reply with your context"
+      >
+        <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        <span className="hidden sm:inline">With Context</span>
+      </Button>
+    </div>
   );
 }
