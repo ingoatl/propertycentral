@@ -20,34 +20,105 @@ function normalizePhone(phone: string): string {
 
 // Look up which user owns a phone number for SMS routing
 // Returns user_id and phone_assignment_id for proper routing
-async function findPhoneOwner(supabase: any, phoneNumber: string): Promise<{ userId: string | null; assignmentId: string | null; displayName: string | null }> {
+async function findPhoneOwner(supabase: any, phoneNumber: string): Promise<{ userId: string | null; assignmentId: string | null; displayName: string | null; phoneType: string | null }> {
   const normalizedPhone = normalizePhone(phoneNumber);
-  
-  // Also try with last 10 digits for more flexible matching
   const last10 = normalizedPhone.replace(/\D/g, "").slice(-10);
   
+  console.log("Finding phone owner for:", phoneNumber, "normalized:", normalizedPhone, "last10:", last10);
+  
+  // Query ALL active phone assignments - check BOTH phone_number and ghl_phone_number
   const { data } = await supabase
     .from("user_phone_assignments")
-    .select("user_id, id, display_name, phone_number")
+    .select("user_id, id, display_name, phone_number, ghl_phone_number, phone_type")
     .eq("is_active", true);
   
   if (data && data.length > 0) {
-    // Find exact match first
-    const exactMatch = data.find((a: any) => a.phone_number === normalizedPhone);
+    // Find exact match first - check both phone_number and ghl_phone_number
+    const exactMatch = data.find((a: any) => 
+      a.phone_number === normalizedPhone || 
+      a.ghl_phone_number === normalizedPhone
+    );
     if (exactMatch) {
-      return { userId: exactMatch.user_id, assignmentId: exactMatch.id, displayName: exactMatch.display_name };
+      console.log("Found exact match:", exactMatch);
+      return { userId: exactMatch.user_id, assignmentId: exactMatch.id, displayName: exactMatch.display_name, phoneType: exactMatch.phone_type };
     }
     
-    // Try last 10 digits match
+    // Try last 10 digits match on both fields
     const digitMatch = data.find((a: any) => {
-      const assignmentDigits = a.phone_number?.replace(/\D/g, "").slice(-10);
-      return assignmentDigits === last10;
+      const phoneDigits = a.phone_number?.replace(/\D/g, "").slice(-10);
+      const ghlDigits = a.ghl_phone_number?.replace(/\D/g, "").slice(-10);
+      return phoneDigits === last10 || ghlDigits === last10;
     });
     if (digitMatch) {
-      return { userId: digitMatch.user_id, assignmentId: digitMatch.id, displayName: digitMatch.display_name };
+      console.log("Found digit match:", digitMatch);
+      return { userId: digitMatch.user_id, assignmentId: digitMatch.id, displayName: digitMatch.display_name, phoneType: digitMatch.phone_type };
     }
   }
   
+  console.log("No phone owner found");
+  return { userId: null, assignmentId: null, displayName: null, phoneType: null };
+}
+
+// Reverse lookup: Find who last messaged this contact when toNumber is not provided
+// This is CRITICAL for routing inbound SMS to the correct user's inbox
+async function findLastOutboundSender(supabase: any, contactPhone: string): Promise<{ userId: string | null; assignmentId: string | null; displayName: string | null }> {
+  const normalizedPhone = normalizePhone(contactPhone);
+  const last10 = normalizedPhone.replace(/\D/g, "").slice(-10);
+  
+  console.log("Reverse lookup for contact phone:", contactPhone, "last10:", last10);
+  
+  // Strategy 1: Check user_phone_messages for recent outbound to this contact
+  const { data: recentOutbound } = await supabase
+    .from("user_phone_messages")
+    .select("user_id, phone_assignment_id")
+    .eq("direction", "outbound")
+    .or(`to_number.ilike.%${last10}`)
+    .order("created_at", { ascending: false })
+    .limit(1);
+    
+  if (recentOutbound && recentOutbound.length > 0) {
+    const match = recentOutbound[0];
+    console.log("Found recent outbound in user_phone_messages:", match);
+    
+    // Get the assignment details to verify it's personal
+    const { data: assignment } = await supabase
+      .from("user_phone_assignments")
+      .select("id, user_id, display_name, phone_type")
+      .eq("id", match.phone_assignment_id)
+      .eq("is_active", true)
+      .single();
+      
+    if (assignment && assignment.phone_type === "personal") {
+      console.log("Reverse lookup SUCCESS - found personal assignment:", assignment);
+      return { userId: assignment.user_id, assignmentId: assignment.id, displayName: assignment.display_name };
+    }
+  }
+  
+  // Strategy 2: Check lead_communications for recent outbound SMS with sent_from_number
+  const { data: recentLeadComm } = await supabase
+    .from("lead_communications")
+    .select("sent_by_user_id, sent_from_number, contact_phone")
+    .eq("communication_type", "sms")
+    .eq("direction", "outbound")
+    .or(`contact_phone.ilike.%${last10}`)
+    .order("created_at", { ascending: false })
+    .limit(1);
+    
+  if (recentLeadComm && recentLeadComm.length > 0) {
+    const comm = recentLeadComm[0];
+    console.log("Found recent outbound in lead_communications:", comm);
+    
+    if (comm.sent_by_user_id && comm.sent_from_number) {
+      // Find the assignment for this sender's phone number
+      const senderPhone = await findPhoneOwner(supabase, comm.sent_from_number);
+      if (senderPhone.userId === comm.sent_by_user_id && senderPhone.phoneType === "personal") {
+        console.log("Reverse lookup SUCCESS via lead_communications:", senderPhone);
+        return { userId: senderPhone.userId, assignmentId: senderPhone.assignmentId, displayName: senderPhone.displayName };
+      }
+    }
+  }
+  
+  console.log("Reverse lookup - no outbound sender found");
   return { userId: null, assignmentId: null, displayName: null };
 }
 
@@ -387,36 +458,40 @@ serve(async (req) => {
     // ============================================
     
     // Look up which team member owns this receiving number for routing
-    // CRITICAL: Only route to a personal inbox if we have a DEFINITIVE toNumber
-    // that matches a PERSONAL phone assignment. This prevents cross-contamination.
+    // CRITICAL: Route to personal inbox if:
+    // 1. We have a toNumber that matches a personal phone assignment, OR
+    // 2. We can find who last messaged this contact (reverse lookup)
     let assignedUserId: string | null = null;
     let routedPhoneAssignmentId: string | null = null;
     let isPersonalPhoneMessage = false;
     
     if (toNumber) {
+      // Direct routing: toNumber is provided by GHL
       const phoneOwner = await findPhoneOwner(supabase, toNumber);
       
-      if (phoneOwner.userId && phoneOwner.assignmentId) {
-        // Check if this is a PERSONAL phone (not company line)
-        const { data: assignment } = await supabase
-          .from("user_phone_assignments")
-          .select("phone_type")
-          .eq("id", phoneOwner.assignmentId)
-          .single();
-        
-        if (assignment?.phone_type === "personal") {
-          assignedUserId = phoneOwner.userId;
-          routedPhoneAssignmentId = phoneOwner.assignmentId;
-          isPersonalPhoneMessage = true;
-          console.log("SMS routing - Personal phone message for user:", assignedUserId, "assignment:", routedPhoneAssignmentId);
-        } else {
-          // Company line - goes to shared inbox only
-          console.log("SMS routing - Company line message, goes to shared inbox");
-        }
+      if (phoneOwner.userId && phoneOwner.assignmentId && phoneOwner.phoneType === "personal") {
+        assignedUserId = phoneOwner.userId;
+        routedPhoneAssignmentId = phoneOwner.assignmentId;
+        isPersonalPhoneMessage = true;
+        console.log("SMS routing - Direct match to personal phone:", assignedUserId);
+      } else if (phoneOwner.phoneType === "company") {
+        console.log("SMS routing - Company line message, goes to shared inbox");
       }
-    } else {
-      // No toNumber provided by GHL - cannot reliably route to personal inbox
-      console.log("SMS routing - No toNumber provided, goes to shared inbox only");
+    }
+    
+    // REVERSE LOOKUP: If no toNumber or no match found, find who last messaged this contact
+    if (!isPersonalPhoneMessage) {
+      console.log("SMS routing - Attempting reverse lookup for contact:", normalizedPhone);
+      const sender = await findLastOutboundSender(supabase, normalizedPhone);
+      
+      if (sender.userId && sender.assignmentId) {
+        assignedUserId = sender.userId;
+        routedPhoneAssignmentId = sender.assignmentId;
+        isPersonalPhoneMessage = true;
+        console.log("SMS routing - Reverse lookup SUCCESS, routing to user:", assignedUserId);
+      } else {
+        console.log("SMS routing - Reverse lookup found no sender, goes to shared inbox only");
+      }
     }
     
     console.log("SMS routing - Final:", { 
