@@ -495,6 +495,33 @@ serve(async (req) => {
         .select()
         .single();
 
+      // Also store in user_phone_messages if routed to a specific team member
+      if (assignedUserId && toNumber) {
+        const { data: phoneAssignment } = await supabase
+          .from("user_phone_assignments")
+          .select("id")
+          .eq("phone_number", normalizePhone(toNumber))
+          .eq("is_active", true)
+          .maybeSingle();
+        
+        if (phoneAssignment) {
+          await supabase
+            .from("user_phone_messages")
+            .insert({
+              user_id: assignedUserId,
+              phone_assignment_id: phoneAssignment.id,
+              direction: "inbound",
+              from_number: normalizedPhone,
+              to_number: normalizePhone(toNumber),
+              body: messageBody,
+              media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+              status: "received",
+              external_id: ghlContactId,
+            });
+          console.log("Unmatched message stored in user_phone_messages for user:", assignedUserId);
+        }
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -537,6 +564,40 @@ serve(async (req) => {
     }
 
     console.log("Communication record created:", comm.id);
+
+    // Also store in user_phone_messages if this is routed to a specific team member
+    // This ensures messages show up in team member inboxes
+    if (assignedUserId && toNumber) {
+      // Find the phone assignment for this number
+      const { data: phoneAssignment } = await supabase
+        .from("user_phone_assignments")
+        .select("id")
+        .eq("phone_number", normalizePhone(toNumber))
+        .eq("is_active", true)
+        .maybeSingle();
+      
+      if (phoneAssignment) {
+        const { error: userMsgError } = await supabase
+          .from("user_phone_messages")
+          .insert({
+            user_id: assignedUserId,
+            phone_assignment_id: phoneAssignment.id,
+            direction: "inbound",
+            from_number: normalizedPhone,
+            to_number: normalizePhone(toNumber),
+            body: messageBody,
+            media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+            status: "received",
+            external_id: ghlContactId,
+          });
+        
+        if (userMsgError) {
+          console.error("Error storing to user_phone_messages:", userMsgError);
+        } else {
+          console.log("Message also stored in user_phone_messages for user:", assignedUserId);
+        }
+      }
+    }
 
     // Only update lead-specific fields if we have a lead (not tenant)
     if (lead) {
