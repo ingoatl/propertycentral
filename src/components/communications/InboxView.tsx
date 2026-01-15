@@ -2280,8 +2280,8 @@ export function InboxView() {
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Notification bell */}
             <TeamNotificationBell />
-            {/* Admin inbox selector - for SMS/Calls */}
-            {activeTab !== "emails" && activeTab !== "all" && isAdmin && (
+            {/* Admin inbox selector - for all tabs including All and Emails */}
+            {isAdmin && (
               <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
             )}
             
