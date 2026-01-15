@@ -86,9 +86,16 @@ const GoogleReviewsTab = () => {
   const [optOutConfirm, setOptOutConfirm] = useState<string | null>(null);
   const [resubscribeConfirm, setResubscribeConfirm] = useState<string | null>(null);
   const [campaignPaused, setCampaignPaused] = useState(true);
+  const [runningAutomation, setRunningAutomation] = useState(false);
 
   useEffect(() => {
     loadData();
+    
+    // Load campaign pause state from localStorage
+    const savedPauseState = localStorage.getItem("googleReviewCampaignPaused");
+    if (savedPauseState !== null) {
+      setCampaignPaused(savedPauseState === "true");
+    }
     
     const channel = supabase
       .channel('sms-log-changes')
@@ -113,6 +120,45 @@ const GoogleReviewsTab = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Toggle campaign and trigger automation when unpaused
+  const toggleCampaign = async () => {
+    const newPausedState = !campaignPaused;
+    setCampaignPaused(newPausedState);
+    localStorage.setItem("googleReviewCampaignPaused", String(newPausedState));
+    
+    if (!newPausedState) {
+      // Campaign is now active - trigger the batch sender
+      toast.success("Campaign activated! Starting automation...");
+      runBatchAutomation();
+    } else {
+      toast.info("Campaign paused");
+    }
+  };
+
+  const runBatchAutomation = async () => {
+    try {
+      setRunningAutomation(true);
+      const { data, error } = await supabase.functions.invoke("google-review-batch-sender");
+      
+      if (error) throw error;
+      
+      if (data?.outsideWindow) {
+        toast.info("Outside send window (11am-3pm EST). Messages will send during business hours.");
+      } else if (data?.messagesSent > 0) {
+        toast.success(`Sent ${data.messagesSent} permission SMS(s)`);
+      } else {
+        toast.info("No pending reviews to process");
+      }
+      
+      await loadData();
+    } catch (error: any) {
+      console.error("Batch automation error:", error);
+      toast.error("Automation error: " + (error.message || "Unknown error"));
+    } finally {
+      setRunningAutomation(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -312,12 +358,25 @@ const GoogleReviewsTab = () => {
         <div className="flex gap-2 flex-wrap">
           <Button 
             variant={campaignPaused ? "destructive" : "default"}
-            onClick={() => setCampaignPaused(!campaignPaused)} 
+            onClick={toggleCampaign} 
             size="sm"
             className={campaignPaused ? "" : "bg-emerald-600 hover:bg-emerald-700"}
+            disabled={runningAutomation}
           >
-            {campaignPaused ? <><Pause className="w-4 h-4 mr-1" />Paused</> : <><Play className="w-4 h-4 mr-1" />Active</>}
+            {runningAutomation ? (
+              <><RefreshCw className="w-4 h-4 mr-1 animate-spin" />Running...</>
+            ) : campaignPaused ? (
+              <><Pause className="w-4 h-4 mr-1" />Paused</>
+            ) : (
+              <><Play className="w-4 h-4 mr-1" />Active</>
+            )}
           </Button>
+          {!campaignPaused && (
+            <Button variant="outline" onClick={runBatchAutomation} disabled={runningAutomation} size="sm" title="Manually run batch sender">
+              <RefreshCw className={`w-4 h-4 mr-1 ${runningAutomation ? "animate-spin" : ""}`} />
+              Run Now
+            </Button>
+          )}
           <Button variant="outline" onClick={() => sendTestSms(false)} disabled={sendingTest} size="sm">
             <Send className={`w-4 h-4 mr-1 ${sendingTest ? "animate-pulse" : ""}`} />
             Test SMS
