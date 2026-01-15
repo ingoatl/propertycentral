@@ -70,7 +70,7 @@ import { PriorityBadge } from "./PriorityBadge";
 import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript, extractCallerNameFromTranscript } from "./VoiceAIBadge";
 import { CallRecordingPlayer } from "./CallRecordingPlayer";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
-import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
+
 import { ConversationSummary } from "./ConversationSummary";
 import { TeamAssignmentDropdown } from "./TeamAssignmentDropdown";
 import { TeamNotificationBell } from "./TeamNotificationBell";
@@ -225,12 +225,7 @@ export function InboxView() {
   const [viewAllInboxes, setViewAllInboxes] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [showEmailActionModal, setShowEmailActionModal] = useState(false);
-  const [selectedOwnerForDetail, setSelectedOwnerForDetail] = useState<{
-    id: string;
-    name: string;
-    email?: string | null;
-    phone?: string | null;
-  } | null>(null);
+  
   const [showCallDialog, setShowCallDialog] = useState(false);
   const [voiceAICallerPhone, setVoiceAICallerPhone] = useState<string | null>(null);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
@@ -2608,14 +2603,8 @@ export function InboxView() {
                           if (comm.contact_type === "email" && comm.gmail_email) {
                             // Handle email click - open email detail
                             handleSelectGmailEmailMobile(comm.gmail_email);
-                          } else if (comm.contact_type === "owner" && comm.owner_id) {
-                            setSelectedOwnerForDetail({
-                              id: comm.owner_id,
-                              name: comm.contact_name,
-                              email: comm.contact_email,
-                              phone: comm.contact_phone,
-                            });
                           } else {
+                            // All other types including owners - load in right panel
                             handleSelectMessage(comm);
                           }
                         }}
@@ -2740,17 +2729,11 @@ export function InboxView() {
                     <div 
                       key={`${comm.id}-${comm.conversation_status}`}
                       onClick={() => {
-                        if (comm.contact_type === "owner" && comm.owner_id) {
-                          setSelectedOwnerForDetail({
-                            id: comm.owner_id,
-                            name: comm.contact_name,
-                            email: comm.contact_email,
-                            phone: comm.contact_phone,
-                          });
-                        } else if (comm.gmail_email) {
+                        if (comm.gmail_email) {
                           // For Gmail emails in the All tab, select the Gmail email directly
                           handleSelectGmailEmailMobile(comm.gmail_email);
                         } else {
+                          // All other types including owners - load in right panel
                           handleSelectMessage(comm);
                         }
                       }}
@@ -3531,17 +3514,7 @@ export function InboxView() {
         onOpenChange={setShowAIComposeEmail}
       />
       
-      {/* Owner Communication Detail Modal */}
-      {selectedOwnerForDetail && (
-        <OwnerCommunicationDetail
-          ownerId={selectedOwnerForDetail.id}
-          ownerName={selectedOwnerForDetail.name}
-          ownerEmail={selectedOwnerForDetail.email}
-          ownerPhone={selectedOwnerForDetail.phone}
-          isOpen={!!selectedOwnerForDetail}
-          onClose={() => setSelectedOwnerForDetail(null)}
-        />
-      )}
+      
       
       {/* Twilio Call Dialog */}
       {/* Twilio Call Dialog - use voiceAICallerPhone for Voice AI transcripts, otherwise contact_phone */}
