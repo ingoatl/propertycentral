@@ -1,9 +1,10 @@
-import { Clock, CheckCheck, RotateCcw, ChevronDown } from "lucide-react";
+import { Clock, CheckCheck, RotateCcw, ChevronDown, Hourglass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -22,6 +23,7 @@ export function ConversationQuickActions({
   onMarkDone,
   onSnooze,
   onReopen,
+  onMarkAwaiting,
   isUpdating,
   compact = false,
 }: ConversationQuickActionsProps) {
@@ -41,6 +43,15 @@ export function ConversationQuickActions({
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
+        ) : status === "awaiting" ? (
+          <button
+            onClick={onReopen}
+            disabled={isUpdating}
+            className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
+            title="Mark as open"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
         ) : (
           <>
             <button
@@ -51,6 +62,16 @@ export function ConversationQuickActions({
             >
               <CheckCheck className="h-3.5 w-3.5" />
             </button>
+            {onMarkAwaiting && (
+              <button
+                onClick={onMarkAwaiting}
+                disabled={isUpdating}
+                className="p-1.5 rounded-full hover:bg-blue-500/10 transition-colors text-muted-foreground hover:text-blue-600 disabled:opacity-50"
+                title="Awaiting response"
+              >
+                <Hourglass className="h-3.5 w-3.5" />
+              </button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -85,7 +106,7 @@ export function ConversationQuickActions({
   // Full version for conversation detail header
   return (
     <div className="flex items-center gap-2">
-      {status === "done" ? (
+      {status === "done" || status === "awaiting" ? (
         <Button
           variant="outline"
           size="sm"
@@ -108,6 +129,19 @@ export function ConversationQuickActions({
             <CheckCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Done</span>
           </Button>
+          
+          {onMarkAwaiting && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onMarkAwaiting}
+              disabled={isUpdating}
+              className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+            >
+              <Hourglass className="h-4 w-4" />
+              <span className="hidden sm:inline">Awaiting</span>
+            </Button>
+          )}
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
