@@ -297,32 +297,40 @@ serve(async (req) => {
     
     // ============================================
     // CHECK IF THIS IS A GOOGLE REVIEWS MESSAGE
-    // Since GHL doesn't always tell us which number received the message,
-    // we check if this phone has a PENDING Google review request
+    // ONLY route to Google Reviews if:
+    // 1. The message was sent TO the Google Reviews phone number, OR
+    // 2. It's explicitly flagged as a Google source
+    // DO NOT route based solely on pending review - the guest might text other numbers!
     // ============================================
-    const { data: pendingReviewRequest } = await supabase
-      .from("google_review_requests")
-      .select("id")
-      .ilike("guest_phone", `%${last10Digits}`)
-      .in("workflow_status", ["permission_asked", "pending"])
-      .eq("opted_out", false)
-      .limit(1)
-      .maybeSingle();
-    
-    const hasPendingGoogleReview = !!pendingReviewRequest;
     const isGoogleReviewsToNumber = isGoogleReviewsNumber(toNumber);
     const isGoogleSource = payload.source === "GoogleReviews" || 
                            payload.customField?.source === "GoogleReviews" ||
                            (message.source && String(message.source).includes("Google"));
     
+    // Only check for pending review if we know it's the Google Reviews number
+    let hasPendingGoogleReview = false;
+    if (isGoogleReviewsToNumber) {
+      const { data: pendingReviewRequest } = await supabase
+        .from("google_review_requests")
+        .select("id")
+        .ilike("guest_phone", `%${last10Digits}`)
+        .in("workflow_status", ["permission_asked", "pending"])
+        .eq("opted_out", false)
+        .limit(1)
+        .maybeSingle();
+      hasPendingGoogleReview = !!pendingReviewRequest;
+    }
+    
     console.log("Google Reviews routing check:", {
-      hasPendingGoogleReview,
       isGoogleReviewsToNumber,
       isGoogleSource,
+      hasPendingGoogleReview,
+      toNumber,
       last10Digits
     });
     
-    if (hasPendingGoogleReview || isGoogleReviewsToNumber || isGoogleSource) {
+    // ONLY route to Google Reviews if the message was sent to the Google Reviews number or explicitly flagged
+    if (isGoogleReviewsToNumber || isGoogleSource) {
       console.log("=== GOOGLE REVIEWS CHANNEL (GHL) ===");
       
       const reviewResult = await processGoogleReviewReply(
