@@ -118,10 +118,18 @@ export function ConversationListItem({
     <div
       onClick={onClick}
       className={cn(
-        "group relative flex items-start gap-3 p-3 cursor-pointer transition-all border-b hover:bg-muted/50",
+        "group relative flex items-start gap-3 p-3 cursor-pointer border-b hover:bg-muted/50",
+        // Smooth transitions for status changes (color, opacity)
+        "transition-all duration-300 ease-out",
         isSelected && "bg-primary/5 border-l-2 border-l-primary",
-        (isDone || isSnoozed) && "opacity-60",
-        direction === "inbound" && !isDone && "border-l-2 border-l-blue-400"
+        // Done status: green left border with fade effect
+        isDone && "border-l-2 border-l-green-500 opacity-50 bg-green-50/30 dark:bg-green-950/10",
+        // Snoozed status: amber left border with fade effect  
+        isSnoozed && "border-l-2 border-l-amber-500 opacity-50 bg-amber-50/30 dark:bg-amber-950/10",
+        // Awaiting status: cyan left border
+        isAwaiting && !isDone && !isSnoozed && "border-l-2 border-l-cyan-500",
+        // Inbound messages: blue left border (lowest priority)
+        direction === "inbound" && !isDone && !isSnoozed && !isAwaiting && !isSelected && "border-l-2 border-l-blue-400"
       )}
     >
       {/* Type Icon */}
