@@ -3208,7 +3208,7 @@ export function InboxView() {
                   className="h-9 gap-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                 />
                 {selectedMessage.contact_phone && !isVoiceAITranscript(selectedMessage.body) && (
-                  <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowSmsReply(true)}><PhoneCall className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => setShowCallDialog(true)} title="Call"><PhoneCall className="h-4 w-4" /></Button>
                 )}
                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowNotes(true)}><FileText className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowContactInfo(true)}><Info className="h-4 w-4" /></Button>
