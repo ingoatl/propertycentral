@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 
 const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
@@ -123,10 +122,10 @@ export function AIReplyButton({
     setIsEditing(true);
   };
 
-  // Show context input panel
+  // Show context input panel - full width display
   if (showContextInput && !generatedReply) {
     return (
-      <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
+      <div className="w-full bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium text-primary">
           <MessageSquare className="h-4 w-4" />
           <span>What would you like to say?</span>
@@ -135,12 +134,12 @@ export function AIReplyButton({
         <Textarea
           value={userInstructions}
           onChange={(e) => setUserInstructions(e.target.value)}
-          placeholder="Enter context or key points for the AI to include in the reply... e.g. 'Tell them we can do a walkthrough next Tuesday, and ask about their move-in timeline'"
-          className="min-h-[80px] text-sm bg-background resize-y"
+          placeholder="Enter context or key points... e.g. 'Tell them we can do a walkthrough next Tuesday'"
+          className="min-h-[100px] text-sm bg-background resize-y w-full"
           autoFocus
         />
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             size="sm"
             onClick={() => handleGenerateReply()}
@@ -166,8 +165,8 @@ export function AIReplyButton({
 
   if (generatedReply) {
     return (
-      <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="w-full bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 text-sm font-medium text-primary">
             <Sparkles className="h-4 w-4" />
             <span>AI Suggested Reply</span>
@@ -202,7 +201,7 @@ export function AIReplyButton({
           <Textarea
             value={editedReply}
             onChange={(e) => setEditedReply(e.target.value)}
-            className="min-h-[120px] text-sm bg-background resize-y"
+            className="min-h-[120px] text-sm bg-background resize-y w-full"
             autoFocus
           />
         ) : (
@@ -260,7 +259,7 @@ export function AIReplyButton({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       <Button
         variant="default"
         size="sm"
@@ -292,7 +291,8 @@ export function AIReplyButton({
         title="Generate AI reply with your context"
       >
         <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        <span className="hidden sm:inline">With Context</span>
+        <span className="hidden sm:inline">Reply with Context</span>
+        <span className="sm:hidden">+ Context</span>
       </Button>
     </div>
   );

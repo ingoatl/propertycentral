@@ -76,7 +76,7 @@ serve(async (req) => {
   }
 
   try {
-    const { contactEmail, contactName, currentSubject, incomingEmailBody } = await req.json();
+    const { contactEmail, contactName, currentSubject, incomingEmailBody, userInstructions } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -393,6 +393,11 @@ STRUCTURE:
 - End with an appropriate response to their situation
 - Sign off naturally: "Best," or "Thanks," followed by your name`;
 
+    // Add user instructions context if provided
+    const instructionsContext = userInstructions 
+      ? `\n\nUSER'S INSTRUCTIONS FOR THIS REPLY (FOLLOW THESE):\n"${userInstructions}"\n\nIncorporate the above instructions naturally into your response.`
+      : "";
+
     const userPrompt = `Contact: ${contactName} (${contactEmail})
 ${currentSubject ? `Subject: ${currentSubject}` : ''}
 ${propertyContext}
@@ -401,8 +406,9 @@ ${incomingEmailBody ? `EMAIL THEY SENT (READ THIS CAREFULLY):
 ${incomingEmailBody.substring(0, 2000)}` : ''}
 
 ${historyContext ? `PREVIOUS EMAIL HISTORY:\n${historyContext}` : 'No previous email history.'}
+${instructionsContext}
 
-CRITICAL: Your reply must directly address what they said in their email above. If they mentioned:
+CRITICAL: ${userInstructions ? 'FOLLOW THE USER\'S INSTRUCTIONS above - incorporate their key points naturally.' : 'Your reply must directly address what they said in their email above.'} If they mentioned:
 - Needing time to look into insurance → Thank them, tell them to take their time
 - Looking for a document to forward → Acknowledge you'll watch for it
 - Visiting your city → Mention it if appropriate
