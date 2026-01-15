@@ -902,9 +902,10 @@ export function InboxView() {
           .order("created_at", { ascending: false })
           .limit(100);
         
-        // Filter by user assignment unless viewing all inboxes (admin feature)
+        // Filter by user assignment - only show messages assigned to the target user
+        // Do NOT show unassigned messages to everyone - they should only appear in admin "all" view
         if (!viewAllInboxes && targetUserId) {
-          commsQuery = commsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_user_id.eq.${targetUserId},assigned_to.is.null`);
+          commsQuery = commsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_user_id.eq.${targetUserId}`);
         }
         
         const { data: allComms } = await commsQuery;
