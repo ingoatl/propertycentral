@@ -70,173 +70,196 @@ serve(async (req) => {
 
     console.log(`Fetching Gmail inbox for ${targetEmails.join(', ')}, last ${daysBack} days...`);
 
-    // Get OAuth tokens
-    const { data: tokenData, error: tokenError } = await supabase
+    // Get ALL OAuth tokens (supporting multiple Gmail accounts)
+    const { data: tokenDataList, error: tokenError } = await supabase
       .from('gmail_oauth_tokens')
-      .select('*')
-      .single();
+      .select('*');
 
-    if (tokenError || !tokenData) {
+    if (tokenError || !tokenDataList || tokenDataList.length === 0) {
       throw new Error('No Gmail connection found. Please authorize Gmail access first.');
     }
 
-    let accessToken = tokenData.access_token;
+    console.log(`Found ${tokenDataList.length} Gmail account(s) connected`);
 
-    // Refresh token if expired
-    if (new Date(tokenData.expires_at) <= new Date()) {
-      console.log('Access token expired, refreshing...');
-      const refreshResult = await refreshGoogleToken(tokenData.refresh_token);
-      accessToken = refreshResult.accessToken;
+    // Helper function to refresh token if needed
+    const ensureValidToken = async (tokenData: any) => {
+      let accessToken = tokenData.access_token;
+
+      // Refresh token if expired
+      if (new Date(tokenData.expires_at) <= new Date()) {
+        console.log(`Access token expired for ${tokenData.email_address || tokenData.user_id}, refreshing...`);
+        const refreshResult = await refreshGoogleToken(tokenData.refresh_token);
+        accessToken = refreshResult.accessToken;
+        
+        await supabase
+          .from('gmail_oauth_tokens')
+          .update({
+            access_token: accessToken,
+            expires_at: new Date(Date.now() + refreshResult.expiresIn * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', tokenData.id);
+      }
       
-      await supabase
-        .from('gmail_oauth_tokens')
-        .update({
-          access_token: accessToken,
-          expires_at: new Date(Date.now() + refreshResult.expiresIn * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', tokenData.user_id);
-    }
+      return accessToken;
+    };
 
     // Calculate date filter
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - daysBack);
     const afterDate = Math.floor(daysAgo.getTime() / 1000);
 
-    // Build search query - fetch emails TO any team member
-    const toQuery = targetEmails.map(e => `to:${e}`).join(' OR ');
-    const query = `(${toQuery}) after:${afterDate}`;
-
-    console.log(`Fetching emails with query: ${query}`);
-
-    const messagesResponse = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=200&q=${encodeURIComponent(query)}`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
-    );
-
-    if (!messagesResponse.ok) {
-      const error = await messagesResponse.text();
-      console.error('Failed to fetch messages:', error);
-      throw new Error('Failed to fetch emails from Gmail');
-    }
-
-    const messagesData = await messagesResponse.json();
-    const messageIds = messagesData.messages || [];
-
-    console.log(`Found ${messageIds.length} emails`);
-
-    // Fetch full email data for each message
-    const emails = [];
-    for (const msg of messageIds.slice(0, 150)) {
+    // Helper function to fetch emails from a single account
+    const fetchEmailsFromAccount = async (tokenData: any, accountLabel: string) => {
+      const accountEmails: any[] = [];
+      
       try {
-        const messageResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+        const accessToken = await ensureValidToken(tokenData);
+        
+        // For individual accounts, fetch their own inbox
+        // For shared account, fetch emails TO team members
+        let query: string;
+        
+        if (tokenData.email_address && tokenData.label_name) {
+          // Individual account - fetch their inbox directly (no TO filter)
+          query = `in:inbox after:${afterDate}`;
+          console.log(`[${accountLabel}] Fetching inbox emails`);
+        } else {
+          // Shared account - fetch emails TO team members
+          const toQuery = targetEmails.map(e => `to:${e}`).join(' OR ');
+          query = `(${toQuery}) after:${afterDate}`;
+          console.log(`[${accountLabel}] Fetching with query: ${query}`);
+        }
+
+        const messagesResponse = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=200&q=${encodeURIComponent(query)}`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
-        if (!messageResponse.ok) continue;
-
-        const emailData = await messageResponse.json();
-        const headers = emailData.payload.headers;
-        
-        const subject = headers.find((h: any) => h.name.toLowerCase() === 'subject')?.value || '(No subject)';
-        const from = headers.find((h: any) => h.name.toLowerCase() === 'from')?.value || '';
-        const to = headers.find((h: any) => h.name.toLowerCase() === 'to')?.value || '';
-        const dateStr = headers.find((h: any) => h.name.toLowerCase() === 'date')?.value || '';
-
-        // Extract sender name and email
-        const fromMatch = from.match(/^(.+?)\s*<(.+?)>$/) || [null, from, from];
-        const senderName = fromMatch[1]?.replace(/"/g, '').trim() || from;
-        const senderEmail = fromMatch[2]?.trim() || from;
-
-        // Get email body - prefer HTML for proper display
-        let bodyText = '';
-        let bodyHtml = '';
-        
-        const extractBody = (payload: any): { text: string; html: string } => {
-          let text = '';
-          let html = '';
-          
-          if (payload.body?.data) {
-            const decoded = decodeBase64Utf8(payload.body.data);
-            if (payload.mimeType === 'text/html') {
-              html = decoded;
-            } else {
-              text = decoded;
-            }
-          }
-          
-          if (payload.parts) {
-            for (const part of payload.parts) {
-              if (part.mimeType === 'text/plain' && part.body?.data) {
-                text = decodeBase64Utf8(part.body.data);
-              }
-              if (part.mimeType === 'text/html' && part.body?.data) {
-                html = decodeBase64Utf8(part.body.data);
-              }
-              // Handle multipart/alternative
-              if (part.parts) {
-                const nested = extractBody(part);
-                if (nested.text) text = nested.text;
-                if (nested.html) html = nested.html;
-              }
-            }
-          }
-          
-          return { text, html };
-        };
-        
-        const extracted = extractBody(emailData.payload);
-        bodyText = extracted.text;
-        bodyHtml = extracted.html;
-
-        // Determine which inbox this email is for - check against all team member labels
-        const toLower = to.toLowerCase();
-        let targetInbox = 'unknown';
-        
-        // Check against all known labels from database
-        if (gmailLabels && gmailLabels.length > 0) {
-          for (const label of gmailLabels) {
-            const labelLower = label.label_name.toLowerCase();
-            if (toLower.includes(`${labelLower}@`) || 
-                (label.email_address && toLower.includes(label.email_address.toLowerCase()))) {
-              targetInbox = labelLower;
-              break;
-            }
-          }
-        }
-        
-        // Fallback to pattern matching if no database match
-        if (targetInbox === 'unknown') {
-          if (toLower.includes('anja@')) {
-            targetInbox = 'anja';
-          } else if (toLower.includes('alex@')) {
-            targetInbox = 'alex';
-          } else if (toLower.includes('ingo@')) {
-            targetInbox = 'ingo';
-          }
+        if (!messagesResponse.ok) {
+          const error = await messagesResponse.text();
+          console.error(`[${accountLabel}] Failed to fetch messages:`, error);
+          return [];
         }
 
-        emails.push({
-          id: msg.id,
-          threadId: emailData.threadId,
-          subject,
-          from: senderEmail,
-          fromName: senderName,
-          to,
-          targetInbox,
-          date: new Date(dateStr).toISOString(),
-          body: bodyText.substring(0, 3000),
-          bodyHtml: bodyHtml,
-          snippet: emailData.snippet,
-          labelIds: emailData.labelIds || [],
-        });
+        const messagesData = await messagesResponse.json();
+        const messageIds = messagesData.messages || [];
+
+        console.log(`[${accountLabel}] Found ${messageIds.length} emails`);
+
+        // Fetch full email data for each message
+        for (const msg of messageIds.slice(0, 100)) {
+          try {
+            const messageResponse = await fetch(
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+
+            if (!messageResponse.ok) continue;
+
+            const emailData = await messageResponse.json();
+            const headers = emailData.payload.headers;
+            
+            const subject = headers.find((h: any) => h.name.toLowerCase() === 'subject')?.value || '(No subject)';
+            const from = headers.find((h: any) => h.name.toLowerCase() === 'from')?.value || '';
+            const to = headers.find((h: any) => h.name.toLowerCase() === 'to')?.value || '';
+            const dateStr = headers.find((h: any) => h.name.toLowerCase() === 'date')?.value || '';
+
+            // Extract sender name and email
+            const fromMatch = from.match(/^(.+?)\s*<(.+?)>$/) || [null, from, from];
+            const senderName = fromMatch[1]?.replace(/"/g, '').trim() || from;
+            const senderEmail = fromMatch[2]?.trim() || from;
+
+            // Get email body
+            let bodyText = '';
+            let bodyHtml = '';
+            
+            const extractBody = (payload: any): { text: string; html: string } => {
+              let text = '';
+              let html = '';
+              
+              if (payload.body?.data) {
+                const decoded = decodeBase64Utf8(payload.body.data);
+                if (payload.mimeType === 'text/html') {
+                  html = decoded;
+                } else {
+                  text = decoded;
+                }
+              }
+              
+              if (payload.parts) {
+                for (const part of payload.parts) {
+                  if (part.mimeType === 'text/plain' && part.body?.data) {
+                    text = decodeBase64Utf8(part.body.data);
+                  }
+                  if (part.mimeType === 'text/html' && part.body?.data) {
+                    html = decodeBase64Utf8(part.body.data);
+                  }
+                  if (part.parts) {
+                    const nested = extractBody(part);
+                    if (nested.text) text = nested.text;
+                    if (nested.html) html = nested.html;
+                  }
+                }
+              }
+              
+              return { text, html };
+            };
+            
+            const extracted = extractBody(emailData.payload);
+            bodyText = extracted.text;
+            bodyHtml = extracted.html;
+
+            // Determine targetInbox - use account label for individual accounts
+            const toLower = to.toLowerCase();
+            let targetInbox = tokenData.label_name || 'unknown';
+            
+            // For shared account, check TO field
+            if (!tokenData.label_name && gmailLabels && gmailLabels.length > 0) {
+              for (const label of gmailLabels) {
+                const labelLower = label.label_name.toLowerCase();
+                if (toLower.includes(`${labelLower}@`) || 
+                    (label.email_address && toLower.includes(label.email_address.toLowerCase()))) {
+                  targetInbox = labelLower;
+                  break;
+                }
+              }
+            }
+
+            accountEmails.push({
+              id: `${tokenData.id}_${msg.id}`, // Unique ID combining account + message
+              threadId: emailData.threadId,
+              subject,
+              from: senderEmail,
+              fromName: senderName,
+              to,
+              targetInbox,
+              date: new Date(dateStr).toISOString(),
+              body: bodyText.substring(0, 3000),
+              bodyHtml: bodyHtml,
+              snippet: emailData.snippet,
+              labelIds: emailData.labelIds || [],
+              accountSource: accountLabel,
+            });
+          } catch (err) {
+            console.error(`[${accountLabel}] Error fetching email ${msg.id}:`, err);
+          }
+        }
       } catch (err) {
-        console.error(`Error fetching email ${msg.id}:`, err);
+        console.error(`[${accountLabel}] Error:`, err);
       }
-    }
+      
+      return accountEmails;
+    };
+
+    // Fetch emails from ALL connected accounts in parallel
+    const allEmailPromises = tokenDataList.map((tokenData, index) => {
+      const label = tokenData.email_address || tokenData.label_name || `Account ${index + 1}`;
+      return fetchEmailsFromAccount(tokenData, label);
+    });
+
+    const emailArrays = await Promise.all(allEmailPromises);
+    const emails = emailArrays.flat();
 
     // Sort by date descending
     emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

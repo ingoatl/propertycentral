@@ -1837,8 +1837,10 @@ export type Database = {
         Row: {
           access_token: string
           created_at: string
+          email_address: string | null
           expires_at: string
           id: string
+          label_name: string | null
           refresh_token: string
           updated_at: string
           user_id: string
@@ -1846,8 +1848,10 @@ export type Database = {
         Insert: {
           access_token: string
           created_at?: string
+          email_address?: string | null
           expires_at: string
           id?: string
+          label_name?: string | null
           refresh_token: string
           updated_at?: string
           user_id: string
@@ -1855,8 +1859,10 @@ export type Database = {
         Update: {
           access_token?: string
           created_at?: string
+          email_address?: string | null
           expires_at?: string
           id?: string
+          label_name?: string | null
           refresh_token?: string
           updated_at?: string
           user_id?: string
