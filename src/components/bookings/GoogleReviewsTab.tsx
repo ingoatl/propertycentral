@@ -136,19 +136,28 @@ const GoogleReviewsTab = () => {
     }
   };
 
-  const runBatchAutomation = async () => {
+  const runBatchAutomation = async (forceRun: boolean = true) => {
     try {
       setRunningAutomation(true);
-      const { data, error } = await supabase.functions.invoke("google-review-batch-sender");
+      const { data, error } = await supabase.functions.invoke("google-review-batch-sender", {
+        body: { forceRun }
+      });
       
       if (error) throw error;
       
-      if (data?.outsideWindow) {
-        toast.info("Outside send window (11am-3pm EST). Messages will send during business hours.");
-      } else if (data?.messagesSent > 0) {
-        toast.success(`Sent ${data.messagesSent} permission SMS(s)`);
+      if (data?.sentCount > 0) {
+        toast.success(`Sent ${data.sentCount} permission SMS(s)!`);
+      } else if (data?.stats) {
+        // Show detailed status
+        const { totalReviews, alreadyContacted, pendingStatus, optedOut } = data.stats;
+        toast.info(
+          `All ${totalReviews} reviews already contacted. ${alreadyContacted} requests exist. Sync new reviews from OwnerRez.`,
+          { duration: 5000 }
+        );
+      } else if (data?.message?.includes("Outside send window")) {
+        toast.info("Outside send window (11am-3pm EST). Click 'Run Now' to force send.");
       } else {
-        toast.info("No pending reviews to process");
+        toast.info(data?.message || "No pending reviews to process");
       }
       
       await loadData();
@@ -372,7 +381,7 @@ const GoogleReviewsTab = () => {
             )}
           </Button>
           {!campaignPaused && (
-            <Button variant="outline" onClick={runBatchAutomation} disabled={runningAutomation} size="sm" title="Manually run batch sender">
+            <Button variant="outline" onClick={() => runBatchAutomation(true)} disabled={runningAutomation} size="sm" title="Manually run batch sender">
               <RefreshCw className={`w-4 h-4 mr-1 ${runningAutomation ? "animate-spin" : ""}`} />
               Run Now
             </Button>

@@ -44,21 +44,31 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if we're in the optimal send window
-    if (!isWithinSendWindow()) {
+    // Parse request body for options
+    let forceRun = false;
+    let retryPending = false;
+    try {
+      const body = await req.json();
+      forceRun = body?.forceRun === true;
+      retryPending = body?.retryPending === true;
+    } catch {
+      // No body or invalid JSON, use defaults
+    }
+
+    // Check if we're in the optimal send window (unless forced)
+    if (!forceRun && !isWithinSendWindow()) {
       console.log("Outside send window (11am-3pm EST), skipping batch send");
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: "Outside send window (11am-3pm EST)",
+          message: "Outside send window (11am-3pm EST). Use 'Run Now' button to force.",
           sentCount: 0 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Get pending reviews (newest first) that haven't been contacted
-    // These are reviews with valid phone numbers that don't have a google_review_request yet
+    // Get all reviews with phone numbers
     const { data: pendingReviews, error: reviewError } = await supabase
       .from("ownerrez_reviews")
       .select(`
@@ -81,10 +91,10 @@ serve(async (req) => {
 
     console.log(`Found ${pendingReviews?.length || 0} reviews with phone numbers`);
 
-    // Get existing google_review_requests to filter out already contacted guests
+    // Get existing google_review_requests
     const { data: existingRequests } = await supabase
       .from("google_review_requests")
-      .select("review_id, guest_phone, opted_out");
+      .select("review_id, guest_phone, opted_out, workflow_status");
 
     const existingReviewIds = new Set(existingRequests?.map(r => r.review_id) || []);
     const optedOutPhones = new Set(
@@ -93,26 +103,52 @@ serve(async (req) => {
         .map(r => r.guest_phone?.replace(/\D/g, '').slice(-10)) || []
     );
 
-    // Filter to only reviews that haven't been contacted
-    const reviewsToContact = (pendingReviews || []).filter(review => {
-      // Skip if already has a request
-      if (existingReviewIds.has(review.id)) return false;
-      
-      // Skip if guest has opted out
-      const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
-      if (optedOutPhones.has(phoneDigits)) return false;
-      
-      return true;
-    }).slice(0, MAX_SMS_PER_RUN); // Limit to batch size
+    // Find reviews that need contact
+    let reviewsToContact: typeof pendingReviews = [];
+    
+    if (retryPending) {
+      // Retry reviews with "pending" status (created but not sent)
+      const pendingRequestReviewIds = new Set(
+        existingRequests
+          ?.filter(r => r.workflow_status === 'pending')
+          .map(r => r.review_id) || []
+      );
+      reviewsToContact = (pendingReviews || []).filter(review => 
+        pendingRequestReviewIds.has(review.id)
+      ).slice(0, MAX_SMS_PER_RUN);
+    } else {
+      // Normal flow - find reviews without any request yet
+      reviewsToContact = (pendingReviews || []).filter(review => {
+        // Skip if already has a request
+        if (existingReviewIds.has(review.id)) return false;
+        
+        // Skip if guest has opted out
+        const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
+        if (optedOutPhones.has(phoneDigits)) return false;
+        
+        return true;
+      }).slice(0, MAX_SMS_PER_RUN);
+    }
 
     console.log(`${reviewsToContact.length} reviews to contact in this batch`);
 
+    // Provide detailed status if no reviews to contact
     if (reviewsToContact.length === 0) {
+      const totalReviews = pendingReviews?.length || 0;
+      const alreadyContacted = existingRequests?.length || 0;
+      const pendingStatus = existingRequests?.filter(r => r.workflow_status === 'pending').length || 0;
+      
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: "No pending reviews to contact",
-          sentCount: 0 
+          message: `All ${totalReviews} reviews have already been contacted. ${alreadyContacted} requests exist (${pendingStatus} pending status). Sync new reviews from OwnerRez or use retryPending option.`,
+          sentCount: 0,
+          stats: {
+            totalReviews,
+            alreadyContacted,
+            pendingStatus,
+            optedOut: optedOutPhones.size
+          }
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
