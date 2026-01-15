@@ -54,14 +54,35 @@ serve(async (req) => {
       }
     }
 
-    // Find calls needing 24h reminder - ONLY for booking page calls (exclude GHL-synced calls)
+// Find calls needing 24h reminder - ONLY for booking page calls (exclude GHL-synced calls)
     const { data: calls24h } = await supabase
       .from("discovery_calls")
-      .select("id, meeting_notes")
+      .select("id, meeting_notes, google_meet_link")
       .eq("status", "scheduled")
       .eq("reminder_24h_sent", false)
       .gte("scheduled_at", in24Hours.toISOString())
       .lt("scheduled_at", in25Hours.toISOString());
+
+    // Auto-schedule Recall bots for video calls in 24h window that don't have recordings yet
+    for (const call of (calls24h || []).filter(c => c.google_meet_link)) {
+      try {
+        // Check if bot already scheduled
+        const { data: existingRecording } = await supabase
+          .from("meeting_recordings")
+          .select("id")
+          .eq("discovery_call_id", call.id)
+          .single();
+        
+        if (!existingRecording) {
+          console.log("Auto-scheduling Recall bot for 24h reminder call:", call.id);
+          await supabase.functions.invoke("recall-auto-schedule-bot", {
+            body: { discoveryCallId: call.id },
+          });
+        }
+      } catch (e: any) {
+        console.error(`Failed to auto-schedule Recall for ${call.id}:`, e.message);
+      }
+    }
 
     // Filter out GHL-synced calls (they have "Synced from GHL" in meeting_notes)
     const filteredCalls24h = (calls24h || []).filter(call => 

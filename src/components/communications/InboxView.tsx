@@ -898,13 +898,20 @@ export function InboxView() {
       const targetUserId = viewAllInboxes ? null : (selectedInboxUserId || currentUserId);
 
       if (fetchMessages) {
-        // Fetch ALL lead communications (including those without lead_id for tenants/external contacts)
-        const { data: allComms } = await supabase
+        // Fetch lead communications - filter by user assignment for non-admin users
+        let commsQuery = supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, leads(id, name, phone, email)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, leads(id, name, phone, email)`)
           .in("communication_type", ["sms", "email"])
           .order("created_at", { ascending: false })
           .limit(100);
+        
+        // Filter by user assignment unless viewing all inboxes (admin feature)
+        if (!viewAllInboxes && targetUserId) {
+          commsQuery = commsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_to.is.null`);
+        }
+        
+        const { data: allComms } = await commsQuery;
 
         if (allComms) {
           // Lookup tenants for matching
@@ -1009,14 +1016,21 @@ export function InboxView() {
           }
         }
 
-        // Fetch owner communications
-        const { data: ownerComms } = await supabase
+        // Fetch owner communications - filter by user assignment for non-admin users
+        let ownerCommsQuery = supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, owner_id, property_owners(id, name, email, phone)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, owner_id, assigned_to, recipient_user_id, property_owners(id, name, email, phone)`)
           .in("communication_type", ["sms", "email"])
           .not("owner_id", "is", null)
           .order("created_at", { ascending: false })
           .limit(50);
+        
+        // Filter by user assignment unless viewing all inboxes
+        if (!viewAllInboxes && targetUserId) {
+          ownerCommsQuery = ownerCommsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_to.is.null`);
+        }
+        
+        const { data: ownerComms } = await ownerCommsQuery;
 
         if (ownerComms) {
           for (const comm of ownerComms) {

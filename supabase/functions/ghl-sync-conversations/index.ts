@@ -362,14 +362,18 @@ serve(async (req) => {
           communicationData.call_recording_url = message.recordingUrl || null;
         }
 
+        // Use upsert to avoid duplicate external_id errors
         const { data: inserted, error: insertError } = await supabase
           .from("lead_communications")
-          .insert(communicationData)
+          .upsert(communicationData, { 
+            onConflict: "external_id",
+            ignoreDuplicates: false 
+          })
           .select()
           .single();
 
         if (insertError) {
-          console.error(`Error inserting ${message.id}:`, insertError);
+          console.error(`Error upserting ${message.id}:`, insertError);
         } else {
           console.log(`✓ Synced ${commType} for ${displayName}: ${messageBody.slice(0, 40)}...`);
           syncedMessages.push({
