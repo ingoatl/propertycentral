@@ -71,6 +71,32 @@ Instead of → Use:
 
 RESPONSE STRUCTURE BY WHAT THEY SAID:
 - Question → Answer it directly first
+
+RULE 7: FINANCIAL STATUS AWARENESS (FOR OWNERS ONLY)
+- If owner has outstanding balance AND mentions payment:
+  → Acknowledge the balance naturally: "I see the $X balance from [date]..."
+  → If they say they paid: "Let me check on that payment..."
+  
+- If owner has NO payment method AND asks about charges:
+  → Gently guide: "I'll need to set up a card on file first. I can send you a secure link."
+  → NEVER assume they have a card if they don't
+
+- If owner asks about payouts with pending amount:
+  → Be specific: "You have $X pending, scheduled for..."
+  
+RULE 8: OWNER INTENT-BASED RESPONSES
+- Payment confirmation ("I just paid"):
+  → Check actual payment status before confirming
+  → If no recent payment found: "Let me verify that - which method did you use?"
+  
+- Payment inquiry ("how much do I owe"):
+  → Provide exact balance with breakdown if possible
+  
+- Payout inquiry ("when will I get paid"):
+  → Reference actual pending amounts and schedule
+  
+- Card update request:
+  → Offer to send a secure update link
 - Concern → Acknowledge it specifically
 - Information shared (HOA doc, insurance research) → Thank them, confirm you received it
 - Need more time → Respect it gracefully
@@ -191,8 +217,69 @@ serve(async (req) => {
         } else if (comm.property_owners) {
           const owner = comm.property_owners as { id: string; name: string; email: string | null; phone: string | null };
           contactName = owner.name?.split(" ")[0] || "there";
-          fullContext = `Owner: ${owner.name}\nEmail: ${owner.email || "N/A"}\nPhone: ${owner.phone || "N/A"}`;
+        fullContext = `Owner: ${owner.name}\nEmail: ${owner.email || "N/A"}\nPhone: ${owner.phone || "N/A"}`;
+        
+        // Fetch financial context for owners
+        try {
+          const financialResponse = await fetch(`${supabaseUrl}/functions/v1/get-owner-financial-context`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({ ownerId: owner.id }),
+          });
+          
+          if (financialResponse.ok) {
+            const finContext = await financialResponse.json();
+            
+            fullContext += "\n\n--- OWNER FINANCIAL STATUS ---";
+            
+            // Payment method status
+            if (finContext.hasPaymentMethod) {
+              fullContext += `\n✅ Card on file: ${finContext.paymentMethodBrand || finContext.paymentMethodType} ending in ${finContext.paymentMethodLast4}`;
+              if (finContext.cardExpiringSoon) {
+                fullContext += ` (⚠️ EXPIRING ${finContext.cardExpMonth}/${finContext.cardExpYear})`;
+              }
+            } else {
+              fullContext += `\n⚠️ NO PAYMENT METHOD ON FILE - If they mention payments, guide them to set up a card`;
+            }
+            
+            // Outstanding charges
+            if (finContext.hasOutstandingCharges) {
+              fullContext += `\n⚠️ Outstanding balance: $${finContext.outstandingAmount.toFixed(2)}`;
+              if (finContext.oldestUnpaidDate) {
+                fullContext += ` (since ${finContext.oldestUnpaidDate})`;
+              }
+              fullContext += `\n→ If they ask about payments, acknowledge the outstanding balance`;
+            } else {
+              fullContext += `\n✅ No outstanding charges - account is current`;
+            }
+            
+            // Pending payouts
+            if (finContext.pendingPayoutAmount > 0) {
+              fullContext += `\n💰 Pending payout: $${finContext.pendingPayoutAmount.toFixed(2)}`;
+            }
+            
+            // Payment history
+            if (finContext.lastPaymentDate) {
+              fullContext += `\nLast payment: $${finContext.lastPaymentAmount} on ${new Date(finContext.lastPaymentDate).toLocaleDateString()}`;
+            }
+            
+            // Financial health
+            fullContext += `\nAccount status: ${finContext.financialHealthScore.toUpperCase()}`;
+            if (finContext.financialHealthDetails) {
+              fullContext += ` - ${finContext.financialHealthDetails}`;
+            }
+            
+            fullContext += "\n--- END FINANCIAL STATUS ---";
+            
+            console.log("Financial context loaded for owner:", owner.id, "Health:", finContext.financialHealthScore);
+          }
+        } catch (finError) {
+          console.error("Error fetching financial context:", finError);
         }
+      }
       }
     }
 
@@ -229,6 +316,28 @@ serve(async (req) => {
     const isUrgent = msgLower.includes("urgent") || msgLower.includes("asap") || msgLower.includes("emergency") || msgLower.includes("immediately");
     const isFrustrated = msgLower.includes("still waiting") || msgLower.includes("no response") || msgLower.includes("frustrated") || msgLower.includes("disappointed");
     const isThankYou = msgLower.includes("thank") || msgLower.includes("appreciate") || msgLower.includes("great job");
+    
+    // Owner-specific intent patterns
+    const isPaymentInquiry = msgLower.includes("payment") || msgLower.includes("charge") || msgLower.includes("bill") || 
+                             msgLower.includes("invoice") || msgLower.includes("fee") || msgLower.includes("cost") || 
+                             msgLower.includes("how much") || msgLower.includes("owe");
+    const isPaymentConfirmation = msgLower.includes("paid") || msgLower.includes("sent") || msgLower.includes("transfer") || 
+                                  msgLower.includes("completed") || msgLower.includes("done paying");
+    const isPaymentIssue = msgLower.includes("declined") || msgLower.includes("failed") || msgLower.includes("error") || 
+                           msgLower.includes("wrong charge") || msgLower.includes("overcharg") || msgLower.includes("dispute");
+    const isPayoutInquiry = msgLower.includes("payout") || msgLower.includes("distribution") || msgLower.includes("when") && 
+                            (msgLower.includes("paid") || msgLower.includes("get my money")) || msgLower.includes("deposit");
+    const isCardUpdate = msgLower.includes("update") && msgLower.includes("card") || msgLower.includes("new card") || 
+                         msgLower.includes("change") && msgLower.includes("payment") || msgLower.includes("expired");
+    
+    const ownerFinancialIntent = {
+      isPaymentInquiry,
+      isPaymentConfirmation,
+      isPaymentIssue,
+      isPayoutInquiry,
+      isCardUpdate,
+      hasFinancialIntent: isPaymentInquiry || isPaymentConfirmation || isPaymentIssue || isPayoutInquiry || isCardUpdate,
+    };
 
     // Determine contract status from context
     const isLead = fullContext.includes("Stage:") && !fullContext.includes("Stage: signed") && !fullContext.includes("Stage: active");
@@ -260,6 +369,14 @@ MESSAGE ANALYSIS:
 - Does this feel urgent? ${isUrgent ? "YES - prioritize speed and clarity" : "NO"}
 - Is the sender frustrated? ${isFrustrated ? "YES - acknowledge their frustration with empathy, not scripted apologies" : "NO"}
 - Is this expressing gratitude? ${isThankYou ? "YES - keep response brief and warm" : "NO"}
+${ownerId ? `
+OWNER FINANCIAL INTENT DETECTED:
+- Asking about payment/charges? ${ownerFinancialIntent.isPaymentInquiry ? "YES - reference their actual balance" : "NO"}
+- Claiming they paid? ${ownerFinancialIntent.isPaymentConfirmation ? "YES - verify before confirming" : "NO"}
+- Payment issue/dispute? ${ownerFinancialIntent.isPaymentIssue ? "YES - be empathetic and investigative" : "NO"}
+- Asking about payout? ${ownerFinancialIntent.isPayoutInquiry ? "YES - reference actual pending amounts" : "NO"}
+- Wants to update card? ${ownerFinancialIntent.isCardUpdate ? "YES - offer to send secure link" : "NO"}
+` : ""}
 
 RESPONSE REQUIREMENTS:
 1. READ THEIR MESSAGE CAREFULLY - respond to what they ACTUALLY said
@@ -269,13 +386,22 @@ RESPONSE REQUIREMENTS:
 5. ${messageType === "sms" ? "Keep under 160 characters ideal, 200 max" : "2-3 short paragraphs maximum"}
 6. End with an appropriate response to their situation
 7. Sign as: "- Ingo"
+${ownerId && ownerFinancialIntent.hasFinancialIntent ? `
+FINANCIAL RESPONSE GUIDANCE:
+- Use the EXACT financial data from the "OWNER FINANCIAL STATUS" section above
+- If they ask about balance, quote the actual amount
+- If they claim payment, mention you'll verify (unless you see recent payment in status)
+- For payout questions, reference the pending amount if any
+- If no card on file and they need to pay, suggest setting one up
+` : ""}
 
 WHAT NOT TO DO:
 - NEVER claim you "spoke earlier" or something was "promised" unless the history proves it
 - NEVER suggest a call if they're reviewing documents and didn't ask for one
 - Don't use placeholder text like "[specific detail]" - if you don't know, don't guess
 - Don't start with "I" - vary your sentence openings
-- Don't be pushy if they asked for time`;
+- Don't be pushy if they asked for time
+${ownerId ? "- NEVER guess about payment amounts or dates - use ONLY what's in the financial status" : ""}`;
 
     const userPrompt = `THEIR MESSAGE TO REPLY TO:
 "${inboundMessage}"
