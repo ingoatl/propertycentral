@@ -115,10 +115,11 @@ serve(async (req) => {
       messageType, 
       leadId, 
       ownerId,
-      includeCompanyKnowledge 
+      includeCompanyKnowledge,
+      userInstructions 
     } = await req.json();
 
-    console.log("AI Message Assistant request:", { action, contactName, messageType, leadId, ownerId });
+    console.log("AI Message Assistant request:", { action, contactName, messageType, leadId, ownerId, hasUserInstructions: !!userInstructions });
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const MEM0_API_KEY = Deno.env.get("MEM0_API_KEY");
@@ -413,19 +414,25 @@ YOUR RESPONSE SHOULD:
 
     switch (action) {
       case "generate_contextual_reply":
+        // If user provided instructions, incorporate them prominently
+        const instructionsContext = userInstructions 
+          ? `\n\nUSER'S INSTRUCTIONS FOR THIS REPLY (FOLLOW THESE):\n"${userInstructions}"\n\nIncorporate the above instructions naturally into your response.`
+          : "";
+        
         userPrompt = `Generate a warm, human ${messageType === "sms" ? "SMS" : "email"} reply.
 
 THEIR MESSAGE (RESPOND TO THIS):
 "${currentMessage || "See conversation history"}"
 
 ${specificRequestContext}
+${instructionsContext}
 
 CRITICAL RULES:
-1. **JUST ANSWER THEIR QUESTION** - Be helpful and direct
+1. ${userInstructions ? "FOLLOW THE USER'S INSTRUCTIONS above - incorporate their key points naturally" : "**JUST ANSWER THEIR QUESTION** - Be helpful and direct"}
 2. ${hasPhoneCall ? "We talked before - skip pleasantries, be direct" : "Say 'Hi ${firstName}!' or 'Hey!' - NEVER 'great chatting'"}
 3. Be specific - mention the exact thing they asked about
-4. **DO NOT** suggest scheduling a call
-5. **DO NOT** offer income analysis or reports
+4. **DO NOT** suggest scheduling a call (unless user instructions say to)
+5. **DO NOT** offer income analysis or reports (unless user instructions say to)
 6. **DO NOT** pitch any services
 7. Just be helpful, human, and to-the-point
 8. Keep it SHORT - ${messageType === "sms" ? "under 160 characters ideal" : "2-3 sentences"}
