@@ -81,6 +81,7 @@ const GoogleReviewsTab = () => {
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [allInboundMessages, setAllInboundMessages] = useState<SmsLog[]>([]);
+  const [sentMessages, setSentMessages] = useState<SmsLog[]>([]);
   const [activeTab, setActiveTab] = useState("inbox");
   const [optOutConfirm, setOptOutConfirm] = useState<string | null>(null);
   const [resubscribeConfirm, setResubscribeConfirm] = useState<string | null>(null);
@@ -171,7 +172,7 @@ const GoogleReviewsTab = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [reviewsResult, requestsResult, inboundResult] = await Promise.all([
+      const [reviewsResult, requestsResult, inboundResult, sentResult] = await Promise.all([
         supabase
           .from("ownerrez_reviews")
           .select("*")
@@ -186,6 +187,13 @@ const GoogleReviewsTab = () => {
           .in("message_type", ["inbound_reply", "inbound_opt_out", "inbound_resubscribe", "inbound_unmatched", "inbound_unmatched_reviews"])
           .order("created_at", { ascending: false })
           .limit(50),
+        // Fetch sent messages for the Sent tab
+        supabase
+          .from("sms_log")
+          .select("*")
+          .in("message_type", ["permission_request", "link_delivery", "review_text", "nudge", "test"])
+          .order("created_at", { ascending: false })
+          .limit(100),
       ]);
 
       if (reviewsResult.error) throw reviewsResult.error;
@@ -194,6 +202,7 @@ const GoogleReviewsTab = () => {
       setReviews(reviewsResult.data || []);
       setRequests(requestsResult.data || []);
       setAllInboundMessages(inboundResult.data || []);
+      setSentMessages(sentResult.data || []);
     } catch (error: any) {
       console.error("Error loading Google reviews data:", error);
       toast.error("Failed to load reviews data");
@@ -413,10 +422,14 @@ const GoogleReviewsTab = () => {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 w-full">
+        <TabsList className="grid grid-cols-4 w-full">
           <TabsTrigger value="inbox" className="gap-1">
             <Inbox className="w-4 h-4" />
             Inbox {allInboundMessages.length > 0 && <Badge variant="secondary" className="ml-1 h-5 px-1.5">{allInboundMessages.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="sent" className="gap-1">
+            <Send className="w-4 h-4" />
+            Sent {sentMessages.length > 0 && <Badge variant="secondary" className="ml-1 h-5 px-1.5">{sentMessages.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="queue" className="gap-1">
             <Phone className="w-4 h-4" />
@@ -474,6 +487,88 @@ const GoogleReviewsTab = () => {
                           </span>
                         </div>
                         <p className="text-sm bg-background rounded p-2 border">{msg.message_body}</p>
+                        {associatedRequest && (
+                          <div className="mt-2 flex items-center gap-2">
+                            {getStatusBadge(associatedRequest.workflow_status, associatedRequest.opted_out)}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 text-xs"
+                              onClick={() => viewSmsHistory(associatedRequest.id)}
+                            >
+                              View Thread
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* SENT TAB */}
+        <TabsContent value="sent" className="mt-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Send className="w-5 h-5" />
+                Sent Messages
+              </CardTitle>
+              <CardDescription>
+                Messages sent from {formatPhone(GOOGLE_REVIEWS_PHONE)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sentMessages.length === 0 ? (
+                <div className="text-center py-8">
+                  <Send className="w-10 h-10 mx-auto mb-3 opacity-30 text-muted-foreground" />
+                  <p className="text-muted-foreground">No messages sent yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Sent messages will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {sentMessages.map((msg) => {
+                    const associatedRequest = requests.find(r => r.id === msg.request_id);
+                    const associatedReview = associatedRequest 
+                      ? reviews.find(r => r.id === associatedRequest.review_id)
+                      : reviews.find(r => r.guest_phone === msg.phone_number);
+                    
+                    const getMessageTypeLabel = (type: string) => {
+                      switch (type) {
+                        case "permission_request": return "Permission Ask";
+                        case "link_delivery": return "Link Sent";
+                        case "review_text": return "Review Text";
+                        case "nudge": return "Nudge";
+                        case "test": return "Test";
+                        default: return type;
+                      }
+                    };
+                    
+                    return (
+                      <div key={msg.id} className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">
+                              To: {associatedReview?.guest_name || formatPhone(msg.phone_number)}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {getMessageTypeLabel(msg.message_type)}
+                            </Badge>
+                            <Badge 
+                              variant={msg.status === "sent" ? "default" : msg.status === "failed" ? "destructive" : "secondary"} 
+                              className="text-xs"
+                            >
+                              {msg.status}
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(msg.created_at), "MMM d, h:mm a")}
+                          </span>
+                        </div>
+                        <p className="text-sm bg-background rounded p-2 border whitespace-pre-wrap">{msg.message_body}</p>
                         {associatedRequest && (
                           <div className="mt-2 flex items-center gap-2">
                             {getStatusBadge(associatedRequest.workflow_status, associatedRequest.opted_out)}
