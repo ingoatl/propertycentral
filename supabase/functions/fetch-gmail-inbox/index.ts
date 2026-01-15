@@ -243,6 +243,51 @@ serve(async (req) => {
 
     console.log(`Returning ${emails.length} emails`);
 
+    // Auto-trigger insight extraction for new emails (background task)
+    // Only process emails that don't already have insights
+    if (emails.length > 0) {
+      try {
+        const emailIds = emails.map(e => e.id);
+        
+        // Check which emails already have insights
+        const { data: existingInsights } = await supabase
+          .from('email_insights')
+          .select('gmail_message_id')
+          .in('gmail_message_id', emailIds);
+        
+        const existingIds = new Set((existingInsights || []).map(i => i.gmail_message_id));
+        const newEmails = emails.filter(e => !existingIds.has(e.id));
+        
+        if (newEmails.length > 0) {
+          console.log(`[Auto-Insights] Found ${newEmails.length} new emails without insights`);
+          
+          // Process up to 10 new emails for insights (to avoid timeout)
+          for (const email of newEmails.slice(0, 10)) {
+            try {
+              await supabase.functions.invoke('extract-insights', {
+                body: {
+                  email: {
+                    subject: email.subject,
+                    from: email.from,
+                    fromName: email.fromName,
+                    date: email.date,
+                    body: email.body,
+                    gmail_message_id: email.id,
+                  }
+                }
+              });
+              console.log(`[Auto-Insights] Extracted insights for: ${email.subject}`);
+            } catch (insightErr) {
+              console.error(`[Auto-Insights] Failed for email ${email.id}:`, insightErr);
+            }
+          }
+        }
+      } catch (insightError) {
+        console.error('[Auto-Insights] Error checking/extracting insights:', insightError);
+        // Don't fail the main request if insight extraction fails
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, emails }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
