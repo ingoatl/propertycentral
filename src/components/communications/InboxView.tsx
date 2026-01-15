@@ -41,6 +41,7 @@ import {
   Home,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
+import { cn } from "@/lib/utils";
 import { formatPhoneForDisplay } from "@/lib/phoneUtils";
 import { decodeHtmlEntities } from "@/lib/html-utils";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
@@ -895,20 +896,20 @@ export function InboxView() {
 
       if (fetchMessages) {
         // Fetch lead communications - filter by user assignment for non-admin users
+        // Include received_on_number for proper phone-based filtering
         let commsQuery = supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, leads(id, name, phone, email)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, assigned_user_id, received_on_number, leads(id, name, phone, email)`)
           .in("communication_type", ["sms", "email"])
           .order("created_at", { ascending: false })
           .limit(100);
         
-        // Filter by user assignment - only show messages assigned to the target user
-        // CRITICAL: Messages with NO assignment (all null) should ONLY appear in admin "all" view
-        // This prevents unrouted messages from appearing in every user's personal inbox
-        if (!viewAllInboxes && targetUserId) {
-          // Only include messages explicitly assigned to this user
-          commsQuery = commsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_user_id.eq.${targetUserId}`);
-        }
+        // For admin "all" view, fetch everything without filtering
+        // For personal inboxes, we'll filter post-query to include:
+        // 1. Messages explicitly assigned to the user (assigned_to, recipient_user_id, assigned_user_id)
+        // 2. Messages received on the user's personal phone number (received_on_number match)
+        // 3. Messages from company lines (visible to all team members)
+        // We fetch all and filter in JS because we need to cross-reference with userPhoneMap
         
         const { data: allComms } = await commsQuery;
 
@@ -923,6 +924,30 @@ export function InboxView() {
             if (t.tenant_phone) {
               const normalized = normalizePhone(t.tenant_phone);
               tenantMap.set(normalized, { id: t.id, name: t.tenant_name, phone: t.tenant_phone, email: t.tenant_email });
+            }
+          });
+          
+          // Fetch all active phone assignments for proper inbox routing
+          const { data: allPhoneAssignments } = await supabase
+            .from("user_phone_assignments")
+            .select("user_id, phone_number, phone_type")
+            .eq("is_active", true);
+          
+          // Create lookup maps for phone-based filtering
+          const phoneToUserMap = new Map<string, { user_id: string; phone_type: string }>();
+          const userPersonalPhones = new Map<string, string[]>(); // user_id -> list of personal phone numbers
+          
+          allPhoneAssignments?.forEach(a => {
+            if (a.phone_number) {
+              const normalized = normalizePhone(a.phone_number);
+              phoneToUserMap.set(normalized, { user_id: a.user_id, phone_type: a.phone_type });
+              
+              // Track personal phones per user
+              if (a.phone_type === "personal") {
+                const existing = userPersonalPhones.get(a.user_id) || [];
+                existing.push(normalized);
+                userPersonalPhones.set(a.user_id, existing);
+              }
             }
           });
           
@@ -946,6 +971,58 @@ export function InboxView() {
           };
 
           for (const comm of allComms) {
+            // === CRITICAL: Inbox filtering logic ===
+            // For personal inboxes (not admin "all" view), only show messages that belong to this user:
+            // 1. Explicitly assigned to this user (assigned_to, recipient_user_id, assigned_user_id)
+            // 2. Received on the user's personal phone number (received_on_number matches)
+            // 3. Messages from company lines are visible to all team members
+            if (!viewAllInboxes && targetUserId) {
+              const isExplicitlyAssigned = 
+                comm.assigned_to === targetUserId || 
+                comm.recipient_user_id === targetUserId || 
+                comm.assigned_user_id === targetUserId;
+              
+              // Check if message was received on a phone number assigned to another user
+              let isReceivedOnOtherPersonalLine = false;
+              let isReceivedOnUserPersonalLine = false;
+              let isReceivedOnCompanyLine = false;
+              
+              if (comm.received_on_number) {
+                const normalizedReceivedOn = normalizePhone(comm.received_on_number);
+                const phoneOwner = phoneToUserMap.get(normalizedReceivedOn);
+                
+                if (phoneOwner) {
+                  if (phoneOwner.phone_type === "company") {
+                    // Company line - visible to all team members
+                    isReceivedOnCompanyLine = true;
+                  } else if (phoneOwner.user_id === targetUserId) {
+                    // Personal line belonging to this user
+                    isReceivedOnUserPersonalLine = true;
+                  } else {
+                    // Personal line belonging to ANOTHER user - skip this message
+                    isReceivedOnOtherPersonalLine = true;
+                  }
+                }
+              }
+              
+              // Skip if received on another user's personal line
+              if (isReceivedOnOtherPersonalLine) {
+                continue;
+              }
+              
+              // Include message if:
+              // - Explicitly assigned to this user, OR
+              // - Received on user's personal line, OR
+              // - Received on company line (visible to all), OR
+              // - Has no routing info (legacy messages - visible to all for now)
+              const hasNoRoutingInfo = !comm.received_on_number && !comm.assigned_to && !comm.recipient_user_id && !comm.assigned_user_id;
+              const shouldInclude = isExplicitlyAssigned || isReceivedOnUserPersonalLine || isReceivedOnCompanyLine || hasNoRoutingInfo;
+              
+              if (!shouldInclude) {
+                continue;
+              }
+            }
+            
             const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null } | null;
             const metadata = comm.metadata as { 
               unmatched_phone?: string; 
@@ -2619,7 +2696,7 @@ export function InboxView() {
                     {group.communications.map((comm) => {
                       const isDone = comm.conversation_status === "done";
                       const isSnoozed = comm.conversation_status === "snoozed";
-                      const shouldFade = isDone || isSnoozed;
+                      const isAwaiting = comm.conversation_status === "awaiting";
                       return (
                       <div 
                         key={`${comm.id}-${comm.conversation_status}`}
@@ -2632,20 +2709,22 @@ export function InboxView() {
                             handleSelectMessage(comm);
                           }
                         }}
-                        className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${shouldFade ? "opacity-50" : ""}`}
+                        className={cn(
+                          "group relative flex items-start gap-3 px-3 py-3 cursor-pointer border-b border-border/30 active:bg-muted/50",
+                          // Smooth transitions for status changes
+                          "transition-all duration-300 ease-out",
+                          selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30",
+                          // Done status: green border + fade + pale green background
+                          isDone && "border-l-2 border-l-green-500 opacity-50 bg-green-50/30 dark:bg-green-950/10",
+                          // Snoozed status: amber border + fade + pale amber background
+                          isSnoozed && "border-l-2 border-l-amber-500 opacity-50 bg-amber-50/30 dark:bg-amber-950/10",
+                          // Awaiting status: cyan border
+                          isAwaiting && !isDone && !isSnoozed && "border-l-2 border-l-cyan-500",
+                          // Priority colors (lower precedence than status)
+                          comm.priority === "urgent" && !isDone && !isSnoozed && !isAwaiting && "border-l-2 border-l-red-500",
+                          comm.priority === "important" && !isDone && !isSnoozed && !isAwaiting && "border-l-2 border-l-amber-500"
+                        )}
                       >
-                        {/* Status/Priority indicator line - done/snoozed take precedence */}
-                        {isDone ? (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
-                        ) : isSnoozed ? (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
-                        ) : comm.conversation_status === "awaiting" ? (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-r" />
-                        ) : comm.priority === "urgent" ? (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
-                        ) : comm.priority === "important" ? (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
-                        ) : null}
                         
                         {/* Compact avatar */}
                         <div className="relative flex-shrink-0">
@@ -2745,8 +2824,7 @@ export function InboxView() {
                   {comms.map((comm) => {
                     const isDone = comm.conversation_status === "done";
                     const isSnoozed = comm.conversation_status === "snoozed";
-                    const isLowPriority = comm.priority === "low";
-                    const shouldFade = isDone || isSnoozed || isLowPriority;
+                    const isAwaiting = comm.conversation_status === "awaiting";
                     const isSelected = selectedMessage?.id === comm.id || 
                       (comm.gmail_email && selectedGmailEmail?.id === comm.gmail_email.id);
                     return (
@@ -2761,20 +2839,22 @@ export function InboxView() {
                           handleSelectMessage(comm);
                         }
                       }}
-                      className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${isSelected ? "bg-primary/5" : "hover:bg-muted/30"} ${shouldFade ? "opacity-50" : ""}`}
+                      className={cn(
+                        "group relative flex items-start gap-3 px-3 py-3 cursor-pointer border-b border-border/30 active:bg-muted/50",
+                        // Smooth transitions for status changes
+                        "transition-all duration-300 ease-out",
+                        isSelected ? "bg-primary/5" : "hover:bg-muted/30",
+                        // Done status: green border + fade + pale green background
+                        isDone && "border-l-2 border-l-green-500 opacity-50 bg-green-50/30 dark:bg-green-950/10",
+                        // Snoozed status: amber border + fade + pale amber background
+                        isSnoozed && "border-l-2 border-l-amber-500 opacity-50 bg-amber-50/30 dark:bg-amber-950/10",
+                        // Awaiting status: cyan border
+                        isAwaiting && !isDone && !isSnoozed && "border-l-2 border-l-cyan-500",
+                        // Priority colors (lower precedence than status)
+                        comm.priority === "urgent" && !isDone && !isSnoozed && !isAwaiting && "border-l-2 border-l-red-500",
+                        comm.priority === "important" && !isDone && !isSnoozed && !isAwaiting && "border-l-2 border-l-amber-500"
+                      )}
                     >
-                      {/* Status/Priority indicator line - done/snoozed take precedence */}
-                      {isDone ? (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
-                      ) : isSnoozed ? (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
-                      ) : comm.conversation_status === "awaiting" ? (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-r" />
-                      ) : comm.priority === "urgent" ? (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
-                      ) : comm.priority === "important" ? (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
-                      ) : null}
                       
                       {/* Compact avatar */}
                       <div className="relative flex-shrink-0">
