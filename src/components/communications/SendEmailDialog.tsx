@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Send, Mail, Loader2, Sparkles } from "lucide-react";
+import { Send, Mail, Loader2, Sparkles, MessageSquare } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +89,8 @@ export function SendEmailDialog({
   const [body, setBody] = useState("");
   const [selectedSender, setSelectedSender] = useState(SENDERS[0].email);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [showContextInput, setShowContextInput] = useState(false);
+  const [userInstructions, setUserInstructions] = useState("");
   const queryClient = useQueryClient();
 
   // Fetch AI suggestion when dialog opens
@@ -106,7 +108,7 @@ export function SendEmailDialog({
     }
   }, [open, contactEmail, contactName, replyToSubject, replyToBody]);
 
-  const fetchAISuggestion = async () => {
+  const fetchAISuggestion = async (instructions?: string) => {
     setIsLoadingAI(true);
     setBody("");
     
@@ -117,13 +119,15 @@ export function SendEmailDialog({
           contactName,
           currentSubject: replyToSubject || "",
           incomingEmailBody: replyToBody || "",
+          userInstructions: instructions || userInstructions || undefined,
         },
       });
 
       if (error) throw error;
       if (data?.suggestion) {
         setBody(data.suggestion);
-        toast.success("AI drafted a response based on your conversation history");
+        setShowContextInput(false);
+        setUserInstructions("");
       }
     } catch (err) {
       console.error("Failed to get AI suggestion:", err);
@@ -175,7 +179,7 @@ export function SendEmailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
@@ -240,24 +244,81 @@ export function SendEmailDialog({
             />
           </div>
 
+          {/* Context input for AI */}
+          {showContextInput && (
+            <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                <MessageSquare className="h-4 w-4" />
+                <span>What would you like to say?</span>
+              </div>
+              
+              <Textarea
+                value={userInstructions}
+                onChange={(e) => setUserInstructions(e.target.value)}
+                placeholder="Enter context or key points... e.g. 'Tell them we can do a walkthrough next Tuesday'"
+                className="min-h-[80px] text-sm bg-background resize-y w-full"
+                autoFocus
+              />
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => fetchAISuggestion()}
+                  disabled={isLoadingAI || !userInstructions.trim()}
+                  className="gap-2"
+                >
+                  {isLoadingAI ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Generate Email
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setShowContextInput(false);
+                    setUserInstructions("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Body input */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-sm font-medium">Message</label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={fetchAISuggestion}
-                disabled={isLoadingAI}
-                className="h-7 text-xs"
-              >
-                {isLoadingAI ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3 w-3 mr-1" />
-                )}
-                {isLoadingAI ? "Generating..." : "AI Suggest"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fetchAISuggestion()}
+                  disabled={isLoadingAI}
+                  className="h-7 text-xs"
+                >
+                  {isLoadingAI ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3 mr-1" />
+                  )}
+                  {isLoadingAI ? "Generating..." : "AI Suggest"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowContextInput(!showContextInput)}
+                  disabled={isLoadingAI}
+                  className="h-7 text-xs gap-1"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  Reply with Context
+                </Button>
+              </div>
             </div>
             {isLoadingAI ? (
               <div className="flex items-center justify-center h-48 border rounded-md bg-muted/30">
