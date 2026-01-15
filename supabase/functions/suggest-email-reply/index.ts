@@ -241,6 +241,7 @@ serve(async (req) => {
     let isOwner = false;
     let meetingLink = '';
     let upcomingCall = null;
+    let financialContext = '';
     
     if (ownerData) {
       isOwner = true;
@@ -262,6 +263,56 @@ serve(async (req) => {
             }
           }
         }
+      }
+
+      // Fetch financial context for owner
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        
+        const finResponse = await fetch(`${supabaseUrl}/functions/v1/get-owner-financial-context`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ ownerId: ownerData.id }),
+        });
+
+        if (finResponse.ok) {
+          const finData = await finResponse.json();
+          if (finData) {
+            financialContext = '\n\nOWNER FINANCIAL STATUS:';
+            
+            if (finData.hasPaymentMethod) {
+              financialContext += `\n✅ Card on file: ${finData.paymentMethodType || 'card'} ending in ${finData.paymentMethodLast4 || '****'}`;
+              if (finData.cardExpiringSoon) {
+                financialContext += ` (⚠️ EXPIRES SOON)`;
+              }
+            } else {
+              financialContext += '\n⚠️ NO PAYMENT METHOD ON FILE - If they mention payments, guide them to set up a card';
+            }
+            
+            if (finData.hasOutstandingCharges) {
+              financialContext += `\n⚠️ Outstanding balance: $${finData.outstandingAmount?.toFixed(2) || '0.00'} (since ${finData.oldestUnpaidDate || 'N/A'})`;
+              financialContext += '\n→ If they ask about payments, acknowledge the outstanding balance';
+            } else {
+              financialContext += '\n✅ No outstanding charges - account is current';
+            }
+            
+            if (finData.pendingPayoutAmount && finData.pendingPayoutAmount > 0) {
+              financialContext += `\n💰 Pending payout: $${finData.pendingPayoutAmount.toFixed(2)}`;
+            }
+            
+            if (finData.lastPaymentDate) {
+              financialContext += `\nLast payment: $${finData.lastPaymentAmount || 0} on ${finData.lastPaymentDate}`;
+            }
+            
+            financialContext += `\n📊 Financial health: ${finData.financialHealthScore || 'unknown'}`;
+          }
+        }
+      } catch (finError) {
+        console.error("Error fetching financial context:", finError);
       }
     } else if (leadData) {
       propertyContext = `\n\nCONTACT STATUS: Lead (${leadData.status || 'New'})`;

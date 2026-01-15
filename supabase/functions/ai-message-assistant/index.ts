@@ -305,6 +305,62 @@ serve(async (req) => {
           commHistory += `[${dir} - ${type}]: ${preview}${preview.length >= 300 ? "..." : ""}\n`;
         }
       }
+
+      // Fetch financial context for owner (multi-dimensional awareness)
+      try {
+        const finResponse = await fetch(`${supabaseUrl}/functions/v1/get-owner-financial-context`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ ownerId }),
+        });
+
+        if (finResponse.ok) {
+          const finData = await finResponse.json();
+          if (finData) {
+            fullContext += '\n\nOWNER FINANCIAL STATUS:';
+            
+            if (finData.hasPaymentMethod) {
+              fullContext += `\n✅ Card on file: ${finData.paymentMethodType || 'card'} ending in ${finData.paymentMethodLast4 || '****'}`;
+              if (finData.cardExpiringSoon) {
+                fullContext += ` (⚠️ EXPIRES SOON - proactively mention updating)`;
+              }
+            } else {
+              fullContext += '\n⚠️ NO PAYMENT METHOD ON FILE - If they mention payments, guide them to set up a card';
+            }
+            
+            if (finData.hasOutstandingCharges) {
+              fullContext += `\n⚠️ Outstanding balance: $${finData.outstandingAmount?.toFixed(2) || '0.00'} (since ${finData.oldestUnpaidDate || 'N/A'})`;
+              fullContext += '\n→ If they ask about payments, acknowledge the outstanding balance';
+            } else {
+              fullContext += '\n✅ No outstanding charges - account is current';
+            }
+            
+            if (finData.pendingPayoutAmount && finData.pendingPayoutAmount > 0) {
+              fullContext += `\n💰 Pending payout: $${finData.pendingPayoutAmount.toFixed(2)}`;
+              if (finData.lastPayoutDate) {
+                fullContext += ` (last payout: ${finData.lastPayoutDate})`;
+              }
+            }
+            
+            if (finData.lastPaymentDate) {
+              fullContext += `\nLast payment received: $${finData.lastPaymentAmount || 0} on ${finData.lastPaymentDate}`;
+            }
+            
+            fullContext += `\n📊 Financial health: ${finData.financialHealthScore || 'unknown'}`;
+            
+            console.log("Added financial context for owner:", { 
+              hasPaymentMethod: finData.hasPaymentMethod,
+              outstandingAmount: finData.outstandingAmount,
+              healthScore: finData.financialHealthScore 
+            });
+          }
+        }
+      } catch (finError) {
+        console.error("Error fetching financial context:", finError);
+      }
     }
 
     // If conversationContext was passed directly (from UI), use it
