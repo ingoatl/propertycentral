@@ -457,14 +457,28 @@ serve(async (req) => {
     if (action === "test") {
       // Send test to Ingo's phone - use the REAL permission ask message
       const adminPhone = "+17709065022";
-      const testMessage = `Thanks again for the wonderful Airbnb review — it truly means a lot. Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
+      
+      // Get the most recent review with review_text to link with this test
+      const { data: recentReview } = await supabase
+        .from("ownerrez_reviews")
+        .select("id, review_text, review_source")
+        .not("review_text", "is", null)
+        .order("review_date", { ascending: false })
+        .limit(1)
+        .single();
+      
+      const reviewText = recentReview?.review_text || "This was an amazing place with everything included! My family loved it.";
+      const source = recentReview?.review_source || "Airbnb";
+      
+      const testMessage = `Thanks again for the wonderful ${source} review — it truly means a lot. Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
       
       console.log(`Sending test SMS to ${adminPhone} from ${GOOGLE_REVIEWS_PHONE} via GHL`);
       
-      // Create a test review request for tracking purposes
+      // Create a test review request linked to a real review for full automation testing
       const { data: testRequest, error: testRequestError } = await supabase
         .from("google_review_requests")
         .insert({
+          review_id: recentReview?.id || null,
           guest_phone: adminPhone,
           workflow_status: "permission_asked",
           permission_asked_at: new Date().toISOString(),
