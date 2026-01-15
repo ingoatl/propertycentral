@@ -817,6 +817,18 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       }
     }
 
+    // Apply promotional/newsletter override from pre-detection
+    const finalCategory = preDetectedCategory || analysis.category;
+    const finalPriority = preDetectedPriority || analysis.priority;
+    
+    // Log if we overrode the AI's classification
+    if (preDetectedCategory && preDetectedCategory !== analysis.category) {
+      console.log(`Overrode AI category from "${analysis.category}" to "${finalCategory}" (promotional detection)`);
+    }
+    if (preDetectedPriority && preDetectedPriority !== analysis.priority) {
+      console.log(`Overrode AI priority from "${analysis.priority}" to "${finalPriority}" (promotional detection)`);
+    }
+
     // Save email insight
     const insightData = {
       subject,
@@ -825,12 +837,12 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       gmail_message_id: gmailMessageId,
       property_id: property?.id || null,
       owner_id: owner?.id || null,
-      category: analysis.category,
+      category: finalCategory,
       summary: analysis.summary,
       sentiment: analysis.sentiment,
-      action_required: analysis.actionRequired,
+      action_required: preDetectedCategory ? false : analysis.actionRequired, // No action for promotional
       suggested_actions: analysis.suggestedActions,
-      priority: analysis.priority,
+      priority: finalPriority,
       due_date: analysis.dueDate,
       status: 'new',
       expense_detected: analysis.expenseDetected,
