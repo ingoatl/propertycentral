@@ -180,21 +180,20 @@ export function UnifiedComposeDialog({
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `compose-attachments/${fileName}`;
+      const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('documents')
+        .from('message-attachments')
         .upload(filePath, file);
 
       if (uploadError) {
-        // If bucket doesn't exist or permission denied, show helpful message
         console.error('Upload error:', uploadError);
-        toast.error('File upload not available. Contact support to enable attachments.');
+        toast.error(`Upload failed: ${uploadError.message}`);
         return null;
       }
 
       const { data: urlData } = supabase.storage
-        .from('documents')
+        .from('message-attachments')
         .getPublicUrl(filePath);
 
       return {
