@@ -905,7 +905,7 @@ export function InboxView() {
         
         // Filter by user assignment unless viewing all inboxes (admin feature)
         if (!viewAllInboxes && targetUserId) {
-          commsQuery = commsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_to.is.null`);
+          commsQuery = commsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_user_id.eq.${targetUserId},assigned_to.is.null`);
         }
         
         const { data: allComms } = await commsQuery;

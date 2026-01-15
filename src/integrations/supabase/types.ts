@@ -2533,6 +2533,7 @@ export type Database = {
           assigned_at: string | null
           assigned_by: string | null
           assigned_to: string | null
+          assigned_user_id: string | null
           body: string
           call_duration: number | null
           call_recording_url: string | null
@@ -2558,6 +2559,7 @@ export type Database = {
           metadata: Json | null
           opened_at: string | null
           owner_id: string | null
+          received_on_number: string | null
           recipient_user_id: string | null
           replied_at: string | null
           sent_at: string | null
@@ -2572,6 +2574,7 @@ export type Database = {
           assigned_at?: string | null
           assigned_by?: string | null
           assigned_to?: string | null
+          assigned_user_id?: string | null
           body: string
           call_duration?: number | null
           call_recording_url?: string | null
@@ -2597,6 +2600,7 @@ export type Database = {
           metadata?: Json | null
           opened_at?: string | null
           owner_id?: string | null
+          received_on_number?: string | null
           recipient_user_id?: string | null
           replied_at?: string | null
           sent_at?: string | null
@@ -2611,6 +2615,7 @@ export type Database = {
           assigned_at?: string | null
           assigned_by?: string | null
           assigned_to?: string | null
+          assigned_user_id?: string | null
           body?: string
           call_duration?: number | null
           call_recording_url?: string | null
@@ -2636,6 +2641,7 @@ export type Database = {
           metadata?: Json | null
           opened_at?: string | null
           owner_id?: string | null
+          received_on_number?: string | null
           recipient_user_id?: string | null
           replied_at?: string | null
           sent_at?: string | null
@@ -2647,6 +2653,13 @@ export type Database = {
           work_status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_communications_assigned_user_id_fkey"
+            columns: ["assigned_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lead_communications_lead_id_fkey"
             columns: ["lead_id"]
@@ -8011,6 +8024,7 @@ export type Database = {
           is_active: boolean
           phone_number: string
           phone_type: string
+          purpose: string | null
           telnyx_connection_id: string | null
           updated_at: string
           user_id: string
@@ -8022,6 +8036,7 @@ export type Database = {
           is_active?: boolean
           phone_number: string
           phone_type?: string
+          purpose?: string | null
           telnyx_connection_id?: string | null
           updated_at?: string
           user_id: string
@@ -8033,6 +8048,7 @@ export type Database = {
           is_active?: boolean
           phone_number?: string
           phone_type?: string
+          purpose?: string | null
           telnyx_connection_id?: string | null
           updated_at?: string
           user_id?: string
