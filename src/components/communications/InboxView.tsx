@@ -38,9 +38,11 @@ import {
   Volume2,
   Sparkles,
   Keyboard,
+  Home,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { formatPhoneForDisplay } from "@/lib/phoneUtils";
+import { decodeHtmlEntities } from "@/lib/html-utils";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -810,7 +812,7 @@ export function InboxView() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("email_insights")
-        .select("gmail_message_id, category, sentiment, priority, action_required")
+        .select("gmail_message_id, category, sentiment, priority, action_required, property_id, owner_id")
         .not("gmail_message_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -1705,22 +1707,22 @@ export function InboxView() {
     if (isVoiceAITranscript(comm.body)) {
       const summary = extractCallSummaryFromTranscript(comm.body);
       if (summary) {
-        return "🤖 " + summary.slice(0, 100) + (summary.length > 100 ? "..." : "");
+        return "🤖 " + decodeHtmlEntities(summary.slice(0, 100)) + (summary.length > 100 ? "..." : "");
       }
       return "🤖 Voice AI transcript received";
     }
     // For calls, show transcript or direction with icon prefix
     if (comm.type === "call" || comm.type === "personal_call") {
       if (comm.body && comm.body.length > 10 && comm.body !== "Call" && !comm.body.startsWith("Phone call") && !comm.body.startsWith("Incoming call") && !comm.body.startsWith("Outgoing call")) {
-        return "📞 " + comm.body.slice(0, 100) + (comm.body.length > 100 ? "..." : "");
+        return "📞 " + decodeHtmlEntities(comm.body.slice(0, 100)) + (comm.body.length > 100 ? "..." : "");
       }
       return comm.direction === "inbound" ? "📞 Incoming call" : "📞 Outgoing call";
     }
-    // For emails, show subject with icon
+    // For emails, show subject with icon - decode HTML entities
     if (comm.type === "email" && comm.subject) {
-      return "📧 " + comm.subject;
+      return "📧 " + decodeHtmlEntities(comm.subject);
     }
-    if (comm.type === "draft") return `📝 Draft: ${comm.subject || "No subject"}`;
+    if (comm.type === "draft") return `📝 Draft: ${decodeHtmlEntities(comm.subject) || "No subject"}`;
     // For SMS with images but no/empty text
     if ((!comm.body || comm.body === "SMS message" || comm.body.trim().length === 0) && comm.media_urls?.length) {
       return `📷 Image message (${comm.media_urls.length} attachment${comm.media_urls.length > 1 ? 's' : ''})`;
@@ -1729,7 +1731,8 @@ export function InboxView() {
     if (!comm.body || comm.body === "SMS message" || comm.body.trim().length === 0) {
       return comm.direction === "inbound" ? "Received message" : "Sent message";
     }
-    return comm.body.slice(0, 120) + (comm.body.length > 120 ? "..." : "");
+    // Decode HTML entities in message body preview
+    return decodeHtmlEntities(comm.body.slice(0, 120)) + (comm.body.length > 120 ? "..." : "");
   };
 
   // Mobile: show list or detail based on selection
@@ -2479,6 +2482,31 @@ export function InboxView() {
                                   compact
                                 />
                               )}
+                              {/* Property/Owner indicator - clickable */}
+                              {insight?.property_id && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/properties?id=${insight.property_id}`);
+                                  }}
+                                  className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                                  title="View associated property"
+                                >
+                                  <Home className="h-3 w-3 text-amber-600" />
+                                </button>
+                              )}
+                              {insight?.owner_id && !insight?.property_id && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate("/property-owners");
+                                  }}
+                                  className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-purple-500/10 hover:bg-purple-500/20 transition-colors"
+                                  title="View associated owner"
+                                >
+                                  <User className="h-3 w-3 text-purple-600" />
+                                </button>
+                              )}
                             </div>
                             <div className="flex items-center gap-1.5">
                               {/* Quick action buttons on hover */}
@@ -2498,10 +2526,10 @@ export function InboxView() {
                             </div>
                           </div>
                           <p className={`text-[13px] leading-snug ${isUnread ? 'font-medium' : shouldFade ? 'text-muted-foreground' : 'text-foreground/70'}`}>
-                            {email.subject}
+                            {decodeHtmlEntities(email.subject)}
                           </p>
                           <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
-                            {email.snippet}
+                            {decodeHtmlEntities(email.snippet)}
                           </p>
                         </div>
                         {isUnread && !isDone && !isSnoozed && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-3" />}
