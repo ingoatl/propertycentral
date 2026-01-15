@@ -50,8 +50,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SendSMSDialog } from "./SendSMSDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
-import { ComposeEmailDialog } from "./ComposeEmailDialog";
-import { AIComposeEmailDialog } from "./AIComposeEmailDialog";
+import { UnifiedComposeDialog } from "./UnifiedComposeDialog";
 import { AIDraftReplySection } from "./AIDraftReplySection";
 import { AIWritingAssistant } from "./AIWritingAssistant";
 import { AIReplyButton } from "./AIReplyButton";
@@ -3516,7 +3515,7 @@ export function InboxView() {
           }}
         />
       )}
-      <ComposeEmailDialog open={showComposeEmail} onOpenChange={setShowComposeEmail} />
+      <UnifiedComposeDialog open={showComposeEmail} onOpenChange={setShowComposeEmail} />
       {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "personal" : selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
       {selectedMessage && <ConversationNotes open={showNotes} onOpenChange={setShowNotes} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} contactName={selectedMessage.contact_name} />}
       
@@ -3535,11 +3534,6 @@ export function InboxView() {
         email={selectedGmailEmail}
       />
       
-      {/* AI Compose Email Dialog */}
-      <AIComposeEmailDialog
-        open={showAIComposeEmail}
-        onOpenChange={setShowAIComposeEmail}
-      />
       
       
       
