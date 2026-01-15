@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
 };
 
+// Google Reviews GHL phone number
+const GOOGLE_REVIEWS_PHONE = "+14046090955";
+
 // Format phone number to E.164 for matching - strips ALL non-digit characters including Unicode
 function normalizePhone(phone: string): string {
   // Remove ALL non-digit characters including Unicode formatting characters
@@ -29,6 +32,219 @@ async function findPhoneOwner(supabase: any, phoneNumber: string): Promise<strin
   return data?.user_id || null;
 }
 
+// Check if phone number matches the Google Reviews number
+function isGoogleReviewsNumber(phoneNumber: string): boolean {
+  if (!phoneNumber) return false;
+  const digits = phoneNumber.replace(/\D/g, "").slice(-10);
+  const googleDigits = GOOGLE_REVIEWS_PHONE.replace(/\D/g, "").slice(-10);
+  return digits === googleDigits;
+}
+
+// Send SMS via GHL
+async function sendSmsViaGhl(
+  ghlApiKey: string,
+  ghlLocationId: string,
+  ghlContactId: string,
+  message: string,
+  fromNumber: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const sendResponse = await fetch(
+      `https://services.leadconnectorhq.com/conversations/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${ghlApiKey}`,
+          "Version": "2021-04-15",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: "SMS",
+          contactId: ghlContactId,
+          message: message,
+          fromNumber: fromNumber,
+        }),
+      }
+    );
+
+    if (!sendResponse.ok) {
+      const errorText = await sendResponse.text();
+      console.error("GHL SMS send error:", errorText);
+      return { success: false, error: errorText };
+    }
+
+    const data = await sendResponse.json();
+    return { success: true, messageId: data.messageId || data.conversationId };
+  } catch (error) {
+    console.error("GHL SMS exception:", error);
+    return { success: false, error: String(error) };
+  }
+}
+
+// Process Google Review reply
+async function processGoogleReviewReply(
+  supabase: any,
+  ghlApiKey: string,
+  ghlLocationId: string,
+  ghlContactId: string,
+  phoneDigits: string,
+  messageBody: string
+): Promise<{ handled: boolean }> {
+  const googleReviewUrl = Deno.env.get("GOOGLE_REVIEW_URL") || "https://g.page/r/YOUR_REVIEW_LINK";
+
+  // Check for opt-out keywords
+  const optOutKeywords = ["stop", "unsubscribe", "opt out", "opt-out", "cancel", "quit", "end"];
+  const isOptOut = optOutKeywords.some(kw => messageBody.toLowerCase() === kw || messageBody.toLowerCase().includes(kw));
+
+  if (isOptOut) {
+    console.log(`Google Reviews opt-out detected`);
+    
+    await supabase
+      .from("google_review_requests")
+      .update({
+        opted_out: true,
+        opted_out_at: new Date().toISOString(),
+        workflow_status: "ignored",
+        updated_at: new Date().toISOString(),
+      })
+      .ilike("guest_phone", `%${phoneDigits}`);
+
+    await supabase.from("sms_log").insert({
+      phone_number: `+1${phoneDigits}`,
+      message_type: "inbound_opt_out",
+      message_body: messageBody,
+      status: "received",
+    });
+
+    await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId,
+      "You've been unsubscribed from PeachHaus messages. Reply START to resubscribe.",
+      GOOGLE_REVIEWS_PHONE);
+
+    return { handled: true };
+  }
+
+  // Check for re-subscribe keywords
+  const resubKeywords = ["start", "yes", "unstop"];
+  const isResubscribe = resubKeywords.some(kw => messageBody.toLowerCase() === kw);
+
+  if (isResubscribe) {
+    console.log(`Google Reviews re-subscribe detected`);
+    
+    await supabase
+      .from("google_review_requests")
+      .update({
+        opted_out: false,
+        opted_out_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .ilike("guest_phone", `%${phoneDigits}`);
+
+    await supabase.from("sms_log").insert({
+      phone_number: `+1${phoneDigits}`,
+      message_type: "inbound_resubscribe",
+      message_body: messageBody,
+      status: "received",
+    });
+
+    await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId,
+      "You've been re-subscribed to PeachHaus messages. Thank you!",
+      GOOGLE_REVIEWS_PHONE);
+
+    return { handled: true };
+  }
+
+  // Find pending review request
+  const { data: reviewRequest, error: findError } = await supabase
+    .from("google_review_requests")
+    .select("*, ownerrez_reviews(*)")
+    .ilike("guest_phone", `%${phoneDigits}`)
+    .in("workflow_status", ["permission_asked"])
+    .eq("opted_out", false)
+    .order("permission_asked_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (findError || !reviewRequest) {
+    console.log(`No pending review request found for phone digits ${phoneDigits}`);
+    await supabase.from("sms_log").insert({
+      phone_number: `+1${phoneDigits}`,
+      message_type: "inbound_unmatched_reviews",
+      message_body: messageBody,
+      status: "received",
+    });
+    return { handled: false };
+  }
+
+  console.log(`Found pending Google review request: ${reviewRequest.id}`);
+
+  // Log the inbound reply
+  await supabase.from("sms_log").insert({
+    request_id: reviewRequest.id,
+    phone_number: reviewRequest.guest_phone,
+    message_type: "inbound_reply",
+    message_body: messageBody,
+    status: "received",
+  });
+
+  // Update request status to permission granted
+  await supabase
+    .from("google_review_requests")
+    .update({
+      workflow_status: "permission_granted",
+      permission_granted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", reviewRequest.id);
+
+  // Send the Google review link
+  const review = reviewRequest.ownerrez_reviews;
+  const source = review?.review_source || "Airbnb";
+  const reviewText = review?.review_text || "";
+
+  const linkMessage = `Amazing — thank you! Here's the direct link to leave the Google review: ${googleReviewUrl}`;
+  const linkResult = await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId, linkMessage, GOOGLE_REVIEWS_PHONE);
+
+  await supabase.from("sms_log").insert({
+    request_id: reviewRequest.id,
+    phone_number: reviewRequest.guest_phone,
+    message_type: "link_delivery",
+    message_body: linkMessage,
+    ghl_message_id: linkResult.messageId,
+    status: linkResult.success ? "sent" : "failed",
+    error_message: linkResult.error,
+  });
+
+  // Send the review text if available
+  if (reviewText) {
+    const reviewMessage = `And here's the text of your ${source} review so you can copy/paste:\n\n"${reviewText}"`;
+    const reviewResult = await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId, reviewMessage, GOOGLE_REVIEWS_PHONE);
+
+    await supabase.from("sms_log").insert({
+      request_id: reviewRequest.id,
+      phone_number: reviewRequest.guest_phone,
+      message_type: "review_text",
+      message_body: reviewMessage,
+      ghl_message_id: reviewResult.messageId,
+      status: reviewResult.success ? "sent" : "failed",
+      error_message: reviewResult.error,
+    });
+  }
+
+  // Update status to link_sent
+  await supabase
+    .from("google_review_requests")
+    .update({
+      workflow_status: "link_sent",
+      link_sent_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", reviewRequest.id);
+
+  console.log(`Google review link sent via GHL for request: ${reviewRequest.id}`);
+
+  return { handled: true };
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -38,6 +254,8 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const ghlApiKey = Deno.env.get("GHL_API_KEY")!;
+    const ghlLocationId = Deno.env.get("GHL_LOCATION_ID")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const payload = await req.json();
@@ -70,6 +288,44 @@ serve(async (req) => {
     // GHL may provide this in various locations
     const toNumber = message.to || payload.to || payload.toNumber || message.phoneNumberId || null;
     console.log("SMS routing - To number:", toNumber);
+    
+    // Extract phone digits for matching
+    const normalizedPhone = normalizePhone(contactPhone);
+    const digits = normalizedPhone.replace(/\D/g, "");
+    const last10Digits = digits.slice(-10);
+    
+    // ============================================
+    // CHECK IF THIS IS A GOOGLE REVIEWS MESSAGE
+    // ============================================
+    if (isGoogleReviewsNumber(toNumber)) {
+      console.log("=== GOOGLE REVIEWS CHANNEL (GHL) ===");
+      
+      const reviewResult = await processGoogleReviewReply(
+        supabase,
+        ghlApiKey,
+        ghlLocationId,
+        ghlContactId,
+        last10Digits,
+        messageBody
+      );
+      
+      if (reviewResult.handled) {
+        return new Response(
+          JSON.stringify({ success: true, message: "Google review reply processed" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // Even if not handled by review flow, we still processed it
+      return new Response(
+        JSON.stringify({ success: true, message: "Google reviews channel - no pending request" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // ============================================
+    // REGULAR SMS HANDLING (Leads/Tenants)
+    // ============================================
     
     // Look up which team member owns this receiving number for routing
     let assignedUserId: string | null = null;
@@ -136,10 +392,6 @@ serve(async (req) => {
       });
     }
 
-    // Normalize phone for matching - extract last 10 digits
-    const normalizedPhone = normalizePhone(contactPhone);
-    const digits = normalizedPhone.replace(/\D/g, "");
-    const last10Digits = digits.slice(-10);
     const last4Digits = digits.slice(-4);
     console.log("Looking for lead with phone:", normalizedPhone, "last 10:", last10Digits, "last 4:", last4Digits);
 
