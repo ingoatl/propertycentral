@@ -321,18 +321,14 @@ export function UnifiedComposeDialog({
     mutationFn: async () => {
       if (!selectedContact?.email) throw new Error("No email address");
       
-      const bodyWithAttachments = activeTab === "ai" 
-        ? aiBody 
-        : emailAttachments.length > 0 
-          ? `${emailBody}\n\n---\nAttachments:\n${emailAttachments.map(a => `- ${a.name}: ${a.url}`).join('\n')}`
-          : emailBody;
+      const currentBody = activeTab === "ai" ? aiBody : emailBody;
 
       const { data, error } = await supabase.functions.invoke("send-lead-email", {
         body: {
           to: selectedContact.email,
           toName: selectedContact.name,
           subject: activeTab === "ai" ? aiSubject : subject,
-          body: bodyWithAttachments,
+          body: currentBody,
           contactType: selectedContact.type,
           contactId: selectedContact.id,
           attachments: emailAttachments.map(a => a.url),

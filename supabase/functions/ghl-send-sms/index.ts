@@ -34,7 +34,7 @@ serve(async (req) => {
       throw new Error("GHL_API_KEY and GHL_LOCATION_ID are required");
     }
 
-    const { leadId, ownerId, phone, to, message, fromNumber } = await req.json();
+    const { leadId, ownerId, phone, to, message, fromNumber, mediaUrls } = await req.json();
 
     // Accept either 'phone' or 'to' parameter for the recipient
     const recipientPhone = phone || to;
@@ -137,8 +137,23 @@ serve(async (req) => {
       throw new Error("Failed to find or create GHL contact");
     }
 
-    // Step 2: Send SMS message
-    console.log(`Sending SMS to contact ${contactId} with message: "${message.substring(0, 50)}..."`);
+    // Step 2: Send SMS message (or MMS if media attached)
+    const hasMedia = mediaUrls && Array.isArray(mediaUrls) && mediaUrls.length > 0;
+    console.log(`Sending ${hasMedia ? 'MMS' : 'SMS'} to contact ${contactId} with message: "${message.substring(0, 50)}..."${hasMedia ? ` with ${mediaUrls.length} attachment(s)` : ''}`);
+    
+    // Build request payload - GHL uses "attachments" for MMS
+    const messagePayload: any = {
+      type: "SMS",
+      contactId: contactId,
+      message: message,
+      fromNumber: formattedFromNumber,
+    };
+    
+    // Add attachments for MMS - GHL expects array of URLs
+    if (hasMedia) {
+      messagePayload.attachments = mediaUrls;
+      console.log(`MMS attachments:`, mediaUrls);
+    }
     
     const sendResponse = await fetch(
       `https://services.leadconnectorhq.com/conversations/messages`,
@@ -149,12 +164,7 @@ serve(async (req) => {
           "Version": "2021-04-15",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          type: "SMS",
-          contactId: contactId,
-          message: message,
-          fromNumber: formattedFromNumber,
-        }),
+        body: JSON.stringify(messagePayload),
       }
     );
 
