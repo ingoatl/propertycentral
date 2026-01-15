@@ -76,7 +76,6 @@ const GoogleReviewsTab = () => {
   const [reviews, setReviews] = useState<OwnerrezReview[]>([]);
   const [requests, setRequests] = useState<GoogleReviewRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [selectedReview, setSelectedReview] = useState<OwnerrezReview | null>(null);
   const [smsLogs, setSmsLogs] = useState<SmsLog[]>([]);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
@@ -200,23 +199,6 @@ const GoogleReviewsTab = () => {
       toast.error("Failed to load reviews data");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const syncReviews = async () => {
-    try {
-      setSyncing(true);
-      toast.loading("Syncing reviews from OwnerRez...");
-      const { data, error } = await supabase.functions.invoke("sync-ownerrez-reviews");
-      if (error) throw error;
-      toast.dismiss();
-      toast.success(`Synced ${data?.reviewsAdded || 0} new 5-star reviews`);
-      await loadData();
-    } catch (error: any) {
-      toast.dismiss();
-      toast.error("Failed to sync reviews");
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -392,10 +374,6 @@ const GoogleReviewsTab = () => {
           </Button>
           <Button variant="secondary" onClick={() => sendTestSms(true)} disabled={sendingTest} size="sm" title="Bypass time window">
             Force Test
-          </Button>
-          <Button onClick={syncReviews} disabled={syncing} size="sm">
-            <RefreshCw className={`w-4 h-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
-            Sync
           </Button>
         </div>
       </div>

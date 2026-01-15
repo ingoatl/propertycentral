@@ -68,6 +68,21 @@ serve(async (req) => {
       );
     }
 
+    // Auto-sync reviews from OwnerRez first (to get phone numbers)
+    console.log("Auto-syncing reviews from OwnerRez to get latest phone numbers...");
+    try {
+      const { data: syncResult, error: syncError } = await supabase.functions.invoke("sync-ownerrez-reviews", {
+        body: { action: "backfill_phones" }
+      });
+      if (syncError) {
+        console.error("OwnerRez sync error:", syncError);
+      } else {
+        console.log("OwnerRez sync result:", syncResult);
+      }
+    } catch (syncErr) {
+      console.error("Failed to sync OwnerRez reviews:", syncErr);
+    }
+
     // Get all reviews with phone numbers
     const { data: pendingReviews, error: reviewError } = await supabase
       .from("ownerrez_reviews")
