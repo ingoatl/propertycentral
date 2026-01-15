@@ -60,7 +60,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Loading fallback component
+// Loading fallback component for lazy-loaded pages
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="animate-pulse text-muted-foreground">Loading...</div>
