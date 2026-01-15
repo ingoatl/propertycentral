@@ -1511,7 +1511,7 @@ export function InboxView() {
           snoozed_until: snoozedUntil?.toISOString() || null,
           updated_at: new Date().toISOString(),
         }, {
-          onConflict: 'gmail_message_id'
+          onConflict: 'gmail_message_id,user_id'
         });
       
       if (error) throw error;
@@ -2381,13 +2381,31 @@ export function InboxView() {
                 {filteredGmailEmails
                   .filter(email => !search || search === " " || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase()))
                   .filter(email => !snoozedGmailEmails.has(email.id)) // Hide snoozed emails
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Newest first
+                  .sort((a, b) => {
+                    const aIsDone = doneGmailIds.has(a.id);
+                    const bIsDone = doneGmailIds.has(b.id);
+                    const aInsight = emailInsightsMap.get(a.id);
+                    const bInsight = emailInsightsMap.get(b.id);
+                    const aIsLow = aInsight?.priority === 'low' || aInsight?.category === 'promotional' || aInsight?.category === 'newsletter';
+                    const bIsLow = bInsight?.priority === 'low' || bInsight?.category === 'promotional' || bInsight?.category === 'newsletter';
+                    const aIsUrgent = aInsight?.priority === 'urgent' || aInsight?.priority === 'high' || aInsight?.action_required;
+                    const bIsUrgent = bInsight?.priority === 'urgent' || bInsight?.priority === 'high' || bInsight?.action_required;
+                    
+                    // Done emails sink to bottom
+                    if (aIsDone !== bIsDone) return aIsDone ? 1 : -1;
+                    // Low priority/promotional sink below normal
+                    if (aIsLow !== bIsLow) return aIsLow ? 1 : -1;
+                    // Urgent emails rise to top
+                    if (aIsUrgent !== bIsUrgent) return aIsUrgent ? -1 : 1;
+                    // Finally sort by date (newest first)
+                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                  })
                   .map((email) => {
                     const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
                     const isDone = doneGmailIds.has(email.id);
                     const isSnoozed = snoozedGmailEmails.has(email.id);
                     const insight = emailInsightsMap.get(email.id);
-                    const isLowPriority = insight?.priority === 'low';
+                    const isLowPriority = insight?.priority === 'low' || insight?.category === 'promotional' || insight?.category === 'newsletter';
                     const shouldFade = isDone || isSnoozed || isLowPriority;
                     
                     return (
