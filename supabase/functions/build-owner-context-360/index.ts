@@ -10,6 +10,38 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+interface OwnerFinancialContext {
+  hasPaymentMethod: boolean;
+  paymentMethodType: "card" | "bank" | null;
+  paymentMethodBrand: string | null;
+  paymentMethodLast4: string | null;
+  paymentMethodCount: number;
+  hasOutstandingCharges: boolean;
+  outstandingAmount: number;
+  outstandingChargesCount: number;
+  oldestUnpaidDate: string | null;
+  unpaidCharges: Array<{
+    id: string;
+    amount: number;
+    description: string;
+    charge_date: string;
+  }>;
+  lastPaymentDate: string | null;
+  lastPaymentAmount: number | null;
+  totalPaidThisYear: number;
+  paymentHistoryStatus: "excellent" | "good" | "late" | "delinquent" | "new";
+  paymentCount: number;
+  pendingPayoutAmount: number;
+  pendingPayoutCount: number;
+  lastPayoutDate: string | null;
+  lastPayoutAmount: number | null;
+  financialHealthScore: "excellent" | "good" | "attention_needed" | "critical";
+  financialHealthDetails: string;
+  cardExpiringSoon: boolean;
+  cardExpMonth: number | null;
+  cardExpYear: number | null;
+}
+
 interface Owner360Context {
   owner: {
     id: string;
@@ -38,6 +70,20 @@ interface Owner360Context {
     pending_payouts: number;
     last_payout_date: string | null;
     last_payout_amount: number | null;
+    // New enhanced financial context
+    hasPaymentMethod: boolean;
+    paymentMethodType: "card" | "bank" | null;
+    paymentMethodBrand: string | null;
+    paymentMethodLast4: string | null;
+    hasOutstandingCharges: boolean;
+    outstandingAmount: number;
+    outstandingChargesCount: number;
+    oldestUnpaidDate: string | null;
+    financialHealthScore: "excellent" | "good" | "attention_needed" | "critical";
+    financialHealthDetails: string;
+    cardExpiringSoon: boolean;
+    totalPaidThisYear: number;
+    paymentHistoryStatus: "excellent" | "good" | "late" | "delinquent" | "new";
   };
   communications: {
     total_messages: number;
@@ -162,6 +208,26 @@ serve(async (req) => {
       .select("id, name, address, management_fee_percentage, status")
       .eq("owner_id", ownerId);
 
+    // 2.5 Fetch enhanced financial context
+    let financialContext: OwnerFinancialContext | null = null;
+    try {
+      const finResponse = await fetch(`${SUPABASE_URL}/functions/v1/get-owner-financial-context`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({ ownerId }),
+      });
+      
+      if (finResponse.ok) {
+        financialContext = await finResponse.json();
+        console.log("Financial context fetched for owner:", ownerId, "Health:", financialContext?.financialHealthScore);
+      }
+    } catch (finError) {
+      console.error("Error fetching financial context:", finError);
+    }
+
     // 3. Fetch communications (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -251,6 +317,50 @@ serve(async (req) => {
       });
     }
 
+    // Financial alerts from enhanced context
+    if (financialContext) {
+      // No payment method is critical
+      if (!financialContext.hasPaymentMethod) {
+        alerts.push({
+          type: "warning",
+          icon: "💳",
+          message: "No payment method on file",
+          priority: 1,
+        });
+      }
+      
+      // Card expiring soon
+      if (financialContext.cardExpiringSoon) {
+        alerts.push({
+          type: "warning",
+          icon: "⚠️",
+          message: `Card expires ${financialContext.cardExpMonth}/${financialContext.cardExpYear}`,
+          priority: 2,
+        });
+      }
+      
+      // Outstanding balance
+      if (financialContext.hasOutstandingCharges) {
+        const severity = financialContext.paymentHistoryStatus === "delinquent" ? "warning" : "info";
+        alerts.push({
+          type: severity,
+          icon: "💰",
+          message: `$${financialContext.outstandingAmount.toLocaleString()} outstanding balance`,
+          priority: financialContext.paymentHistoryStatus === "delinquent" ? 1 : 3,
+        });
+      }
+      
+      // Account health critical
+      if (financialContext.financialHealthScore === "critical") {
+        alerts.push({
+          type: "warning",
+          icon: "🚨",
+          message: "Account needs immediate attention",
+          priority: 1,
+        });
+      }
+    }
+
     // Upcoming turnovers
     if (bookings && bookings.length > 0) {
       const thisWeek = bookings.filter((b) => {
@@ -270,12 +380,13 @@ serve(async (req) => {
       }
     }
 
-    // Pending payouts
-    if (pendingPayouts > 0) {
+    // Pending payouts (use enhanced context if available)
+    const actualPendingPayouts = financialContext?.pendingPayoutAmount || pendingPayouts;
+    if (actualPendingPayouts > 0) {
       alerts.push({
         type: "info",
         icon: "💰",
-        message: `$${pendingPayouts.toLocaleString()} pending payout`,
+        message: `$${actualPendingPayouts.toLocaleString()} pending payout`,
         priority: 3,
       });
     }
@@ -334,9 +445,23 @@ serve(async (req) => {
         ytd_revenue: ytdRevenue,
         ytd_expenses: ytdExpenses,
         ytd_net: ytdRevenue - ytdExpenses,
-        pending_payouts: pendingPayouts,
-        last_payout_date: lastPayout?.created_at || null,
-        last_payout_amount: lastPayout?.amount || null,
+        pending_payouts: financialContext?.pendingPayoutAmount || pendingPayouts,
+        last_payout_date: financialContext?.lastPayoutDate || lastPayout?.created_at || null,
+        last_payout_amount: financialContext?.lastPayoutAmount || lastPayout?.amount || null,
+        // Enhanced financial context
+        hasPaymentMethod: financialContext?.hasPaymentMethod || false,
+        paymentMethodType: financialContext?.paymentMethodType || null,
+        paymentMethodBrand: financialContext?.paymentMethodBrand || null,
+        paymentMethodLast4: financialContext?.paymentMethodLast4 || null,
+        hasOutstandingCharges: financialContext?.hasOutstandingCharges || false,
+        outstandingAmount: financialContext?.outstandingAmount || 0,
+        outstandingChargesCount: financialContext?.outstandingChargesCount || 0,
+        oldestUnpaidDate: financialContext?.oldestUnpaidDate || null,
+        financialHealthScore: financialContext?.financialHealthScore || "good",
+        financialHealthDetails: financialContext?.financialHealthDetails || "",
+        cardExpiringSoon: financialContext?.cardExpiringSoon || false,
+        totalPaidThisYear: financialContext?.totalPaidThisYear || 0,
+        paymentHistoryStatus: financialContext?.paymentHistoryStatus || "new",
       },
       communications: {
         total_messages: (communications?.length || 0),
