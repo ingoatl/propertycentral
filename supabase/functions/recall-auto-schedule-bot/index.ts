@@ -99,6 +99,10 @@ serve(async (req) => {
 
     // Schedule the bot via Recall.ai API
     // Recall.ai will join at the specified time
+    // Use regional endpoint - default to us-west-2 for pay-as-you-go accounts
+    const recallRegion = Deno.env.get("RECALL_REGION") || "us-west-2";
+    const recallBaseUrl = `https://${recallRegion}.recall.ai`;
+    
     const recallPayload: Record<string, unknown> = {
       meeting_url: call.google_meet_link,
       bot_name: "PeachHaus Notes",
@@ -123,9 +127,9 @@ serve(async (req) => {
       recallPayload.join_at = joinAt.toISOString();
     }
 
-    console.log("Creating Recall bot for meeting:", call.google_meet_link, "join_at:", recallPayload.join_at || "immediately");
+    console.log("Creating Recall bot for meeting:", call.google_meet_link, "region:", recallRegion, "join_at:", recallPayload.join_at || "immediately");
 
-    const recallResponse = await fetch("https://api.recall.ai/api/v1/bot", {
+    const recallResponse = await fetch(`${recallBaseUrl}/api/v1/bot`, {
       method: "POST",
       headers: {
         "Authorization": `Token ${recallApiKey}`,

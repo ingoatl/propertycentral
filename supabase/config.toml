@@ -453,5 +453,8 @@ verify_jwt = false
 [functions.ghl-sync-calendar]
 verify_jwt = true
 
+[functions.discovery-call-reminder-cron]
+verify_jwt = false
+
 [functions.generate-draft-reply]
 verify_jwt = true

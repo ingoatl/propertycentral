@@ -69,7 +69,11 @@ serve(async (req) => {
     }
 
     // Create bot via Recall.ai API
-    const recallResponse = await fetch("https://api.recall.ai/api/v1/bot", {
+    // Use regional endpoint - default to us-west-2 for pay-as-you-go accounts
+    const recallRegion = Deno.env.get("RECALL_REGION") || "us-west-2";
+    const recallBaseUrl = `https://${recallRegion}.recall.ai`;
+    
+    const recallResponse = await fetch(`${recallBaseUrl}/api/v1/bot`, {
       method: "POST",
       headers: {
         "Authorization": `Token ${recallApiKey}`,

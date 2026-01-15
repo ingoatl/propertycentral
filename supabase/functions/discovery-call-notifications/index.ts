@@ -324,6 +324,20 @@ const handler = async (req: Request): Promise<Response> => {
           .from("discovery_calls")
           .update({ confirmation_email_sent: true, confirmation_sent: true })
           .eq("id", discoveryCallId);
+
+        // Auto-schedule Recall.ai bot for video calls at confirmation time
+        if (isVideoCall) {
+          try {
+            console.log("Auto-scheduling Recall.ai bot for video call:", discoveryCallId);
+            const recallResult = await supabase.functions.invoke("recall-auto-schedule-bot", {
+              body: { discoveryCallId },
+            });
+            console.log("Recall auto-schedule result:", recallResult.data);
+          } catch (recallError) {
+            console.error("Failed to auto-schedule Recall bot:", recallError);
+            // Don't fail confirmation if Recall scheduling fails
+          }
+        }
       }
     }
 
