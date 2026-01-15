@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Google Reviews dedicated phone number (Twilio)
-const GOOGLE_REVIEWS_PHONE = "+17709885286";
+const GOOGLE_REVIEWS_PHONE = "+14046090955";
 
 // Helper to check if current time is within send window (11am-3pm EST)
 const isWithinSendWindow = (): boolean => {
