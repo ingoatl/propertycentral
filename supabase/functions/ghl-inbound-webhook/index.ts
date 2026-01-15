@@ -19,17 +19,36 @@ function normalizePhone(phone: string): string {
 }
 
 // Look up which user owns a phone number for SMS routing
-async function findPhoneOwner(supabase: any, phoneNumber: string): Promise<string | null> {
+// Returns user_id and phone_assignment_id for proper routing
+async function findPhoneOwner(supabase: any, phoneNumber: string): Promise<{ userId: string | null; assignmentId: string | null; displayName: string | null }> {
   const normalizedPhone = normalizePhone(phoneNumber);
+  
+  // Also try with last 10 digits for more flexible matching
+  const last10 = normalizedPhone.replace(/\D/g, "").slice(-10);
   
   const { data } = await supabase
     .from("user_phone_assignments")
-    .select("user_id")
-    .eq("phone_number", normalizedPhone)
-    .eq("is_active", true)
-    .maybeSingle();
+    .select("user_id, id, display_name, phone_number")
+    .eq("is_active", true);
   
-  return data?.user_id || null;
+  if (data && data.length > 0) {
+    // Find exact match first
+    const exactMatch = data.find((a: any) => a.phone_number === normalizedPhone);
+    if (exactMatch) {
+      return { userId: exactMatch.user_id, assignmentId: exactMatch.id, displayName: exactMatch.display_name };
+    }
+    
+    // Try last 10 digits match
+    const digitMatch = data.find((a: any) => {
+      const assignmentDigits = a.phone_number?.replace(/\D/g, "").slice(-10);
+      return assignmentDigits === last10;
+    });
+    if (digitMatch) {
+      return { userId: digitMatch.user_id, assignmentId: digitMatch.id, displayName: digitMatch.display_name };
+    }
+  }
+  
+  return { userId: null, assignmentId: null, displayName: null };
 }
 
 // Check if phone number matches the Google Reviews number
@@ -373,10 +392,13 @@ serve(async (req) => {
     // 2. Otherwise, check the last OUTBOUND message to this contact to see which user sent it
     // 3. Fall back to checking GHL contact's assigned user (if available in payload)
     let assignedUserId: string | null = null;
+    let routedPhoneAssignmentId: string | null = null;
     
     if (toNumber) {
-      assignedUserId = await findPhoneOwner(supabase, toNumber);
-      console.log("SMS routing - Found user by toNumber:", assignedUserId);
+      const phoneOwner = await findPhoneOwner(supabase, toNumber);
+      assignedUserId = phoneOwner.userId;
+      routedPhoneAssignmentId = phoneOwner.assignmentId;
+      console.log("SMS routing - Found user by toNumber:", assignedUserId, "assignment:", routedPhoneAssignmentId);
     }
     
     // If we couldn't find user by toNumber, check recent outbound messages to this contact

@@ -61,7 +61,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { FollowUpSchedulerModal } from "./FollowUpSchedulerModal";
 import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
-import { AdminInboxSelector } from "./AdminInboxSelector";
+// AdminInboxSelector removed - using EnhancedInboxSelector for all tabs
 import { EmailActionModal } from "./EmailActionModal";
 import { InboxZeroGuide } from "./InboxZeroGuide";
 import { ConversationQuickActions } from "./ConversationQuickActions";
@@ -2314,50 +2314,39 @@ export function InboxView() {
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Notification bell */}
             <TeamNotificationBell />
-            {/* Admin inbox selector - for all tabs including All and Emails */}
-            {isAdmin && (
-              <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
-            )}
             
-            {/* Email inbox selector - show for both All tab and Emails tab */}
-            {(activeTab === "emails" || activeTab === "all") && (
+            {/* Single Inbox Selector - for all tabs */}
+            <EnhancedInboxSelector
+              selectedView={selectedEmailInboxView}
+              onViewChange={setSelectedEmailInboxView}
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
+            />
+            
+            {/* Compose button - only for emails tab */}
+            {activeTab === "emails" && (
               <>
-                {activeTab === "emails" && (
-                  <>
-                    <Button 
-                      onClick={() => setShowAIComposeEmail(true)} 
-                      size="sm"
-                      className="gap-1.5 h-8"
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span className="hidden sm:inline">Compose</span>
-                    </Button>
-                    <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
-                  </>
-                )}
-                {/* Enhanced Inbox Selector - filter emails by team member, "All" only for admins */}
-                <EnhancedInboxSelector
-                  selectedView={selectedEmailInboxView}
-                  onViewChange={setSelectedEmailInboxView}
-                  currentUserId={currentUserId}
-                  isAdmin={isAdmin}
+                <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+                <Button 
+                  onClick={() => setShowAIComposeEmail(true)} 
+                  size="sm"
+                  className="gap-1.5 h-8"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Compose</span>
+                </Button>
+                <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+                {/* AI Category Filter */}
+                <EmailCategoryFilter 
+                  selectedCategory={selectedEmailCategory}
+                  onCategoryChange={setSelectedEmailCategory}
                 />
-                {activeTab === "emails" && (
-                  <>
-                    <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
-                    {/* AI Category Filter */}
-                    <EmailCategoryFilter 
-                      selectedCategory={selectedEmailCategory}
-                      onCategoryChange={setSelectedEmailCategory}
-                    />
-                    {/* Keyboard shortcuts help */}
-                    <KeyboardShortcutsHelp 
-                      shortcuts={keyboardShortcuts}
-                      open={showKeyboardHelp}
-                      onOpenChange={setShowKeyboardHelp}
-                    />
-                  </>
-                )}
+                {/* Keyboard shortcuts help */}
+                <KeyboardShortcutsHelp 
+                  shortcuts={keyboardShortcuts}
+                  open={showKeyboardHelp}
+                  onOpenChange={setShowKeyboardHelp}
+                />
               </>
             )}
             
