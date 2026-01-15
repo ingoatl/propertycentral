@@ -187,16 +187,16 @@ const GoogleReviewsTab = () => {
     }
   };
 
-  const sendTestSms = async () => {
+  const sendTestSms = async (forceTime: boolean = false) => {
     try {
       setSendingTest(true);
-      toast.loading("Sending test SMS...");
+      toast.loading("Sending test SMS to Ingo...");
       const { data, error } = await supabase.functions.invoke("send-review-sms", {
-        body: { action: "test" },
+        body: { action: "test", forceTime },
       });
       if (error) throw error;
       toast.dismiss();
-      toast.success("Test SMS sent to (770) 906-5022");
+      toast.success("Test SMS sent to Ingo (770) 906-5022 — Reply to test automation!");
     } catch (error: any) {
       toast.dismiss();
       toast.error(error.message || "Failed to send test SMS");
@@ -318,9 +318,12 @@ const GoogleReviewsTab = () => {
           >
             {campaignPaused ? <><Pause className="w-4 h-4 mr-1" />Paused</> : <><Play className="w-4 h-4 mr-1" />Active</>}
           </Button>
-          <Button variant="outline" onClick={sendTestSms} disabled={sendingTest} size="sm">
+          <Button variant="outline" onClick={() => sendTestSms(false)} disabled={sendingTest} size="sm">
             <Send className={`w-4 h-4 mr-1 ${sendingTest ? "animate-pulse" : ""}`} />
             Test SMS
+          </Button>
+          <Button variant="secondary" onClick={() => sendTestSms(true)} disabled={sendingTest} size="sm" title="Bypass time window">
+            Force Test
           </Button>
           <Button onClick={syncReviews} disabled={syncing} size="sm">
             <RefreshCw className={`w-4 h-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
