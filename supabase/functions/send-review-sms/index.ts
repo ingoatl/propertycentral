@@ -6,8 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Google Reviews dedicated phone number (Twilio)
+// Google Reviews dedicated phone number (GHL)
 const GOOGLE_REVIEWS_PHONE = "+14046090955";
+
+// Format phone number to E.164 format
+function formatPhoneE164(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  if (digits.length > 10) {
+    return `+${digits}`;
+  }
+  return phone;
+}
 
 // Helper to check if current time is within send window (11am-3pm EST)
 const isWithinSendWindow = (): boolean => {
@@ -29,8 +44,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
-    const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN")!;
+    const ghlApiKey = Deno.env.get("GHL_API_KEY")!;
+    const ghlLocationId = Deno.env.get("GHL_LOCATION_ID")!;
     const googleReviewUrl = Deno.env.get("GOOGLE_REVIEW_URL") || "https://g.page/r/YOUR_REVIEW_LINK";
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -50,42 +65,97 @@ serve(async (req) => {
       );
     }
 
-    // Helper function to send SMS via Twilio
+    // Helper function to send SMS via GHL
     const sendSms = async (toNumber: string, messageBody: string, contactId?: string): Promise<{ success: boolean; messageId?: string; error?: string; optedOut?: boolean }> => {
       try {
-        // Format phone number for Twilio (needs + prefix)
-        let formattedTo = toNumber.replace(/\D/g, '');
-        if (!formattedTo.startsWith('1') && formattedTo.length === 10) {
-          formattedTo = '1' + formattedTo;
-        }
-        formattedTo = '+' + formattedTo;
+        const formattedTo = formatPhoneE164(toNumber);
         
-        console.log(`Sending SMS via Twilio from ${GOOGLE_REVIEWS_PHONE} to ${formattedTo}`);
+        console.log(`Sending SMS via GHL from ${GOOGLE_REVIEWS_PHONE} to ${formattedTo}`);
         
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
-        const authHeader = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
-        
-        const formData = new URLSearchParams();
-        formData.append('From', GOOGLE_REVIEWS_PHONE);
-        formData.append('To', formattedTo);
-        formData.append('Body', messageBody);
-        
-        const response = await fetch(twilioUrl, {
-          method: "POST",
-          headers: {
-            "Authorization": `Basic ${authHeader}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: formData.toString(),
-        });
+        // Step 1: Find or create contact in GHL
+        const searchResponse = await fetch(
+          `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${ghlLocationId}&phone=${encodeURIComponent(formattedTo)}`,
+          {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${ghlApiKey}`,
+              "Version": "2021-07-28",
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Twilio error:", errorData);
+        let ghlContactId = null;
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          if (searchData.contact?.id) {
+            ghlContactId = searchData.contact.id;
+            console.log(`Found existing GHL contact: ${ghlContactId}`);
+          }
+        }
+
+        // If no contact found, create one
+        if (!ghlContactId) {
+          const createContactResponse = await fetch(
+            `https://services.leadconnectorhq.com/contacts/`,
+            {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${ghlApiKey}`,
+                "Version": "2021-07-28",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                locationId: ghlLocationId,
+                phone: formattedTo,
+                name: "Guest",
+                source: "GoogleReviews",
+              }),
+            }
+          );
+
+          if (!createContactResponse.ok) {
+            const errorText = await createContactResponse.text();
+            console.error("Error creating GHL contact:", errorText);
+            return { success: false, error: `Failed to create GHL contact: ${createContactResponse.status}` };
+          }
+
+          const createData = await createContactResponse.json();
+          ghlContactId = createData.contact?.id;
+          console.log(`Created new GHL contact: ${ghlContactId}`);
+        }
+
+        if (!ghlContactId) {
+          return { success: false, error: "Failed to find or create GHL contact" };
+        }
+
+        // Step 2: Send SMS message via GHL
+        const sendResponse = await fetch(
+          `https://services.leadconnectorhq.com/conversations/messages`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${ghlApiKey}`,
+              "Version": "2021-04-15",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              type: "SMS",
+              contactId: ghlContactId,
+              message: messageBody,
+              fromNumber: GOOGLE_REVIEWS_PHONE,
+            }),
+          }
+        );
+
+        if (!sendResponse.ok) {
+          const errorData = await sendResponse.text();
+          console.error("GHL SMS error:", errorData);
           
           // Check for opt-out/blocked errors
-          if (errorData.code === 21610 || errorData.message?.includes("unsubscribed")) {
-            console.log(`Contact ${toNumber} has unsubscribed`);
+          if (errorData.includes("unsubscribed") || errorData.includes("blocked") || errorData.includes("DND")) {
+            console.log(`Contact ${toNumber} may be opted out in GHL`);
             
             const cleanPhone = toNumber.replace(/[\s\-\(\)\+]/g, "");
             const phoneDigits = cleanPhone.slice(-10);
@@ -103,14 +173,14 @@ serve(async (req) => {
             return { success: false, error: "Contact has unsubscribed", optedOut: true };
           }
           
-          return { success: false, error: errorData.message || JSON.stringify(errorData) };
+          return { success: false, error: errorData };
         }
 
-        const data = await response.json();
-        console.log(`SMS sent successfully via Twilio, SID: ${data.sid}`);
-        return { success: true, messageId: data.sid };
+        const data = await sendResponse.json();
+        console.log(`SMS sent successfully via GHL, Message ID: ${data.messageId}`);
+        return { success: true, messageId: data.messageId || data.conversationId };
       } catch (error) {
-        console.error("Twilio exception:", error);
+        console.error("GHL exception:", error);
         return { success: false, error: String(error) };
       }
     };
@@ -205,7 +275,7 @@ serve(async (req) => {
         phone_number: review.guest_phone,
         message_type: "permission_ask",
         message_body: message,
-        twilio_message_id: result.messageId,
+        ghl_message_id: result.messageId,
         status: "sent",
       });
 
@@ -218,7 +288,7 @@ serve(async (req) => {
         })
         .eq("id", request.id);
 
-      console.log(`Permission SMS sent to ${review.guest_phone}`);
+      console.log(`Permission SMS sent to ${review.guest_phone} via GHL`);
 
       return new Response(
         JSON.stringify({ success: true, action: "permission_ask", requestId: request.id }),
@@ -277,7 +347,7 @@ serve(async (req) => {
         phone_number: request.guest_phone,
         message_type: "link_delivery",
         message_body: linkMessage,
-        twilio_message_id: linkResult.messageId,
+        ghl_message_id: linkResult.messageId,
         status: "sent",
       });
 
@@ -290,7 +360,7 @@ serve(async (req) => {
           phone_number: request.guest_phone,
           message_type: "review_text",
           message_body: reviewMessage,
-          twilio_message_id: reviewResult.messageId,
+          ghl_message_id: reviewResult.messageId,
           status: reviewResult.success ? "sent" : "failed",
           error_message: reviewResult.error,
         });
@@ -305,7 +375,7 @@ serve(async (req) => {
         })
         .eq("id", request.id);
 
-      console.log(`Link sent to ${request.guest_phone}`);
+      console.log(`Link sent to ${request.guest_phone} via GHL`);
 
       return new Response(
         JSON.stringify({ success: true, action: "send_link" }),
@@ -363,7 +433,7 @@ serve(async (req) => {
         phone_number: request.guest_phone,
         message_type: request.nudge_count === 0 ? "nudge" : "final_reminder",
         message_body: nudgeMessage,
-        twilio_message_id: nudgeResult.messageId,
+        ghl_message_id: nudgeResult.messageId,
         status: "sent",
       });
 
@@ -376,7 +446,7 @@ serve(async (req) => {
         })
         .eq("id", request.id);
 
-      console.log(`Nudge sent to ${request.guest_phone}`);
+      console.log(`Nudge sent to ${request.guest_phone} via GHL`);
 
       return new Response(
         JSON.stringify({ success: true, action: "nudge" }),
@@ -387,9 +457,9 @@ serve(async (req) => {
     if (action === "test") {
       // Send test to Ingo's phone
       const adminPhone = "+17709065022";
-      const testMessage = `🧪 Test SMS from PeachHaus Google Review system (via Twilio from ${GOOGLE_REVIEWS_PHONE}). If you received this, the SMS integration is working! Reply to test inbound handling.`;
+      const testMessage = `🧪 Test SMS from PeachHaus Google Review system (via GHL from ${GOOGLE_REVIEWS_PHONE}). If you received this, the SMS integration is working! Reply to test inbound handling.`;
       
-      console.log(`Sending test SMS to ${adminPhone} from ${GOOGLE_REVIEWS_PHONE}`);
+      console.log(`Sending test SMS to ${adminPhone} from ${GOOGLE_REVIEWS_PHONE} via GHL`);
       
       const testResult = await sendSms(adminPhone, testMessage);
       
@@ -397,7 +467,7 @@ serve(async (req) => {
         phone_number: adminPhone,
         message_type: "test",
         message_body: testMessage,
-        twilio_message_id: testResult.messageId,
+        ghl_message_id: testResult.messageId,
         status: testResult.success ? "sent" : "failed",
         error_message: testResult.error,
       });
@@ -407,7 +477,7 @@ serve(async (req) => {
         throw new Error(testResult.error || "Failed to send test SMS");
       }
 
-      console.log(`Test SMS sent successfully via Twilio, message SID: ${testResult.messageId}`);
+      console.log(`Test SMS sent successfully via GHL, message ID: ${testResult.messageId}`);
 
       return new Response(
         JSON.stringify({ success: true, action: "test", messageId: testResult.messageId }),
