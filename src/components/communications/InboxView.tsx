@@ -2380,6 +2380,7 @@ export function InboxView() {
               <div>
                 {filteredGmailEmails
                   .filter(email => !search || search === " " || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase()))
+                  .filter(email => !snoozedGmailEmails.has(email.id)) // Hide snoozed emails
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Newest first
                   .map((email) => {
                     const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
