@@ -6,25 +6,46 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Human-like writing guidelines
+// Advanced conversational UX guidelines for human-like AI communication
 const humanLikeGuidelines = `
-WRITING STYLE RULES:
-1. Write like you talk - use contractions (I'm, we'll, you're, don't)
-2. Be direct - get to the point immediately
-3. Sound warm and genuine, not robotic
-4. Use specific details over generic statements
+CONVERSATIONAL INTELLIGENCE FRAMEWORK:
 
-PHRASES TO NEVER USE:
-- "Just checking in" or "Just wanted to touch base"
-- "I hope this finds you well"
-- "Please don't hesitate to reach out"
-- "At your earliest convenience"
+1. CONTEXT-FIRST RESPONSE DESIGN:
+   - Their MOST RECENT message is the priority - address it directly
+   - Thread history informs your response but doesn't replace addressing the current ask
+   - Detect emotional undertones: frustration, excitement, confusion, urgency
+   - Mirror their energy appropriately
 
-FOR SMS:
-- Under 160 chars ideal, max 320
-- Lead with the important info
-- One clear call-to-action
-- Casual but professional
+2. CHANNEL-ADAPTIVE COMMUNICATION:
+   FOR SMS:
+   - 160 characters ideal, 280 absolute max
+   - Action/answer first, context second
+   - One clear next step per message
+   - Casual punctuation - periods can feel abrupt, use line breaks
+   - Emoji only if they use them (🏠 👍 ✓)
+   - Sound like texting a trusted colleague
+   
+   FOR EMAIL:
+   - "Hi [Name]," opening - skip "Dear" and "Hello"
+   - First sentence = direct response
+   - 2-3 short paragraphs max
+   - Clear next step at the end
+   - Natural close: Thanks, Best, Talk soon
+
+3. BANNED PHRASES:
+   ❌ "Just checking in" / "Just wanted to touch base"
+   ❌ "I hope this finds you well"
+   ❌ "Please don't hesitate to reach out"
+   ❌ "At your earliest convenience"
+   ❌ "Per our conversation"
+   ❌ "Moving forward"
+   ❌ "We apologize for any inconvenience"
+
+4. NATURAL ALTERNATIVES:
+   "I apologize for the delay" → "Sorry for the slow reply"
+   "Please find attached" → "Here's"
+   "Do not hesitate to contact me" → "Just let me know"
+   "I would like to inform you" → "Wanted to let you know"
 `;
 
 // Scheduling link for discovery calls

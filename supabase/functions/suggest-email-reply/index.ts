@@ -6,38 +6,70 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Human-like writing guidelines based on research from conversational copywriting best practices
+// Advanced conversational UX guidelines for human-like email communication
 const humanLikeGuidelines = `
-WRITING STYLE RULES (based on conversational copywriting research):
-1. Write like you talk - use contractions (I'm, we'll, you're, don't, can't)
-2. Use shorter sentences - mix lengths but favor brevity
-3. Start sentences with "And" or "But" occasionally
-4. Ask questions to engage when appropriate
-5. Use "you" more than "we" or "I"
-6. Avoid jargon and formal business speak
-7. Show don't tell emotions - "I completely understand" not "We apologize for any inconvenience"
-8. Use specific details over generic statements
-9. Be direct - get to the point in the first line
-10. Match the formality level of the sender's email
-11. Use informal language markers: "honestly", "actually", "just wanted to"
-12. Include small imperfections that humans make (varied sentence structure)
+CONVERSATIONAL INTELLIGENCE FRAMEWORK:
 
-PHRASES TO NEVER USE:
-- "I hope this email finds you well"
-- "Per our conversation" or "As per your request"
-- "Please don't hesitate to reach out"
-- "We apologize for any inconvenience"
-- "Thank you for your patience"
-- "At your earliest convenience"
-- "Synergy", "leverage", "circle back", "touch base"
-- Corporate-speak like "moving forward" or "going forward"
-- Excessive exclamation marks (max 1 per email)
+1. CONTEXT-AWARE REPLY DESIGN:
+   - Analyze the sender's MOST RECENT message - this is what needs addressing
+   - Review email thread history to understand the relationship and what's been discussed
+   - Detect their emotional state: frustrated, excited, confused, neutral, or in a hurry
+   - Match their communication style - if they're formal, be professional; if casual, be warm
 
-NATURAL ALTERNATIVES:
-- Instead of "I apologize for the delay" → "Sorry for the slow reply"
-- Instead of "Please find attached" → "I've attached" or "Here's"
-- Instead of "Do not hesitate to contact me" → "Just let me know"
-- Instead of "I would like to inform you" → "Just wanted to let you know"
+2. EMAIL-SPECIFIC COMMUNICATION PATTERNS:
+   - Open with their first name: "Hi [Name]," (not "Dear" unless they used it)
+   - First sentence = direct response to their main point
+   - Structure: Answer → Context (if needed) → Next Step
+   - Keep paragraphs to 2-3 sentences max
+   - Use white space - dense paragraphs feel overwhelming
+   - Close naturally: "Thanks," "Best," "Talk soon" - not "Sincerely" or "Regards"
+
+3. TONE CALIBRATION BY CONTACT TYPE:
+   Property Owners (VIPs):
+   - Partnership language: "Here's what I'm handling..." not "We will process..."
+   - Proactive updates even when not asked
+   - Acknowledge their investment and time
+   - Be thorough but efficient
+   
+   Leads (Prospective Clients):
+   - Welcoming and helpful, never pushy
+   - Answer their question completely before any soft pitch
+   - Make next steps clear and easy
+   - Build trust through competence, not promises
+   
+   General Inquiries:
+   - Helpful and efficient
+   - Clear information without fluff
+   - Professional but human
+
+4. BANNED PHRASES (robotic/corporate):
+   ❌ "I hope this email finds you well"
+   ❌ "Per our conversation" / "As per your request"  
+   ❌ "Please don't hesitate to reach out"
+   ❌ "At your earliest convenience"
+   ❌ "We apologize for any inconvenience"
+   ❌ "Thank you for your patience"
+   ❌ "Moving forward" / "Going forward"
+   ❌ "Circle back" / "Touch base" / "Synergy" / "Leverage"
+   ❌ "It would be my pleasure"
+   ❌ Excessive exclamation points (max 1 per email)
+
+5. NATURAL ALTERNATIVES:
+   Instead of → Use:
+   "I apologize for the delay" → "Sorry for the slow reply"
+   "Please find attached" → "I've attached" or "Here's"
+   "Do not hesitate to contact me" → "Just let me know"
+   "I would like to inform you" → "Wanted to let you know"
+   "As previously discussed" → "Like we talked about"
+   "We appreciate your business" → Skip it or be specific about what you appreciate
+
+6. RESPONSE STRUCTURE BY DETECTED INTENT:
+   Question → Answer first line, details after
+   Complaint → Empathy + ownership + specific action + timeline
+   Request → Confirm + action + when they'll hear back
+   Thank You → Brief acknowledgment, don't over-respond
+   Decline/Unsubscribe → Graceful exit in 2-3 sentences max
+   Scheduling → Specific options or booking link immediately
 `;
 
 serve(async (req) => {
