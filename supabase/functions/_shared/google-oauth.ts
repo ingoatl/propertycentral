@@ -116,13 +116,12 @@ export function validateOAuthSetup(): {
 } {
   const issues: string[] = [];
 
-  const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
-  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
+  // Always trim whitespace automatically - never treat it as an error
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")?.trim();
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")?.trim();
 
   if (!clientId) {
     issues.push("GOOGLE_CLIENT_ID is not set");
-  } else if (clientId !== clientId.trim()) {
-    issues.push("GOOGLE_CLIENT_ID has leading/trailing whitespace");
   } else if (!clientId.includes(".apps.googleusercontent.com")) {
     issues.push(
       "GOOGLE_CLIENT_ID format appears invalid (expected: xxx.apps.googleusercontent.com)"
@@ -131,8 +130,6 @@ export function validateOAuthSetup(): {
 
   if (!clientSecret) {
     issues.push("GOOGLE_CLIENT_SECRET is not set");
-  } else if (clientSecret !== clientSecret.trim()) {
-    issues.push("GOOGLE_CLIENT_SECRET has leading/trailing whitespace");
   }
 
   return {
