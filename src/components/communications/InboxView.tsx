@@ -2943,6 +2943,11 @@ export function InboxView() {
               contactId=""
               replyToSubject={selectedGmailEmail.subject}
               replyToBody={selectedGmailEmail.body}
+              gmailMessageId={selectedGmailEmail.id}
+              onEmailSent={() => {
+                // Auto-mark Gmail email as done after sending reply
+                markEmailAsDone(selectedGmailEmail.id);
+              }}
             />
           </>
         ) : selectedMessage ? (
@@ -3488,7 +3493,29 @@ export function InboxView() {
       </div>
 
       {selectedMessage && selectedMessage.contact_phone && <SendSMSDialog open={showSmsReply} onOpenChange={setShowSmsReply} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" || selectedMessage.contact_type === "personal" || selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "lead" : selectedMessage.contact_type} contactId={selectedMessage.contact_id} />}
-      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <SendEmailDialog open={showEmailReply} onOpenChange={setShowEmailReply} contactName={selectedMessage.contact_name} contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""} contactType={(selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "lead" : selectedMessage.contact_type) as "lead" | "owner"} contactId={selectedMessage.contact_id} replyToSubject={selectedMessage.subject} replyToBody={selectedMessage.body} />}
+      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && (
+        <SendEmailDialog 
+          open={showEmailReply} 
+          onOpenChange={setShowEmailReply} 
+          contactName={selectedMessage.contact_name} 
+          contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""} 
+          contactType={(selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "lead" : selectedMessage.contact_type) as "lead" | "owner"} 
+          contactId={selectedMessage.contact_id} 
+          replyToSubject={selectedMessage.subject} 
+          replyToBody={selectedMessage.body}
+          gmailMessageId={selectedMessage.gmail_email?.id || selectedGmailEmail?.id}
+          onEmailSent={() => {
+            // Auto-mark email as done after sending reply
+            const emailId = selectedMessage.gmail_email?.id || selectedGmailEmail?.id;
+            if (emailId) {
+              markEmailAsDone(emailId);
+            } else if (selectedMessage.contact_type !== "email") {
+              // For non-Gmail messages, mark the conversation as done
+              handleMarkDone(selectedMessage);
+            }
+          }}
+        />
+      )}
       <ComposeEmailDialog open={showComposeEmail} onOpenChange={setShowComposeEmail} />
       {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "personal" : selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
       {selectedMessage && <ConversationNotes open={showNotes} onOpenChange={setShowNotes} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} contactName={selectedMessage.contact_name} />}
