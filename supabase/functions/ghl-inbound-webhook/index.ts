@@ -15,6 +15,20 @@ function normalizePhone(phone: string): string {
   return phone.startsWith("+") ? phone : `+${digits}`;
 }
 
+// Look up which user owns a phone number for SMS routing
+async function findPhoneOwner(supabase: any, phoneNumber: string): Promise<string | null> {
+  const normalizedPhone = normalizePhone(phoneNumber);
+  
+  const { data } = await supabase
+    .from("user_phone_assignments")
+    .select("user_id")
+    .eq("phone_number", normalizedPhone)
+    .eq("is_active", true)
+    .maybeSingle();
+  
+  return data?.user_id || null;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -51,6 +65,18 @@ serve(async (req) => {
     const messageBody = message.body;
     const contactPhone = rawPhone;
     const contactName = fullName || firstName || "Lead";
+    
+    // Extract the "to" number (the GHL number that received the SMS)
+    // GHL may provide this in various locations
+    const toNumber = message.to || payload.to || payload.toNumber || message.phoneNumberId || null;
+    console.log("SMS routing - To number:", toNumber);
+    
+    // Look up which team member owns this receiving number for routing
+    let assignedUserId: string | null = null;
+    if (toNumber) {
+      assignedUserId = await findPhoneOwner(supabase, toNumber);
+      console.log("SMS routing - Assigned user:", assignedUserId);
+    }
     
     // Extract media URLs from MMS attachments - check ALL possible locations
     const mediaUrls: string[] = [];
@@ -174,6 +200,8 @@ serve(async (req) => {
           ghl_contact_id: ghlContactId,
           is_read: false,
           media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+          assigned_user_id: assignedUserId,
+          received_on_number: toNumber,
           metadata: { 
             unmatched_phone: normalizedPhone, 
             contact_name: contactName,
@@ -208,6 +236,8 @@ serve(async (req) => {
         ghl_contact_id: ghlContactId,
         is_read: false,
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+        assigned_user_id: assignedUserId,
+        received_on_number: toNumber,
         metadata: tenantMatch ? { 
           tenant_id: tenantMatch.id, 
           tenant_name: tenantMatch.name,
