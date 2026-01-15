@@ -70,7 +70,7 @@ interface SmsLog {
   created_at: string;
 }
 
-const GOOGLE_REVIEWS_PHONE = "+17709885286";
+const GOOGLE_REVIEWS_PHONE = "+14046090955";
 
 const GoogleReviewsTab = () => {
   const [reviews, setReviews] = useState<OwnerrezReview[]>([]);
@@ -129,7 +129,7 @@ const GoogleReviewsTab = () => {
         supabase
           .from("sms_log")
           .select("*")
-          .in("message_type", ["inbound_reply", "inbound_opt_out", "inbound_resubscribe", "inbound_unmatched"])
+          .in("message_type", ["inbound_reply", "inbound_opt_out", "inbound_resubscribe", "inbound_unmatched", "inbound_unmatched_reviews"])
           .order("created_at", { ascending: false })
           .limit(50),
       ]);
