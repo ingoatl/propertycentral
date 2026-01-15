@@ -18,29 +18,42 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const now = new Date();
-    const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    
+    // Expanded time windows to catch more calls (cron runs every 15 min)
+    // 48h reminder: 47-49 hours before call
+    const in47Hours = new Date(now.getTime() + 47 * 60 * 60 * 1000);
     const in49Hours = new Date(now.getTime() + 49 * 60 * 60 * 1000);
-    const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    // 24h reminder: 23-25 hours before call
+    const in23Hours = new Date(now.getTime() + 23 * 60 * 60 * 1000);
     const in25Hours = new Date(now.getTime() + 25 * 60 * 60 * 1000);
-    const in1Hour = new Date(now.getTime() + 60 * 60 * 1000);
-    const in75Min = new Date(now.getTime() + 75 * 60 * 1000);
+    // 1h reminder: 45 min to 90 min before call
+    const in45Min = new Date(now.getTime() + 45 * 60 * 1000);
+    const in90Min = new Date(now.getTime() + 90 * 60 * 1000);
+
+    console.log(`[Reminder Cron] Running at ${now.toISOString()}`);
+    console.log(`[Reminder Cron] 48h window: ${in47Hours.toISOString()} - ${in49Hours.toISOString()}`);
+    console.log(`[Reminder Cron] 24h window: ${in23Hours.toISOString()} - ${in25Hours.toISOString()}`);
+    console.log(`[Reminder Cron] 1h window: ${in45Min.toISOString()} - ${in90Min.toISOString()}`);
 
     const results = {
       reminder48h: 0,
       reminder24h: 0,
       reminder1h: 0,
+      recallBotsScheduled: 0,
       errors: [] as string[],
     };
 
     // Find calls needing 48h reminder (email only) - ONLY for booking page calls (no ghl_calendar_id)
-    const { data: calls48h } = await supabase
+    const { data: calls48h, error: err48h } = await supabase
       .from("discovery_calls")
-      .select("id, google_calendar_event_id")
+      .select("id, google_calendar_event_id, scheduled_at")
       .eq("status", "scheduled")
       .eq("reminder_48h_sent", false)
       .is("google_calendar_event_id", null) // Only non-Google calendar (booking page) calls - GHL calls are excluded
-      .gte("scheduled_at", in48Hours.toISOString())
+      .gte("scheduled_at", in47Hours.toISOString())
       .lt("scheduled_at", in49Hours.toISOString());
+    
+    console.log(`[Reminder Cron] 48h query result: ${calls48h?.length || 0} calls, error: ${err48h?.message || 'none'}`);
 
     for (const call of calls48h || []) {
       try {
@@ -54,14 +67,16 @@ serve(async (req) => {
       }
     }
 
-// Find calls needing 24h reminder - ONLY for booking page calls (exclude GHL-synced calls)
-    const { data: calls24h } = await supabase
+    // Find calls needing 24h reminder - ONLY for booking page calls (exclude GHL-synced calls)
+    const { data: calls24h, error: err24h } = await supabase
       .from("discovery_calls")
-      .select("id, meeting_notes, google_meet_link")
+      .select("id, meeting_notes, google_meet_link, scheduled_at")
       .eq("status", "scheduled")
       .eq("reminder_24h_sent", false)
-      .gte("scheduled_at", in24Hours.toISOString())
+      .gte("scheduled_at", in23Hours.toISOString())
       .lt("scheduled_at", in25Hours.toISOString());
+    
+    console.log(`[Reminder Cron] 24h query result: ${calls24h?.length || 0} calls, error: ${err24h?.message || 'none'}`);
 
     // Auto-schedule Recall bots for video calls in 24h window that don't have recordings yet
     for (const call of (calls24h || []).filter(c => c.google_meet_link)) {
@@ -74,10 +89,13 @@ serve(async (req) => {
           .single();
         
         if (!existingRecording) {
-          console.log("Auto-scheduling Recall bot for 24h reminder call:", call.id);
+          console.log(`[Reminder Cron] Auto-scheduling Recall bot for call: ${call.id}, meet link: ${call.google_meet_link}`);
           await supabase.functions.invoke("recall-auto-schedule-bot", {
             body: { discoveryCallId: call.id },
           });
+          results.recallBotsScheduled++;
+        } else {
+          console.log(`[Reminder Cron] Recall bot already exists for call: ${call.id}`);
         }
       } catch (e: any) {
         console.error(`Failed to auto-schedule Recall for ${call.id}:`, e.message);
@@ -101,15 +119,15 @@ serve(async (req) => {
     }
 
     // Find calls needing 1h reminder - ONLY for booking page calls (exclude GHL-synced calls)
-    const { data: calls1h } = await supabase
+    const { data: calls1h, error: err1h } = await supabase
       .from("discovery_calls")
-      .select("id, meeting_notes")
+      .select("id, meeting_notes, scheduled_at")
       .eq("status", "scheduled")
       .eq("reminder_1h_sent", false)
-      .gte("scheduled_at", in1Hour.toISOString())
-      .lt("scheduled_at", in75Min.toISOString());
-
-    // Filter out GHL-synced calls
+      .gte("scheduled_at", in45Min.toISOString())
+      .lt("scheduled_at", in90Min.toISOString());
+    
+    console.log(`[Reminder Cron] 1h query result: ${calls1h?.length || 0} calls, error: ${err1h?.message || 'none'}`);
     const filteredCalls1h = (calls1h || []).filter(call => 
       !call.meeting_notes?.includes("Synced from GHL")
     );
