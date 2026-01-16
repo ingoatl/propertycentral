@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bookmark } from "lucide-react";
+import { Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SaveCommunicationModal } from "./SaveCommunicationModal";
 
@@ -47,11 +47,11 @@ export function SaveCommunicationButton({
           e.stopPropagation();
           setShowModal(true);
         }}
-        className={compact ? "h-7 px-2 gap-1" : "gap-2"}
-        title="Save this message"
+        className={compact ? "h-7 px-2 gap-1" : "gap-1.5 border-muted-foreground/30"}
+        title="Archive this message"
       >
-        <Bookmark className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
-        {!compact && <span>Save</span>}
+        <Archive className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        {!compact && <span>Archive</span>}
       </Button>
 
       <SaveCommunicationModal

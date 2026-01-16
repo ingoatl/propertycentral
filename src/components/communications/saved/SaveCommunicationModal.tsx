@@ -158,9 +158,9 @@ export function SaveCommunicationModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Save Communication</DialogTitle>
+          <DialogTitle>Archive Communication</DialogTitle>
           <DialogDescription>
-            Archive this message for future reference
+            Save this message to your archive for future reference
           </DialogDescription>
         </DialogHeader>
 
@@ -174,12 +174,12 @@ export function SaveCommunicationModal({
             <p className="text-sm text-muted-foreground line-clamp-2">{preview}</p>
           </div>
 
-          {/* Save Reason */}
+          {/* Archive Reason */}
           <div className="space-y-2">
-            <Label htmlFor="save-reason">Save Reason *</Label>
+            <Label htmlFor="save-reason">Archive Reason *</Label>
             <Select value={saveReason} onValueChange={setSaveReason}>
               <SelectTrigger id="save-reason">
-                <SelectValue placeholder="Why are you saving this?" />
+                <SelectValue placeholder="Why are you archiving this?" />
               </SelectTrigger>
               <SelectContent>
                 {SAVE_REASONS.map((reason) => (
@@ -196,7 +196,7 @@ export function SaveCommunicationModal({
             <Label htmlFor="comment">Your Note (optional)</Label>
             <Textarea
               id="comment"
-              placeholder="Why I'm saving this..."
+              placeholder="Why I'm archiving this..."
               value={userComment}
               onChange={(e) => setUserComment(e.target.value)}
               rows={2}
@@ -251,7 +251,7 @@ export function SaveCommunicationModal({
               ) : (
                 <Check className="h-4 w-4" />
               )}
-              Save
+              Archive
             </Button>
           </div>
         </div>

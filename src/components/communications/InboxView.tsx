@@ -2385,7 +2385,7 @@ export function InboxView() {
               className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "saved" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
               <Archive className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Saved</span>
+              <span className="hidden sm:inline">Archive</span>
             </button>
           </div>
           
@@ -2911,39 +2911,63 @@ export function InboxView() {
               />
             </div>
             
-            {/* Desktop email header */}
-            <div className="hidden md:flex p-4 border-b items-center gap-4">
+            {/* Desktop email header - reorganized */}
+            <div className="hidden md:flex p-4 border-b items-center gap-3">
+              {/* Sender info - left side */}
               <div className="h-11 w-11 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium text-white">{getInitials(selectedGmailEmail.fromName)}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-base">{selectedGmailEmail.fromName}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-base">{selectedGmailEmail.fromName}</h3>
+                  <Badge variant="secondary" className="text-xs">
+                    {format(new Date(selectedGmailEmail.date), "MMM d, h:mm a")}
+                  </Badge>
+                </div>
                 <p className="text-sm text-muted-foreground truncate">{selectedGmailEmail.from}</p>
               </div>
-              {/* Desktop email quick actions */}
-              <SaveCommunicationButton
-                messageId={selectedGmailEmail.id}
-                messageType="email"
-                threadId={selectedGmailEmail.threadId}
-                messageContent={selectedGmailEmail.body}
-                messageSubject={selectedGmailEmail.subject}
-                messageSnippet={selectedGmailEmail.snippet}
-                senderName={selectedGmailEmail.fromName}
-                senderEmail={selectedGmailEmail.from}
-                messageDate={selectedGmailEmail.date}
-              />
-              <ConversationQuickActions
-                status={doneGmailIds.has(selectedGmailEmail.id) ? "done" : snoozedGmailEmails.has(selectedGmailEmail.id) ? "snoozed" : "open"}
-                onMarkDone={() => markEmailAsDone(selectedGmailEmail.id)}
-                onSnooze={(hours) => handleGmailSnooze(selectedGmailEmail.id, hours)}
-                onReopen={() => unmarkEmailAsDone(selectedGmailEmail.id)}
-                isUpdating={updateGmailStatusMutation.isPending}
-              />
-              {/* More Actions Dropdown */}
-              <InboxMoreActionsDropdown showSaveMessage={false} />
-              <Badge variant="secondary" className="text-xs">
-                {format(new Date(selectedGmailEmail.date), "MMM d, h:mm a")}
-              </Badge>
+              
+              {/* Action buttons - right side, organized in groups */}
+              <div className="flex items-center gap-2">
+                {/* Primary actions */}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowEmailReply(true)}
+                  className="gap-1.5 bg-primary hover:bg-primary/90"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Reply with AI
+                </Button>
+                
+                {/* Divider */}
+                <div className="w-px h-6 bg-border" />
+                
+                {/* Archive button */}
+                <SaveCommunicationButton
+                  messageId={selectedGmailEmail.id}
+                  messageType="email"
+                  threadId={selectedGmailEmail.threadId}
+                  messageContent={selectedGmailEmail.body}
+                  messageSubject={selectedGmailEmail.subject}
+                  messageSnippet={selectedGmailEmail.snippet}
+                  senderName={selectedGmailEmail.fromName}
+                  senderEmail={selectedGmailEmail.from}
+                  messageDate={selectedGmailEmail.date}
+                />
+                
+                {/* Done/Snooze actions */}
+                <ConversationQuickActions
+                  status={doneGmailIds.has(selectedGmailEmail.id) ? "done" : snoozedGmailEmails.has(selectedGmailEmail.id) ? "snoozed" : "open"}
+                  onMarkDone={() => markEmailAsDone(selectedGmailEmail.id)}
+                  onSnooze={(hours) => handleGmailSnooze(selectedGmailEmail.id, hours)}
+                  onReopen={() => unmarkEmailAsDone(selectedGmailEmail.id)}
+                  isUpdating={updateGmailStatusMutation.isPending}
+                />
+                
+                {/* More Actions Dropdown */}
+                <InboxMoreActionsDropdown showSaveMessage={false} />
+              </div>
             </div>
 
             <ScrollArea className="flex-1">
@@ -2994,8 +3018,18 @@ export function InboxView() {
               </div>
             </ScrollArea>
 
-            <div className="p-4 border-t">
-              <div className="flex gap-2 max-w-3xl mx-auto">
+            {/* Bottom reply section */}
+            <div className="p-4 border-t bg-muted/20">
+              <div className="flex gap-2 max-w-3xl mx-auto justify-center">
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  onClick={() => setShowEmailReply(true)}
+                  className="gap-1.5"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Reply with AI
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowEmailReply(true)}>
                   <Mail className="h-4 w-4 mr-2" />Reply
                 </Button>
