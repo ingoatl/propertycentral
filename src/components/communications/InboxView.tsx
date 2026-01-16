@@ -88,6 +88,7 @@ import { EmailQuickFilters, type EmailQuickFilterType } from "./inbox/EmailQuick
 import { useEmailClassification, classifyEmail, getClassificationColor } from "@/hooks/useEmailClassification";
 import { SavedCommunicationsDashboard } from "./saved/SavedCommunicationsDashboard";
 import { SaveCommunicationButton } from "./saved/SaveCommunicationButton";
+import { InboxMoreActionsDropdown } from "./inbox/InboxMoreActionsDropdown";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -2938,6 +2939,8 @@ export function InboxView() {
                 onReopen={() => unmarkEmailAsDone(selectedGmailEmail.id)}
                 isUpdating={updateGmailStatusMutation.isPending}
               />
+              {/* More Actions Dropdown */}
+              <InboxMoreActionsDropdown showSaveMessage={false} />
               <Badge variant="secondary" className="text-xs">
                 {format(new Date(selectedGmailEmail.date), "MMM d, h:mm a")}
               </Badge>
@@ -3159,41 +3162,26 @@ export function InboxView() {
                     Call Back
                   </Button>
                 )}
-                {/* Income Report button in detail header */}
-                <IncomeReportButton 
-                  variant="ghost" 
-                  size="sm"
-                  className="h-9 gap-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                />
+                {/* Call button */}
                 {selectedMessage.contact_phone && !isVoiceAITranscript(selectedMessage.body) && (
                   <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => setShowCallDialog(true)} title="Call"><PhoneCall className="h-4 w-4" /></Button>
                 )}
-                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowNotes(true)}><FileText className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowContactInfo(true)}><Info className="h-4 w-4" /></Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {selectedMessage.contact_type === "lead" && selectedMessage.contact_id ? (
-                      <DropdownMenuItem onClick={() => setSelectedLeadId(selectedMessage.contact_id)}>
-                        <User className="h-4 w-4 mr-2" />View Lead
-                      </DropdownMenuItem>
-                    ) : selectedMessage.contact_type === "owner" ? (
-                      <DropdownMenuItem onClick={() => navigate("/property-owners")}>View Owner</DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem 
-                        onClick={() => createLeadMutation.mutate({
+                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowNotes(true)} title="Notes"><FileText className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowContactInfo(true)} title="Contact Info"><Info className="h-4 w-4" /></Button>
+                {/* More Actions Dropdown - consolidated menu */}
+                <InboxMoreActionsDropdown
+                  onCreateLead={
+                    selectedMessage.contact_type !== "lead" && selectedMessage.contact_type !== "owner"
+                      ? () => createLeadMutation.mutate({
                           name: selectedMessage.contact_name,
                           phone: selectedMessage.contact_phone || undefined,
                           email: selectedMessage.contact_email || undefined,
-                        })}
-                        disabled={createLeadMutation.isPending}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />{createLeadMutation.isPending ? "Creating..." : "Create Lead"}
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => setShowNotes(true)}>Add Note</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        })
+                      : undefined
+                  }
+                  showCreateLead={selectedMessage.contact_type !== "lead" && selectedMessage.contact_type !== "owner"}
+                  showSaveMessage={false}
+                />
               </div>
             </div>
 
