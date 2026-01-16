@@ -24,14 +24,15 @@ function formatPhoneE164(phone: string): string {
   return phone;
 }
 
-// Helper to check if current time is within send window (11am-3pm EST)
+// Helper to check if current time is within send window (6pm-8pm EST)
 const isWithinSendWindow = (): boolean => {
   const now = new Date();
   const estOffset = -5 * 60;
   const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   const estMinutes = utcMinutes + estOffset;
   const estHour = Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
-  return estHour >= 11 && estHour < 15;
+  // 6pm-8pm EST = hours 18, 19
+  return estHour >= 18 && estHour < 20;
 };
 
 serve(async (req) => {

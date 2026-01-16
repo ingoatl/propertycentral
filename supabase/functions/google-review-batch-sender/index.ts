@@ -17,17 +17,19 @@ function formatPhoneE164(phone: string): string {
   return phone.startsWith('+') ? phone : `+${digits}`;
 }
 
-// Check if current time is within optimal send window (11am-3pm EST)
-function isWithinSendWindow(): boolean {
+// Check if current time is within optimal send window (6pm-8pm EST)
+function isWithinSendWindow(): { inWindow: boolean; currentESTHour: number } {
   const now = new Date();
+  // EST is UTC-5 (or EDT UTC-4, but we'll use EST for consistency)
   const estOffset = -5 * 60;
   const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   const estMinutes = utcMinutes + estOffset;
   const estHour = Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
-  return estHour >= 11 && estHour < 15;
+  // 6pm-8pm EST = hours 18, 19
+  return { inWindow: estHour >= 18 && estHour < 20, currentESTHour: estHour };
 }
 
-// Best practice: Max 5 SMS per hour for optimal deliverability
+// Best practice: Max 5 SMS per run
 const MAX_SMS_PER_RUN = 5;
 const MIN_DELAY_BETWEEN_SMS_MS = 30000; // 30 seconds between each SMS
 
@@ -47,22 +49,28 @@ serve(async (req) => {
     // Parse request body for options
     let forceRun = false;
     let retryPending = false;
+    let isCronJob = false;
     try {
       const body = await req.json();
       forceRun = body?.forceRun === true;
       retryPending = body?.retryPending === true;
+      isCronJob = body?.isCronJob === true;
     } catch {
       // No body or invalid JSON, use defaults
     }
 
+    const windowCheck = isWithinSendWindow();
+    console.log(`Current EST hour: ${windowCheck.currentESTHour}, In window (6-8pm): ${windowCheck.inWindow}, Force: ${forceRun}, Cron: ${isCronJob}`);
+
     // Check if we're in the optimal send window (unless forced)
-    if (!forceRun && !isWithinSendWindow()) {
-      console.log("Outside send window (11am-3pm EST), skipping batch send");
+    if (!forceRun && !windowCheck.inWindow) {
+      console.log("Outside send window (6-8pm EST), skipping batch send");
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: "Outside send window (11am-3pm EST). Use 'Run Now' button to force.",
-          sentCount: 0 
+          message: `Outside send window (6-8pm EST). Current EST hour: ${windowCheck.currentESTHour}. Use forceRun to override.`,
+          sentCount: 0,
+          currentESTHour: windowCheck.currentESTHour
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -84,7 +92,7 @@ serve(async (req) => {
     }
 
     // Get all reviews with phone numbers
-    const { data: pendingReviews, error: reviewError } = await supabase
+    const { data: allReviews, error: reviewError } = await supabase
       .from("ownerrez_reviews")
       .select(`
         id,
@@ -97,14 +105,14 @@ serve(async (req) => {
       .not("guest_phone", "is", null)
       .not("review_text", "is", null)
       .order("review_date", { ascending: false })
-      .limit(50);
+      .limit(100);
 
     if (reviewError) {
       console.error("Error fetching reviews:", reviewError);
       throw reviewError;
     }
 
-    console.log(`Found ${pendingReviews?.length || 0} reviews with phone numbers`);
+    console.log(`Found ${allReviews?.length || 0} reviews with phone numbers`);
 
     // Get existing google_review_requests
     const { data: existingRequests } = await supabase
@@ -119,7 +127,7 @@ serve(async (req) => {
     );
 
     // Find reviews that need contact
-    let reviewsToContact: typeof pendingReviews = [];
+    let reviewsToContact: typeof allReviews = [];
     
     if (retryPending) {
       // Retry reviews with "pending" status (created but not sent)
@@ -128,12 +136,13 @@ serve(async (req) => {
           ?.filter(r => r.workflow_status === 'pending')
           .map(r => r.review_id) || []
       );
-      reviewsToContact = (pendingReviews || []).filter(review => 
+      reviewsToContact = (allReviews || []).filter(review => 
         pendingRequestReviewIds.has(review.id)
       ).slice(0, MAX_SMS_PER_RUN);
+      console.log(`Retrying ${reviewsToContact.length} pending requests`);
     } else {
       // Normal flow - find reviews without any request yet
-      reviewsToContact = (pendingReviews || []).filter(review => {
+      reviewsToContact = (allReviews || []).filter(review => {
         // Skip if already has a request
         if (existingReviewIds.has(review.id)) return false;
         
@@ -149,14 +158,14 @@ serve(async (req) => {
 
     // Provide detailed status if no reviews to contact
     if (reviewsToContact.length === 0) {
-      const totalReviews = pendingReviews?.length || 0;
+      const totalReviews = allReviews?.length || 0;
       const alreadyContacted = existingRequests?.length || 0;
       const pendingStatus = existingRequests?.filter(r => r.workflow_status === 'pending').length || 0;
       
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: `All ${totalReviews} reviews have already been contacted. ${alreadyContacted} requests exist (${pendingStatus} pending status). Sync new reviews from OwnerRez or use retryPending option.`,
+          message: `All ${totalReviews} reviews have been processed. ${alreadyContacted} requests exist (${pendingStatus} pending status).`,
           sentCount: 0,
           stats: {
             totalReviews,
@@ -170,13 +179,14 @@ serve(async (req) => {
     }
 
     // Send SMS for each review with delay between sends
-    const results: Array<{ reviewId: string; success: boolean; error?: string }> = [];
+    const results: Array<{ reviewId: string; guestName?: string; phone: string; success: boolean; error?: string }> = [];
 
     for (let i = 0; i < reviewsToContact.length; i++) {
       const review = reviewsToContact[i];
       
       // Add delay between SMS (except for first one)
       if (i > 0) {
+        console.log(`Waiting ${MIN_DELAY_BETWEEN_SMS_MS / 1000}s before next SMS...`);
         await new Promise(resolve => setTimeout(resolve, MIN_DELAY_BETWEEN_SMS_MS));
       }
 
@@ -185,7 +195,7 @@ serve(async (req) => {
         const source = review.review_source || "Airbnb";
         const message = `Thanks again for the wonderful ${source} review — it truly means a lot. Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
 
-        console.log(`Sending permission ask to ${formattedPhone} for review ${review.id}`);
+        console.log(`[${i + 1}/${reviewsToContact.length}] Sending permission ask to ${formattedPhone} (${review.guest_name}) for review ${review.id}`);
 
         // Find or create GHL contact
         const searchResponse = await fetch(
@@ -203,9 +213,13 @@ serve(async (req) => {
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
           ghlContactId = searchData.contact?.id;
+          if (ghlContactId) {
+            console.log(`Found existing GHL contact: ${ghlContactId}`);
+          }
         }
 
         if (!ghlContactId) {
+          console.log(`Creating new GHL contact for ${formattedPhone}`);
           const createResponse = await fetch(
             `https://services.leadconnectorhq.com/contacts/`,
             {
@@ -227,6 +241,10 @@ serve(async (req) => {
           if (createResponse.ok) {
             const createData = await createResponse.json();
             ghlContactId = createData.contact?.id;
+            console.log(`Created new GHL contact: ${ghlContactId}`);
+          } else {
+            const errorText = await createResponse.text();
+            console.error(`Failed to create contact: ${errorText}`);
           }
         }
 
@@ -235,6 +253,7 @@ serve(async (req) => {
         }
 
         // Send SMS
+        console.log(`Sending SMS via GHL from ${GOOGLE_REVIEWS_PHONE} to ${formattedPhone}`);
         const sendResponse = await fetch(
           `https://services.leadconnectorhq.com/conversations/messages`,
           {
@@ -255,21 +274,22 @@ serve(async (req) => {
 
         if (!sendResponse.ok) {
           const errorText = await sendResponse.text();
+          console.error(`GHL SMS error: ${errorText}`);
           
           // Check for opt-out
           if (errorText.includes("unsubscribed") || errorText.includes("blocked") || errorText.includes("DND")) {
             // Mark as opted out
             await supabase
               .from("google_review_requests")
-              .insert({
+              .upsert({
                 review_id: review.id,
                 guest_phone: formattedPhone,
                 workflow_status: "ignored",
                 opted_out: true,
                 opted_out_at: new Date().toISOString(),
-              });
+              }, { onConflict: 'review_id' });
             
-            results.push({ reviewId: review.id, success: false, error: "Contact opted out" });
+            results.push({ reviewId: review.id, guestName: review.guest_name, phone: formattedPhone, success: false, error: "Contact opted out" });
             continue;
           }
           
@@ -277,22 +297,24 @@ serve(async (req) => {
         }
 
         const sendData = await sendResponse.json();
+        console.log(`SMS sent successfully, message ID: ${sendData.messageId}`);
 
-        // Create google_review_request record
-        const { data: newRequest, error: insertError } = await supabase
+        // Create or update google_review_request record
+        const { data: newRequest, error: upsertError } = await supabase
           .from("google_review_requests")
-          .insert({
+          .upsert({
             review_id: review.id,
             guest_phone: formattedPhone,
             workflow_status: "permission_asked",
             permission_asked_at: new Date().toISOString(),
             opted_out: false,
-          })
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'review_id' })
           .select()
           .single();
 
-        if (insertError) {
-          console.error("Error creating request record:", insertError);
+        if (upsertError) {
+          console.error("Error upserting request record:", upsertError);
         }
 
         // Log the SMS
@@ -305,13 +327,15 @@ serve(async (req) => {
           status: "sent",
         });
 
-        results.push({ reviewId: review.id, success: true });
-        console.log(`Successfully sent to ${formattedPhone}`);
+        results.push({ reviewId: review.id, guestName: review.guest_name, phone: formattedPhone, success: true });
+        console.log(`✓ Successfully sent to ${review.guest_name} (${formattedPhone})`);
 
       } catch (error) {
-        console.error(`Error sending to review ${review.id}:`, error);
+        console.error(`✗ Error sending to review ${review.id}:`, error);
         results.push({ 
           reviewId: review.id, 
+          guestName: review.guest_name,
+          phone: review.guest_phone,
           success: false, 
           error: error instanceof Error ? error.message : String(error) 
         });
@@ -319,11 +343,19 @@ serve(async (req) => {
     }
 
     const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+
+    console.log(`\n=== Batch Complete ===`);
+    console.log(`Sent: ${successCount}, Failed: ${failCount}`);
+    results.forEach(r => {
+      console.log(`  ${r.success ? '✓' : '✗'} ${r.guestName || 'Unknown'} (${r.phone}) ${r.error ? `- ${r.error}` : ''}`);
+    });
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         sentCount: successCount,
+        failedCount: failCount,
         totalProcessed: results.length,
         results 
       }),
