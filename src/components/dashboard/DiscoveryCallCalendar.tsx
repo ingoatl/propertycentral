@@ -1114,6 +1114,7 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
   const [isCallingLead, setIsCallingLead] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
 
@@ -1424,14 +1425,23 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
                 </Button>
               )}
 
-              {/* Delete Button */}
-              <Button 
-                variant="outline" 
-                className="w-full h-8 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 className="h-3 w-3 mr-1" /> Delete Scheduled Call
-              </Button>
+              {/* Reschedule & Delete Buttons */}
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-8 text-xs"
+                  onClick={() => setShowRescheduleDialog(true)}
+                >
+                  <Calendar className="h-3 w-3 mr-1" /> Reschedule
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-8 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" /> Delete
+                </Button>
+              </div>
 
               {/* Combined Notes - Compact */}
               {allNotes && (

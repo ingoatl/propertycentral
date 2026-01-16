@@ -265,6 +265,57 @@ export type Database = {
           },
         ]
       }
+      appointment_reschedule_logs: {
+        Row: {
+          appointment_id: string
+          appointment_type: string
+          created_at: string
+          google_calendar_updated: boolean | null
+          id: string
+          new_scheduled_at: string
+          notification_sent: boolean | null
+          notification_sent_at: string | null
+          previous_scheduled_at: string
+          reason: string | null
+          reschedule_notes: string | null
+          rescheduled_by: string | null
+          rescheduled_by_name: string | null
+          rescheduled_by_type: string
+        }
+        Insert: {
+          appointment_id: string
+          appointment_type: string
+          created_at?: string
+          google_calendar_updated?: boolean | null
+          id?: string
+          new_scheduled_at: string
+          notification_sent?: boolean | null
+          notification_sent_at?: string | null
+          previous_scheduled_at: string
+          reason?: string | null
+          reschedule_notes?: string | null
+          rescheduled_by?: string | null
+          rescheduled_by_name?: string | null
+          rescheduled_by_type?: string
+        }
+        Update: {
+          appointment_id?: string
+          appointment_type?: string
+          created_at?: string
+          google_calendar_updated?: boolean | null
+          id?: string
+          new_scheduled_at?: string
+          notification_sent?: boolean | null
+          notification_sent_at?: string | null
+          previous_scheduled_at?: string
+          reason?: string | null
+          reschedule_notes?: string | null
+          rescheduled_by?: string | null
+          rescheduled_by_name?: string | null
+          rescheduled_by_type?: string
+        }
+        Relationships: []
+      }
       audit_access_log: {
         Row: {
           accessed_at: string | null
