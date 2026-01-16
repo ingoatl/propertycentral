@@ -7,6 +7,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Field category definitions with user-friendly labels
+const CATEGORY_LABELS: Record<string, string> = {
+  property: "Property Details",
+  financial: "Financial Terms",
+  dates: "Lease Dates",
+  occupancy: "Occupancy & Policies",
+  contact: "Contact Information",
+  identification: "Identification",
+  vehicle: "Vehicle Information",
+  emergency: "Emergency Contact",
+  acknowledgment: "Acknowledgments",
+  signature: "Signatures",
+  other: "Other Fields",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -105,7 +120,7 @@ serve(async (req) => {
     console.log("Extracted document text length:", documentText.length);
     console.log("Document preview:", documentText.substring(0, 500));
 
-    // Use AI to analyze the document
+    // Use AI to analyze the document with IMPROVED prompts
     const aiPrompt = detectTypeOnly 
       ? `Analyze this document and determine its type and suggest a name.
 
@@ -125,55 +140,117 @@ Also suggest a concise name for this template.
 
 Return ONLY a JSON object like:
 {
-  "detected_contract_type": "co_hosting",
-  "suggested_name": "Co-Hosting Management Agreement"
+  "detected_contract_type": "rental_agreement",
+  "suggested_name": "Standard Lease Agreement"
 }
 
 Return ONLY the JSON, no other text.`
-      : `Analyze this property management/rental agreement document and identify ALL fields that need to be filled in, INCLUDING signature blocks.
+      : `You are a legal document analyst. Analyze this rental/lease agreement and extract ALL fillable fields.
 
-Document content:
-${documentText.substring(0, 15000)}
+DOCUMENT CONTENT:
+${documentText.substring(0, 20000)}
 
-FIRST, determine the document type from these options:
+CRITICAL RULES FOR FIELD ASSIGNMENT:
+
+1. **ADMIN fills BEFORE sending** (filled_by: "admin"):
+   - Property address, unit number, city, county, state, zip
+   - Landlord/management company name, address, phone, email
+   - Monthly rent amount, security deposit, all fees (late fees, cleaning, etc.)
+   - Lease start date, end date, move-in date
+   - Rent due date, grace period, late fee policies
+   - Utilities included/excluded, parking spaces
+   - Number of bedrooms, bathrooms
+   - Any property-specific terms or rules
+   - Pet policies, pet deposits, pet rent
+   - All financial terms and amounts
+   - Landlord/Host signature and date (if document has host signature)
+
+2. **GUEST fills WHEN SIGNING** (filled_by: "guest"):
+   - Tenant/Guest name (their legal name)
+   - Tenant email, phone, current address
+   - Social Security Number (SSN), Driver's License
+   - Date of Birth
+   - Vehicle information (make, model, plate number)
+   - Emergency contact name, phone, relationship
+   - Number of occupants
+   - **SIGNATURES** - Guest signature, initials
+   - **DATES next to signatures** - Date tenant signs
+
+3. **SIGNATURE FIELDS** - Mark these as type: "signature", category: "signature":
+   - Look for "Tenant Signature", "Guest Signature", "Lessee Signature"
+   - Look for "Landlord Signature", "Host Signature", "Lessor Signature", "Agent Signature"
+   - Look for initials lines on each page
+
+For each field, provide:
+- api_id: snake_case identifier (e.g., "monthly_rent", "tenant_signature")
+- label: User-friendly label (e.g., "Monthly Rent Amount", "Tenant Signature")
+- type: One of "text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"
+- filled_by: "admin" or "guest" based on rules above
+- category: One of "property", "financial", "dates", "occupancy", "contact", "identification", "vehicle", "emergency", "acknowledgment", "signature", "other"
+- required: true/false (signatures are always required, text fields usually required)
+- description: Brief help text explaining what to enter
+
+Also determine the contract type:
 - "co_hosting" - Co-hosting agreement
-- "full_service" - Full-service property management agreement  
-- "rental_agreement" - Guest/tenant rental or lease agreement
-- "addendum" - Supplement or addendum
-- "pet_policy" - Pet policy agreement
-- "early_termination" - Early termination agreement
-- "other" - Any other type
+- "full_service" - Full-service property management
+- "rental_agreement" - Rental/lease agreement
+- "addendum" - Addendum
+- "pet_policy" - Pet policy
+- "early_termination" - Early termination
+- "other" - Other
 
-THEN, identify ALL fillable fields including:
-1. Regular form fields (name blanks, date blanks, amounts, addresses)
-2. SIGNATURE BLOCKS - Look for:
-   - "Guest Signature" or "Tenant Signature" lines
-   - "Owner Signature" or "Host Signature" lines
-   - Date lines near signatures
-
-For each field found, determine:
-1. The field name/label (use snake_case for api_id)
-2. The field type: "text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"
-3. Who should fill it: "admin" (filled before sending) or "guest" (owner fills during signing)
-4. A user-friendly label
-5. The category: "property", "financial", "dates", "occupancy", "contact", "identification", "signature", "other"
-
-Rules for admin vs guest:
-- Admin fills: effective_date, host info
-- Guest/Owner fills: their personal info (name, address, phone, email), property address, package selection, signatures
-
-Return a JSON object with this structure:
+Return ONLY valid JSON in this format:
 {
-  "detected_contract_type": "co_hosting",
-  "suggested_name": "Co-Hosting Agreement",
+  "detected_contract_type": "rental_agreement",
+  "suggested_name": "Standard Lease Agreement",
   "fields": [
-    {"api_id": "effective_date", "label": "Effective Date", "type": "date", "filled_by": "admin", "category": "dates"},
-    {"api_id": "owner_name", "label": "Owner Name", "type": "text", "filled_by": "guest", "category": "contact"},
-    {"api_id": "owner_signature", "label": "Owner Signature", "type": "signature", "filled_by": "guest", "category": "signature"}
+    {
+      "api_id": "property_address",
+      "label": "Property Address",
+      "type": "text",
+      "filled_by": "admin",
+      "category": "property",
+      "required": true,
+      "description": "Full street address of the rental property"
+    },
+    {
+      "api_id": "monthly_rent",
+      "label": "Monthly Rent",
+      "type": "number",
+      "filled_by": "admin",
+      "category": "financial",
+      "required": true,
+      "description": "Monthly rent amount in dollars"
+    },
+    {
+      "api_id": "tenant_name",
+      "label": "Tenant Full Name",
+      "type": "text",
+      "filled_by": "guest",
+      "category": "contact",
+      "required": true,
+      "description": "Legal name of the tenant"
+    },
+    {
+      "api_id": "tenant_signature",
+      "label": "Tenant Signature",
+      "type": "signature",
+      "filled_by": "guest",
+      "category": "signature",
+      "required": true,
+      "description": "Tenant signs here to agree to lease terms"
+    },
+    {
+      "api_id": "host_signature",
+      "label": "Host/Landlord Signature",
+      "type": "signature",
+      "filled_by": "admin",
+      "category": "signature",
+      "required": true,
+      "description": "Host/landlord signs after tenant"
+    }
   ]
-}
-
-Return ONLY the JSON, no other text.`;
+}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -186,7 +263,14 @@ Return ONLY the JSON, no other text.`;
         messages: [
           {
             role: "system",
-            content: "You are an expert at analyzing legal documents and identifying form fields AND signature blocks. Return only valid JSON. Pay special attention to document type detection and signature lines.",
+            content: `You are an expert legal document analyst. You analyze rental agreements, leases, and property management contracts to identify all fillable fields.
+
+KEY PRINCIPLES:
+1. Admin fills ALL property details, financial terms, and lease terms BEFORE sending to tenant
+2. Guest/Tenant ONLY fills their personal info (name, contact, ID) and SIGNS
+3. Signature fields are CRITICAL - identify all signature and initial lines
+4. Use clear, user-friendly labels that explain what to enter
+5. Return ONLY valid JSON - no markdown, no explanations`,
           },
           { role: "user", content: aiPrompt },
         ],
@@ -205,7 +289,6 @@ Return ONLY the JSON, no other text.`;
       aiData = await aiResponse.json();
     } catch (jsonError) {
       console.error("Error parsing AI response JSON:", jsonError);
-      // Return default values if AI response is not valid JSON
       return new Response(
         JSON.stringify({
           success: true,
@@ -220,7 +303,7 @@ Return ONLY the JSON, no other text.`;
 
     const aiContent = aiData.choices?.[0]?.message?.content || "{}";
     
-    console.log("AI response:", aiContent);
+    console.log("AI response:", aiContent.substring(0, 500));
 
     // Parse the AI response
     let parsedResult: {
@@ -232,6 +315,8 @@ Return ONLY the JSON, no other text.`;
         type: string;
         filled_by: string;
         category: string;
+        required?: boolean;
+        description?: string;
       }>;
     } = {};
 
@@ -254,24 +339,121 @@ Return ONLY the JSON, no other text.`;
 
     const detectedType = parsedResult.detected_contract_type || "other";
     const suggestedName = parsedResult.suggested_name || "Document Template";
-    let fields = parsedResult.fields || [];
+    const rawFields = parsedResult.fields || [];
 
-    // If not detectTypeOnly, ensure we have essential fields
+    // Post-process fields to ensure proper structure and assignments
+    const fields: Array<{
+      api_id: string;
+      label: string;
+      type: string;
+      filled_by: string;
+      category: string;
+      required: boolean;
+      description: string;
+      page: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }> = rawFields.map((f, index) => {
+      // Ensure proper type
+      const validTypes = ["text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"];
+      const fieldType = validTypes.includes(f.type) ? f.type : "text";
+      
+      // Force signature fields to signature category
+      const category = fieldType === "signature" ? "signature" : (f.category || "other");
+      
+      // Ensure required is boolean
+      const required = f.required !== false;
+      
+      return {
+        api_id: f.api_id || `field_${index}`,
+        label: f.label || f.api_id,
+        type: fieldType,
+        filled_by: f.filled_by === "guest" ? "guest" : "admin",
+        category,
+        required,
+        description: f.description || "",
+        // Default positioning - will be improved in future with PDF coordinate extraction
+        page: 1,
+        x: 10 + (index % 2) * 45,
+        y: 10 + Math.floor(index / 2) * 8,
+        width: 40,
+        height: 4,
+      };
+    });
+
+    // Ensure we have essential signature fields
     if (!detectTypeOnly && fields.length > 0) {
-      const hasOwnerSignature = fields.some(f => 
-        f.api_id.includes("owner_signature") || f.api_id.includes("guest_signature")
+      const hasGuestSignature = fields.some(f => 
+        f.type === "signature" && 
+        (f.filled_by === "guest" || f.api_id.includes("tenant") || f.api_id.includes("guest"))
       );
-      const hasHostSignature = fields.some(f => 
-        f.api_id.includes("host_signature") || f.api_id.includes("agent_signature")
+      const hasHostSignature = fields.some(f =>
+        f.type === "signature" && 
+        (f.filled_by === "admin" || f.api_id.includes("host") || f.api_id.includes("landlord") || f.api_id.includes("agent"))
       );
       
-      if (!hasOwnerSignature) {
-        fields.push({ api_id: "owner_signature", label: "Owner Signature", type: "signature", filled_by: "guest", category: "signature" });
-        fields.push({ api_id: "owner_date_signed", label: "Owner Date Signed", type: "date", filled_by: "guest", category: "signature" });
+      if (!hasGuestSignature) {
+        fields.push({
+          api_id: "tenant_signature",
+          label: "Tenant Signature",
+          type: "signature",
+          filled_by: "guest",
+          category: "signature",
+          required: true,
+          description: "Tenant signs here to agree to lease terms",
+          page: 1,
+          x: 10,
+          y: 85,
+          width: 35,
+          height: 6,
+        });
+        fields.push({
+          api_id: "tenant_date_signed",
+          label: "Date Signed (Tenant)",
+          type: "date",
+          filled_by: "guest",
+          category: "signature",
+          required: true,
+          description: "Date tenant signs the agreement",
+          page: 1,
+          x: 55,
+          y: 85,
+          width: 25,
+          height: 4,
+        });
       }
+      
       if (!hasHostSignature) {
-        fields.push({ api_id: "host_signature", label: "Host/Agent Signature", type: "signature", filled_by: "admin", category: "signature" });
-        fields.push({ api_id: "host_date_signed", label: "Host Date Signed", type: "date", filled_by: "admin", category: "signature" });
+        fields.push({
+          api_id: "host_signature",
+          label: "Host/Landlord Signature",
+          type: "signature",
+          filled_by: "admin",
+          category: "signature",
+          required: true,
+          description: "Host/landlord signs to execute the agreement",
+          page: 1,
+          x: 10,
+          y: 92,
+          width: 35,
+          height: 6,
+        });
+        fields.push({
+          api_id: "host_date_signed",
+          label: "Date Signed (Host)",
+          type: "date",
+          filled_by: "admin",
+          category: "signature",
+          required: true,
+          description: "Date host signs the agreement",
+          page: 1,
+          x: 55,
+          y: 92,
+          width: 25,
+          height: 4,
+        });
       }
     }
 
@@ -291,6 +473,9 @@ Return ONLY the JSON, no other text.`;
     }
 
     console.log("Detected type:", detectedType, "Fields:", fields.length);
+    console.log("Admin fields:", fields.filter(f => f.filled_by === "admin").length);
+    console.log("Guest fields:", fields.filter(f => f.filled_by === "guest").length);
+    console.log("Signature fields:", fields.filter(f => f.type === "signature").length);
 
     return new Response(
       JSON.stringify({
