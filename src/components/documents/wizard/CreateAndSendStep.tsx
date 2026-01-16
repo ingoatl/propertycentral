@@ -5,18 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Send, Copy, CheckCircle, FileText, User, Building, Calendar, Mail, Eye, Download } from "lucide-react";
+import { Loader2, Send, Copy, CheckCircle, FileText, User, Building, Calendar, Mail, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { WizardData } from "../DocumentCreateWizard";
 import { format } from "date-fns";
 import { getFieldLabelInfo } from "@/utils/fieldLabelMapping";
-import { Document, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/esm/Page/AnnotationLayer.css";
-import "react-pdf/dist/esm/Page/TextLayer.css";
-
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+import InteractiveDocumentPreview from "./InteractiveDocumentPreview";
 
 interface Props {
   data: WizardData;
@@ -27,9 +21,8 @@ interface Props {
 const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true); // Show by default
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [numPages, setNumPages] = useState<number>(0);
   const { toast } = useToast();
 
   // Load template PDF URL for preview
@@ -139,10 +132,6 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
     window.location.reload();
   };
 
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-  };
-
   // Get values from fieldValues
   const propertyAddress = data.fieldValues.property_address as string || "";
   const leaseStartDate = data.fieldValues.lease_start_date as string || "";
@@ -171,57 +160,47 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Label className="text-lg font-medium">Create & Send Document</Label>
-        <p className="text-sm text-muted-foreground mt-1">
-          Review your document with pre-filled values and send for signing
-        </p>
-      </div>
-
-      {/* Document Preview Toggle */}
-      <div className="flex gap-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <Label className="text-lg font-medium">Create & Send Document</Label>
+          <p className="text-sm text-muted-foreground mt-1">
+            Review your document with pre-filled values and send for signing
+          </p>
+        </div>
         <Button 
-          variant={showPreview ? "default" : "outline"} 
+          variant="outline" 
           size="sm" 
           onClick={() => setShowPreview(!showPreview)}
         >
-          <Eye className="h-4 w-4 mr-2" />
-          {showPreview ? "Hide Preview" : "Preview Document"}
+          {showPreview ? (
+            <>
+              <EyeOff className="h-4 w-4 mr-2" />
+              Hide Preview
+            </>
+          ) : (
+            <>
+              <Eye className="h-4 w-4 mr-2" />
+              Show Preview
+            </>
+          )}
         </Button>
       </div>
 
-      {/* PDF Preview */}
+      {/* Interactive Document Preview */}
       {showPreview && pdfUrl && (
-        <div className="border rounded-lg overflow-hidden bg-muted/20">
-          <div className="bg-muted p-2 flex items-center justify-between">
-            <span className="text-sm font-medium">Document Preview</span>
-            <span className="text-xs text-muted-foreground">
-              {numPages} {numPages === 1 ? "page" : "pages"}
-            </span>
-          </div>
-          <ScrollArea className="h-[400px]">
-            <div className="p-4 flex flex-col items-center gap-4">
-              <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
-                {Array.from(new Array(numPages), (_, index) => (
-                  <Page 
-                    key={`page_${index + 1}`}
-                    pageNumber={index + 1}
-                    width={500}
-                    className="shadow-lg mb-4"
-                  />
-                ))}
-              </Document>
-            </div>
-          </ScrollArea>
-        </div>
+        <InteractiveDocumentPreview
+          data={data}
+          updateData={updateData}
+          pdfUrl={pdfUrl}
+        />
       )}
 
-      {/* Pre-filled Values Summary */}
-      {filledFields.length > 0 && (
+      {/* Summary - Compact view when preview is shown */}
+      {!showPreview && filledFields.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-primary" />
-            <h4 className="font-medium">Pre-filled Document Values ({filledFields.length})</h4>
+            <h4 className="font-medium">Pre-filled Values ({filledFields.length})</h4>
           </div>
           <div className="p-3 bg-muted/50 rounded-lg max-h-48 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
