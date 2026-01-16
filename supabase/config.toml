@@ -222,20 +222,8 @@ verify_jwt = true
 [functions.send-welcome-email]
 verify_jwt = true
 
-[functions.signwell-create-document]
+[functions.create-document-for-signing]
 verify_jwt = true
-
-[functions.signwell-create-draft-document]
-verify_jwt = true
-
-[functions.signwell-finalize-document]
-verify_jwt = true
-
-[functions.signwell-get-signing-url]
-verify_jwt = true
-
-[functions.signwell-webhook]
-verify_jwt = false
 
 [functions.sync-ownerrez]
 verify_jwt = true

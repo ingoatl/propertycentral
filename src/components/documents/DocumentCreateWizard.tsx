@@ -35,8 +35,7 @@ export interface WizardData {
   documentName: string;
   detectedFields: DetectedField[];
   fieldValues: Record<string, string | boolean>;
-  signwellDocumentId: string | null;
-  embeddedEditUrl: string | null;
+  // Native signing URLs
   guestSigningUrl: string | null;
   hostSigningUrl: string | null;
   // Edit document content
@@ -68,8 +67,6 @@ const DocumentCreateWizard = () => {
     documentName: "",
     detectedFields: [],
     fieldValues: {},
-    signwellDocumentId: null,
-    embeddedEditUrl: null,
     guestSigningUrl: null,
     hostSigningUrl: null,
     documentContent: "",

@@ -1,13 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Send, Copy, CheckCircle, FileText, User, Building, Calendar, Mail } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, Send, Copy, CheckCircle, FileText, User, Building, Calendar, Mail, Eye, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { WizardData } from "../DocumentCreateWizard";
 import { format } from "date-fns";
+import { getFieldLabelInfo } from "@/utils/fieldLabelMapping";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/esm/Page/AnnotationLayer.css";
+import "react-pdf/dist/esm/Page/TextLayer.css";
+
+// Set up PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface Props {
   data: WizardData;
@@ -18,7 +27,32 @@ interface Props {
 const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [numPages, setNumPages] = useState<number>(0);
   const { toast } = useToast();
+
+  // Load template PDF URL for preview
+  useEffect(() => {
+    const loadPdf = async () => {
+      if (!data.templateId) return;
+      
+      try {
+        const { data: template } = await supabase
+          .from("document_templates")
+          .select("file_path")
+          .eq("id", data.templateId)
+          .single();
+        
+        if (template?.file_path) {
+          setPdfUrl(template.file_path);
+        }
+      } catch (error) {
+        console.error("Failed to load PDF:", error);
+      }
+    };
+    loadPdf();
+  }, [data.templateId]);
 
   const createDocument = async () => {
     setCreating(true);
@@ -42,20 +76,11 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
         preFillData.tenant_email = data.guestEmail;
       }
 
-      // Get guest fields for reference
-      const guestFields = data.detectedFields
-        .filter((f) => f.filled_by === "guest")
-        .map((f) => ({
-          api_id: f.api_id,
-          label: f.label,
-          type: f.type,
-          category: f.category,
-        }));
-
       console.log("Creating document with preFillData:", preFillData);
 
+      // Use our native signing solution
       const { data: result, error } = await supabase.functions.invoke(
-        "signwell-create-draft-document",
+        "create-document-for-signing",
         {
           body: {
             templateId: data.templateId,
@@ -65,7 +90,6 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
             propertyId: data.propertyId,
             bookingId: data.bookingId,
             preFillData,
-            guestFields,
             detectedFields: data.detectedFields,
           },
         }
@@ -75,14 +99,12 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
 
       if (result.success) {
         updateData({
-          signwellDocumentId: result.signwellDocumentId,
-          embeddedEditUrl: result.embeddedEditUrl,
           guestSigningUrl: result.guestSigningUrl,
           hostSigningUrl: result.hostSigningUrl,
         });
         toast({
           title: "Document Created & Sent!",
-          description: "Signing links have been emailed to both parties",
+          description: "Signing invitation has been emailed to the guest",
         });
       } else {
         throw new Error(result.error || "Failed to create document");
@@ -117,6 +139,10 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
     window.location.reload();
   };
 
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+  };
+
   // Get values from fieldValues
   const propertyAddress = data.fieldValues.property_address as string || "";
   const leaseStartDate = data.fieldValues.lease_start_date as string || "";
@@ -124,20 +150,96 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
   const monthlyRent = data.fieldValues.monthly_rent as string || "";
   const securityDeposit = data.fieldValues.security_deposit as string || "";
 
+  // Get filled admin fields for display
+  const filledFields = Object.entries(data.fieldValues)
+    .filter(([_, value]) => value && typeof value === "string" && value.toString().trim() !== "")
+    .map(([key, value]) => {
+      const field = data.detectedFields.find(f => f.api_id === key);
+      const labelInfo = getFieldLabelInfo(key, field?.label || key);
+      return {
+        key,
+        label: labelInfo.label,
+        value: value as string,
+      };
+    });
+
   // Get guest fields from detected fields
   const guestFields = data.detectedFields.filter((f) => f.filled_by === "guest");
   const guestFieldCategories = [...new Set(guestFields.map((f) => f.category))];
 
-  const isDocumentCreated = !!data.signwellDocumentId && !!data.guestSigningUrl;
+  const isDocumentCreated = !!data.guestSigningUrl;
 
   return (
     <div className="space-y-6">
       <div>
         <Label className="text-lg font-medium">Create & Send Document</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Review your document details and create the document for signing
+          Review your document with pre-filled values and send for signing
         </p>
       </div>
+
+      {/* Document Preview Toggle */}
+      <div className="flex gap-2">
+        <Button 
+          variant={showPreview ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setShowPreview(!showPreview)}
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          {showPreview ? "Hide Preview" : "Preview Document"}
+        </Button>
+      </div>
+
+      {/* PDF Preview */}
+      {showPreview && pdfUrl && (
+        <div className="border rounded-lg overflow-hidden bg-muted/20">
+          <div className="bg-muted p-2 flex items-center justify-between">
+            <span className="text-sm font-medium">Document Preview</span>
+            <span className="text-xs text-muted-foreground">
+              {numPages} {numPages === 1 ? "page" : "pages"}
+            </span>
+          </div>
+          <ScrollArea className="h-[400px]">
+            <div className="p-4 flex flex-col items-center gap-4">
+              <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
+                {Array.from(new Array(numPages), (_, index) => (
+                  <Page 
+                    key={`page_${index + 1}`}
+                    pageNumber={index + 1}
+                    width={500}
+                    className="shadow-lg mb-4"
+                  />
+                ))}
+              </Document>
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Pre-filled Values Summary */}
+      {filledFields.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary" />
+            <h4 className="font-medium">Pre-filled Document Values ({filledFields.length})</h4>
+          </div>
+          <div className="p-3 bg-muted/50 rounded-lg max-h-48 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {filledFields.slice(0, 12).map((field) => (
+                <div key={field.key} className="text-sm">
+                  <span className="text-muted-foreground">{field.label}:</span>{" "}
+                  <span className="font-medium">{field.value}</span>
+                </div>
+              ))}
+              {filledFields.length > 12 && (
+                <div className="text-sm text-muted-foreground italic">
+                  +{filledFields.length - 12} more fields...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
@@ -211,6 +313,9 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
       {guestFields.length > 0 && (
         <div className="space-y-2">
           <h4 className="font-medium">Guest Required Fields ({guestFields.length})</h4>
+          <p className="text-xs text-muted-foreground">
+            These fields will be completed by the guest when they sign the document
+          </p>
           <div className="flex flex-wrap gap-2">
             {guestFieldCategories.map((category) => (
               <Badge key={category} variant="outline" className="capitalize">
@@ -221,19 +326,14 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
         </div>
       )}
 
-      {/* Auto Signature Page Info */}
-      <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-        <div className="flex items-center gap-2 mb-1">
-          <Mail className="h-4 w-4 text-blue-600" />
-          <span className="font-medium text-sm text-blue-800 dark:text-blue-200">
-            Automatic Signing Process
-          </span>
-        </div>
-        <p className="text-xs text-blue-700 dark:text-blue-300">
-          SignWell will add a signature page at the end of the document. Both guest and host will 
-          receive email invitations with their signing links. No manual field placement required.
-        </p>
-      </div>
+      {/* Signing Process Info */}
+      <Alert>
+        <Mail className="h-4 w-4" />
+        <AlertDescription>
+          <strong>How signing works:</strong> The guest will receive an email with a secure link to 
+          review and sign the document. Once they sign, you'll be notified to counter-sign.
+        </AlertDescription>
+      </Alert>
 
       <Separator />
 
@@ -241,7 +341,7 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
       {!isDocumentCreated ? (
         <div className="text-center space-y-4">
           <p className="text-sm text-muted-foreground">
-            Creating the document will send signing invitations to both parties
+            Ready to send? The guest will receive a signing invitation via email.
           </p>
           <Button onClick={createDocument} disabled={creating} size="lg">
             {creating ? (
@@ -267,8 +367,8 @@ const CreateAndSendStep = ({ data, updateData, onComplete }: Props) => {
               </h4>
             </div>
             <p className="text-sm text-green-700 dark:text-green-300 mb-4">
-              Signing invitations have been sent to both parties via email. You can also share the 
-              guest signing link directly if needed.
+              A signing invitation has been sent to <strong>{data.guestEmail}</strong>. 
+              You can also share the signing link directly if needed.
             </p>
 
             <div className="space-y-3">
