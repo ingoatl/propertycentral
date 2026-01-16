@@ -83,6 +83,9 @@ import { WorkStatusBadge, WorkStatusDot, type WorkStatus } from "./WorkStatusBad
 import { LabelBadges } from "./MessageLabels";
 import { BatchActions } from "./BatchActions";
 import { QuickAssignButton } from "./QuickAssignButton";
+import { VirtualizedEmailList } from "./inbox/VirtualizedEmailList";
+import { EmailQuickFilters, type EmailQuickFilterType } from "./inbox/EmailQuickFilters";
+import { useEmailClassification, classifyEmail } from "@/hooks/useEmailClassification";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -239,6 +242,21 @@ export function InboxView() {
   const [selectedCommIndex, setSelectedCommIndex] = useState<number>(0);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Email quick filters and promotions toggle
+  const [emailQuickFilter, setEmailQuickFilter] = useState<EmailQuickFilterType>("all");
+  const [hidePromotions, setHidePromotions] = useState(false);
+  
+  // Email classification counts
+  const emailClassificationCounts = useMemo(() => {
+    const counts = { total: 0, important: 0, promotional: 0, normal: 0 };
+    filteredGmailEmails?.forEach(email => {
+      const classification = classifyEmail(email);
+      counts.total++;
+      counts[classification]++;
+    });
+    return counts;
+  }, [filteredGmailEmails]);
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
