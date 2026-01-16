@@ -91,6 +91,35 @@ serve(async (req) => {
       console.error("Failed to sync OwnerRez reviews:", syncErr);
     }
 
+    // Check how many SMS have already been sent TODAY to enforce daily limit
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    
+    const { data: todaySent, error: todayError } = await supabase
+      .from("google_review_requests")
+      .select("id")
+      .gte("permission_asked_at", todayStart.toISOString())
+      .not("permission_asked_at", "is", null);
+    
+    const sentToday = todaySent?.length || 0;
+    const remainingToday = Math.max(0, MAX_SMS_PER_RUN - sentToday);
+    
+    console.log(`Already sent ${sentToday} SMS today. Remaining quota: ${remainingToday}`);
+    
+    if (remainingToday === 0) {
+      console.log("Daily limit of 5 SMS reached. No more messages will be sent today.");
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: `Daily limit reached: ${sentToday} SMS already sent today. Max is ${MAX_SMS_PER_RUN}/day.`,
+          sentCount: 0,
+          sentToday,
+          maxPerDay: MAX_SMS_PER_RUN
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Get all reviews with phone numbers
     const { data: allReviews, error: reviewError } = await supabase
       .from("ownerrez_reviews")
@@ -150,14 +179,16 @@ serve(async (req) => {
       return !reviewDate || reviewDate < today;
     });
 
-    // Combine: today's reviews first (up to MAX), then fill with older ones
+    // Combine: today's reviews first (up to remaining quota), then fill with older ones
+    // CRITICAL: Respect the remaining daily quota
     reviewsToContact = [
-      ...todayReviews.slice(0, MAX_SMS_PER_RUN),
-      ...olderReviews.slice(0, Math.max(0, MAX_SMS_PER_RUN - todayReviews.length))
-    ].slice(0, MAX_SMS_PER_RUN);
+      ...todayReviews.slice(0, remainingToday),
+      ...olderReviews.slice(0, Math.max(0, remainingToday - todayReviews.length))
+    ].slice(0, remainingToday);
 
     console.log(`Found ${todayReviews.length} new reviews from today, ${olderReviews.length} older reviews`);
-    console.log(`Processing ${reviewsToContact.length} reviews in this batch (today's reviews prioritized)`);
+    console.log(`Processing ${reviewsToContact.length} reviews in this batch (limited by remaining quota: ${remainingToday})`);
+    console.log(`Daily send stats: ${sentToday} already sent + ${reviewsToContact.length} this batch = ${sentToday + reviewsToContact.length} total`);
 
     // Provide detailed status if no reviews to contact
     if (reviewsToContact.length === 0) {
@@ -196,7 +227,8 @@ serve(async (req) => {
       try {
         const formattedPhone = formatPhoneE164(review.guest_phone);
         const source = review.review_source || "Airbnb";
-        const message = `Thanks again for the wonderful ${source} review — it truly means a lot. Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
+        const guestName = review.guest_name || "there";
+        const message = `Hi ${guestName}! This is Anja & Ingo, your hosts with PeachHaus Group. Thanks again for the wonderful ${source} review — it truly means a lot! Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
 
         console.log(`[${i + 1}/${reviewsToContact.length}] Sending permission ask to ${formattedPhone} (${review.guest_name}) for review ${review.id}`);
 
