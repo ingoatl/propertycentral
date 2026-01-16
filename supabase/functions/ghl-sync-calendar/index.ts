@@ -369,57 +369,15 @@ serve(async (req) => {
 
       enrichedAppointments.push(enrichedApt);
 
-      // Optionally sync to discovery_calls table if it's a discovery/consultation call
-      const aptTitle = apt.title as string | undefined;
-      const titleLower = (aptTitle || "").toLowerCase();
-      const isDiscoveryCall = titleLower.includes("discovery") || titleLower.includes("consultation") || 
-                              titleLower.includes("intro") || titleLower.includes("call") ||
-                              titleLower.includes("meeting") || titleLower.includes("demo");
-
-      if (isDiscoveryCall && matchedLeadId) {
-        // Check if this event already exists in discovery_calls
-        const { data: existingCall } = await supabase
-          .from("discovery_calls")
-          .select("id")
-          .eq("lead_id", matchedLeadId)
-          .gte("scheduled_at", new Date(apt.startTime as string).toISOString())
-          .lte("scheduled_at", new Date(new Date(apt.startTime as string).getTime() + 60000).toISOString())
-          .single();
-
-        if (!existingCall) {
-          // Create discovery call entry
-          const { data: newCall, error: insertError } = await supabase
-            .from("discovery_calls")
-            .insert({
-              lead_id: matchedLeadId,
-              scheduled_at: new Date(apt.startTime as string).toISOString(),
-              status: apt.appointmentStatus === "cancelled" ? "cancelled" : "scheduled",
-              meeting_type: meetingLink ? "video" : "phone",
-              google_meet_link: meetingLink || null,
-              meeting_notes: apt.notes || `Synced from GHL Calendar: ${apt.calendarName}`,
-            })
-            .select()
-            .single();
-
-          if (insertError) {
-            console.error(`[GHL Calendar Sync] Error creating discovery call:`, insertError);
-          } else {
-            console.log(`[GHL Calendar Sync] Created discovery call for lead ${matchedLeadDetails?.name}`);
-            
-            // Auto-schedule Recall.ai bot for video calls
-            if (meetingLink && newCall?.id) {
-              try {
-                console.log(`[GHL Calendar Sync] Auto-scheduling Recall bot for new call: ${newCall.id}`);
-                await supabase.functions.invoke("recall-auto-schedule-bot", {
-                  body: { discoveryCallId: newCall.id },
-                });
-              } catch (recallError) {
-                console.error(`[GHL Calendar Sync] Failed to auto-schedule Recall bot:`, recallError);
-              }
-            }
-          }
-        }
-      }
+      // IMPORTANT: Do NOT auto-create discovery_calls from GHL sync
+      // This was causing duplicate entries when calls are booked through the native calendar modal
+      // The native booking flow (BookDiscoveryCall.tsx -> lead-calendar-webhook) already creates 
+      // discovery_calls entries. GHL sync should only DISPLAY existing GHL appointments, not create new ones.
+      // 
+      // If you need to link GHL appointments to leads, that should be done through the GHL inbound webhook
+      // when the appointment is first created, not during periodic sync.
+      
+      console.log(`[GHL Calendar Sync] Processed appointment: ${apt.title || apt.id} (read-only sync, no DB writes)`);
     }
 
     console.log(`[GHL Calendar Sync] Completed. ${enrichedAppointments.length} appointments enriched`);
