@@ -1,17 +1,18 @@
 import { ReactNode, useState, useEffect } from "react";
-import { Building2, LogOut } from "lucide-react";
+import { Building2, LogOut, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "./ProtectedRoute";
-import { FloatingChatButton } from "@/components/ai-assistant/FloatingChatButton";
+import { ChatDialog } from "@/components/ai-assistant/ChatDialog";
 import { MainNavigation } from "@/components/navigation/MainNavigation";
 import { MobileNavigation } from "@/components/navigation/MobileNavigation";
 import { QuickCommunicationButton } from "@/components/communications/QuickCommunicationButton";
 import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 import { TaskConfirmationModal } from "@/components/TaskConfirmationModal";
 import { CallRecapModal } from "@/components/CallRecapModal";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface LayoutProps {
   children: ReactNode;
@@ -21,6 +22,7 @@ const Layout = ({ children }: LayoutProps) => {
   const { user, loading, pendingApproval } = useAuth() as any;
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasUserRole, setHasUserRole] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   
   // Real-time notifications for inbound lead messages
   useLeadRealtimeMessages();
@@ -113,9 +115,30 @@ const Layout = ({ children }: LayoutProps) => {
             {/* Center: Desktop Navigation */}
             {canAccessNav && <MainNavigation isAdmin={isAdmin} />}
 
-            {/* Right side: Quick Actions + User info + Logout */}
+            {/* Right side: Quick Actions + AI Assistant + User info + Logout */}
             <div className="flex items-center gap-1 sm:gap-2">
               {canAccessNav && <QuickCommunicationButton />}
+              
+              {/* AI Assistant Button in Nav */}
+              {canAccessNav && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setAiChatOpen(true)}
+                      className="shrink-0 h-9 gap-2 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-700"
+                    >
+                      <Bot className="h-4 w-4" />
+                      <span className="hidden sm:inline">AI Assistant</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Ask questions about properties, bookings, and more</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              
               {user && (
                 <>
                   <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
@@ -138,7 +161,10 @@ const Layout = ({ children }: LayoutProps) => {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 md:py-8 text-base">{children}</main>
-      <FloatingChatButton />
+      
+      {/* AI Chat Dialog - moved from floating button to header-triggered */}
+      <ChatDialog open={aiChatOpen} onOpenChange={setAiChatOpen} />
+      
       <CallRecapModal />
       <TaskConfirmationModal />
     </div>

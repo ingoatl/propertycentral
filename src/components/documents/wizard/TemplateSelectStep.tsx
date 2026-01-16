@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Check, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { WizardData, DetectedField } from "../DocumentCreateWizard";
+import { getFieldAssignment } from "@/utils/fieldAssignment";
 
 interface Template {
   id: string;
@@ -138,29 +139,12 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
     }
   };
 
-  // Apply smart defaults: dates and certain fields should be admin by default
+  // Apply smart defaults using the field assignment utility
   const applyDefaultAssignments = (fields: DetectedField[]): DetectedField[] => {
-    const ADMIN_DEFAULT_PATTERNS = [
-      'date', 'start', 'end', 'lease', 'term', 'rent', 'deposit', 'fee',
-      'address', 'property', 'city', 'state', 'host', 'landlord', 'agent',
-      'innkeeper', 'brand', 'listing', 'agreement'
-    ];
-    
     return fields.map(field => {
-      const apiIdLower = field.api_id.toLowerCase();
-      const labelLower = field.label.toLowerCase();
-      
-      // Check if this field should default to admin
-      const shouldBeAdmin = ADMIN_DEFAULT_PATTERNS.some(pattern => 
-        apiIdLower.includes(pattern) || labelLower.includes(pattern)
-      );
-      
-      // For date fields in the 'dates' category, always default to admin
-      if (field.category === 'dates' || field.type === 'date' || shouldBeAdmin) {
-        return { ...field, filled_by: 'admin' as const };
-      }
-      
-      return field;
+      // Use the centralized field assignment logic
+      const assignedTo = getFieldAssignment(field.api_id, field.label, field.category);
+      return { ...field, filled_by: assignedTo };
     });
   };
 
