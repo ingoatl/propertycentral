@@ -152,7 +152,7 @@ const GoogleReviewsTab = () => {
         const { totalReviews, alreadyContacted, pendingStatus, optedOut } = data.stats;
         if (pendingStatus > 0) {
           toast.info(
-            `${pendingStatus} pending requests waiting. Click "Retry Pending" to send.`,
+            `${pendingStatus} pending requests - automation will send 5/day at 6-8pm EST.`,
             { duration: 5000 }
           );
         } else {
@@ -385,19 +385,7 @@ const GoogleReviewsTab = () => {
                 <RefreshCw className={`w-4 h-4 mr-1 ${runningAutomation ? "animate-spin" : ""}`} />
                 Run Now
               </Button>
-              {pendingStatusCount > 0 && (
-                <Button 
-                  variant="default" 
-                  onClick={() => runBatchAutomation(true, true)} 
-                  disabled={runningAutomation} 
-                  size="sm" 
-                  title="Retry pending requests that weren't sent"
-                  className="bg-orange-600 hover:bg-orange-700"
-                >
-                  <Send className={`w-4 h-4 mr-1 ${runningAutomation ? "animate-spin" : ""}`} />
-                  Retry {pendingStatusCount} Pending
-                </Button>
-              )}
+              {/* Removed bulk retry button - automation trickles 5/day automatically */}
             </>
           )}
           <Button variant="outline" onClick={() => sendTestSms(false)} disabled={sendingTest} size="sm">
