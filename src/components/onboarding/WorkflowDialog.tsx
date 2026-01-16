@@ -39,6 +39,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
   const [localProgress, setLocalProgress] = useState(initialProject?.progress ?? 0);
   const [localStatus, setLocalStatus] = useState(initialProject?.status ?? "pending");
   const [projectData, setProjectData] = useState<OnboardingProject | null>(initialProject);
+  const [assignedUserNames, setAssignedUserNames] = useState<Map<string, string>>(new Map());
 
   // Update showMyTasksOnly when isAdmin changes
   useEffect(() => {

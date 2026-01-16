@@ -1,5 +1,55 @@
 import { PhaseDefinition } from "@/types/onboarding";
 
+// Platform categories for Phase 7 - used for UI grouping only (not stored in DB)
+export const PLATFORM_CATEGORIES = {
+  shortTerm: {
+    title: "Core Short-Term Rental Platforms",
+    emoji: "🌐",
+    priority: "HIGH",
+    platforms: ["Airbnb", "VRBO", "Booking.com", "Homads"]
+  },
+  midTerm: {
+    title: "Mid-Term Rental Platforms",
+    emoji: "🏡",
+    priority: "HIGH",
+    platforms: ["Furnished Finder", "Zillow", "HomeSource", "CHBO (Corporate Housing by Owner)", "MidTermRentalProperties.com", "June Homes"]
+  },
+  corporate: {
+    title: "Corporate Housing & Relocation Providers",
+    emoji: "💼",
+    priority: "MEDIUM-HIGH",
+    platforms: ["NCH (National Corporate Housing)", "UCH (United Corporate Housing)", "CRU Homes", "Alacrity", "CRS Temporary Housing", "Housing Headquarters", "ALE Solutions"]
+  },
+  insurance: {
+    title: "Insurance & Claims Housing Networks",
+    emoji: "🏥",
+    priority: "MEDIUM",
+    platforms: ["Sedgwick Temporary Housing", "Homelink"]
+  },
+  niche: {
+    title: "International & Niche Platforms",
+    emoji: "🌍",
+    priority: "LOW-MEDIUM",
+    platforms: ["AROS"]
+  },
+  direct: {
+    title: "Direct Booking & Your Own Channels",
+    emoji: "📱",
+    priority: "CRITICAL",
+    platforms: ["Direct Booking Page"]
+  }
+};
+
+// Get category for a platform title
+export const getPlatformCategory = (title: string): string | null => {
+  for (const [category, data] of Object.entries(PLATFORM_CATEGORIES)) {
+    if (data.platforms.includes(title)) {
+      return category;
+    }
+  }
+  return null;
+};
+
 export const ONBOARDING_PHASES: PhaseDefinition[] = [
   {
     id: 1,
@@ -98,45 +148,33 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
     title: "Listings & Booking Platforms",
     description: "Publish property across all relevant booking channels",
     tasks: [
-      // 🌐 CORE SHORT-TERM RENTAL PLATFORMS
-      { title: "🌐 Core Short-Term Rental Platforms", field_type: "section_header", description: "Priority: HIGH | Focus: Days-weeks stays, tourists, leisure travelers" },
-      { title: "Airbnb", field_type: "text", description: "World's largest STR platform, vacation focus | Est. Time: 2-4 hours" },
-      { title: "VRBO", field_type: "text", description: "Stronger for multi-bedroom homes, coastal properties | Est. Time: 2-4 hours" },
-      { title: "Booking.com", field_type: "text", description: "Massive audience, STR + hotel listings, global reach | Est. Time: 1-2 hours" },
+      // Short-Term Rental Platforms
+      { title: "Airbnb", field_type: "text", description: "World's largest STR platform | Est. Time: 2-4 hours" },
+      { title: "VRBO", field_type: "text", description: "Stronger for multi-bedroom homes | Est. Time: 2-4 hours" },
+      { title: "Booking.com", field_type: "text", description: "Massive global audience | Est. Time: 1-2 hours" },
       { title: "Homads", field_type: "text", description: "European/international STR platform | Est. Time: 1-2 hours" },
-      
-      // 🏡 MID-TERM RENTAL PLATFORMS
-      { title: "🏡 Mid-Term Rental Platforms", field_type: "section_header", description: "Priority: HIGH | Focus: 1-12 month stays, corporate, relocations" },
-      { title: "Furnished Finder", field_type: "text", description: "#1 for nurses, medical professionals, relocations | Est. Time: 2-3 hours" },
-      { title: "Zillow", field_type: "text", description: "Allow 1-12 month lease options in listing | Est. Time: 1 hour" },
-      { title: "HomeSource", field_type: "text", description: "Mid-term furnished rentals for corporate housing & relocations | https://www.homesourcetemphousing.com | Est. Time: 2-3 hours" },
-      { title: "CHBO (Corporate Housing by Owner)", field_type: "text", description: "Connects property owners with corporate renters (1-12 months) | Est. Time: 1-2 hours" },
+      // Mid-Term Rental Platforms
+      { title: "Furnished Finder", field_type: "text", description: "#1 for nurses, medical professionals | Est. Time: 2-3 hours" },
+      { title: "Zillow", field_type: "text", description: "1-12 month lease options | Est. Time: 1 hour" },
+      { title: "HomeSource", field_type: "text", description: "Mid-term corporate housing | Est. Time: 2-3 hours" },
+      { title: "CHBO (Corporate Housing by Owner)", field_type: "text", description: "Corporate renters (1-12 months) | Est. Time: 1-2 hours" },
       { title: "MidTermRentalProperties.com", field_type: "text", description: "Mid-term rental marketplace | Est. Time: 1-2 hours" },
       { title: "June Homes", field_type: "text", description: "Furnished mid-term rentals | Est. Time: 1-2 hours" },
-      
-      // 💼 CORPORATE HOUSING & RELOCATION PROVIDERS
-      { title: "💼 Corporate Housing & Relocation Providers", field_type: "section_header", description: "Priority: MEDIUM-HIGH | Focus: Relocating professionals, corporate clients" },
-      { title: "NCH (National Corporate Housing)", field_type: "text", description: "Nationwide corporate housing provider | Est. Time: 1-2 hours" },
-      { title: "UCH (United Corporate Housing)", field_type: "text", description: "Nationwide corporate housing, relocation specialists | Est. Time: 2-3 hours" },
+      // Corporate Housing Providers
+      { title: "NCH (National Corporate Housing)", field_type: "text", description: "Nationwide corporate housing | Est. Time: 1-2 hours" },
+      { title: "UCH (United Corporate Housing)", field_type: "text", description: "Relocation specialists | Est. Time: 2-3 hours" },
       { title: "CRU Homes", field_type: "text", description: "Corporate relocation housing | Est. Time: 1-2 hours" },
-      { title: "Alacrity", field_type: "text", description: "Insurance claim housing partnerships, corporate relocation | Est. Time: 1-2 hours" },
-      { title: "CRS Temporary Housing", field_type: "text", description: "Corporate relocation & temporary housing coordinator | Est. Time: 1-2 hours" },
-      { title: "Housing Headquarters", field_type: "text", description: "Relocation services, temporary housing marketplace | Est. Time: 1-2 hours" },
-      { title: "ALE Solutions", field_type: "text", description: "Corporate housing solutions provider | Est. Time: 1-2 hours" },
-      
-      // 🏥 INSURANCE & CLAIMS HOUSING NETWORKS
-      { title: "🏥 Insurance & Claims Housing Networks", field_type: "section_header", description: "Priority: MEDIUM | Focus: Insurance claim holders needing temporary housing" },
-      { title: "Sedgwick Temporary Housing", field_type: "text", description: "Insurance claim housing, disaster relief, property damage temporary housing | Est. Time: 2-3 hours" },
-      { title: "Homelink", field_type: "text", description: "Insurance claim housing network | https://homelinkhelps.com/ | Est. Time: 1-2 hours" },
-      
-      // 🌍 INTERNATIONAL & NICHE PLATFORMS
-      { title: "🌍 International & Niche Platforms", field_type: "section_header", description: "Priority: LOW-MEDIUM | Focus: Specific markets, unique channels" },
-      { title: "Mobile", field_type: "text", description: "International/niche platform | Est. Time: 1-2 hours" },
-      { title: "AROS", field_type: "text", description: "Verify platform type and market segment before listing | Est. Time: TBD" },
-      
-      // 📱 DIRECT BOOKING & YOUR OWN CHANNELS
-      { title: "📱 Direct Booking & Your Own Channels", field_type: "section_header", description: "Priority: CRITICAL | Focus: Your brand, direct booking, no commission" },
-      { title: "Direct Booking Page", field_type: "text", description: "Your own website (highest profit margin, no commissions) | Est. Time: 4-6 hours" },
+      { title: "Alacrity", field_type: "text", description: "Insurance claim housing partnerships | Est. Time: 1-2 hours" },
+      { title: "CRS Temporary Housing", field_type: "text", description: "Corporate relocation coordinator | Est. Time: 1-2 hours" },
+      { title: "Housing Headquarters", field_type: "text", description: "Relocation services marketplace | Est. Time: 1-2 hours" },
+      { title: "ALE Solutions", field_type: "text", description: "Corporate housing solutions | Est. Time: 1-2 hours" },
+      // Insurance Housing
+      { title: "Sedgwick Temporary Housing", field_type: "text", description: "Insurance claim housing, disaster relief | Est. Time: 2-3 hours" },
+      { title: "Homelink", field_type: "text", description: "Insurance claim housing network | Est. Time: 1-2 hours" },
+      // Niche
+      { title: "AROS", field_type: "text", description: "Verify platform type before listing | Est. Time: TBD" },
+      // Direct Booking
+      { title: "Direct Booking Page", field_type: "text", description: "Your own website (no commissions) | Est. Time: 4-6 hours" },
     ]
   },
   {
