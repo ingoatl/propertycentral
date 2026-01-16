@@ -2050,7 +2050,7 @@ export type Database = {
           {
             foreignKeyName: "google_review_requests_review_id_fkey"
             columns: ["review_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "ownerrez_reviews"
             referencedColumns: ["id"]
           },
