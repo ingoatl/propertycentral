@@ -194,11 +194,11 @@ const GoogleReviewsTab = () => {
           .in("message_type", ["inbound_reply", "inbound_opt_out", "inbound_resubscribe", "inbound_unmatched", "inbound_unmatched_reviews"])
           .order("created_at", { ascending: false })
           .limit(50),
-        // Fetch sent messages for the Sent tab
+        // Fetch sent messages for the Sent tab - updated message types to match actual DB values
         supabase
           .from("sms_log")
           .select("*")
-          .in("message_type", ["permission_request", "link_delivery", "review_text", "nudge", "test"])
+          .in("message_type", ["permission_ask", "link_delivery", "review_text", "nudge", "test"])
           .order("created_at", { ascending: false })
           .limit(100),
       ]);
@@ -565,7 +565,7 @@ const GoogleReviewsTab = () => {
                     
                     const getMessageTypeLabel = (type: string) => {
                       switch (type) {
-                        case "permission_request": return "Permission Ask";
+                        case "permission_ask": return "Permission Ask";
                         case "link_delivery": return "Link Sent";
                         case "review_text": return "Review Text";
                         case "nudge": return "Nudge";
