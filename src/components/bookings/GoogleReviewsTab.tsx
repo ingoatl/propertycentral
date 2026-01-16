@@ -136,11 +136,11 @@ const GoogleReviewsTab = () => {
     }
   };
 
-  const runBatchAutomation = async (forceRun: boolean = true) => {
+  const runBatchAutomation = async (forceRun: boolean = true, retryPending: boolean = false) => {
     try {
       setRunningAutomation(true);
       const { data, error } = await supabase.functions.invoke("google-review-batch-sender", {
-        body: { forceRun }
+        body: { forceRun, retryPending }
       });
       
       if (error) throw error;
@@ -148,12 +148,19 @@ const GoogleReviewsTab = () => {
       if (data?.sentCount > 0) {
         toast.success(`Sent ${data.sentCount} permission SMS(s)!`);
       } else if (data?.stats) {
-        // Show detailed status
+        // Show detailed status with actionable info
         const { totalReviews, alreadyContacted, pendingStatus, optedOut } = data.stats;
-        toast.info(
-          `All ${totalReviews} reviews already contacted. ${alreadyContacted} requests exist. Sync new reviews from OwnerRez.`,
-          { duration: 5000 }
-        );
+        if (pendingStatus > 0) {
+          toast.info(
+            `${pendingStatus} pending requests waiting. Click "Retry Pending" to send.`,
+            { duration: 5000 }
+          );
+        } else {
+          toast.info(
+            `All ${totalReviews} reviews already contacted. Sync new reviews from OwnerRez.`,
+            { duration: 5000 }
+          );
+        }
       } else if (data?.message?.includes("Outside send window")) {
         toast.info("Outside send window (11am-3pm EST). Click 'Run Now' to force send.");
       } else {
@@ -332,6 +339,7 @@ const GoogleReviewsTab = () => {
   // Stats
   const totalReviews = reviews.filter(r => r.guest_phone).length;
   const pendingOutreach = reviews.filter(r => r.guest_phone && !getRequestForReview(r.id)).length;
+  const pendingStatusCount = requests.filter(r => r.workflow_status === "pending" && !r.opted_out).length;
   const permissionAsked = requests.filter(r => r.workflow_status === "permission_asked" && !r.opted_out).length;
   const completedCount = requests.filter(r => r.workflow_status === "completed").length;
   const optedOutCount = requests.filter(r => r.opted_out).length;
@@ -372,10 +380,25 @@ const GoogleReviewsTab = () => {
             )}
           </Button>
           {!campaignPaused && (
-            <Button variant="outline" onClick={() => runBatchAutomation(true)} disabled={runningAutomation} size="sm" title="Manually run batch sender">
-              <RefreshCw className={`w-4 h-4 mr-1 ${runningAutomation ? "animate-spin" : ""}`} />
-              Run Now
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => runBatchAutomation(true, false)} disabled={runningAutomation} size="sm" title="Send to new reviews">
+                <RefreshCw className={`w-4 h-4 mr-1 ${runningAutomation ? "animate-spin" : ""}`} />
+                Run Now
+              </Button>
+              {pendingStatusCount > 0 && (
+                <Button 
+                  variant="default" 
+                  onClick={() => runBatchAutomation(true, true)} 
+                  disabled={runningAutomation} 
+                  size="sm" 
+                  title="Retry pending requests that weren't sent"
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  <Send className={`w-4 h-4 mr-1 ${runningAutomation ? "animate-spin" : ""}`} />
+                  Retry {pendingStatusCount} Pending
+                </Button>
+              )}
+            </>
           )}
           <Button variant="outline" onClick={() => sendTestSms(false)} disabled={sendingTest} size="sm">
             <Send className={`w-4 h-4 mr-1 ${sendingTest ? "animate-pulse" : ""}`} />
@@ -388,7 +411,7 @@ const GoogleReviewsTab = () => {
       </div>
 
       {/* Quick Stats Bar */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-6 gap-2">
         <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-center border border-amber-200 dark:border-amber-800">
           <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{totalReviews}</div>
           <div className="text-xs text-amber-600">5-Star</div>
@@ -396,6 +419,10 @@ const GoogleReviewsTab = () => {
         <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-center border border-blue-200 dark:border-blue-800">
           <div className="text-xl font-bold text-blue-700 dark:text-blue-400">{pendingOutreach}</div>
           <div className="text-xs text-blue-600">Ready</div>
+        </div>
+        <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg text-center border border-orange-200 dark:border-orange-800">
+          <div className="text-xl font-bold text-orange-700 dark:text-orange-400">{pendingStatusCount}</div>
+          <div className="text-xs text-orange-600">Pending</div>
         </div>
         <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg text-center border border-purple-200 dark:border-purple-800">
           <div className="text-xl font-bold text-purple-700 dark:text-purple-400">{permissionAsked}</div>
