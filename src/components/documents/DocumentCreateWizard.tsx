@@ -2,12 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, ChevronRight, FileText, Building, User, Edit, CheckCircle, ToggleLeft, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, User, Edit, CheckCircle, Send } from "lucide-react";
 import TemplateSelectStep from "./wizard/TemplateSelectStep";
-import PropertyLinkStep from "./wizard/PropertyLinkStep";
 import GuestInfoStep from "./wizard/GuestInfoStep";
-import AssignFieldsStep from "./wizard/AssignFieldsStep";
-import PreFillFieldsStep from "./wizard/PreFillFieldsStep";
+import FillDocumentStep from "./wizard/FillDocumentStep";
 import CreateAndSendStep from "./wizard/CreateAndSendStep";
 
 export interface DetectedField {
@@ -45,13 +43,12 @@ export interface WizardData {
   importedFields: string[];
 }
 
+// Streamlined 4-step wizard
 const STEPS = [
   { id: 1, title: "Select Template", icon: FileText },
-  { id: 2, title: "Link Property", icon: Building },
-  { id: 3, title: "Guest Info", icon: User },
-  { id: 4, title: "Assign Fields", icon: ToggleLeft },
-  { id: 5, title: "Fill Values", icon: Edit },
-  { id: 6, title: "Create & Send", icon: Send },
+  { id: 2, title: "Guest Info", icon: User },
+  { id: 3, title: "Fill & Review", icon: Edit },
+  { id: 4, title: "Create & Send", icon: Send },
 ];
 
 const DocumentCreateWizard = () => {
@@ -85,14 +82,10 @@ const DocumentCreateWizard = () => {
       case 1:
         return !!wizardData.templateId;
       case 2:
-        return true; // Property link is optional
-      case 3:
         return wizardData.guestName.trim() !== "" && wizardData.guestEmail.trim() !== "";
+      case 3:
+        return true; // Fill & Review - always can proceed
       case 4:
-        return true; // Assign fields - always can proceed
-      case 5:
-        return true; // Pre-fill is optional
-      case 6:
         return true; // Create & Send step - handled internally
       default:
         return false;
@@ -104,14 +97,10 @@ const DocumentCreateWizard = () => {
       case 1:
         return <TemplateSelectStep data={wizardData} updateData={updateWizardData} />;
       case 2:
-        return <PropertyLinkStep data={wizardData} updateData={updateWizardData} />;
-      case 3:
         return <GuestInfoStep data={wizardData} updateData={updateWizardData} />;
+      case 3:
+        return <FillDocumentStep data={wizardData} updateData={updateWizardData} />;
       case 4:
-        return <AssignFieldsStep data={wizardData} updateData={updateWizardData} />;
-      case 5:
-        return <PreFillFieldsStep data={wizardData} updateData={updateWizardData} />;
-      case 6:
         return <CreateAndSendStep data={wizardData} updateData={updateWizardData} onComplete={() => setCurrentStep(1)} />;
       default:
         return null;

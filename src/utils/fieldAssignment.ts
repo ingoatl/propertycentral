@@ -339,14 +339,38 @@ export const FIELD_ASSIGNMENT_RULES: FieldAssignmentRule[] = [
     filledBy: 'tenant',
     reason: 'Tenant initials each page when signing',
   },
+  
+  // Print Name fields - Tenant fills
+  {
+    exactMatch: ['print_name', 'printed_name', 'name_printed', 'tenant_print_name'],
+    patterns: ['print name', 'printed name', 'name print'],
+    filledBy: 'tenant',
+    reason: 'Tenant prints their name when signing',
+  },
+  
+  // Signature Date fields - Tenant fills
+  {
+    exactMatch: ['signature_date', 'date_signed', 'signing_date_tenant'],
+    patterns: ['signature date', 'date signed'],
+    filledBy: 'tenant',
+    reason: 'Tenant enters date when signing',
+  },
 ];
 
 /**
- * Signature field rules - these are handled separately
+ * Signature field rules - Priority 3 fix
+ * ANY field with "Signature" → Tenant (unless specifically landlord/host)
+ * ANY field with "Print Name" or "Initial" → Tenant
+ * Only "Landlord Signature" or "Property Manager Signature" → Admin
  */
 export const SIGNATURE_ASSIGNMENT_RULES = {
-  tenantSignatures: ['tenant', 'lessee', 'renter', 'guest', 'occupant'],
-  adminSignatures: ['landlord', 'lessor', 'owner', 'manager', 'agent', 'innkeeper', 'host', 'admin'],
+  // Only these specific patterns should be Admin signatures
+  adminSignaturePatterns: ['landlord signature', 'lessor signature', 'owner signature', 
+    'manager signature', 'host signature', 'property manager signature', 'agent signature',
+    'landlord_signature', 'lessor_signature', 'owner_signature', 'manager_signature',
+    'host_signature', 'property_manager_signature', 'agent_signature'],
+  // Everything else with signature/initial/print name → Tenant
+  tenantPatterns: ['signature', 'sign', 'initial', 'print name', 'printed name'],
 };
 
 /**
@@ -357,14 +381,25 @@ export function getFieldAssignment(apiId: string, label: string, category?: stri
   const apiIdNormalized = apiIdLower.replace(/[_\-\.]/g, '');
   const labelLower = label.toLowerCase();
   const labelNormalized = labelLower.replace(/\s+/g, '');
+  const combined = `${apiIdLower} ${labelLower}`;
 
-  // Check for signature fields first
-  if (category === 'signature' || apiIdLower.includes('signature') || apiIdLower.includes('sign')) {
-    // Determine if it's a tenant or admin signature
-    const isTenantSig = SIGNATURE_ASSIGNMENT_RULES.tenantSignatures.some(
-      pattern => apiIdLower.includes(pattern) || labelLower.includes(pattern)
-    );
-    return isTenantSig ? 'tenant' : 'admin';
+  // Priority 3 Fix: Handle signature/initial/print name fields
+  // First check if it's specifically an ADMIN signature
+  const isAdminSignature = SIGNATURE_ASSIGNMENT_RULES.adminSignaturePatterns.some(
+    pattern => combined.includes(pattern.replace(/_/g, '')) || combined.includes(pattern.replace(/_/g, ' '))
+  );
+  
+  if (isAdminSignature) {
+    return 'admin';
+  }
+
+  // Then check if it's ANY signature, initial, or print name field → Tenant
+  const isTenantSignField = SIGNATURE_ASSIGNMENT_RULES.tenantPatterns.some(
+    pattern => combined.includes(pattern)
+  );
+  
+  if (isTenantSignField || category === 'signature') {
+    return 'tenant';
   }
 
   // Check each rule in order
