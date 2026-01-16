@@ -6,100 +6,297 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Advanced conversational UX guidelines for human-like AI communication
+// Scheduling link for discovery calls
+const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
+
+// ==========================================
+// PEACHHAUS COMPANY KNOWLEDGE BASE
+// ==========================================
+const companyKnowledge = `
+COMPANY: PeachHaus Group
+WEBSITE: www.peachhausgroup.com
+BUSINESS: Premium mid-term rental property management in Atlanta, Georgia
+
+DISCOVERY CALL BOOKING LINK: ${SCHEDULING_LINK}
+- Use this link when scheduling calls with leads or owners
+- Present it as a helpful next step, not pushy sales
+
+KEY SERVICES:
+1. Mid-Term Rental Management (30-365 day stays)
+   - Full-service property management
+   - Guest screening and placement
+   - 24/7 guest support
+   - Professional cleaning coordination
+   - Maintenance management
+
+2. Owner Reports & Statements
+   - Monthly income/expense reports sent to owners
+   - Year-to-date performance summaries
+   - Detailed transaction breakdowns
+   - Reports are delivered via email as PDFs
+
+3. Property Onboarding
+   - Professional photography
+   - Listing optimization
+   - Pricing strategy
+   - Market analysis
+
+CONTACT INFO:
+- Email: info@peachhausgroup.com
+- Website: www.peachhausgroup.com
+- Phone: (404) 800-5932
+- Office hours: Monday-Friday 9am-6pm EST
+
+BRAND VOICE:
+- Professional yet warm
+- Knowledgeable and trustworthy
+- Atlanta local expertise
+- Solutions-focused
+- Relationship-driven
+- NOT pushy or sales-y
+`;
+
+// ==========================================
+// INTELLIGENT INTENT DETECTION PATTERNS
+// ==========================================
+interface DetectedIntent {
+  // Meeting/Call Related
+  wantsLiveDiscussion: boolean;
+  wantsToScheduleCall: boolean;
+  wantsCallback: boolean;
+  mentionsCall: boolean;
+  
+  // Report/Document Related
+  asksAboutReports: boolean;
+  asksAboutStatements: boolean;
+  wantsToReviewNumbers: boolean;
+  mentionsIncome: boolean;
+  
+  // Question Types
+  isQuestion: boolean;
+  askingHow: boolean;
+  askingWhen: boolean;
+  askingWhy: boolean;
+  
+  // Emotional/Urgency
+  isUrgent: boolean;
+  isFrustrated: boolean;
+  isThankful: boolean;
+  isConfused: boolean;
+  
+  // Owner Financial
+  isPaymentInquiry: boolean;
+  isPaymentConfirmation: boolean;
+  isPaymentIssue: boolean;
+  isPayoutInquiry: boolean;
+  isCardUpdate: boolean;
+  
+  // Action Requests
+  wantsUpdate: boolean;
+  wantsConfirmation: boolean;
+  needsHelp: boolean;
+  
+  // Summary
+  primaryIntent: string;
+  suggestedAction: string;
+}
+
+function detectIntent(message: string): DetectedIntent {
+  const msgLower = message.toLowerCase();
+  const msgClean = msgLower.replace(/[^\w\s]/g, ' ');
+  
+  // Meeting/Call Related Patterns
+  const wantsLiveDiscussion = /\b(discuss live|talk live|speak live|meet live|live discussion|live chat|discuss this live|want to discuss|like to discuss|discuss.*live)\b/i.test(msgLower) ||
+    /\b(yes.*(discuss|talk|call|chat|meet|speak))\b/i.test(msgLower) ||
+    /\b(would like to (discuss|talk|chat|speak|meet))\b/i.test(msgLower) ||
+    /\b(can we (discuss|talk|chat|speak|meet|hop on))\b/i.test(msgLower);
+  
+  const wantsToScheduleCall = /\b(schedule.*(call|meeting|chat)|set up.*(call|meeting|time)|book.*(call|time|meeting)|calendar invite|when.*available|what time works)\b/i.test(msgLower);
+  
+  const wantsCallback = /\b(call me|call back|give.*(call|ring)|reach me at|phone me)\b/i.test(msgLower);
+  
+  const mentionsCall = /\b(call|phone|meeting|zoom|video|chat live)\b/i.test(msgLower);
+  
+  // Report/Document Related
+  const asksAboutReports = /\b(report|reports|income report|expense report|monthly report|statement|statements)\b/i.test(msgLower);
+  const asksAboutStatements = /\b(statement|owner statement|monthly statement|income statement)\b/i.test(msgLower);
+  const wantsToReviewNumbers = /\b(review.*(numbers|report|income|expenses)|go.*(over|through).*(numbers|report|income)|walk.*through|understand.*(numbers|report|income))\b/i.test(msgLower);
+  const mentionsIncome = /\b(income|revenue|earnings|rent|rental income|profit|expenses)\b/i.test(msgLower);
+  
+  // Question Detection
+  const isQuestion = msgLower.includes("?") || /^(how|what|when|where|why|who|can|could|would|is|are|do|does|did|will|should)\b/.test(msgClean);
+  const askingHow = /\b(how (do|does|can|should|would|to))\b/i.test(msgLower);
+  const askingWhen = /\b(when (will|can|do|does|should|is|are))\b/i.test(msgLower);
+  const askingWhy = /\b(why (is|are|do|does|did|would|should|was|were))\b/i.test(msgLower);
+  
+  // Emotional/Urgency Detection
+  const isUrgent = /\b(urgent|urgently|asap|immediately|emergency|right away|critical|time.sensitive)\b/i.test(msgLower);
+  const isFrustrated = /\b(still waiting|no response|frustrated|disappointed|upset|unacceptable|haven't heard|what's going on|why haven't)\b/i.test(msgLower);
+  const isThankful = /\b(thank|thanks|appreciate|grateful|great job|awesome|wonderful|excellent)\b/i.test(msgLower);
+  const isConfused = /\b(confused|don't understand|not sure|unclear|explain|what does|what is this)\b/i.test(msgLower);
+  
+  // Owner Financial Intent
+  const isPaymentInquiry = /\b(payment|charge|bill|invoice|fee|cost|how much|owe|balance|amount due)\b/i.test(msgLower);
+  const isPaymentConfirmation = /\b(paid|sent payment|made payment|transferred|completed payment|just paid)\b/i.test(msgLower);
+  const isPaymentIssue = /\b(declined|failed|error|wrong charge|overcharge|dispute|incorrect|issue with payment)\b/i.test(msgLower);
+  const isPayoutInquiry = /\b(payout|distribution|my money|deposit|when.*paid|owner distribution|my payment)\b/i.test(msgLower);
+  const isCardUpdate = /\b(update.*card|new card|change.*payment|expired.*card|update payment|change card)\b/i.test(msgLower);
+  
+  // Action Requests
+  const wantsUpdate = /\b(update|status|progress|where are we|what's happening|any news|any update)\b/i.test(msgLower);
+  const wantsConfirmation = /\b(confirm|confirmation|verify|make sure|can you confirm|is this right)\b/i.test(msgLower);
+  const needsHelp = /\b(help|assist|support|need help|can you help|having trouble|problem)\b/i.test(msgLower);
+  
+  // Determine Primary Intent
+  let primaryIntent = "general_response";
+  let suggestedAction = "reply_normally";
+  
+  if (wantsLiveDiscussion || wantsToScheduleCall || wantsCallback) {
+    primaryIntent = "wants_meeting";
+    suggestedAction = "send_calendar_link";
+  } else if (wantsToReviewNumbers && (asksAboutReports || mentionsIncome)) {
+    primaryIntent = "wants_to_review_reports";
+    suggestedAction = "offer_walkthrough_call";
+  } else if (asksAboutReports || asksAboutStatements) {
+    primaryIntent = "asking_about_reports";
+    suggestedAction = "explain_reports_offer_call";
+  } else if (isPaymentInquiry || isPaymentIssue) {
+    primaryIntent = "payment_question";
+    suggestedAction = "check_payment_status";
+  } else if (isPayoutInquiry) {
+    primaryIntent = "payout_question";
+    suggestedAction = "check_payout_status";
+  } else if (isCardUpdate) {
+    primaryIntent = "card_update_request";
+    suggestedAction = "send_payment_update_link";
+  } else if (isUrgent) {
+    primaryIntent = "urgent_matter";
+    suggestedAction = "prioritize_response";
+  } else if (isFrustrated) {
+    primaryIntent = "frustrated_customer";
+    suggestedAction = "empathize_then_solve";
+  } else if (isQuestion) {
+    primaryIntent = "asking_question";
+    suggestedAction = "answer_directly";
+  } else if (isThankful) {
+    primaryIntent = "expressing_gratitude";
+    suggestedAction = "acknowledge_warmly";
+  }
+  
+  return {
+    wantsLiveDiscussion,
+    wantsToScheduleCall,
+    wantsCallback,
+    mentionsCall,
+    asksAboutReports,
+    asksAboutStatements,
+    wantsToReviewNumbers,
+    mentionsIncome,
+    isQuestion,
+    askingHow,
+    askingWhen,
+    askingWhy,
+    isUrgent,
+    isFrustrated,
+    isThankful,
+    isConfused,
+    isPaymentInquiry,
+    isPaymentConfirmation,
+    isPaymentIssue,
+    isPayoutInquiry,
+    isCardUpdate,
+    wantsUpdate,
+    wantsConfirmation,
+    needsHelp,
+    primaryIntent,
+    suggestedAction,
+  };
+}
+
+// ==========================================
+// INTELLIGENT RESPONSE GUIDELINES
+// ==========================================
 const humanLikeGuidelines = `
-PROFESSIONAL COMMUNICATION ASSISTANT - STRICT RULES:
+PROFESSIONAL COMMUNICATION ASSISTANT - INTELLIGENT RESPONSE SYSTEM
 
-RULE 1: CONTEXT FIRST - ALWAYS
-- Read and directly respond to THEIR MOST RECENT MESSAGE - this is your primary focus
-- Consider the FULL conversation history to avoid repeating information or making irrelevant suggestions
-- Never reference things they didn't mention (calls, attachments, promises, meetings)
-- If they mentioned a specific topic (insurance, HOA docs, contracts), address THAT specifically
+CRITICAL RULE: ACTUALLY READ AND UNDERSTAND THEIR MESSAGE
+- Your #1 job is to respond to what they ACTUALLY said
+- If they say "Yes I would like to discuss live" → OFFER TO SCHEDULE A CALL
+- If they ask about reports → EXPLAIN and offer to walk through them
+- NEVER give generic responses that ignore their specific request
 
-RULE 2: LEAD STAGE AWARENESS - CRITICAL
-- If client is a LEAD who has NOT signed a contract:
-  → You MAY suggest a call IF it's relevant to their message
-  → Be helpful and informative, not pushy
-- If client is reviewing documents, insurance, or contracts:
-  → DO NOT push a call unless THEY request it
-  → Focus on answering their questions and giving them time
-- Once a contract is SIGNED (owner status):
-  → NEVER suggest sales-style calls
-  → Be a helpful partner, not a salesperson
+RULE 1: INTENT-BASED RESPONSE MAPPING
+When they want to talk/meet/discuss:
+→ "Great! Here's my calendar link to book a time that works: ${SCHEDULING_LINK}"
+→ Or: "Happy to chat! When works best for you? I can also send a calendar invite."
 
-RULE 3: NO ASSUMPTIONS - EVER
-- NEVER claim something was "promised," "attached," "discussed," or "sent" unless the conversation history proves it
-- NEVER reference a call that didn't happen
-- NEVER say "As promised" or "Great speaking with you earlier" unless there's evidence of that
-- If you don't know something, DON'T make it up
+When they ask about reports/income/statements:
+→ Acknowledge the reports are ready/sent
+→ Offer to walk through them together: "Want to hop on a quick call to go through them?"
+
+When they confirm something positive (yes, sounds good, looks great):
+→ Move to the logical next step
+→ Be proactive about what comes next
+
+When they have questions:
+→ Answer the question DIRECTLY first
+→ Then offer additional help if needed
+
+RULE 2: CONTEXT AWARENESS
+- Read the FULL conversation history
+- If we recently sent reports → acknowledge that context
+- If there's been back-and-forth about a topic → continue that thread
+- Never start fresh when there's existing context
+
+RULE 3: LEAD vs OWNER AWARENESS
+LEADS (not yet signed):
+- Can suggest discovery calls when relevant
+- Offer free income analysis
+- Be helpful and informative
+
+OWNERS (already signed):
+- NEVER suggest sales calls
+- Focus on service: reports, payouts, maintenance, etc.
+- Proactively offer to explain or walk through things
 
 RULE 4: TONE & STYLE
-- Sound like a real, attentive human who actually read their message
-- Professional, calm, and helpful - NEVER salesy
-- Match the client's tone and level of formality
-- Keep responses concise but thoughtful
+- Sound like a real human who actually read their message
+- Use their name
+- Be warm, efficient, direct
+- Match their energy level
 
-RULE 5: ACTION-ORIENTED BUT RESPECTFUL
-- Acknowledge what they ACTUALLY said (be specific)
-- Address their ACTUAL concerns clearly
-- Offer the next logical step WITHOUT pressure
-- If they need time, give them time gracefully
+RULE 5: CHANNEL AWARENESS
+- SMS: Short, direct, 160 chars ideal, 280 max
+- Email: 2-3 short paragraphs max
 
-RULE 6: CHANNEL AWARENESS
-- Emails: clear paragraphs, polite closing, 2-3 short paragraphs max
-- SMS: short, friendly, direct - 160 chars ideal, 280 max
+RULE 6: FINANCIAL CONTEXT (FOR OWNERS)
+- If they have outstanding balance → mention it when relevant
+- If no payment method → guide them to set one up
+- If asking about payouts → give specific amounts/dates
+- NEVER guess numbers - use only what you're given
 
-BANNED PHRASES (sound robotic/corporate):
-❌ "Just checking in" / "Just wanted to touch base"
-❌ "I hope this email finds you well"
+RULE 7: COMMON SENSE ACTIONS
+When someone says they want to discuss something:
+→ SCHEDULE A CALL (send calendar link or offer times)
+
+When reports are mentioned and they want to review:
+→ OFFER A WALKTHROUGH CALL
+
+When they're confused:
+→ EXPLAIN CLEARLY then offer to discuss live
+
+When something is urgent:
+→ ACKNOWLEDGE URGENCY and respond promptly
+
+BANNED PHRASES:
+❌ "Just checking in"
+❌ "I hope this finds you well"
 ❌ "Please don't hesitate to reach out"
 ❌ "At your earliest convenience"
-❌ "Per our conversation" / "As per your request"
-❌ "As promised" (unless you actually promised something)
-❌ "Great speaking with you earlier" (unless you actually spoke)
-❌ "We apologize for any inconvenience"
-❌ "Thank you for your patience"
-❌ "It would be my pleasure to assist you"
+❌ "Per our conversation"
+❌ Generic platitudes that ignore their specific message
 
-NATURAL ALTERNATIVES:
-Instead of → Use:
-"I apologize for the delay" → "Sorry for the slow reply"
-"Please find attached" → "I've attached" or "Here's"
-"Do not hesitate to contact me" → "Just let me know"
-"I would like to inform you" → "Wanted to let you know"
-"Thank you for reaching out" → "Thanks for the message" or skip it entirely
-
-RESPONSE STRUCTURE BY WHAT THEY SAID:
-- Question → Answer it directly first
-
-RULE 7: FINANCIAL STATUS AWARENESS (FOR OWNERS ONLY)
-- If owner has outstanding balance AND mentions payment:
-  → Acknowledge the balance naturally: "I see the $X balance from [date]..."
-  → If they say they paid: "Let me check on that payment..."
-  
-- If owner has NO payment method AND asks about charges:
-  → Gently guide: "I'll need to set up a card on file first. I can send you a secure link."
-  → NEVER assume they have a card if they don't
-
-- If owner asks about payouts with pending amount:
-  → Be specific: "You have $X pending, scheduled for..."
-  
-RULE 8: OWNER INTENT-BASED RESPONSES
-- Payment confirmation ("I just paid"):
-  → Check actual payment status before confirming
-  → If no recent payment found: "Let me verify that - which method did you use?"
-  
-- Payment inquiry ("how much do I owe"):
-  → Provide exact balance with breakdown if possible
-  
-- Payout inquiry ("when will I get paid"):
-  → Reference actual pending amounts and schedule
-  
-- Card update request:
-  → Offer to send a secure update link
-- Concern → Acknowledge it specifically
-- Information shared (HOA doc, insurance research) → Thank them, confirm you received it
-- Need more time → Respect it gracefully
+REQUIRED: ALWAYS SIGN AS "- Ingo"
 `;
 
 serve(async (req) => {
@@ -147,6 +344,7 @@ serve(async (req) => {
     let fullContext = "";
     let commHistory = "";
     let contactMemories = "";
+    let recentActivity = "";
 
     // Build contact identifier and fetch memories from Mem0
     let contactIdentifier = "";
@@ -173,23 +371,12 @@ serve(async (req) => {
           
           if (memories.length > 0) {
             contactMemories = "\n\nREMEMBERED ABOUT THIS CONTACT:\n";
-            const grouped: Record<string, string[]> = {};
-            
             for (const m of memories) {
-              const category = m.metadata?.category || "general";
               const memory = m.memory || m.text || m.content;
               if (memory) {
-                if (!grouped[category]) grouped[category] = [];
-                grouped[category].push(memory);
+                contactMemories += `- ${memory}\n`;
               }
             }
-            
-            for (const [category, items] of Object.entries(grouped)) {
-              for (const item of items) {
-                contactMemories += `- ${item}\n`;
-              }
-            }
-            
             contactMemories += "\nUse this to personalize the response naturally.\n";
             console.log(`Loaded ${memories.length} memories for draft generation`);
           }
@@ -210,83 +397,118 @@ serve(async (req) => {
         inboundMessage = comm.body || "";
         
         if (comm.leads) {
-          const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null; property_address: string | null; stage: string; ai_summary: string | null };
+          const lead = comm.leads as any;
           contactName = lead.name?.split(" ")[0] || "there";
-          fullContext = `Lead: ${lead.name}\nPhone: ${lead.phone || "N/A"}\nEmail: ${lead.email || "N/A"}\nProperty: ${lead.property_address || "N/A"}\nStage: ${lead.stage}`;
+          fullContext = `Contact Type: LEAD (has NOT signed contract yet)\nName: ${lead.name}\nPhone: ${lead.phone || "N/A"}\nEmail: ${lead.email || "N/A"}\nProperty: ${lead.property_address || "N/A"}\nStage: ${lead.stage}`;
           if (lead.ai_summary) fullContext += `\nNotes: ${lead.ai_summary}`;
-        } else if (comm.property_owners) {
-          const owner = comm.property_owners as { id: string; name: string; email: string | null; phone: string | null };
-          contactName = owner.name?.split(" ")[0] || "there";
-        fullContext = `Owner: ${owner.name}\nEmail: ${owner.email || "N/A"}\nPhone: ${owner.phone || "N/A"}`;
-        
-        // Fetch financial context for owners
-        try {
-          const financialResponse = await fetch(`${supabaseUrl}/functions/v1/get-owner-financial-context`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${supabaseServiceKey}`,
-            },
-            body: JSON.stringify({ ownerId: owner.id }),
-          });
           
-          if (financialResponse.ok) {
-            const finContext = await financialResponse.json();
+          // Fetch recent lead activities for context
+          try {
+            const { data: timeline } = await supabase
+              .from("lead_timeline")
+              .select("event_type, event_data, created_at")
+              .eq("lead_id", lead.id)
+              .order("created_at", { ascending: false })
+              .limit(5);
             
-            fullContext += "\n\n--- OWNER FINANCIAL STATUS ---";
-            
-            // Payment method status
-            if (finContext.hasPaymentMethod) {
-              fullContext += `\n✅ Card on file: ${finContext.paymentMethodBrand || finContext.paymentMethodType} ending in ${finContext.paymentMethodLast4}`;
-              if (finContext.cardExpiringSoon) {
-                fullContext += ` (⚠️ EXPIRING ${finContext.cardExpMonth}/${finContext.cardExpYear})`;
+            if (timeline && timeline.length > 0) {
+              recentActivity = "\n\nRECENT ACTIVITY FOR THIS LEAD:\n";
+              for (const event of timeline) {
+                const eventDate = new Date(event.created_at).toLocaleDateString();
+                if (event.event_type === "income_report_sent") {
+                  recentActivity += `- ${eventDate}: Income/rental analysis report was SENT to them\n`;
+                } else if (event.event_type === "discovery_call_scheduled") {
+                  recentActivity += `- ${eventDate}: Discovery call was scheduled\n`;
+                } else if (event.event_type === "email_sent") {
+                  recentActivity += `- ${eventDate}: Email was sent\n`;
+                } else if (event.event_type === "contract_sent") {
+                  recentActivity += `- ${eventDate}: Contract was sent\n`;
+                }
               }
-            } else {
-              fullContext += `\n⚠️ NO PAYMENT METHOD ON FILE - If they mention payments, guide them to set up a card`;
             }
-            
-            // Outstanding charges
-            if (finContext.hasOutstandingCharges) {
-              fullContext += `\n⚠️ Outstanding balance: $${finContext.outstandingAmount.toFixed(2)}`;
-              if (finContext.oldestUnpaidDate) {
-                fullContext += ` (since ${finContext.oldestUnpaidDate})`;
-              }
-              fullContext += `\n→ If they ask about payments, acknowledge the outstanding balance`;
-            } else {
-              fullContext += `\n✅ No outstanding charges - account is current`;
-            }
-            
-            // Pending payouts
-            if (finContext.pendingPayoutAmount > 0) {
-              fullContext += `\n💰 Pending payout: $${finContext.pendingPayoutAmount.toFixed(2)}`;
-            }
-            
-            // Payment history
-            if (finContext.lastPaymentDate) {
-              fullContext += `\nLast payment: $${finContext.lastPaymentAmount} on ${new Date(finContext.lastPaymentDate).toLocaleDateString()}`;
-            }
-            
-            // Financial health
-            fullContext += `\nAccount status: ${finContext.financialHealthScore.toUpperCase()}`;
-            if (finContext.financialHealthDetails) {
-              fullContext += ` - ${finContext.financialHealthDetails}`;
-            }
-            
-            fullContext += "\n--- END FINANCIAL STATUS ---";
-            
-            console.log("Financial context loaded for owner:", owner.id, "Health:", finContext.financialHealthScore);
+          } catch (e) {
+            console.error("Error fetching lead timeline:", e);
           }
-        } catch (finError) {
-          console.error("Error fetching financial context:", finError);
+        } else if (comm.property_owners) {
+          const owner = comm.property_owners as any;
+          contactName = owner.name?.split(" ")[0] || "there";
+          fullContext = `Contact Type: OWNER (already signed, is a client)\nName: ${owner.name}\nEmail: ${owner.email || "N/A"}\nPhone: ${owner.phone || "N/A"}`;
+          
+          // Fetch financial context for owners
+          try {
+            const financialResponse = await fetch(`${supabaseUrl}/functions/v1/get-owner-financial-context`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({ ownerId: owner.id }),
+            });
+            
+            if (financialResponse.ok) {
+              const finContext = await financialResponse.json();
+              
+              fullContext += "\n\n--- OWNER FINANCIAL STATUS ---";
+              
+              if (finContext.hasPaymentMethod) {
+                fullContext += `\n✅ Card on file: ${finContext.paymentMethodBrand || finContext.paymentMethodType} ending in ${finContext.paymentMethodLast4}`;
+                if (finContext.cardExpiringSoon) {
+                  fullContext += ` (⚠️ EXPIRING ${finContext.cardExpMonth}/${finContext.cardExpYear})`;
+                }
+              } else {
+                fullContext += `\n⚠️ NO PAYMENT METHOD ON FILE`;
+              }
+              
+              if (finContext.hasOutstandingCharges) {
+                fullContext += `\n⚠️ Outstanding balance: $${finContext.outstandingAmount.toFixed(2)}`;
+              } else {
+                fullContext += `\n✅ Account is current - no outstanding charges`;
+              }
+              
+              if (finContext.pendingPayoutAmount > 0) {
+                fullContext += `\n💰 Pending payout: $${finContext.pendingPayoutAmount.toFixed(2)}`;
+              }
+              
+              if (finContext.lastPaymentDate) {
+                fullContext += `\nLast payment: $${finContext.lastPaymentAmount} on ${new Date(finContext.lastPaymentDate).toLocaleDateString()}`;
+              }
+              
+              fullContext += `\nAccount Health: ${finContext.financialHealthScore?.toUpperCase() || "UNKNOWN"}`;
+              fullContext += "\n--- END FINANCIAL STATUS ---";
+              
+              console.log("Financial context loaded for owner:", owner.id);
+            }
+          } catch (finError) {
+            console.error("Error fetching financial context:", finError);
+          }
+          
+          // Fetch recent owner statements/reports
+          try {
+            const { data: recentReports } = await supabase
+              .from("owner_statements")
+              .select("statement_period, created_at")
+              .eq("owner_id", owner.id)
+              .order("created_at", { ascending: false })
+              .limit(3);
+            
+            if (recentReports && recentReports.length > 0) {
+              recentActivity = "\n\nRECENT REPORTS SENT TO THIS OWNER:\n";
+              for (const report of recentReports) {
+                const sentDate = new Date(report.created_at).toLocaleDateString();
+                recentActivity += `- ${report.statement_period} statement sent on ${sentDate}\n`;
+              }
+            }
+          } catch (e) {
+            console.error("Error fetching owner statements:", e);
+          }
         }
-      }
       }
     }
 
     // Fetch recent conversation history
     const historyQuery = supabase
       .from("lead_communications")
-      .select("direction, body, communication_type, created_at")
+      .select("direction, body, communication_type, created_at, subject")
       .order("created_at", { ascending: false })
       .limit(15);
 
@@ -295,7 +517,6 @@ serve(async (req) => {
     } else if (ownerId) {
       historyQuery.eq("owner_id", ownerId);
     } else if (contactPhone) {
-      // For external contacts, match by phone in metadata
       historyQuery.contains("metadata", { unmatched_phone: contactPhone });
     }
 
@@ -305,113 +526,112 @@ serve(async (req) => {
       commHistory = "\n\nCONVERSATION HISTORY (newest first):\n";
       for (const c of recentComms) {
         const dir = c.direction === "outbound" ? "WE SENT" : "THEY REPLIED";
-        const preview = (c.body || "").substring(0, 200);
-        commHistory += `[${dir}]: ${preview}${preview.length >= 200 ? "..." : ""}\n`;
+        const preview = (c.body || "").substring(0, 300);
+        const subject = c.subject ? ` | Subject: ${c.subject}` : "";
+        commHistory += `[${dir}${subject}]: ${preview}${preview.length >= 300 ? "..." : ""}\n`;
       }
     }
 
-    // Analyze the inbound message for context
-    const msgLower = (inboundMessage || "").toLowerCase();
-    const isQuestion = msgLower.includes("?") || msgLower.startsWith("how") || msgLower.startsWith("what") || msgLower.startsWith("when") || msgLower.startsWith("can");
-    const isUrgent = msgLower.includes("urgent") || msgLower.includes("asap") || msgLower.includes("emergency") || msgLower.includes("immediately");
-    const isFrustrated = msgLower.includes("still waiting") || msgLower.includes("no response") || msgLower.includes("frustrated") || msgLower.includes("disappointed");
-    const isThankYou = msgLower.includes("thank") || msgLower.includes("appreciate") || msgLower.includes("great job");
+    // ==========================================
+    // INTELLIGENT INTENT ANALYSIS
+    // ==========================================
+    const intent = detectIntent(inboundMessage);
+    console.log("Detected intent:", intent.primaryIntent, "| Suggested action:", intent.suggestedAction);
     
-    // Owner-specific intent patterns
-    const isPaymentInquiry = msgLower.includes("payment") || msgLower.includes("charge") || msgLower.includes("bill") || 
-                             msgLower.includes("invoice") || msgLower.includes("fee") || msgLower.includes("cost") || 
-                             msgLower.includes("how much") || msgLower.includes("owe");
-    const isPaymentConfirmation = msgLower.includes("paid") || msgLower.includes("sent") || msgLower.includes("transfer") || 
-                                  msgLower.includes("completed") || msgLower.includes("done paying");
-    const isPaymentIssue = msgLower.includes("declined") || msgLower.includes("failed") || msgLower.includes("error") || 
-                           msgLower.includes("wrong charge") || msgLower.includes("overcharg") || msgLower.includes("dispute");
-    const isPayoutInquiry = msgLower.includes("payout") || msgLower.includes("distribution") || msgLower.includes("when") && 
-                            (msgLower.includes("paid") || msgLower.includes("get my money")) || msgLower.includes("deposit");
-    const isCardUpdate = msgLower.includes("update") && msgLower.includes("card") || msgLower.includes("new card") || 
-                         msgLower.includes("change") && msgLower.includes("payment") || msgLower.includes("expired");
+    // Build intent-specific instructions
+    let intentInstructions = "";
     
-    const ownerFinancialIntent = {
-      isPaymentInquiry,
-      isPaymentConfirmation,
-      isPaymentIssue,
-      isPayoutInquiry,
-      isCardUpdate,
-      hasFinancialIntent: isPaymentInquiry || isPaymentConfirmation || isPaymentIssue || isPayoutInquiry || isCardUpdate,
-    };
+    if (intent.wantsLiveDiscussion || intent.wantsToScheduleCall || intent.wantsCallback) {
+      intentInstructions = `
+⚠️ CRITICAL: This person WANTS TO TALK/DISCUSS/MEET!
+- They said they want to discuss live or talk
+- YOUR RESPONSE MUST offer to schedule a call
+- Include the calendar link: ${SCHEDULING_LINK}
+- Example: "Great! Here's my calendar to book a time: ${SCHEDULING_LINK}"
+- Or: "Happy to chat! When works for you? Or grab a time here: ${SCHEDULING_LINK}"
+- DO NOT ignore their request for a conversation!`;
+    } else if (intent.wantsToReviewNumbers || (intent.asksAboutReports && intent.mentionsIncome)) {
+      intentInstructions = `
+⚠️ IMPORTANT: They want to review/discuss reports or numbers.
+- Acknowledge the reports if we sent them
+- OFFER TO WALK THROUGH THE REPORTS ON A CALL
+- Example: "Want to hop on a quick call to go through the numbers? Here's my calendar: ${SCHEDULING_LINK}"`;
+    } else if (intent.asksAboutReports || intent.asksAboutStatements) {
+      intentInstructions = `
+This person is asking about reports/statements.
+- Confirm if reports were sent (check recent activity)
+- Offer to explain or walk through them
+- If appropriate, suggest a call to review together`;
+    } else if (intent.isFrustrated) {
+      intentInstructions = `
+⚠️ This person seems frustrated.
+- Acknowledge their frustration genuinely (not with scripted apologies)
+- Take ownership and provide a concrete next step
+- Be proactive about solving their issue`;
+    } else if (intent.isUrgent) {
+      intentInstructions = `
+This is marked as URGENT.
+- Acknowledge the urgency
+- Be direct and action-oriented
+- Provide clear next steps immediately`;
+    } else if (intent.isPaymentInquiry || intent.isPayoutInquiry) {
+      intentInstructions = `
+Financial question detected.
+- Reference the EXACT numbers from the Financial Status section above
+- Don't guess or make up amounts
+- If you don't have the info, say you'll check and follow up`;
+    }
 
-    // Determine contract status from context
-    const isLead = fullContext.includes("Stage:") && !fullContext.includes("Stage: signed") && !fullContext.includes("Stage: active");
-    const hasNotSignedContract = isLead || (!fullContext.includes("Owner:") && !fullContext.includes("Stage: signed"));
-    
-    // Build system prompt
-    const systemPrompt = `You are an experienced property manager at PeachHaus Group, a premium mid-term rental management company in Atlanta. You're composing a ${messageType === "email" ? "email" : "text message"} reply.
+    // Determine if this is a lead or owner
+    const isOwner = fullContext.includes("Contact Type: OWNER");
+    const isLead = fullContext.includes("Contact Type: LEAD");
+
+    // Build the system prompt
+    const systemPrompt = `You are Ingo, an experienced property manager at PeachHaus Group, a premium mid-term rental management company in Atlanta.
+
+${companyKnowledge}
 
 ${humanLikeGuidelines}
 
-YOUR COMMUNICATION PERSONA:
-- Name: Ingo
-- Role: Property management professional who genuinely cares about both owners and guests
-- Style: Warm, efficient, knowledgeable - like a trusted advisor, not a call center rep
-- You remember details and follow through on commitments
-
-CONTRACT STATUS CONTEXT:
-${hasNotSignedContract ? "- This person has NOT signed a contract yet (LEAD)" : "- This is an existing client/owner (CONTRACT SIGNED)"}
-${hasNotSignedContract ? "- You MAY suggest a call ONLY if it's directly relevant to their message and helpful" : "- DO NOT suggest sales calls - they're already a client"}
-
-CURRENT CONVERSATION CONTEXT:
-Contact Name: ${contactName}
+=====================
+CURRENT SITUATION
+=====================
 ${fullContext}
+${recentActivity}
 ${commHistory}
 ${contactMemories}
 
-MESSAGE ANALYSIS:
-- Is this a question needing an answer? ${isQuestion ? "YES" : "NO"}
-- Does this feel urgent? ${isUrgent ? "YES - prioritize speed and clarity" : "NO"}
-- Is the sender frustrated? ${isFrustrated ? "YES - acknowledge their frustration with empathy, not scripted apologies" : "NO"}
-- Is this expressing gratitude? ${isThankYou ? "YES - keep response brief and warm" : "NO"}
-${ownerId ? `
-OWNER FINANCIAL INTENT DETECTED:
-- Asking about payment/charges? ${ownerFinancialIntent.isPaymentInquiry ? "YES - reference their actual balance" : "NO"}
-- Claiming they paid? ${ownerFinancialIntent.isPaymentConfirmation ? "YES - verify before confirming" : "NO"}
-- Payment issue/dispute? ${ownerFinancialIntent.isPaymentIssue ? "YES - be empathetic and investigative" : "NO"}
-- Asking about payout? ${ownerFinancialIntent.isPayoutInquiry ? "YES - reference actual pending amounts" : "NO"}
-- Wants to update card? ${ownerFinancialIntent.isCardUpdate ? "YES - offer to send secure link" : "NO"}
-` : ""}
+=====================
+INTENT ANALYSIS
+=====================
+Their primary intent: ${intent.primaryIntent}
+Suggested action: ${intent.suggestedAction}
+${intentInstructions}
 
-RESPONSE REQUIREMENTS:
-1. READ THEIR MESSAGE CAREFULLY - respond to what they ACTUALLY said
-2. If they mentioned needing time (for insurance, review, etc.) - RESPECT that and don't rush them
-3. If they mentioned sending something (HOA doc) - acknowledge you'll look for it
-4. Reference specific details from their message to show you read it
-5. ${messageType === "sms" ? "Keep under 160 characters ideal, 200 max" : "2-3 short paragraphs maximum"}
-6. End with an appropriate response to their situation
-7. Sign as: "- Ingo"
-${ownerId && ownerFinancialIntent.hasFinancialIntent ? `
-FINANCIAL RESPONSE GUIDANCE:
-- Use the EXACT financial data from the "OWNER FINANCIAL STATUS" section above
-- If they ask about balance, quote the actual amount
-- If they claim payment, mention you'll verify (unless you see recent payment in status)
-- For payout questions, reference the pending amount if any
-- If no card on file and they need to pay, suggest setting one up
-` : ""}
+=====================
+RESPONSE REQUIREMENTS
+=====================
+1. Channel: ${messageType === "email" ? "EMAIL - 2-3 short paragraphs max" : "SMS - 160 chars ideal, 280 max"}
+2. ${isOwner ? "This is an OWNER (existing client) - focus on service, NOT sales" : "This is a LEAD - be helpful, can suggest discovery calls"}
+3. Address their SPECIFIC message - don't give generic responses
+4. If they want to talk/meet → include the calendar link: ${SCHEDULING_LINK}
+5. Sign as: "- Ingo"
 
 WHAT NOT TO DO:
-- NEVER claim you "spoke earlier" or something was "promised" unless the history proves it
-- NEVER suggest a call if they're reviewing documents and didn't ask for one
-- Don't use placeholder text like "[specific detail]" - if you don't know, don't guess
-- Don't start with "I" - vary your sentence openings
-- Don't be pushy if they asked for time
-${ownerId ? "- NEVER guess about payment amounts or dates - use ONLY what's in the financial status" : ""}`;
+- NEVER ignore a request to talk/discuss/meet
+- NEVER give a generic response that doesn't address their message
+- NEVER claim something was "promised" or "discussed" unless history proves it
+- NEVER use banned phrases like "just checking in" or "I hope this finds you well"
+- NEVER guess financial numbers - only use what's in the context`;
 
     const userPrompt = `THEIR MESSAGE TO REPLY TO:
 "${inboundMessage}"
 
-CRITICAL: Your reply must directly address what they said above. If they mentioned:
-- Needing time to review insurance → Acknowledge this and give them that time
-- Looking for a document to send → Thank them and say you'll look for it
-- Visiting a city → Acknowledge the visit if appropriate
+Generate a natural, intelligent ${messageType === "email" ? "email" : "text message"} reply that DIRECTLY addresses what they said.
+${intent.wantsLiveDiscussion || intent.wantsToScheduleCall ? `
+REMEMBER: They want to discuss/talk/meet! YOUR RESPONSE MUST OFFER TO SCHEDULE A CALL with the calendar link!` : ""}
 
-Generate a natural, human ${messageType === "email" ? "email" : "text message"} reply. Write ONLY the reply text - no explanations.`;
+Write ONLY the reply text - no explanations or meta-commentary.`;
 
     // Call AI to generate draft
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -426,8 +646,8 @@ Generate a natural, human ${messageType === "email" ? "email" : "text message"} 
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: messageType === "sms" ? 150 : 400,
-        temperature: 0.7,
+        max_tokens: messageType === "sms" ? 200 : 500,
+        temperature: 0.6, // Slightly lower for more focused responses
       }),
     });
 
@@ -459,14 +679,16 @@ Generate a natural, human ${messageType === "email" ? "email" : "text message"} 
       draftContent = draftContent.slice(1, -1);
     }
 
-    // Calculate confidence based on context availability
-    let confidenceScore = 0.7; // Base confidence
-    if (commHistory.length > 100) confidenceScore += 0.1; // Has conversation history
-    if (fullContext.length > 50) confidenceScore += 0.1; // Has contact context
-    if (inboundMessage.length > 20) confidenceScore += 0.1; // Clear message to reply to
-    confidenceScore = Math.min(confidenceScore, 0.99);
+    // Calculate confidence based on context and intent clarity
+    let confidenceScore = 0.7;
+    if (commHistory.length > 100) confidenceScore += 0.05;
+    if (fullContext.length > 50) confidenceScore += 0.05;
+    if (inboundMessage.length > 20) confidenceScore += 0.05;
+    if (intent.primaryIntent !== "general_response") confidenceScore += 0.1; // Clear intent detected
+    if (contactMemories.length > 0) confidenceScore += 0.05;
+    confidenceScore = Math.min(confidenceScore, 0.95);
 
-    // Store the draft
+    // Store the draft with intent metadata
     const { data: newDraft, error: insertError } = await supabase
       .from("ai_draft_replies")
       .insert({
@@ -488,7 +710,7 @@ Generate a natural, human ${messageType === "email" ? "email" : "text message"} 
       throw insertError;
     }
 
-    console.log("Draft generated successfully:", newDraft.id);
+    console.log("Draft generated successfully:", newDraft.id, "| Intent:", intent.primaryIntent);
 
     return new Response(
       JSON.stringify({ 
@@ -496,6 +718,8 @@ Generate a natural, human ${messageType === "email" ? "email" : "text message"} 
         draftId: newDraft.id,
         draftContent,
         confidenceScore,
+        detectedIntent: intent.primaryIntent,
+        suggestedAction: intent.suggestedAction,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
