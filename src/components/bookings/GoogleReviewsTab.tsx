@@ -68,6 +68,24 @@ interface SmsLog {
   message_body: string;
   status: string;
   created_at: string;
+  contact_name?: string;
+}
+
+interface LeadCommunication {
+  id: string;
+  body: string;
+  direction: string;
+  status: string;
+  created_at: string;
+  metadata?: {
+    contact_name?: string;
+    unmatched_phone?: string;
+    ghl_data?: {
+      contactPhone?: string;
+      contactName?: string;
+    };
+  };
+  ghl_contact_id?: string;
 }
 
 const GOOGLE_REVIEWS_PHONE = "+14046090955";
@@ -179,7 +197,11 @@ const GoogleReviewsTab = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [reviewsResult, requestsResult, inboundResult, sentResult] = await Promise.all([
+      
+      // Get Google Review phone numbers for filtering GHL messages
+      const googleReviewPhones = ["+14046090955", "+14049247251"];
+      
+      const [reviewsResult, requestsResult, smsInboundResult, smsSentResult, ghlInboundResult, ghlSentResult] = await Promise.all([
         supabase
           .from("ownerrez_reviews")
           .select("*")
@@ -188,17 +210,35 @@ const GoogleReviewsTab = () => {
           .from("google_review_requests")
           .select("*")
           .order("created_at", { ascending: false }),
+        // Legacy SMS log inbound
         supabase
           .from("sms_log")
           .select("*")
           .in("message_type", ["inbound_reply", "inbound_opt_out", "inbound_resubscribe", "inbound_unmatched", "inbound_unmatched_reviews"])
           .order("created_at", { ascending: false })
           .limit(50),
-        // Fetch sent messages for the Sent tab - updated message types to match actual DB values
+        // Legacy SMS log sent
         supabase
           .from("sms_log")
           .select("*")
           .in("message_type", ["permission_ask", "link_delivery", "review_text", "nudge", "test"])
+          .order("created_at", { ascending: false })
+          .limit(100),
+        // GHL inbound messages (from lead_communications) - look for GoogleReviews source contacts
+        supabase
+          .from("lead_communications")
+          .select("id, body, direction, status, created_at, metadata, ghl_contact_id")
+          .eq("communication_type", "sms")
+          .eq("direction", "inbound")
+          .order("created_at", { ascending: false })
+          .limit(100),
+        // GHL outbound messages for Google Reviews
+        supabase
+          .from("lead_communications")
+          .select("id, body, direction, status, created_at, metadata, ghl_contact_id")
+          .eq("communication_type", "sms")
+          .eq("direction", "outbound")
+          .ilike("body", "%Google review%")
           .order("created_at", { ascending: false })
           .limit(100),
       ]);
@@ -208,8 +248,68 @@ const GoogleReviewsTab = () => {
 
       setReviews(reviewsResult.data || []);
       setRequests(requestsResult.data || []);
-      setAllInboundMessages(inboundResult.data || []);
-      setSentMessages(sentResult.data || []);
+      
+      // Get guest phone numbers from requests for filtering
+      const reviewGuestPhones = (requestsResult.data || []).map(r => {
+        const digits = r.guest_phone?.replace(/\D/g, "").slice(-10);
+        return digits;
+      }).filter(Boolean);
+      
+      // Convert GHL messages to SmsLog format and filter to Google Review conversations
+      const ghlInboundMapped: SmsLog[] = (ghlInboundResult.data || [])
+        .filter((msg) => {
+          const meta = msg.metadata as { unmatched_phone?: string; ghl_data?: { contactPhone?: string; contactName?: string }; contact_name?: string } | null;
+          const contactPhone = meta?.unmatched_phone || meta?.ghl_data?.contactPhone || "";
+          const phoneDigits = contactPhone.replace(/\D/g, "").slice(-10);
+          // Include if phone matches a Google Review request
+          return reviewGuestPhones.includes(phoneDigits);
+        })
+        .map((msg) => {
+          const meta = msg.metadata as { unmatched_phone?: string; ghl_data?: { contactPhone?: string; contactName?: string }; contact_name?: string } | null;
+          return {
+            id: msg.id,
+            request_id: null,
+            phone_number: meta?.unmatched_phone || meta?.ghl_data?.contactPhone || "",
+            message_type: "inbound_reply",
+            message_body: msg.body || "",
+            status: msg.status || "received",
+            created_at: msg.created_at,
+            contact_name: meta?.contact_name || meta?.ghl_data?.contactName,
+          };
+        });
+        
+      const ghlSentMapped: SmsLog[] = (ghlSentResult.data || [])
+        .map((msg) => {
+          const meta = msg.metadata as { ghl_data?: { contactPhone?: string; contactName?: string } } | null;
+          return {
+            id: msg.id,
+            request_id: null,
+            phone_number: meta?.ghl_data?.contactPhone || "",
+            message_type: msg.body?.includes("Would that be okay") ? "permission_ask" : 
+                          msg.body?.includes("Here's the direct link") ? "link_delivery" :
+                          msg.body?.includes("copy/paste") ? "review_text" : "permission_ask",
+            message_body: msg.body || "",
+            status: msg.status || "sent",
+            created_at: msg.created_at,
+            contact_name: meta?.ghl_data?.contactName,
+          };
+        });
+      
+      // Combine and deduplicate by id, preferring newer messages
+      const allInbound = [...(smsInboundResult.data || []), ...ghlInboundMapped];
+      const uniqueInbound = allInbound.reduce((acc: SmsLog[], msg) => {
+        if (!acc.find(m => m.id === msg.id)) acc.push(msg);
+        return acc;
+      }, []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      const allSent = [...(smsSentResult.data || []), ...ghlSentMapped];
+      const uniqueSent = allSent.reduce((acc: SmsLog[], msg) => {
+        if (!acc.find(m => m.id === msg.id)) acc.push(msg);
+        return acc;
+      }, []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setAllInboundMessages(uniqueInbound);
+      setSentMessages(uniqueSent);
     } catch (error: any) {
       console.error("Error loading Google reviews data:", error);
       toast.error("Failed to load reviews data");
