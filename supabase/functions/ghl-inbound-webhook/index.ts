@@ -191,7 +191,7 @@ async function sendSmsViaGhl(
   }
 }
 
-// Process Google Review reply
+// Process Google Review reply - handles ALL stages of the review workflow
 async function processGoogleReviewReply(
   supabase: any,
   ghlApiKey: string,
@@ -201,10 +201,11 @@ async function processGoogleReviewReply(
   messageBody: string
 ): Promise<{ handled: boolean }> {
   const googleReviewUrl = Deno.env.get("GOOGLE_REVIEW_URL") || "https://g.page/r/YOUR_REVIEW_LINK";
+  const lowerBody = messageBody.toLowerCase().trim();
 
   // Check for opt-out keywords
   const optOutKeywords = ["stop", "unsubscribe", "opt out", "opt-out", "cancel", "quit", "end"];
-  const isOptOut = optOutKeywords.some(kw => messageBody.toLowerCase() === kw || messageBody.toLowerCase().includes(kw));
+  const isOptOut = optOutKeywords.some(kw => lowerBody === kw || lowerBody.includes(kw));
 
   if (isOptOut) {
     console.log(`Google Reviews opt-out detected`);
@@ -233,9 +234,9 @@ async function processGoogleReviewReply(
     return { handled: true };
   }
 
-  // Check for re-subscribe keywords
-  const resubKeywords = ["start", "yes", "unstop"];
-  const isResubscribe = resubKeywords.some(kw => messageBody.toLowerCase() === kw);
+  // Check for re-subscribe keywords (exact match only)
+  const resubKeywords = ["start", "unstop"];
+  const isResubscribe = resubKeywords.some(kw => lowerBody === kw);
 
   if (isResubscribe) {
     console.log(`Google Reviews re-subscribe detected`);
@@ -263,18 +264,109 @@ async function processGoogleReviewReply(
     return { handled: true };
   }
 
-  // Find pending review request
+  // =============================================
+  // CHECK 1: Look for "review completed" confirmation from guests who got the link
+  // This handles "Done!", "I left a review", "Posted", etc.
+  // =============================================
+  const completionKeywords = ["done", "posted", "left", "submitted", "completed", "wrote", "finished"];
+  const isCompletionMessage = completionKeywords.some(kw => lowerBody.includes(kw));
+  
+  if (isCompletionMessage) {
+    console.log(`Checking for link_sent request for completion confirmation...`);
+    
+    // Find request where we already sent the link
+    const { data: linkSentRequest } = await supabase
+      .from("google_review_requests")
+      .select("*, ownerrez_reviews(*)")
+      .ilike("guest_phone", `%${phoneDigits}`)
+      .in("workflow_status", ["link_sent", "permission_granted"])
+      .eq("opted_out", false)
+      .order("link_sent_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (linkSentRequest) {
+      console.log(`Guest confirmed review completed for request: ${linkSentRequest.id}`);
+      const guestName = linkSentRequest.ownerrez_reviews?.guest_name || "there";
+      
+      // Log the inbound completion confirmation
+      await supabase.from("sms_log").insert({
+        request_id: linkSentRequest.id,
+        phone_number: linkSentRequest.guest_phone,
+        message_type: "inbound_completion",
+        message_body: messageBody,
+        status: "received",
+      });
+      
+      // Update status to completed
+      await supabase
+        .from("google_review_requests")
+        .update({
+          workflow_status: "completed",
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", linkSentRequest.id);
+      
+      // Send heartfelt thank you message
+      const thankYouMessage = `Hi ${guestName}! It's Anja & Ingo from PeachHaus Group. 🙏 THANK YOU so much for taking the time to leave us a Google review! It means the world to us and helps other travelers find our homes. We hope to host you again someday! ❤️`;
+      const thankYouResult = await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId, thankYouMessage, GOOGLE_REVIEWS_PHONE);
+      
+      await supabase.from("sms_log").insert({
+        request_id: linkSentRequest.id,
+        phone_number: linkSentRequest.guest_phone,
+        message_type: "thank_you",
+        message_body: thankYouMessage,
+        ghl_message_id: thankYouResult.messageId,
+        status: thankYouResult.success ? "sent" : "failed",
+        error_message: thankYouResult.error,
+      });
+      
+      console.log(`Thank you message sent for completed review: ${linkSentRequest.id}`);
+      return { handled: true };
+    }
+  }
+
+  // =============================================
+  // CHECK 2: Look for "yes" / affirmative response to permission request
+  // Handles guests agreeing to leave a review
+  // =============================================
+  const affirmativeKeywords = ["yes", "sure", "ok", "okay", "fine", "absolutely", "of course", "definitely", "happy to", "glad to", "will do"];
+  const isAffirmative = affirmativeKeywords.some(kw => lowerBody.includes(kw));
+  
+  // Find pending permission_asked request
   const { data: reviewRequest, error: findError } = await supabase
     .from("google_review_requests")
     .select("*, ownerrez_reviews(*)")
     .ilike("guest_phone", `%${phoneDigits}`)
-    .in("workflow_status", ["permission_asked"])
+    .in("workflow_status", ["permission_asked", "pending"])
     .eq("opted_out", false)
     .order("permission_asked_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (findError || !reviewRequest) {
+  if (!reviewRequest) {
+    // No pending request - check if they already completed and are just saying thanks
+    const { data: completedRequest } = await supabase
+      .from("google_review_requests")
+      .select("id, workflow_status")
+      .ilike("guest_phone", `%${phoneDigits}`)
+      .eq("workflow_status", "completed")
+      .limit(1)
+      .maybeSingle();
+    
+    if (completedRequest) {
+      console.log(`Guest already completed review - no action needed`);
+      await supabase.from("sms_log").insert({
+        request_id: completedRequest.id,
+        phone_number: `+1${phoneDigits}`,
+        message_type: "inbound_post_completion",
+        message_body: messageBody,
+        status: "received",
+      });
+      return { handled: true };
+    }
+    
     console.log(`No pending review request found for phone digits ${phoneDigits}`);
     await supabase.from("sms_log").insert({
       phone_number: `+1${phoneDigits}`,
@@ -285,7 +377,7 @@ async function processGoogleReviewReply(
     return { handled: false };
   }
 
-  console.log(`Found pending Google review request: ${reviewRequest.id}`);
+  console.log(`Found pending Google review request: ${reviewRequest.id}, status: ${reviewRequest.workflow_status}`);
 
   // Log the inbound reply
   await supabase.from("sms_log").insert({
@@ -295,6 +387,12 @@ async function processGoogleReviewReply(
     message_body: messageBody,
     status: "received",
   });
+
+  // Only proceed if it looks like an affirmative response
+  if (!isAffirmative) {
+    console.log(`Message doesn't look like affirmative response, logged but not auto-processing`);
+    return { handled: true }; // Still handled - logged for manual review
+  }
 
   // Update request status to permission granted
   await supabase
@@ -306,13 +404,14 @@ async function processGoogleReviewReply(
     })
     .eq("id", reviewRequest.id);
 
-  // Send the Google review link
+  // Send the Google review link with host introduction
   const review = reviewRequest.ownerrez_reviews;
   const source = review?.review_source || "Airbnb";
   const reviewText = review?.review_text || "";
   const guestName = review?.guest_name || "there";
+  const propertyName = review?.property_name || "our property";
 
-  const linkMessage = `Hi ${guestName}! It's Anja & Ingo from PeachHaus Group — amazing, thank you! Here's the direct link to leave your Google review: ${googleReviewUrl}`;
+  const linkMessage = `Hi ${guestName}! It's Anja & Ingo, your Airbnb hosts with PeachHaus Group — thank you SO much for staying with us at ${propertyName}! 🏠\n\nHere's the direct link to leave your Google review: ${googleReviewUrl}`;
   const linkResult = await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId, linkMessage, GOOGLE_REVIEWS_PHONE);
 
   await supabase.from("sms_log").insert({
@@ -325,9 +424,9 @@ async function processGoogleReviewReply(
     error_message: linkResult.error,
   });
 
-  // Send the review text if available
+  // Send the review text if available for easy copy/paste
   if (reviewText) {
-    const reviewMessage = `Here's the text of your ${source} review so you can easily copy/paste it:\n\n"${reviewText}"\n\nThanks so much! — Anja & Ingo, PeachHaus Group`;
+    const reviewMessage = `Here's the text of your ${source} review so you can easily copy/paste it:\n\n"${reviewText}"\n\nThanks so much! Just reply "Done" when you've posted it and we'll send you our heartfelt thanks! ❤️\n\n— Anja & Ingo, PeachHaus Group`;
     const reviewResult = await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId, reviewMessage, GOOGLE_REVIEWS_PHONE);
 
     await supabase.from("sms_log").insert({
