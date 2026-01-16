@@ -86,7 +86,8 @@ import { QuickAssignButton } from "./QuickAssignButton";
 import { VirtualizedEmailList } from "./inbox/VirtualizedEmailList";
 import { EmailQuickFilters, type EmailQuickFilterType } from "./inbox/EmailQuickFilters";
 import { useEmailClassification, classifyEmail, getClassificationColor } from "@/hooks/useEmailClassification";
-import { SavedCommunicationsDashboard } from "./saved/SavedCommunicationsDashboard";
+import { ArchivedMessagesList } from "./saved/ArchivedMessagesList";
+import { InboxFolderSelector, type InboxFolder } from "./inbox/InboxFolderSelector";
 import { SaveCommunicationButton } from "./saved/SaveCommunicationButton";
 import { InboxMoreActionsDropdown } from "./inbox/InboxMoreActionsDropdown";
 import { useNavigate } from "react-router-dom";
@@ -249,6 +250,9 @@ export function InboxView() {
   // Email quick filters and promotions toggle
   const [emailQuickFilter, setEmailQuickFilter] = useState<EmailQuickFilterType>("all");
   const [hidePromotions, setHidePromotions] = useState(false);
+  
+  // Inbox folder selector (inbox, archived, spam, drafts, all)
+  const [selectedFolder, setSelectedFolder] = useState<InboxFolder>("inbox");
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -2380,13 +2384,6 @@ export function InboxView() {
               <Mail className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Emails</span>
             </button>
-            <button 
-              onClick={() => { setActiveTab("saved"); setSelectedMessage(null); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "saved" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <Archive className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">My Archive</span>
-            </button>
           </div>
           
           {/* Search toggle */}
@@ -2425,6 +2422,18 @@ export function InboxView() {
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Notification bell */}
             <TeamNotificationBell />
+            
+            {/* Inbox Folder Selector - My Inbox dropdown with Inbox/Archived/Spam/Drafts */}
+            <InboxFolderSelector
+              selectedFolder={selectedFolder}
+              onFolderChange={(folder) => {
+                setSelectedFolder(folder);
+                // If switching to archived folder, show archived view
+                if (folder === "archived") {
+                  setActiveTab("saved");
+                }
+              }}
+            />
             
             {/* Single Inbox Selector - for all tabs */}
             <EnhancedInboxSelector
@@ -2549,9 +2558,9 @@ export function InboxView() {
 
         {/* Message List - Clean, content-first cards */}
         <ScrollArea className="flex-1">
-          {activeTab === "saved" ? (
-            // My Archive - Saved Communications Dashboard
-            <SavedCommunicationsDashboard />
+          {activeTab === "saved" || selectedFolder === "archived" ? (
+            // My Archive - Archived Messages List
+            <ArchivedMessagesList />
           ) : activeTab === "emails" ? (
             // Gmail Inbox View - Using VirtualizedEmailList with color categorization
             isLoadingGmail ? (
