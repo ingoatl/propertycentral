@@ -44,9 +44,10 @@ import { SkeletonLine } from "@/components/ui/modal-skeleton";
 interface TaskItemProps {
   task: OnboardingTask;
   onUpdate: () => void;
+  assignedUserName?: string; // Pre-loaded from parent for performance
 }
 
-export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
+export const TaskItem = ({ task, onUpdate, assignedUserName: preloadedUserName }: TaskItemProps) => {
   const [fieldValue, setFieldValue] = useState(task.field_value || "");
   const [notes, setNotes] = useState(task.notes || "");
   const [date, setDate] = useState<Date | undefined>(
@@ -72,9 +73,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showBugDialog, setShowBugDialog] = useState(false);
   const [attachmentsKey, setAttachmentsKey] = useState(0);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
-  const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
+  const [localAssignedUserName, setLocalAssignedUserName] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'typing' | 'saving' | 'saved'>('idle');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Use preloaded name from parent, or fall back to local state
+  const assignedUserName = preloadedUserName || localAssignedUserName;
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -94,9 +98,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   }, [task.id, isCollapsed]);
   
   useEffect(() => {
-    // Load assigned user's first name - either from direct assignment or phase assignment
-    loadAssignedUserName();
-  }, [task.assigned_to_uuid, task.assigned_role_id, task.phase_number]);
+    // Only load assigned user name if not preloaded from parent
+    if (!preloadedUserName) {
+      loadAssignedUserName();
+    }
+  }, [task.assigned_to_uuid, task.assigned_role_id, task.phase_number, preloadedUserName]);
 
   // REMOVED: Auto-correct status logic was causing bugs where rescheduling a due date 
   // would auto-mark tasks as completed if they had any data. Tasks should only be 
@@ -124,7 +130,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .maybeSingle();
       
       if (data) {
-        setAssignedUserName(data.first_name || data.email?.split('@')[0] || 'Unknown');
+        setLocalAssignedUserName(data.first_name || data.email?.split('@')[0] || 'Unknown');
         return;
       }
     }
@@ -151,11 +157,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           .filter(name => name !== 'Unknown');
         
         if (names.length === 1) {
-          setAssignedUserName(names[0]);
+          setLocalAssignedUserName(names[0]);
         } else if (names.length === 2) {
-          setAssignedUserName(names.join(', '));
+          setLocalAssignedUserName(names.join(', '));
         } else if (names.length > 2) {
-          setAssignedUserName(`${names[0]} +${names.length - 1}`);
+          setLocalAssignedUserName(`${names[0]} +${names.length - 1}`);
         }
         return;
       }
@@ -189,11 +195,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           .filter(name => name !== 'Unknown');
         
         if (names.length === 1) {
-          setAssignedUserName(names[0]);
+          setLocalAssignedUserName(names[0]);
         } else if (names.length === 2) {
-          setAssignedUserName(names.join(', '));
+          setLocalAssignedUserName(names.join(', '));
         } else if (names.length > 2) {
-          setAssignedUserName(`${names[0]} +${names.length - 1}`);
+          setLocalAssignedUserName(`${names[0]} +${names.length - 1}`);
         }
       }
     }

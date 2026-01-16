@@ -1,17 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo, memo } from "react";
 import { PhaseDefinition, OnboardingTask, OnboardingSOP } from "@/types/onboarding";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronDown, Lock, CheckCircle2, Plus, FileText, BookOpen } from "lucide-react";
+import { ChevronDown, CheckCircle2, Plus, FileText, BookOpen } from "lucide-react";
 import { TaskItem } from "./TaskItem";
 import { AddTaskDialog } from "./AddTaskDialog";
 import { SOPDialog } from "./SOPDialog";
 import { SOPFormDialog } from "./SOPFormDialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { PLATFORM_CATEGORIES, getPlatformCategory } from "@/context/onboardingPhases";
 
 interface PhaseCardProps {
   phase: PhaseDefinition;
@@ -24,9 +25,11 @@ interface PhaseCardProps {
   highlighted?: boolean;
   projectId: string;
   isPartnerProperty?: boolean;
+  assignedUserNames?: Map<string, string>; // Pre-loaded from parent
 }
 
-export const PhaseCard = ({
+// Memoized component to prevent unnecessary re-renders
+export const PhaseCard = memo(({
   phase,
   tasks,
   completion,
@@ -37,45 +40,159 @@ export const PhaseCard = ({
   highlighted = false,
   projectId,
   isPartnerProperty = false,
+  assignedUserNames,
 }: PhaseCardProps) => {
   const isComplete = completion === 100;
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [sop, setSOP] = useState<OnboardingSOP | null>(null);
   const [showSOPDialog, setShowSOPDialog] = useState(false);
   const [showSOPFormDialog, setShowSOPFormDialog] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [sopLoaded, setSopLoaded] = useState(false);
 
-  useEffect(() => {
-    checkAdminRole();
-    loadSOP();
-  }, [phase.id, projectId]);
+  // Use cached admin check hook instead of local DB call
+  const { isAdmin } = useAdminCheck();
 
-  const checkAdminRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-
-    setIsAdmin(roles?.some(r => r.role === "admin") || false);
-  };
-
+  // Load SOP lazily only when user clicks to view it
   const loadSOP = async () => {
-    // Load global SOP for this phase (not project-specific)
+    if (sopLoaded) return;
     const { data } = await supabase
       .from("onboarding_sops")
       .select("*")
       .eq("phase_number", phase.id)
       .is("task_id", null)
       .maybeSingle();
-
     setSOP(data);
+    setSopLoaded(true);
+  };
+
+  const handleSOPClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await loadSOP();
+    setShowSOPDialog(true);
+  };
+
+  const handleSOPFormClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await loadSOP();
+    setShowSOPFormDialog(true);
   };
 
   const handleSOPSuccess = () => {
+    setSopLoaded(false);
     loadSOP();
+  };
+
+  // Memoize filtered and sorted tasks
+  const { filteredTasks, groupedTasks, taskCount, completedCount } = useMemo(() => {
+    // Tasks to hide for ALL properties
+    const globalHiddenTasks = ['Mobile'];
+    
+    // Tasks to hide for Partner Properties only
+    const partnerHiddenTasks = [
+      'Airbnb', 'Airbnb – 1-Year Listing', 'VRBO', 'Booking.com',
+      'Furnished Finder', 'CHBO (Corporate Housing by Owner)',
+      'June Homes', 'Direct Booking Page'
+    ];
+    
+    // Admin-only tasks
+    const adminOnlyTasks = ['Signed Management Agreement Link', 'ACH Details'];
+
+    const filtered = tasks.filter(task => {
+      if (globalHiddenTasks.includes(task.title)) return false;
+      if (isPartnerProperty && partnerHiddenTasks.includes(task.title)) return false;
+      if (!isAdmin && adminOnlyTasks.includes(task.title)) return false;
+      return true;
+    });
+
+    // Sort tasks
+    const sorted = filtered.sort((a, b) => {
+      const getPriority = (title: string) => {
+        const lowerTitle = title.toLowerCase();
+        if (lowerTitle.includes('owner name')) return 1;
+        if (lowerTitle.includes('owner email')) return 2;
+        if (lowerTitle.includes('owner phone')) return 3;
+        return 999;
+      };
+      const priorityA = getPriority(a.title);
+      const priorityB = getPriority(b.title);
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
+    // Group Phase 7 tasks by platform category
+    let grouped: Map<string, OnboardingTask[]> | null = null;
+    if (phase.id === 7) {
+      grouped = new Map();
+      for (const [key, data] of Object.entries(PLATFORM_CATEGORIES)) {
+        grouped.set(key, []);
+      }
+      grouped.set('other', []);
+      
+      for (const task of sorted) {
+        const category = getPlatformCategory(task.title);
+        if (category && grouped.has(category)) {
+          grouped.get(category)!.push(task);
+        } else {
+          grouped.get('other')!.push(task);
+        }
+      }
+    }
+
+    // Calculate task counts
+    const completableTasks = sorted.filter(t => t.field_type !== 'section_header');
+    const completed = completableTasks.filter(
+      t => t.status === "completed" || (t.field_value && t.field_value.trim() !== "")
+    ).length;
+
+    return {
+      filteredTasks: sorted,
+      groupedTasks: grouped,
+      taskCount: completableTasks.length,
+      completedCount: completed
+    };
+  }, [tasks, isAdmin, isPartnerProperty, phase.id]);
+
+  // Render tasks for Phase 7 grouped by category
+  const renderGroupedTasks = () => {
+    if (!groupedTasks) return null;
+
+    return (
+      <>
+        {Object.entries(PLATFORM_CATEGORIES).map(([key, data]) => {
+          const categoryTasks = groupedTasks.get(key) || [];
+          if (categoryTasks.length === 0) return null;
+
+          return (
+            <div key={key} className="space-y-2">
+              <div className="flex items-center gap-2 py-2 px-1 border-b border-muted">
+                <span className="text-lg">{data.emoji}</span>
+                <span className="font-medium text-sm">{data.title}</span>
+                <Badge variant="outline" className="text-xs ml-auto">
+                  {data.priority}
+                </Badge>
+              </div>
+              {categoryTasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onUpdate={onTaskUpdate}
+                  assignedUserName={assignedUserNames?.get(task.id)}
+                />
+              ))}
+            </div>
+          );
+        })}
+        {/* Other uncategorized tasks */}
+        {(groupedTasks.get('other') || []).map((task) => (
+          <TaskItem
+            key={task.id}
+            task={task}
+            onUpdate={onTaskUpdate}
+            assignedUserName={assignedUserNames?.get(task.id)}
+          />
+        ))}
+      </>
+    );
   };
 
   return (
@@ -96,19 +213,14 @@ export const PhaseCard = ({
                       Phase {phase.id}
                     </Badge>
                     {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600 max-md:w-6 max-md:h-6" />}
-                    {sop && (
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline max-md:text-base"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowSOPDialog(true);
-                        }}
-                      >
-                        <BookOpen className="w-4 h-4 max-md:w-5 max-md:h-5" />
-                        View SOP
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline max-md:text-base"
+                      onClick={handleSOPClick}
+                    >
+                      <BookOpen className="w-4 h-4 max-md:w-5 max-md:h-5" />
+                      View SOP
+                    </button>
                   </div>
                   <div className="flex items-start justify-between gap-4 max-md:flex-col max-md:gap-3">
                     <div className="flex-1 max-md:w-full">
@@ -121,7 +233,7 @@ export const PhaseCard = ({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setShowSOPFormDialog(true)}
+                          onClick={handleSOPFormClick}
                         >
                           <FileText className="w-4 h-4 mr-1" />
                           {sop ? "Edit SOP" : "Add SOP"}
@@ -134,15 +246,7 @@ export const PhaseCard = ({
                   <div className="text-right max-md:text-left">
                     <div className="text-lg font-semibold max-md:text-2xl">{Math.round(completion)}%</div>
                     <div className="text-xs text-muted-foreground max-md:text-sm">
-                      {(() => {
-                        // Exclude section headers from task count
-                        const completableTasks = tasks.filter(t => t.field_type !== 'section_header');
-                        // Count tasks that are completed OR have data filled in (matching progress calculation)
-                        const completedCount = completableTasks.filter(
-                          t => t.status === "completed" || (t.field_value && t.field_value.trim() !== "")
-                        ).length;
-                        return `${completedCount} of ${completableTasks.length} tasks`;
-                      })()}
+                      {completedCount} of {taskCount} tasks
                     </div>
                   </div>
                   <ChevronDown className={cn(
@@ -168,66 +272,18 @@ export const PhaseCard = ({
 
         <CollapsibleContent>
           <CardContent className="space-y-2 pt-0 max-md:space-y-3 max-md:p-5 max-md:pt-0">
-            {tasks
-              .filter((task) => {
-                // Tasks to hide for ALL properties (Mobile removed everywhere)
-                const globalHiddenTasks = ['Mobile'];
-                if (globalHiddenTasks.includes(task.title)) {
-                  return false;
-                }
-                
-                // Tasks to hide for Partner Properties only
-                const partnerHiddenTasks = [
-                  'Airbnb',
-                  'Airbnb – 1-Year Listing',
-                  'VRBO',
-                  'Booking.com',
-                  'Furnished Finder',
-                  'CHBO (Corporate Housing by Owner)',
-                  'June Homes',
-                  'Direct Booking Page'
-                ];
-                if (isPartnerProperty && partnerHiddenTasks.includes(task.title)) {
-                  return false;
-                }
-                
-                // Admin-only tasks: hide from non-admins
-                const adminOnlyTasks = [
-                  'Signed Management Agreement Link',
-                  'ACH Details'
-                ];
-                if (!isAdmin && adminOnlyTasks.includes(task.title)) {
-                  return false;
-                }
-                return true;
-              })
-              .sort((a, b) => {
-                // Define priority order based on title keywords
-                const getPriority = (title: string) => {
-                  const lowerTitle = title.toLowerCase();
-                  if (lowerTitle.includes('owner name') || lowerTitle.includes('owner\'s name')) return 1;
-                  if (lowerTitle.includes('owner email') || lowerTitle.includes('owner\'s email')) return 2;
-                  if (lowerTitle.includes('owner phone') || lowerTitle.includes('owner\'s phone')) return 3;
-                  return 999; // Everything else comes after
-                };
-                
-                const priorityA = getPriority(a.title);
-                const priorityB = getPriority(b.title);
-                
-                if (priorityA !== priorityB) {
-                  return priorityA - priorityB;
-                }
-                
-                // If same priority, maintain original order (by creation date)
-                return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-              })
-              .map((task) => (
+            {phase.id === 7 ? (
+              renderGroupedTasks()
+            ) : (
+              filteredTasks.map((task) => (
                 <TaskItem
                   key={task.id}
                   task={task}
                   onUpdate={onTaskUpdate}
+                  assignedUserName={assignedUserNames?.get(task.id)}
                 />
-              ))}
+              ))
+            )}
             
             <Button
               onClick={() => setShowAddTaskDialog(true)}
@@ -267,4 +323,6 @@ export const PhaseCard = ({
       />
     </Card>
   );
-};
+});
+
+PhaseCard.displayName = "PhaseCard";
