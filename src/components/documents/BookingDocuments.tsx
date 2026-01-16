@@ -106,27 +106,37 @@ export function BookingDocuments({ booking, properties }: BookingDocumentsProps)
   };
 
   const refreshSigningUrl = async (doc: BookingDocument, recipientType: 'guest' | 'host') => {
-    if (!doc.signwell_document_id) return;
-    
-    setRefreshingUrl(`${doc.id}-${recipientType}`);
-    try {
-      const { data, error } = await supabase.functions.invoke('signwell-get-signing-url', {
-        body: {
-          signwellDocumentId: doc.signwell_document_id,
-          recipientType,
-        },
-      });
+    // For documents with signwell_document_id, use the SignWell function (backward compatibility)
+    // For new native documents, use the direct URL from database
+    if (doc.signwell_document_id) {
+      setRefreshingUrl(`${doc.id}-${recipientType}`);
+      try {
+        const { data, error } = await supabase.functions.invoke('signwell-get-signing-url', {
+          body: {
+            signwellDocumentId: doc.signwell_document_id,
+            recipientType,
+          },
+        });
 
-      if (error) throw error;
-      if (data?.signingUrl) {
-        window.open(data.signingUrl, '_blank');
-      } else {
-        toast.error('Could not get signing URL');
+        if (error) throw error;
+        if (data?.signingUrl) {
+          window.open(data.signingUrl, '_blank');
+        } else {
+          toast.error('Could not get signing URL');
+        }
+      } catch (err: any) {
+        toast.error(`Failed to get signing URL: ${err.message}`);
+      } finally {
+        setRefreshingUrl(null);
       }
-    } catch (err: any) {
-      toast.error(`Failed to get signing URL: ${err.message}`);
-    } finally {
-      setRefreshingUrl(null);
+    } else {
+      // Native signing - use the stored URL directly
+      const url = recipientType === 'guest' ? doc.guest_signing_url : doc.host_signing_url;
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        toast.error('Signing URL not available');
+      }
     }
   };
 

@@ -12,143 +12,45 @@ export interface FieldLabelInfo {
 }
 
 // Common patterns found in lease/rental agreement field names
+// IMPORTANT: Patterns are ordered from most specific to least specific
 const FIELD_PATTERNS: Array<{
   patterns: string[];
+  exactMatch?: string[]; // These must match exactly (case insensitive)
   info: FieldLabelInfo;
 }> = [
-  // === PROPERTY DETAILS ===
+  // === IDENTIFICATION (must come before generic patterns) ===
   {
-    patterns: ['premises', 'property_address', 'rental_address', 'located', 'situated', 'residence'],
+    exactMatch: ['ssn', 'social_security', 'tax_id', 'taxpayer_id'],
+    patterns: ['social security', 'tax identification'],
     info: {
-      label: 'Property Address',
-      placeholder: 'e.g., 123 Main Street, Atlanta, GA 30301',
-      description: 'Full street address of the rental property',
+      label: 'SSN / Tax ID',
+      placeholder: 'XXX-XX-XXXX',
+      description: 'Social Security or Tax ID number',
     },
   },
   {
-    patterns: ['property_name', 'listing_name', 'unit_name'],
+    exactMatch: ['drivers_license', 'driver_license', 'dl_number', 'id_number', 'license_number'],
+    patterns: ['driver license', 'license number', 'id number'],
     info: {
-      label: 'Property Name',
-      placeholder: 'e.g., Sunset Villa Unit 2B',
-      description: 'Name or nickname of the property',
+      label: "Driver's License / ID Number",
+      placeholder: 'e.g., GA123456789',
+      description: 'State-issued ID or license number',
     },
   },
   {
-    patterns: ['unit', 'apt', 'apartment', 'suite'],
+    exactMatch: ['dob', 'date_of_birth', 'birth_date', 'birthdate'],
+    patterns: ['date of birth', 'birth date'],
     info: {
-      label: 'Unit/Apt Number',
-      placeholder: 'e.g., Apt 4B, Unit 201',
-      description: 'Apartment or unit number if applicable',
-    },
-  },
-  {
-    patterns: ['city'],
-    info: {
-      label: 'City',
-      placeholder: 'e.g., Atlanta',
-      description: 'City where the property is located',
-    },
-  },
-  {
-    patterns: ['county'],
-    info: {
-      label: 'County',
-      placeholder: 'e.g., Fulton County',
-      description: 'County where the property is located',
-    },
-  },
-  {
-    patterns: ['state'],
-    info: {
-      label: 'State',
-      placeholder: 'e.g., Georgia or GA',
-      description: 'State where the property is located',
-    },
-  },
-  {
-    patterns: ['zip', 'postal'],
-    info: {
-      label: 'ZIP Code',
-      placeholder: 'e.g., 30301',
-      description: '5-digit ZIP code',
-    },
-  },
-  {
-    patterns: ['bedrooms', 'beds'],
-    info: {
-      label: 'Number of Bedrooms',
-      placeholder: 'e.g., 2',
-      description: 'Total bedrooms in the property',
-    },
-  },
-  {
-    patterns: ['bathrooms', 'baths'],
-    info: {
-      label: 'Number of Bathrooms',
-      placeholder: 'e.g., 1.5',
-      description: 'Total bathrooms (use .5 for half bath)',
-    },
-  },
-  {
-    patterns: ['square_feet', 'sqft', 'sq_ft'],
-    info: {
-      label: 'Square Footage',
-      placeholder: 'e.g., 1200',
-      description: 'Total square feet of living space',
+      label: 'Date of Birth',
+      placeholder: 'MM/DD/YYYY',
+      description: 'Date of birth',
     },
   },
 
-  // === FINANCIAL TERMS ===
+  // === SPECIFIC FEES (must come before generic financial) ===
   {
-    patterns: ['monthly_rent', 'rent_amount', 'installments', 'monthly_rental', 'tenancy_at_a_monthly_rental'],
-    info: {
-      label: 'Monthly Rent',
-      placeholder: 'e.g., $1,500',
-      description: 'Amount due each month',
-    },
-  },
-  {
-    patterns: ['additional_rent', 'extra_rent', 'additional_fee'],
-    info: {
-      label: 'Additional Rent/Fees',
-      placeholder: 'e.g., $50 for utilities',
-      description: 'Any extra monthly charges beyond base rent',
-    },
-  },
-  {
-    patterns: ['security_deposit', 'deposit_amount', 'security_for_the_return'],
-    info: {
-      label: 'Security Deposit',
-      placeholder: 'e.g., $1,500',
-      description: 'Refundable deposit held for damages',
-    },
-  },
-  {
-    patterns: ['late_fee', 'late_penalty', 'first_day_rent_is_late', 'late_charge'],
-    info: {
-      label: 'Late Fee Amount',
-      placeholder: 'e.g., $75',
-      description: 'Penalty charged when rent is paid late',
-    },
-  },
-  {
-    patterns: ['late_day', 'deemed_late', 'grace_period', 'day_of_any_calendar_month'],
-    info: {
-      label: 'Grace Period (Days)',
-      placeholder: 'e.g., 5',
-      description: 'Number of days before rent is considered late',
-    },
-  },
-  {
-    patterns: ['interest_rate', 'per_annum', 'annual_rate', 'late_payments_under'],
-    info: {
-      label: 'Late Payment Interest Rate',
-      placeholder: 'e.g., 18%',
-      description: 'Annual interest rate charged on late payments',
-    },
-  },
-  {
-    patterns: ['dishonored_check', 'nsf_fee', 'bounced_check', 'returned_check'],
+    exactMatch: ['returned_check_fee', 'nsf_fee', 'bounced_check_fee', 'dishonored_check_fee'],
+    patterns: ['returned check', 'nsf fee', 'bounced check', 'dishonored check'],
     info: {
       label: 'Returned Check Fee',
       placeholder: 'e.g., $35',
@@ -156,7 +58,35 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['pet_deposit', 'pet_fee', 'animal_deposit'],
+    exactMatch: ['late_fee', 'late_fee_amount', 'late_charge', 'late_penalty'],
+    patterns: ['late fee', 'late charge', 'late penalty'],
+    info: {
+      label: 'Late Fee Amount',
+      placeholder: 'e.g., $75',
+      description: 'Penalty charged when rent is paid late',
+    },
+  },
+  {
+    exactMatch: ['grace_period', 'grace_period_days', 'grace_days'],
+    patterns: ['grace period'],
+    info: {
+      label: 'Grace Period (Days)',
+      placeholder: 'e.g., 5',
+      description: 'Number of days before rent is considered late',
+    },
+  },
+  {
+    exactMatch: ['interest_rate', 'late_interest', 'annual_rate'],
+    patterns: ['interest rate', 'per annum'],
+    info: {
+      label: 'Late Payment Interest Rate',
+      placeholder: 'e.g., 18%',
+      description: 'Annual interest rate charged on late payments',
+    },
+  },
+  {
+    exactMatch: ['pet_deposit', 'pet_fee', 'animal_deposit', 'animal_fee'],
+    patterns: ['pet deposit', 'pet fee', 'animal deposit'],
     info: {
       label: 'Pet Deposit/Fee',
       placeholder: 'e.g., $250',
@@ -164,7 +94,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['pet_rent', 'monthly_pet'],
+    exactMatch: ['pet_rent', 'monthly_pet_rent', 'pet_monthly'],
+    patterns: ['pet rent', 'monthly pet'],
     info: {
       label: 'Monthly Pet Rent',
       placeholder: 'e.g., $25/month',
@@ -172,7 +103,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['cleaning_fee', 'cleaning_deposit'],
+    exactMatch: ['cleaning_fee', 'cleaning_deposit', 'cleaning_charge'],
+    patterns: ['cleaning fee', 'cleaning deposit'],
     info: {
       label: 'Cleaning Fee',
       placeholder: 'e.g., $150',
@@ -180,7 +112,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['application_fee', 'app_fee'],
+    exactMatch: ['application_fee', 'app_fee'],
+    patterns: ['application fee'],
     info: {
       label: 'Application Fee',
       placeholder: 'e.g., $50',
@@ -188,7 +121,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['admin_fee', 'processing_fee', 'administration_fee'],
+    exactMatch: ['admin_fee', 'administration_fee', 'processing_fee'],
+    patterns: ['admin fee', 'administration fee', 'processing fee'],
     info: {
       label: 'Admin/Processing Fee',
       placeholder: 'e.g., $100',
@@ -196,23 +130,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['total_amount', 'total_due', 'move_in_total', 'total_rent'],
-    info: {
-      label: 'Total Amount Due',
-      placeholder: 'e.g., $3,250',
-      description: 'Total of all amounts due at signing',
-    },
-  },
-  {
-    patterns: ['prorated_rent', 'proration'],
-    info: {
-      label: 'Prorated Rent',
-      placeholder: 'e.g., $500',
-      description: 'Partial month rent amount',
-    },
-  },
-  {
-    patterns: ['garage_rent', 'parking_fee', 'garage_at_a_rental_rate'],
+    exactMatch: ['garage_rent', 'parking_fee', 'garage_fee', 'parking_rent'],
+    patterns: ['garage rent', 'parking fee', 'garage fee'],
     info: {
       label: 'Parking/Garage Fee',
       placeholder: 'e.g., $100/month',
@@ -220,7 +139,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['parking_spaces', 'garage_spaces', 'spaces_in_the_garage'],
+    exactMatch: ['parking_spaces', 'garage_spaces', 'num_parking'],
+    patterns: ['parking spaces', 'garage spaces'],
     info: {
       label: 'Number of Parking Spaces',
       placeholder: 'e.g., 2',
@@ -228,7 +148,64 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['payment_method', 'forms_of_payment', 'accepted_by_landlord'],
+    exactMatch: ['early_termination_fee', 'break_lease_fee', 'termination_fee'],
+    patterns: ['early termination', 'break lease fee'],
+    info: {
+      label: 'Early Termination Fee',
+      placeholder: 'e.g., 2 months rent',
+      description: 'Penalty for breaking lease early',
+    },
+  },
+
+  // === MAIN FINANCIAL TERMS ===
+  {
+    exactMatch: ['monthly_rent', 'rent_amount', 'base_rent', 'monthly_rental'],
+    patterns: ['monthly rent', 'rent amount', 'base rent'],
+    info: {
+      label: 'Monthly Rent',
+      placeholder: 'e.g., $1,500',
+      description: 'Amount due each month',
+    },
+  },
+  {
+    exactMatch: ['additional_rent', 'extra_rent', 'additional_charges'],
+    patterns: ['additional rent', 'extra rent', 'additional charges'],
+    info: {
+      label: 'Additional Rent/Fees',
+      placeholder: 'e.g., $50 for utilities',
+      description: 'Any extra monthly charges beyond base rent',
+    },
+  },
+  {
+    exactMatch: ['security_deposit', 'deposit_amount', 'damage_deposit'],
+    patterns: ['security deposit', 'damage deposit'],
+    info: {
+      label: 'Security Deposit',
+      placeholder: 'e.g., $1,500',
+      description: 'Refundable deposit held for damages',
+    },
+  },
+  {
+    exactMatch: ['total_amount', 'total_due', 'move_in_total', 'total_rent', 'amount_due'],
+    patterns: ['total amount', 'total due', 'move in total'],
+    info: {
+      label: 'Total Amount Due',
+      placeholder: 'e.g., $3,250',
+      description: 'Total of all amounts due at signing',
+    },
+  },
+  {
+    exactMatch: ['prorated_rent', 'proration', 'partial_rent'],
+    patterns: ['prorated rent', 'partial rent'],
+    info: {
+      label: 'Prorated Rent',
+      placeholder: 'e.g., $500',
+      description: 'Partial month rent amount',
+    },
+  },
+  {
+    exactMatch: ['payment_method', 'payment_methods', 'accepted_payments'],
+    patterns: ['payment method', 'accepted payment', 'forms of payment'],
     info: {
       label: 'Accepted Payment Methods',
       placeholder: 'e.g., Check, Money Order, ACH',
@@ -236,9 +213,102 @@ const FIELD_PATTERNS: Array<{
     },
   },
 
+  // === PROPERTY DETAILS ===
+  {
+    exactMatch: ['property_address', 'rental_address', 'premises_address', 'address'],
+    patterns: ['property address', 'rental address', 'premises address', 'located at', 'situated at'],
+    info: {
+      label: 'Property Address',
+      placeholder: 'e.g., 123 Main Street, Atlanta, GA 30301',
+      description: 'Full street address of the rental property',
+    },
+  },
+  {
+    exactMatch: ['property_name', 'listing_name', 'unit_name'],
+    patterns: ['property name', 'listing name'],
+    info: {
+      label: 'Property Name',
+      placeholder: 'e.g., Sunset Villa Unit 2B',
+      description: 'Name or nickname of the property',
+    },
+  },
+  {
+    exactMatch: ['unit', 'apt', 'apartment', 'suite', 'unit_number'],
+    patterns: ['unit number', 'apt number', 'apartment number'],
+    info: {
+      label: 'Unit/Apt Number',
+      placeholder: 'e.g., Apt 4B, Unit 201',
+      description: 'Apartment or unit number if applicable',
+    },
+  },
+  {
+    exactMatch: ['city', 'property_city'],
+    patterns: [],
+    info: {
+      label: 'City',
+      placeholder: 'e.g., Atlanta',
+      description: 'City where the property is located',
+    },
+  },
+  {
+    exactMatch: ['county', 'property_county'],
+    patterns: [],
+    info: {
+      label: 'County',
+      placeholder: 'e.g., Fulton County',
+      description: 'County where the property is located',
+    },
+  },
+  {
+    exactMatch: ['state', 'property_state'],
+    patterns: [],
+    info: {
+      label: 'State',
+      placeholder: 'e.g., Georgia or GA',
+      description: 'State where the property is located',
+    },
+  },
+  {
+    exactMatch: ['zip', 'zip_code', 'postal', 'postal_code'],
+    patterns: ['zip code', 'postal code'],
+    info: {
+      label: 'ZIP Code',
+      placeholder: 'e.g., 30301',
+      description: '5-digit ZIP code',
+    },
+  },
+  {
+    exactMatch: ['bedrooms', 'beds', 'num_bedrooms'],
+    patterns: ['number of bedrooms'],
+    info: {
+      label: 'Number of Bedrooms',
+      placeholder: 'e.g., 2',
+      description: 'Total bedrooms in the property',
+    },
+  },
+  {
+    exactMatch: ['bathrooms', 'baths', 'num_bathrooms'],
+    patterns: ['number of bathrooms'],
+    info: {
+      label: 'Number of Bathrooms',
+      placeholder: 'e.g., 1.5',
+      description: 'Total bathrooms (use .5 for half bath)',
+    },
+  },
+  {
+    exactMatch: ['square_feet', 'sqft', 'sq_ft', 'square_footage'],
+    patterns: ['square feet', 'square footage'],
+    info: {
+      label: 'Square Footage',
+      placeholder: 'e.g., 1200',
+      description: 'Total square feet of living space',
+    },
+  },
+
   // === DATES ===
   {
-    patterns: ['lease_start', 'start_date', 'commencement', 'begin_date', 'effective_date'],
+    exactMatch: ['lease_start', 'start_date', 'lease_start_date', 'commencement_date', 'begin_date'],
+    patterns: ['lease start', 'start date', 'commencement'],
     info: {
       label: 'Lease Start Date',
       placeholder: 'Select start date',
@@ -246,7 +316,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['lease_end', 'end_date', 'termination', 'expiration', 'expire_date'],
+    exactMatch: ['lease_end', 'end_date', 'lease_end_date', 'termination_date', 'expiration_date'],
+    patterns: ['lease end', 'end date', 'termination date', 'expiration'],
     info: {
       label: 'Lease End Date',
       placeholder: 'Select end date',
@@ -254,7 +325,17 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['move_in_date', 'occupancy_date'],
+    exactMatch: ['effective_date', 'agreement_effective_date'],
+    patterns: ['effective date'],
+    info: {
+      label: 'Effective Date',
+      placeholder: 'Select effective date',
+      description: 'Date when agreement takes effect',
+    },
+  },
+  {
+    exactMatch: ['move_in_date', 'occupancy_date'],
+    patterns: ['move in date', 'occupancy date'],
     info: {
       label: 'Move-In Date',
       placeholder: 'Select move-in date',
@@ -262,7 +343,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['signing_date', 'execution_date', 'agreement_date'],
+    exactMatch: ['signing_date', 'execution_date', 'agreement_date', 'document_date'],
+    patterns: ['signing date', 'execution date', 'agreement date'],
     info: {
       label: 'Signing Date',
       placeholder: 'Date document is signed',
@@ -270,7 +352,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['rent_due', 'due_date', 'payment_due'],
+    exactMatch: ['rent_due_day', 'rent_due', 'due_date', 'payment_due'],
+    patterns: ['rent due', 'payment due'],
     info: {
       label: 'Rent Due Day',
       placeholder: 'e.g., 1st of each month',
@@ -280,7 +363,8 @@ const FIELD_PATTERNS: Array<{
 
   // === LANDLORD/MANAGEMENT ===
   {
-    patterns: ['landlord_name', 'lessor', 'owner_name', 'management_company', 'landlord_means'],
+    exactMatch: ['landlord_name', 'lessor_name', 'owner_name', 'management_company', 'property_manager_name'],
+    patterns: ['landlord name', 'lessor name', 'owner name', 'management company'],
     info: {
       label: 'Landlord/Owner Name',
       placeholder: 'e.g., ABC Property Management LLC',
@@ -288,7 +372,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['landlord_address', 'lessor_address', 'owner_address', 'payment_address'],
+    exactMatch: ['landlord_address', 'lessor_address', 'owner_address', 'payment_address', 'management_address'],
+    patterns: ['landlord address', 'payment address'],
     info: {
       label: 'Landlord Address',
       placeholder: 'Address to mail rent payments',
@@ -296,7 +381,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['landlord_phone', 'lessor_phone', 'management_phone', 'office_phone'],
+    exactMatch: ['landlord_phone', 'lessor_phone', 'management_phone', 'office_phone', 'owner_phone'],
+    patterns: ['landlord phone', 'office phone'],
     info: {
       label: 'Landlord Phone',
       placeholder: 'e.g., (404) 555-1234',
@@ -304,7 +390,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['landlord_email', 'lessor_email', 'management_email', 'office_email'],
+    exactMatch: ['landlord_email', 'lessor_email', 'management_email', 'office_email', 'owner_email'],
+    patterns: ['landlord email', 'office email'],
     info: {
       label: 'Landlord Email',
       placeholder: 'e.g., office@propertymanagement.com',
@@ -312,7 +399,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['agent_name', 'property_manager', 'manager_name'],
+    exactMatch: ['agent_name', 'property_manager', 'manager_name'],
+    patterns: ['agent name', 'property manager'],
     info: {
       label: 'Property Manager Name',
       placeholder: 'e.g., John Smith',
@@ -322,7 +410,8 @@ const FIELD_PATTERNS: Array<{
 
   // === TENANT INFO ===
   {
-    patterns: ['tenant_name', 'lessee', 'renter_name', 'occupant_name'],
+    exactMatch: ['tenant_name', 'lessee_name', 'renter_name', 'guest_name', 'occupant_name'],
+    patterns: ['tenant name', 'lessee name', 'renter name', 'guest name'],
     info: {
       label: 'Tenant Full Name',
       placeholder: 'e.g., Jane Doe',
@@ -330,7 +419,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['tenant_email', 'lessee_email', 'renter_email'],
+    exactMatch: ['tenant_email', 'lessee_email', 'renter_email', 'guest_email'],
+    patterns: ['tenant email', 'renter email'],
     info: {
       label: 'Tenant Email',
       placeholder: 'e.g., tenant@email.com',
@@ -338,7 +428,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['tenant_phone', 'lessee_phone', 'renter_phone'],
+    exactMatch: ['tenant_phone', 'lessee_phone', 'renter_phone', 'guest_phone'],
+    patterns: ['tenant phone', 'renter phone'],
     info: {
       label: 'Tenant Phone',
       placeholder: 'e.g., (404) 555-5678',
@@ -346,7 +437,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['tenant_address', 'current_address', 'previous_address'],
+    exactMatch: ['tenant_address', 'current_address', 'previous_address'],
+    patterns: ['tenant address', 'current address', 'previous address'],
     info: {
       label: 'Tenant Current Address',
       placeholder: 'Current address before moving',
@@ -354,7 +446,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['co_tenant', 'additional_tenant', 'co_signer', 'other_occupant'],
+    exactMatch: ['co_tenant', 'additional_tenant', 'co_signer', 'other_occupant', 'co_tenant_name'],
+    patterns: ['co tenant', 'additional tenant', 'co signer'],
     info: {
       label: 'Co-Tenant/Additional Occupant',
       placeholder: 'e.g., John Doe (spouse)',
@@ -362,7 +455,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['num_occupants', 'occupants_allowed', 'max_occupants', 'number_of_occupants'],
+    exactMatch: ['num_occupants', 'occupants_allowed', 'max_occupants', 'number_of_occupants'],
+    patterns: ['number of occupants', 'max occupants'],
     info: {
       label: 'Maximum Occupants',
       placeholder: 'e.g., 4',
@@ -372,7 +466,8 @@ const FIELD_PATTERNS: Array<{
 
   // === VEHICLE INFO ===
   {
-    patterns: ['vehicle_make', 'car_make'],
+    exactMatch: ['vehicle_make', 'car_make'],
+    patterns: ['vehicle make'],
     info: {
       label: 'Vehicle Make',
       placeholder: 'e.g., Toyota',
@@ -380,7 +475,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['vehicle_model', 'car_model'],
+    exactMatch: ['vehicle_model', 'car_model'],
+    patterns: ['vehicle model'],
     info: {
       label: 'Vehicle Model',
       placeholder: 'e.g., Camry',
@@ -388,7 +484,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['vehicle_year', 'car_year'],
+    exactMatch: ['vehicle_year', 'car_year'],
+    patterns: ['vehicle year'],
     info: {
       label: 'Vehicle Year',
       placeholder: 'e.g., 2020',
@@ -396,7 +493,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['vehicle_color', 'car_color'],
+    exactMatch: ['vehicle_color', 'car_color'],
+    patterns: ['vehicle color'],
     info: {
       label: 'Vehicle Color',
       placeholder: 'e.g., Silver',
@@ -404,7 +502,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['license_plate', 'tag_number', 'plate_number'],
+    exactMatch: ['license_plate', 'tag_number', 'plate_number'],
+    patterns: ['license plate', 'tag number'],
     info: {
       label: 'License Plate Number',
       placeholder: 'e.g., ABC1234',
@@ -414,7 +513,8 @@ const FIELD_PATTERNS: Array<{
 
   // === EMERGENCY CONTACT ===
   {
-    patterns: ['emergency_name', 'emergency_contact'],
+    exactMatch: ['emergency_name', 'emergency_contact', 'emergency_contact_name'],
+    patterns: ['emergency contact name'],
     info: {
       label: 'Emergency Contact Name',
       placeholder: 'e.g., Mary Doe',
@@ -422,7 +522,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['emergency_phone', 'emergency_number'],
+    exactMatch: ['emergency_phone', 'emergency_number', 'emergency_contact_phone'],
+    patterns: ['emergency phone', 'emergency number'],
     info: {
       label: 'Emergency Contact Phone',
       placeholder: 'e.g., (404) 555-9999',
@@ -430,7 +531,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['emergency_relationship', 'emergency_relation'],
+    exactMatch: ['emergency_relationship', 'emergency_relation'],
+    patterns: ['emergency relationship'],
     info: {
       label: 'Emergency Contact Relationship',
       placeholder: 'e.g., Mother, Brother, Friend',
@@ -440,7 +542,8 @@ const FIELD_PATTERNS: Array<{
 
   // === UTILITIES & AMENITIES ===
   {
-    patterns: ['utilities_included', 'included_utilities'],
+    exactMatch: ['utilities_included', 'included_utilities'],
+    patterns: ['utilities included'],
     info: {
       label: 'Utilities Included',
       placeholder: 'e.g., Water, Trash, Gas',
@@ -448,7 +551,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['utilities_tenant', 'tenant_utilities', 'tenant_pays'],
+    exactMatch: ['utilities_tenant', 'tenant_utilities', 'tenant_pays'],
+    patterns: ['tenant pays', 'tenant utilities'],
     info: {
       label: 'Tenant Pays Utilities',
       placeholder: 'e.g., Electric, Internet',
@@ -456,7 +560,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['appliances', 'supplied_appliances', 'included_appliances', 'may_not_be_removed'],
+    exactMatch: ['appliances', 'supplied_appliances', 'included_appliances'],
+    patterns: ['appliances included', 'supplied appliances'],
     info: {
       label: 'Appliances Included',
       placeholder: 'e.g., Refrigerator, Stove, Dishwasher',
@@ -466,7 +571,8 @@ const FIELD_PATTERNS: Array<{
 
   // === POLICIES ===
   {
-    patterns: ['pet_policy', 'pet_allowed', 'pet_type'],
+    exactMatch: ['pet_policy', 'pet_allowed', 'pet_type', 'pets_allowed'],
+    patterns: ['pet policy', 'pets allowed'],
     info: {
       label: 'Pet Policy',
       placeholder: 'e.g., No pets, or Cats only',
@@ -474,7 +580,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['smoking_policy', 'smoking_allowed'],
+    exactMatch: ['smoking_policy', 'smoking_allowed'],
+    patterns: ['smoking policy'],
     info: {
       label: 'Smoking Policy',
       placeholder: 'e.g., No smoking on premises',
@@ -482,7 +589,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['notice_period', 'notice_days', 'termination_notice'],
+    exactMatch: ['notice_period', 'notice_days', 'termination_notice'],
+    patterns: ['notice period', 'termination notice'],
     info: {
       label: 'Notice Period',
       placeholder: 'e.g., 30 days, 60 days',
@@ -490,7 +598,8 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['quiet_hours', 'noise_policy'],
+    exactMatch: ['quiet_hours', 'noise_policy'],
+    patterns: ['quiet hours'],
     info: {
       label: 'Quiet Hours',
       placeholder: 'e.g., 10 PM - 8 AM',
@@ -498,35 +607,10 @@ const FIELD_PATTERNS: Array<{
     },
   },
 
-  // === IDENTIFICATION ===
-  {
-    patterns: ['ssn', 'social_security', 'tax_id'],
-    info: {
-      label: 'SSN / Tax ID',
-      placeholder: 'XXX-XX-XXXX',
-      description: 'Social Security or Tax ID number',
-    },
-  },
-  {
-    patterns: ['drivers_license', 'driver_license', 'dl_number', 'id_number'],
-    info: {
-      label: "Driver's License / ID Number",
-      placeholder: 'e.g., GA123456789',
-      description: 'State-issued ID or license number',
-    },
-  },
-  {
-    patterns: ['dob', 'date_of_birth', 'birth_date'],
-    info: {
-      label: 'Date of Birth',
-      placeholder: 'MM/DD/YYYY',
-      description: 'Date of birth',
-    },
-  },
-
   // === LEASE TERMS ===
   {
-    patterns: ['lease_term', 'term_length', 'lease_duration'],
+    exactMatch: ['lease_term', 'term_length', 'lease_duration'],
+    patterns: ['lease term', 'term length'],
     info: {
       label: 'Lease Term Length',
       placeholder: 'e.g., 12 months',
@@ -534,23 +618,15 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    patterns: ['renewal_terms', 'auto_renew'],
+    exactMatch: ['renewal_terms', 'auto_renew'],
+    patterns: ['renewal terms', 'auto renew'],
     info: {
       label: 'Renewal Terms',
       placeholder: 'e.g., Month-to-month after initial term',
       description: 'What happens when lease expires',
     },
   },
-  {
-    patterns: ['early_termination', 'break_lease'],
-    info: {
-      label: 'Early Termination Fee',
-      placeholder: 'e.g., 2 months rent',
-      description: 'Penalty for breaking lease early',
-    },
-  },
 ];
-
 // Date field patterns that need special handling
 const DATE_FIELD_PATTERNS = [
   { pattern: 'date_0', label: 'Document Date', placeholder: 'Date of this document' },
@@ -567,13 +643,14 @@ const DATE_FIELD_PATTERNS = [
  * Get a clean, human-readable label and placeholder for a field
  */
 export function getFieldLabelInfo(apiId: string, originalLabel: string): FieldLabelInfo {
-  const apiIdLower = apiId.toLowerCase().replace(/[_\-\.]/g, ' ');
+  const apiIdLower = apiId.toLowerCase();
+  const apiIdNormalized = apiIdLower.replace(/[_\-\.]/g, '');
   const labelLower = originalLabel.toLowerCase();
 
   // Check for date patterns first
   for (const datePattern of DATE_FIELD_PATTERNS) {
-    if (apiId.toLowerCase() === datePattern.pattern.toLowerCase() ||
-        apiId.toLowerCase().replace(/[_\.]/g, '') === datePattern.pattern.replace(/[_\.]/g, '')) {
+    if (apiIdLower === datePattern.pattern.toLowerCase() ||
+        apiIdNormalized === datePattern.pattern.replace(/[_\.]/g, '')) {
       return {
         label: datePattern.label,
         placeholder: datePattern.placeholder,
@@ -581,15 +658,29 @@ export function getFieldLabelInfo(apiId: string, originalLabel: string): FieldLa
     }
   }
 
-  // Check against our pattern mappings
-  for (const { patterns, info } of FIELD_PATTERNS) {
-    for (const pattern of patterns) {
-      const patternWords = pattern.replace(/_/g, ' ').split(' ');
-      const matches = patternWords.every(word => 
-        apiIdLower.includes(word) || labelLower.includes(word)
-      );
-      if (matches) {
-        return info;
+  // Check against our pattern mappings - EXACT MATCHES FIRST
+  for (const patternDef of FIELD_PATTERNS) {
+    // Check exact matches first (highest priority)
+    if (patternDef.exactMatch) {
+      for (const exact of patternDef.exactMatch) {
+        if (apiIdLower === exact.toLowerCase() || 
+            apiIdNormalized === exact.replace(/[_\-]/g, '').toLowerCase()) {
+          return patternDef.info;
+        }
+      }
+    }
+  }
+
+  // Then check pattern matches (lower priority)
+  for (const patternDef of FIELD_PATTERNS) {
+    if (patternDef.patterns.length > 0) {
+      for (const pattern of patternDef.patterns) {
+        const patternNormalized = pattern.toLowerCase().replace(/\s+/g, '');
+        // Check if the api_id or label contains the full pattern phrase
+        if (apiIdNormalized.includes(patternNormalized) || 
+            labelLower.replace(/\s+/g, '').includes(patternNormalized)) {
+          return patternDef.info;
+        }
       }
     }
   }
