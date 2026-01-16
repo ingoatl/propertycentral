@@ -72,6 +72,12 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     );
   };
 
+  // Check if a field was imported from document
+  const isImportedField = (apiId: string) => {
+    return data.importedFields?.includes(apiId) || 
+           data.importedFields?.some(f => apiId.toLowerCase().includes(f.toLowerCase()));
+  };
+
   // Separate fields by type
   const adminFields = data.detectedFields.filter(
     (f) => f.filled_by === "admin" && f.category !== "signature" && !isAutoFilledField(f.api_id)
