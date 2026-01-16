@@ -114,26 +114,45 @@ async function findLastOutboundSender(supabase: any, contactPhone: string): Prom
     }
   }
   
-  // Strategy 2: Check lead_communications for recent outbound SMS with sent_from_number
+  // Strategy 2: Check lead_communications for recent outbound SMS with assigned_user_id (who sent it)
   const { data: recentLeadComm } = await supabase
     .from("lead_communications")
-    .select("sent_by_user_id, sent_from_number, contact_phone")
+    .select("assigned_user_id, metadata")
     .eq("communication_type", "sms")
     .eq("direction", "outbound")
-    .or(`contact_phone.ilike.%${last10}`)
+    .not("assigned_user_id", "is", null)
     .order("created_at", { ascending: false })
-    .limit(1);
+    .limit(20);
     
   if (recentLeadComm && recentLeadComm.length > 0) {
-    const comm = recentLeadComm[0];
-    console.log("Found recent outbound in lead_communications:", comm);
-    
-    if (comm.sent_by_user_id && comm.sent_from_number) {
-      // Find the assignment for this sender's phone number
-      const senderPhone = await findPhoneOwner(supabase, comm.sent_from_number);
-      if (senderPhone.userId === comm.sent_by_user_id && senderPhone.phoneType === "personal") {
-        console.log("Reverse lookup SUCCESS via lead_communications:", senderPhone);
-        return { userId: senderPhone.userId, assignmentId: senderPhone.assignmentId, displayName: senderPhone.displayName, phoneNumber: senderPhone.phoneNumber };
+    // Find messages to this contact phone
+    for (const comm of recentLeadComm) {
+      const meta = comm.metadata as any;
+      const commToNumber = meta?.to_number || meta?.ghl_data?.contactPhone;
+      if (commToNumber) {
+        const commLast10 = commToNumber.replace(/\D/g, "").slice(-10);
+        if (commLast10 === last10) {
+          console.log("Found recent outbound in lead_communications to this contact, sent by:", comm.assigned_user_id);
+          
+          // Get the user's personal phone assignment
+          const { data: userAssignment } = await supabase
+            .from("user_phone_assignments")
+            .select("id, user_id, display_name, phone_type, phone_number")
+            .eq("user_id", comm.assigned_user_id)
+            .eq("phone_type", "personal")
+            .eq("is_active", true)
+            .limit(1)
+            .maybeSingle();
+            
+          if (userAssignment) {
+            console.log("Reverse lookup SUCCESS via lead_communications assigned_user_id:", userAssignment);
+            return { userId: userAssignment.user_id, assignmentId: userAssignment.id, displayName: userAssignment.display_name, phoneNumber: userAssignment.phone_number };
+          }
+          
+          // Return user_id without assignment (for assigned_user_id routing)
+          console.log("Reverse lookup - found assigned_user_id but no personal assignment:", comm.assigned_user_id);
+          return { userId: comm.assigned_user_id, assignmentId: null, displayName: null, phoneNumber: null };
+        }
       }
     }
   }
