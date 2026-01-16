@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WizardData, DetectedField } from "../DocumentCreateWizard";
 import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle, PenTool, Info, FileText, Sparkles } from "lucide-react";
+import { getFieldLabelInfo, getCategoryHelpText } from "@/utils/fieldLabelMapping";
 
 interface Props {
   data: WizardData;
@@ -199,6 +200,12 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
   const renderField = (field: DetectedField, isGuestField: boolean = false) => {
     const value = getFieldValue(field.api_id);
     const imported = isImportedField(field.api_id) || (data.importSource && value);
+    
+    // Get clean, human-readable label and placeholder
+    const labelInfo = getFieldLabelInfo(field.api_id, field.label);
+    const displayLabel = labelInfo.label;
+    const displayPlaceholder = isGuestField ? "Guest will fill this field" : labelInfo.placeholder;
+
     // Skip signature type fields - they're placed in visual editor
     if (field.type === "signature") {
       return null;
@@ -214,7 +221,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
             disabled={isGuestField}
           />
           <Label htmlFor={field.api_id} className="font-normal flex items-center gap-2">
-            {field.label}
+            {displayLabel}
             {imported && (
               <TooltipProvider>
                 <Tooltip>
@@ -223,6 +230,18 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Imported from document</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {labelInfo.description && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>{labelInfo.description}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -237,7 +256,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
       return (
         <div key={field.api_id} className="space-y-2">
           <Label htmlFor={field.api_id} className="flex items-center gap-2">
-            {field.label}
+            {displayLabel}
             {imported && (
               <TooltipProvider>
                 <Tooltip>
@@ -250,13 +269,25 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
                 </Tooltip>
               </TooltipProvider>
             )}
+            {labelInfo.description && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>{labelInfo.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {isGuestField && <Badge variant="outline" className="text-xs">Guest fills</Badge>}
           </Label>
           <Textarea
             id={field.api_id}
             value={(value as string) || ""}
             onChange={(e) => updateFieldValue(field.api_id, e.target.value)}
-            placeholder={isGuestField ? "Guest will fill this field" : `Enter ${field.label.toLowerCase()}`}
+            placeholder={displayPlaceholder}
             disabled={isGuestField}
             rows={3}
             className={imported ? "border-amber-300 bg-amber-50/50 dark:bg-amber-900/10" : ""}
@@ -283,7 +314,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
       return (
         <div key={field.api_id} className="space-y-2">
           <Label htmlFor={field.api_id} className="flex items-center gap-2">
-            {field.label}
+            {displayLabel}
             {imported && (
               <TooltipProvider>
                 <Tooltip>
@@ -292,6 +323,18 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Imported from document</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {labelInfo.description && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>{labelInfo.description}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -327,10 +370,11 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
         </div>
       );
     }
+    
     return (
       <div key={field.api_id} className="space-y-2">
         <Label htmlFor={field.api_id} className="flex items-center gap-2">
-          {field.label}
+          {displayLabel}
           {imported && (
             <TooltipProvider>
               <Tooltip>
@@ -343,6 +387,18 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
               </Tooltip>
             </TooltipProvider>
           )}
+          {labelInfo.description && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>{labelInfo.description}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {isGuestField && <Badge variant="outline" className="text-xs">Guest fills</Badge>}
         </Label>
         <Input
@@ -350,7 +406,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
           type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
           value={(value as string) || ""}
           onChange={(e) => updateFieldValue(field.api_id, e.target.value)}
-          placeholder={isGuestField ? "Guest will fill this field" : `Enter ${field.label.toLowerCase()}`}
+          placeholder={displayPlaceholder}
           disabled={isGuestField}
           className={imported ? "border-amber-300 bg-amber-50/50 dark:bg-amber-900/10" : ""}
         />
@@ -366,6 +422,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
     const Icon = config.icon;
     const renderedFields = fields.map((field) => renderField(field, isGuestSection)).filter(Boolean);
+    const categoryHelp = getCategoryHelpText(category);
     
     if (renderedFields.length === 0) return null;
 
@@ -374,6 +431,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
         <div className="flex items-center gap-2">
           <Icon className="h-4 w-4 text-muted-foreground" />
           <h3 className="font-medium">{config.label}</h3>
+          <span className="text-xs text-muted-foreground">— {categoryHelp}</span>
         </div>
         <div className={`grid grid-cols-1 ${fields.some(f => f.type === "textarea" || f.type === "checkbox") ? "" : "md:grid-cols-2"} gap-4`}>
           {renderedFields}
@@ -466,9 +524,10 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
           <div className="p-4 bg-secondary/20 rounded-lg border">
             <h4 className="font-medium text-sm mb-2">Fields guest will complete:</h4>
             <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              {guestFields.map((field) => (
-                <li key={field.api_id}>{field.label}</li>
-              ))}
+              {guestFields.map((field) => {
+                const labelInfo = getFieldLabelInfo(field.api_id, field.label);
+                return <li key={field.api_id}>{labelInfo.label}</li>;
+              })}
             </ul>
           </div>
         </div>
@@ -487,9 +546,10 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
               <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
                 <h4 className="font-medium text-sm mb-2 text-blue-800 dark:text-blue-200">Guest Signatures:</h4>
                 <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
-                  {guestSignatureFields.map((field) => (
-                    <li key={field.api_id}>{field.label}</li>
-                  ))}
+                  {guestSignatureFields.map((field) => {
+                    const labelInfo = getFieldLabelInfo(field.api_id, field.label);
+                    return <li key={field.api_id}>{labelInfo.label}</li>;
+                  })}
                 </ul>
               </div>
             )}
@@ -498,9 +558,10 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
               <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
                 <h4 className="font-medium text-sm mb-2 text-purple-800 dark:text-purple-200">Host Signatures:</h4>
                 <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1 list-disc list-inside">
-                  {hostSignatureFields.map((field) => (
-                    <li key={field.api_id}>{field.label}</li>
-                  ))}
+                  {hostSignatureFields.map((field) => {
+                    const labelInfo = getFieldLabelInfo(field.api_id, field.label);
+                    return <li key={field.api_id}>{labelInfo.label}</li>;
+                  })}
                 </ul>
               </div>
             )}
