@@ -41,6 +41,9 @@ export interface WizardData {
   hostSigningUrl: string | null;
   // Edit document content
   documentContent: string;
+  // Import source tracking
+  importSource: string | null;
+  importedFields: string[];
 }
 
 const STEPS = [
@@ -70,6 +73,8 @@ const DocumentCreateWizard = () => {
     guestSigningUrl: null,
     hostSigningUrl: null,
     documentContent: "",
+    importSource: null,
+    importedFields: [],
   });
 
   const updateWizardData = (updates: Partial<WizardData>) => {

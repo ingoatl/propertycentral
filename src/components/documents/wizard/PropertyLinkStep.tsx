@@ -1,11 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Building, Calendar, Upload, FileText, Loader2, CheckCircle, X } from "lucide-react";
 import { WizardData } from "../DocumentCreateWizard";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface Property {
   id: string;
@@ -32,6 +36,8 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadProperties();
@@ -175,6 +181,76 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await supabase.functions.invoke("extract-lease-data", {
+        body: formData,
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Failed to extract data");
+      }
+
+      const { extractedData, fieldsExtracted } = response.data;
+      
+      if (extractedData && Object.keys(extractedData).length > 0) {
+        // Merge with existing field values
+        updateData({
+          fieldValues: {
+            ...data.fieldValues,
+            ...extractedData,
+          },
+          importSource: file.name,
+          importedFields: Object.keys(extractedData),
+          // Auto-fill guest info if found
+          guestName: extractedData.tenant_name || extractedData.guest_name || data.guestName,
+          guestEmail: extractedData.tenant_email || extractedData.guest_email || data.guestEmail,
+        });
+        
+        toast.success(`Extracted ${fieldsExtracted} fields from document`, {
+          description: "Values have been pre-filled and are editable",
+        });
+      } else {
+        toast.warning("No data could be extracted", {
+          description: "Try a different document or fill fields manually",
+        });
+      }
+    } catch (error) {
+      console.error("Document extraction error:", error);
+      toast.error("Failed to extract data", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setIsExtracting(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const clearImport = () => {
+    // Clear imported fields from fieldValues
+    const clearedValues = { ...data.fieldValues };
+    data.importedFields.forEach(field => {
+      delete clearedValues[field];
+    });
+    
+    updateData({
+      fieldValues: clearedValues,
+      importSource: null,
+      importedFields: [],
+    });
+    toast.info("Imported data cleared");
+  };
+
   if (loadingProperties) {
     return (
       <div className="space-y-6">
@@ -187,11 +263,84 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
   return (
     <div className="space-y-6">
       <div>
-        <Label className="text-lg font-medium">Link to Property (Optional)</Label>
+        <Label className="text-lg font-medium">Link to Property or Import Data</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Optionally link this document to a property and/or existing booking
+          Link this document to a property, select an existing booking, or import data from a filled document
         </p>
       </div>
+
+      {/* Import from Document Section */}
+      <div className="p-4 border-2 border-dashed rounded-lg bg-muted/30">
+        <div className="flex items-start gap-4">
+          <div className="p-3 bg-primary/10 rounded-lg">
+            <FileText className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium">Import from Filled Document</h4>
+            <p className="text-sm text-muted-foreground mt-1">
+              Upload a filled lease agreement to automatically extract and pre-fill admin fields
+            </p>
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.doc,.txt"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            
+            {data.importSource ? (
+              <div className="mt-3 flex items-center gap-2">
+                <Badge variant="secondary" className="flex items-center gap-1.5">
+                  <CheckCircle className="h-3 w-3 text-green-600" />
+                  Imported: {data.importSource}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  ({data.importedFields.length} fields)
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearImport}
+                  className="h-6 w-6 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isExtracting}
+              >
+                {isExtracting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Extracting...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Document
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {data.importSource && (
+        <Alert>
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription>
+            <strong>{data.importedFields.length} fields</strong> were extracted from "{data.importSource}". 
+            All values are editable in the "Fill Values" step.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-4">
         <div className="space-y-2">

@@ -6,8 +6,10 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WizardData, DetectedField } from "../DocumentCreateWizard";
-import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle, PenTool, Info } from "lucide-react";
+import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle, PenTool, Info, FileText, Sparkles } from "lucide-react";
+
 interface Props {
   data: WizardData;
   updateData: (updates: Partial<WizardData>) => void;
@@ -97,7 +99,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
 
   const renderField = (field: DetectedField, isGuestField: boolean = false) => {
     const value = data.fieldValues[field.api_id];
-
+    const imported = isImportedField(field.api_id);
     // Skip signature type fields - they're placed in visual editor
     if (field.type === "signature") {
       return null;
@@ -112,9 +114,21 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
             onCheckedChange={(checked) => updateFieldValue(field.api_id, checked as boolean)}
             disabled={isGuestField}
           />
-          <Label htmlFor={field.api_id} className="font-normal">
+          <Label htmlFor={field.api_id} className="font-normal flex items-center gap-2">
             {field.label}
-            {isGuestField && <Badge variant="outline" className="ml-2 text-xs">Guest fills</Badge>}
+            {imported && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Sparkles className="h-3 w-3 text-amber-500" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Imported from document</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {isGuestField && <Badge variant="outline" className="text-xs">Guest fills</Badge>}
           </Label>
         </div>
       );
@@ -123,9 +137,21 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     if (field.type === "textarea") {
       return (
         <div key={field.api_id} className="space-y-2">
-          <Label htmlFor={field.api_id}>
+          <Label htmlFor={field.api_id} className="flex items-center gap-2">
             {field.label}
-            {isGuestField && <Badge variant="outline" className="ml-2 text-xs">Guest fills</Badge>}
+            {imported && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Sparkles className="h-3 w-3 text-amber-500" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Imported from document</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {isGuestField && <Badge variant="outline" className="text-xs">Guest fills</Badge>}
           </Label>
           <Textarea
             id={field.api_id}
@@ -134,6 +160,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
             placeholder={isGuestField ? "Guest will fill this field" : `Enter ${field.label.toLowerCase()}`}
             disabled={isGuestField}
             rows={3}
+            className={imported ? "border-amber-300 bg-amber-50/50 dark:bg-amber-900/10" : ""}
           />
         </div>
       );
@@ -156,9 +183,21 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
       
       return (
         <div key={field.api_id} className="space-y-2">
-          <Label htmlFor={field.api_id}>
+          <Label htmlFor={field.api_id} className="flex items-center gap-2">
             {field.label}
-            {isGuestField && <Badge variant="outline" className="ml-2 text-xs">Guest fills</Badge>}
+            {imported && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Sparkles className="h-3 w-3 text-amber-500" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Imported from document</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {isGuestField && <Badge variant="outline" className="text-xs">Guest fills</Badge>}
           </Label>
           <div className="flex gap-2">
             <Input
@@ -170,7 +209,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
               onChange={(e) => updateTimeValue(e.target.value, period)}
               placeholder="Hour"
               disabled={isGuestField}
-              className="w-20"
+              className={`w-20 ${imported ? "border-amber-300 bg-amber-50/50 dark:bg-amber-900/10" : ""}`}
             />
             <Select
               value={period}
@@ -189,7 +228,6 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
         </div>
       );
     }
-
     return (
       <div key={field.api_id} className="space-y-2">
         <Label htmlFor={field.api_id}>
