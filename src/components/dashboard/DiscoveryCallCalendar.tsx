@@ -61,7 +61,7 @@ import { PropertyPhotos } from "@/components/ui/property-photos";
 import { toast } from "sonner";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 import { useGhlCalendarSync, GhlAppointment } from "@/hooks/useGhlCalendarSync";
-
+import { AdminRescheduleDialog } from "@/components/scheduling/AdminRescheduleDialog";
 interface DiscoveryCall {
   id: string;
   scheduled_at: string;
@@ -1544,6 +1544,22 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Admin Reschedule Dialog */}
+      <AdminRescheduleDialog
+        open={showRescheduleDialog}
+        onOpenChange={setShowRescheduleDialog}
+        appointmentId={call.id}
+        appointmentType="discovery_call"
+        currentScheduledAt={call.scheduled_at}
+        contactName={call.leads?.name || "Unknown"}
+        contactEmail={call.leads?.email || undefined}
+        contactPhone={call.leads?.phone || undefined}
+        onRescheduleComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ["discovery-calls-calendar"] });
+          onClose();
+        }}
+      />
     </>
   );
 }
