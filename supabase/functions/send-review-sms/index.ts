@@ -247,7 +247,8 @@ serve(async (req) => {
       }
 
       const source = review.review_source || "Airbnb";
-      const message = `Thanks again for the wonderful ${source} review — it truly means a lot. Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
+      const guestName = review.guest_name || "there";
+      const message = `Hi ${guestName}! This is Anja & Ingo, your hosts with PeachHaus Group. Thanks again for the wonderful ${source} review — it truly means a lot! Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
 
       const result = await sendSms(review.guest_phone, message, request.id);
 
@@ -319,8 +320,9 @@ serve(async (req) => {
       const review = request.ownerrez_reviews;
       const source = review?.review_source || "Airbnb";
       const reviewText = review?.review_text || "";
+      const guestName = review?.guest_name || "there";
 
-      const linkMessage = `Amazing — thank you! Here's the direct link to leave the Google review: ${googleReviewUrl}`;
+      const linkMessage = `Hi ${guestName}! It's Anja & Ingo from PeachHaus Group — amazing, thank you! Here's the direct link to leave your Google review: ${googleReviewUrl}`;
       const linkResult = await sendSms(request.guest_phone, linkMessage, request.id);
 
       if (!linkResult.success) {
@@ -353,7 +355,7 @@ serve(async (req) => {
       });
 
       if (reviewText) {
-        const reviewMessage = `And here's the text of your ${source} review so you can copy/paste:\n\n"${reviewText}"`;
+        const reviewMessage = `Here's the text of your ${source} review so you can easily copy/paste it:\n\n"${reviewText}"\n\nThanks so much! — Anja & Ingo, PeachHaus Group`;
         const reviewResult = await sendSms(request.guest_phone, reviewMessage, request.id);
 
         await supabase.from("sms_log").insert({
@@ -404,8 +406,8 @@ serve(async (req) => {
       }
 
       const nudgeMessage = request.nudge_count === 0
-        ? `Just checking in real quick — no pressure at all. Happy to send the Google link + your review text if you'd like. Just reply and I'll send it over.`
-        : `Just a friendly bump in case life got busy — if you're still open to it, here's the Google link again: ${googleReviewUrl}. We appreciate you!`;
+        ? `Hi! It's Anja & Ingo from PeachHaus Group — just checking in real quick, no pressure at all. Happy to send the Google link + your review text if you'd like. Just reply and I'll send it over!`
+        : `Hi! It's Anja & Ingo from PeachHaus Group — just a friendly bump in case life got busy. If you're still open to it, here's the Google link again: ${googleReviewUrl}. We appreciate you!`;
 
       const nudgeResult = await sendSms(request.guest_phone, nudgeMessage, request.id);
 

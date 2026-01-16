@@ -310,8 +310,9 @@ async function processGoogleReviewReply(
   const review = reviewRequest.ownerrez_reviews;
   const source = review?.review_source || "Airbnb";
   const reviewText = review?.review_text || "";
+  const guestName = review?.guest_name || "there";
 
-  const linkMessage = `Amazing — thank you! Here's the direct link to leave the Google review: ${googleReviewUrl}`;
+  const linkMessage = `Hi ${guestName}! It's Anja & Ingo from PeachHaus Group — amazing, thank you! Here's the direct link to leave your Google review: ${googleReviewUrl}`;
   const linkResult = await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId, linkMessage, GOOGLE_REVIEWS_PHONE);
 
   await supabase.from("sms_log").insert({
@@ -326,7 +327,7 @@ async function processGoogleReviewReply(
 
   // Send the review text if available
   if (reviewText) {
-    const reviewMessage = `And here's the text of your ${source} review so you can copy/paste:\n\n"${reviewText}"`;
+    const reviewMessage = `Here's the text of your ${source} review so you can easily copy/paste it:\n\n"${reviewText}"\n\nThanks so much! — Anja & Ingo, PeachHaus Group`;
     const reviewResult = await sendSmsViaGhl(ghlApiKey, ghlLocationId, ghlContactId, reviewMessage, GOOGLE_REVIEWS_PHONE);
 
     await supabase.from("sms_log").insert({
