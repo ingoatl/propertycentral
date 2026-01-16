@@ -10,6 +10,7 @@ interface SendStripeAuthButtonProps {
   name: string | null;
   propertyAddress?: string | null;
   stage?: string | null;
+  serviceType?: string | null;
   className?: string;
 }
 
@@ -19,6 +20,7 @@ export function SendStripeAuthButton({
   name, 
   propertyAddress,
   stage,
+  serviceType,
   className 
 }: SendStripeAuthButtonProps) {
   const [isSending, setIsSending] = useState(false);
@@ -44,7 +46,8 @@ export function SendStripeAuthButton({
           leadId,
           email,
           name,
-          propertyAddress
+          propertyAddress,
+          serviceType
         }
       });
 
@@ -54,7 +57,11 @@ export function SendStripeAuthButton({
         throw new Error(data.error);
       }
 
-      toast.success("Payment authorization email sent successfully!");
+      const successMessage = data?.includesW9 
+        ? "Payment setup & W-9 email sent successfully!"
+        : "Payment setup email sent successfully!";
+      
+      toast.success(successMessage);
     } catch (error: any) {
       console.error("Error sending Stripe auth email:", error);
       toast.error(error.message || "Failed to send payment authorization email");
@@ -62,6 +69,12 @@ export function SendStripeAuthButton({
       setIsSending(false);
     }
   };
+
+  // Determine if this is cohosting for button label
+  const isCohosting = serviceType === "cohosting";
+  const buttonLabel = isCohosting 
+    ? "Send ACH/Payment Setup & W9"
+    : "Send ACH/Payment Setup";
 
   return (
     <Button
@@ -78,7 +91,7 @@ export function SendStripeAuthButton({
       ) : (
         <>
           <CreditCard className="w-4 h-4 mr-2" />
-          Send ACH/Payment Setup
+          {buttonLabel}
         </>
       )}
     </Button>
