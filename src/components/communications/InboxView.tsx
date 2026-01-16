@@ -86,6 +86,8 @@ import { QuickAssignButton } from "./QuickAssignButton";
 import { VirtualizedEmailList } from "./inbox/VirtualizedEmailList";
 import { EmailQuickFilters, type EmailQuickFilterType } from "./inbox/EmailQuickFilters";
 import { useEmailClassification, classifyEmail } from "@/hooks/useEmailClassification";
+import { SavedCommunicationsDashboard } from "./saved/SavedCommunicationsDashboard";
+import { SaveCommunicationButton } from "./saved/SaveCommunicationButton";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -146,7 +148,7 @@ interface PhoneAssignment {
   display_name: string | null;
 }
 
-type TabType = "all" | "chats" | "calls" | "emails";
+type TabType = "all" | "chats" | "calls" | "emails" | "saved";
 type FilterType = "all" | "open" | "unread" | "snoozed" | "done" | "urgent" | "owners" | "awaiting";
 type MessageChannel = "sms" | "email";
 type ConversationPriority = "urgent" | "important" | "normal" | "low";
@@ -2376,6 +2378,13 @@ export function InboxView() {
             >
               <Mail className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Emails</span>
+            </button>
+            <button 
+              onClick={() => { setActiveTab("saved"); setSelectedMessage(null); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "saved" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+            >
+              <Archive className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Saved</span>
             </button>
           </div>
           
