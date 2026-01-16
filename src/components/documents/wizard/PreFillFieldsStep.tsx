@@ -1,3 +1,4 @@
+import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +30,75 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ComponentType
   other: { label: "Other Fields", icon: HelpCircle },
 };
 
+// Mapping from extracted field names to common field patterns in templates
+const FIELD_SEMANTIC_MAP: Record<string, string[]> = {
+  // Property
+  property_address: ['premises', 'property', 'address', 'residence', 'located', 'situated'],
+  county: ['county'],
+  state: ['state'],
+  city: ['city'],
+  zip_code: ['zip', 'postal'],
+  
+  // Financial
+  monthly_rent: ['rent', 'monthly', 'installments', 'payment'],
+  security_deposit: ['security', 'deposit'],
+  cleaning_fee: ['cleaning'],
+  admin_fee: ['admin', 'administration'],
+  application_fee: ['application'],
+  late_fee: ['late', 'penalty'],
+  pet_fee: ['pet'],
+  total_rent: ['total'],
+  
+  // Dates
+  lease_start_date: ['start', 'begin', 'commence', 'effective'],
+  lease_end_date: ['end', 'expire', 'termination'],
+  rent_due_day: ['due', 'day'],
+  
+  // Parties
+  landlord_name: ['landlord', 'lessor', 'owner', 'manager', 'management'],
+  tenant_name: ['tenant', 'lessee', 'renter'],
+  occupants: ['occupant', 'resident', 'person'],
+};
+
 const PreFillFieldsStep = ({ data, updateData }: Props) => {
+  // Match extracted values to template field api_ids on mount
+  React.useEffect(() => {
+    if (!data.importSource || Object.keys(data.fieldValues).length === 0) return;
+    
+    const extractedValues = data.fieldValues;
+    const matchedValues: Record<string, string | boolean> = { ...extractedValues };
+    
+    // For each detected field, try to find a matching extracted value
+    data.detectedFields.forEach(field => {
+      const apiIdLower = field.api_id.toLowerCase();
+      const labelLower = field.label.toLowerCase();
+      
+      // If field already has a value, skip
+      if (matchedValues[field.api_id]) return;
+      
+      // Try to match against extracted fields using semantic mapping
+      for (const [extractedKey, patterns] of Object.entries(FIELD_SEMANTIC_MAP)) {
+        const extractedValue = extractedValues[extractedKey];
+        if (!extractedValue || typeof extractedValue !== 'string') continue;
+        
+        // Check if any pattern matches the field's api_id or label
+        const matches = patterns.some(pattern => 
+          apiIdLower.includes(pattern) || labelLower.includes(pattern)
+        );
+        
+        if (matches) {
+          matchedValues[field.api_id] = extractedValue;
+          break;
+        }
+      }
+    });
+    
+    // Only update if we found new matches
+    if (Object.keys(matchedValues).length > Object.keys(extractedValues).length) {
+      updateData({ fieldValues: matchedValues });
+    }
+  }, [data.importSource, data.detectedFields]);
+
   const updateFieldValue = (fieldId: string, value: string | boolean) => {
     updateData({
       fieldValues: {
@@ -72,10 +141,34 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     );
   };
 
-  // Check if a field was imported from document
+  // Check if a field was imported from document or has a matched value
   const isImportedField = (apiId: string) => {
-    return data.importedFields?.includes(apiId) || 
-           data.importedFields?.some(f => apiId.toLowerCase().includes(f.toLowerCase()));
+    if (!data.importSource) return false;
+    // Check if this field has a value that came from import
+    const hasValue = !!data.fieldValues[apiId];
+    const wasDirectlyImported = data.importedFields?.includes(apiId);
+    return hasValue || wasDirectlyImported;
+  };
+
+  // Get the value for a field - check both direct api_id and semantic matches
+  const getFieldValue = (apiId: string): string | boolean | undefined => {
+    // First check direct match
+    if (data.fieldValues[apiId] !== undefined) {
+      return data.fieldValues[apiId];
+    }
+    
+    // Then check semantic matches from extracted data
+    const apiIdLower = apiId.toLowerCase();
+    for (const [extractedKey, patterns] of Object.entries(FIELD_SEMANTIC_MAP)) {
+      const extractedValue = data.fieldValues[extractedKey];
+      if (!extractedValue) continue;
+      
+      if (patterns.some(p => apiIdLower.includes(p))) {
+        return extractedValue;
+      }
+    }
+    
+    return undefined;
   };
 
   // Separate fields by type
@@ -104,8 +197,8 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
   const adminFieldsByCategory = groupFieldsByCategory(adminFields);
 
   const renderField = (field: DetectedField, isGuestField: boolean = false) => {
-    const value = data.fieldValues[field.api_id];
-    const imported = isImportedField(field.api_id);
+    const value = getFieldValue(field.api_id);
+    const imported = isImportedField(field.api_id) || (data.importSource && value);
     // Skip signature type fields - they're placed in visual editor
     if (field.type === "signature") {
       return null;
@@ -236,9 +329,21 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     }
     return (
       <div key={field.api_id} className="space-y-2">
-        <Label htmlFor={field.api_id}>
+        <Label htmlFor={field.api_id} className="flex items-center gap-2">
           {field.label}
-          {isGuestField && <Badge variant="outline" className="ml-2 text-xs">Guest fills</Badge>}
+          {imported && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Sparkles className="h-3 w-3 text-amber-500" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Imported from document</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {isGuestField && <Badge variant="outline" className="text-xs">Guest fills</Badge>}
         </Label>
         <Input
           id={field.api_id}
@@ -247,6 +352,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
           onChange={(e) => updateFieldValue(field.api_id, e.target.value)}
           placeholder={isGuestField ? "Guest will fill this field" : `Enter ${field.label.toLowerCase()}`}
           disabled={isGuestField}
+          className={imported ? "border-amber-300 bg-amber-50/50 dark:bg-amber-900/10" : ""}
         />
       </div>
     );
@@ -288,6 +394,9 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     );
   }
 
+  // Count fields that have values
+  const filledFieldsCount = adminFields.filter(f => getFieldValue(f.api_id)).length;
+
   return (
     <div className="space-y-6">
       <div>
@@ -296,6 +405,20 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
           Fill in the admin fields below. These values will be used when you place text fields in the visual editor.
         </p>
       </div>
+
+      {/* Import Source Alert */}
+      {data.importSource && (
+        <Alert className="border-amber-300 bg-amber-50/50 dark:bg-amber-900/10">
+          <FileText className="h-4 w-4 text-amber-600" />
+          <AlertDescription>
+            <strong>Imported from:</strong> {data.importSource}
+            <br />
+            <span className="text-sm text-muted-foreground">
+              {data.importedFields?.length || 0} fields extracted. Values are highlighted with <Sparkles className="h-3 w-3 inline text-amber-500" /> and are editable.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Important Info Alert */}
       <Alert>
@@ -308,7 +431,8 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
       {/* Summary */}
       <div className="p-3 bg-muted rounded-lg border">
         <p className="text-sm">
-          <span className="font-medium">{adminFields.length}</span> admin fields •{" "}
+          <span className="font-medium">{adminFields.length}</span> admin fields 
+          {data.importSource && <span className="text-amber-600"> ({filledFieldsCount} pre-filled)</span>} •{" "}
           <span className="font-medium">{guestFields.length}</span> guest fields •{" "}
           <span className="font-medium">{signatureFields.length}</span> signature fields
         </p>
