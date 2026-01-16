@@ -85,7 +85,7 @@ import { BatchActions } from "./BatchActions";
 import { QuickAssignButton } from "./QuickAssignButton";
 import { VirtualizedEmailList } from "./inbox/VirtualizedEmailList";
 import { EmailQuickFilters, type EmailQuickFilterType } from "./inbox/EmailQuickFilters";
-import { useEmailClassification, classifyEmail } from "@/hooks/useEmailClassification";
+import { useEmailClassification, classifyEmail, getClassificationColor } from "@/hooks/useEmailClassification";
 import { SavedCommunicationsDashboard } from "./saved/SavedCommunicationsDashboard";
 import { SaveCommunicationButton } from "./saved/SaveCommunicationButton";
 import { useNavigate } from "react-router-dom";
@@ -2606,6 +2606,13 @@ export function InboxView() {
                       const isDone = comm.conversation_status === "done";
                       const isSnoozed = comm.conversation_status === "snoozed";
                       const isAwaiting = comm.conversation_status === "awaiting";
+                      
+                      // Apply email classification for email type communications
+                      const emailClassification = comm.gmail_email ? classifyEmail(comm.gmail_email) : null;
+                      const emailColors = emailClassification ? getClassificationColor(emailClassification) : null;
+                      const isPromotional = emailClassification === "promotional";
+                      const isImportant = emailClassification === "important";
+                      
                       return (
                       <div 
                         key={`${comm.id}-${comm.conversation_status}`}
@@ -2623,29 +2630,34 @@ export function InboxView() {
                           // Smooth transitions for status changes
                           "transition-all duration-300 ease-out",
                           selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30",
+                          // Email classification styling (applies to emails)
+                          emailColors && `border-l-4 ${emailColors.borderColor} ${emailColors.bgColor}`,
+                          // Fade promotional emails
+                          isPromotional && !isDone && !isSnoozed && emailColors?.opacity,
                           // Done status: green border + fade + pale green background
-                          isDone && "border-l-2 border-l-green-500 opacity-50 bg-green-50/30 dark:bg-green-950/10",
+                          isDone && "border-l-4 border-l-green-500 opacity-50 bg-green-50/30 dark:bg-green-950/10",
                           // Snoozed status: amber border + fade + pale amber background
-                          isSnoozed && "border-l-2 border-l-amber-500 opacity-50 bg-amber-50/30 dark:bg-amber-950/10",
-                          // Awaiting status: cyan border
-                          isAwaiting && !isDone && !isSnoozed && "border-l-2 border-l-cyan-500",
-                          // Priority colors (lower precedence than status)
-                          comm.priority === "urgent" && !isDone && !isSnoozed && !isAwaiting && "border-l-2 border-l-red-500",
-                          comm.priority === "important" && !isDone && !isSnoozed && !isAwaiting && "border-l-2 border-l-amber-500"
+                          isSnoozed && "border-l-4 border-l-amber-500 opacity-50 bg-amber-50/30 dark:bg-amber-950/10",
+                          // Awaiting status: cyan border (non-emails only)
+                          !emailColors && isAwaiting && !isDone && !isSnoozed && "border-l-4 border-l-cyan-500",
+                          // Priority colors for non-emails
+                          !emailColors && comm.priority === "urgent" && !isDone && !isSnoozed && !isAwaiting && "border-l-4 border-l-red-500",
+                          !emailColors && comm.priority === "important" && !isDone && !isSnoozed && !isAwaiting && "border-l-4 border-l-amber-500"
                         )}
                       >
                         
                         {/* Compact avatar */}
                         <div className="relative flex-shrink-0">
-                          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                          <div className={cn(
+                            "h-10 w-10 rounded-full flex items-center justify-center",
+                            // Use email classification colors for avatar if email
+                            emailColors ? emailColors.avatarBg :
                             comm.contact_type === "owner" 
                               ? "bg-gradient-to-br from-purple-500 to-purple-600" 
                               : comm.contact_type === "tenant"
                               ? "bg-gradient-to-br from-blue-500 to-blue-600"
-                              : comm.contact_type === "email"
-                              ? "bg-gradient-to-br from-blue-500 to-blue-600"
                               : "bg-gradient-to-br from-emerald-500 to-emerald-600"
-                          }`}>
+                          )}>
                             <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
                           </div>
                           {comm.conversation_status === "done" && (
@@ -2664,13 +2676,28 @@ export function InboxView() {
                         <div className="flex-1 min-w-0 py-0.5">
                           <div className="flex items-center justify-between gap-2 mb-0.5">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
-                              {/* Priority/Status badge */}
-                              <PriorityBadge 
-                                priority={comm.priority} 
-                                status={comm.conversation_status}
-                                compact
-                              />
+                              <span className={cn(
+                                "font-semibold text-sm truncate",
+                                isPromotional && "text-muted-foreground font-medium"
+                              )}>{comm.contact_name}</span>
+                              {/* Email classification badge */}
+                              {emailClassification && emailClassification !== "normal" && (
+                                <span className={cn(
+                                  "inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+                                  isImportant && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+                                  isPromotional && "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                                )}>
+                                  {isImportant ? "Priority" : "Promo"}
+                                </span>
+                              )}
+                              {/* Priority/Status badge for non-emails */}
+                              {!emailClassification && (
+                                <PriorityBadge 
+                                  priority={comm.priority} 
+                                  status={comm.conversation_status}
+                                  compact
+                                />
+                              )}
                               {/* Type indicator */}
                               {comm.type === "call" && (
                                 <Phone className="h-3 w-3 text-orange-500 flex-shrink-0" />
@@ -2703,7 +2730,10 @@ export function InboxView() {
                           </div>
                           
                           {/* Message preview - 2 lines */}
-                          <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
+                          <p className={cn(
+                            "text-[13px] text-muted-foreground line-clamp-2 leading-relaxed",
+                            isPromotional && "text-muted-foreground/70"
+                          )}>
                             {getMessagePreview(comm)}
                           </p>
                         </div>
@@ -2858,6 +2888,18 @@ export function InboxView() {
                 <span className="text-xs text-muted-foreground truncate block">{selectedGmailEmail.from}</span>
               </div>
               {/* Mobile email quick actions */}
+              <SaveCommunicationButton
+                messageId={selectedGmailEmail.id}
+                messageType="email"
+                threadId={selectedGmailEmail.threadId}
+                messageContent={selectedGmailEmail.body}
+                messageSubject={selectedGmailEmail.subject}
+                messageSnippet={selectedGmailEmail.snippet}
+                senderName={selectedGmailEmail.fromName}
+                senderEmail={selectedGmailEmail.from}
+                messageDate={selectedGmailEmail.date}
+                compact
+              />
               <ConversationQuickActions
                 status={doneGmailIds.has(selectedGmailEmail.id) ? "done" : snoozedGmailEmails.has(selectedGmailEmail.id) ? "snoozed" : "open"}
                 onMarkDone={() => markEmailAsDone(selectedGmailEmail.id)}
@@ -2878,6 +2920,17 @@ export function InboxView() {
                 <p className="text-sm text-muted-foreground truncate">{selectedGmailEmail.from}</p>
               </div>
               {/* Desktop email quick actions */}
+              <SaveCommunicationButton
+                messageId={selectedGmailEmail.id}
+                messageType="email"
+                threadId={selectedGmailEmail.threadId}
+                messageContent={selectedGmailEmail.body}
+                messageSubject={selectedGmailEmail.subject}
+                messageSnippet={selectedGmailEmail.snippet}
+                senderName={selectedGmailEmail.fromName}
+                senderEmail={selectedGmailEmail.from}
+                messageDate={selectedGmailEmail.date}
+              />
               <ConversationQuickActions
                 status={doneGmailIds.has(selectedGmailEmail.id) ? "done" : snoozedGmailEmails.has(selectedGmailEmail.id) ? "snoozed" : "open"}
                 onMarkDone={() => markEmailAsDone(selectedGmailEmail.id)}
