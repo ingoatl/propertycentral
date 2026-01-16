@@ -137,48 +137,39 @@ export function CreateAgreementDialog({
 
     setLoading(true);
     try {
-      // Create booking document record first
-      const { data: docRecord, error: docError } = await supabase
-        .from('booking_documents')
-        .insert({
-          booking_id: booking.id,
-          template_id: selectedTemplate,
-          status: 'draft',
-          host_signer_id: (await supabase.auth.getUser()).data.user?.id,
-        })
-        .select()
-        .single();
+      // Build pre-fill data for native signing
+      const preFillData: Record<string, string> = {
+        property_address: property?.address || '',
+        property_name: property?.name || '',
+        guest_name: formData.guestName,
+        tenant_name: formData.guestName,
+        guest_email: formData.guestEmail,
+        tenant_email: formData.guestEmail,
+        max_occupants: formData.maxOccupants,
+        monthly_rent: formData.monthlyRent,
+        security_deposit: formData.securityDeposit,
+        utility_cap: formData.utilityCap,
+        rent_due_date: formData.rentDueDate,
+        check_in_date: formData.checkInDate ? format(new Date(formData.checkInDate), 'MMMM d, yyyy') : '',
+        check_in_time: formData.checkInTime,
+        check_out_date: formData.checkOutDate ? format(new Date(formData.checkOutDate), 'MMMM d, yyyy') : '',
+        check_out_time: formData.checkOutTime,
+        additional_terms: formData.additionalTerms,
+        lease_start_date: formData.checkInDate,
+        lease_end_date: formData.checkOutDate,
+      };
 
-      if (docError) throw docError;
-
-      // Build field values for SignWell
-      const fieldValues = [
-        { api_id: 'property_address', value: property?.address || '' },
-        { api_id: 'property_name', value: property?.name || '' },
-        { api_id: 'guest_name', value: formData.guestName },
-        { api_id: 'max_occupants', value: formData.maxOccupants },
-        { api_id: 'monthly_rent', value: `$${formData.monthlyRent}` },
-        { api_id: 'security_deposit', value: `$${formData.securityDeposit}` },
-        { api_id: 'utility_cap', value: `$${formData.utilityCap}` },
-        { api_id: 'rent_due_date', value: formData.rentDueDate },
-        { api_id: 'check_in_date', value: formData.checkInDate ? format(new Date(formData.checkInDate), 'MMMM d, yyyy') : '' },
-        { api_id: 'check_in_time', value: formData.checkInTime },
-        { api_id: 'check_out_date', value: formData.checkOutDate ? format(new Date(formData.checkOutDate), 'MMMM d, yyyy') : '' },
-        { api_id: 'check_out_time', value: formData.checkOutTime },
-        { api_id: 'additional_terms', value: formData.additionalTerms },
-      ];
-
-      // Call SignWell edge function
-      const { data: result, error: fnError } = await supabase.functions.invoke('signwell-create-document', {
+      // Use native signing solution
+      const { data: result, error: fnError } = await supabase.functions.invoke('create-document-for-signing', {
         body: {
-          bookingId: booking.id,
           templateId: selectedTemplate,
-          guestName: formData.guestName,
-          guestEmail: formData.guestEmail,
-          hostName,
-          hostEmail,
-          fieldValues,
-          documentId: docRecord.id,
+          documentName: templates.find(t => t.id === selectedTemplate)?.name || 'Rental Agreement',
+          recipientName: formData.guestName,
+          recipientEmail: formData.guestEmail,
+          propertyId: property?.id,
+          bookingId: booking.id,
+          preFillData,
+          detectedFields: [], // Fields will be detected from template
         },
       });
 

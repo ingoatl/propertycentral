@@ -31,34 +31,63 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ComponentType
   other: { label: "Other Fields", icon: HelpCircle },
 };
 
-// Mapping from extracted field names to common field patterns in templates
-const FIELD_SEMANTIC_MAP: Record<string, string[]> = {
-  // Property
-  property_address: ['premises', 'property', 'address', 'residence', 'located', 'situated'],
-  county: ['county'],
-  state: ['state'],
-  city: ['city'],
-  zip_code: ['zip', 'postal'],
+// Mapping from extracted field names to SPECIFIC field patterns in templates
+// IMPORTANT: These mappings are specific - do NOT use broad patterns
+const FIELD_SEMANTIC_MAP: Record<string, { patterns: string[]; exactMatch: string[] }> = {
+  // Property - only map to property-related fields
+  property_address: { 
+    exactMatch: ['property_address', 'rental_address', 'premises_address', 'address', 'premises'],
+    patterns: ['property address', 'rental address', 'premises']
+  },
+  county: { exactMatch: ['county', 'property_county'], patterns: [] },
+  state: { exactMatch: ['state', 'property_state'], patterns: [] },
+  city: { exactMatch: ['city', 'property_city'], patterns: [] },
+  zip_code: { exactMatch: ['zip', 'zip_code', 'postal', 'postal_code'], patterns: [] },
   
-  // Financial
-  monthly_rent: ['rent', 'monthly', 'installments', 'payment'],
-  security_deposit: ['security', 'deposit'],
-  cleaning_fee: ['cleaning'],
-  admin_fee: ['admin', 'administration'],
-  application_fee: ['application'],
-  late_fee: ['late', 'penalty'],
-  pet_fee: ['pet'],
-  total_rent: ['total'],
+  // Main Financial - only map to rent-specific fields
+  monthly_rent: { 
+    exactMatch: ['monthly_rent', 'rent_amount', 'base_rent', 'monthly_rental'],
+    patterns: ['monthly rent', 'rent amount', 'base rent']
+  },
+  security_deposit: { 
+    exactMatch: ['security_deposit', 'deposit_amount', 'damage_deposit'],
+    patterns: ['security deposit']
+  },
   
-  // Dates
-  lease_start_date: ['start', 'begin', 'commence', 'effective'],
-  lease_end_date: ['end', 'expire', 'termination'],
-  rent_due_day: ['due', 'day'],
+  // Specific fees - map ONLY to their exact field types
+  late_fee: { exactMatch: ['late_fee', 'late_fee_amount', 'late_charge', 'late_penalty'], patterns: [] },
+  returned_check_fee: { exactMatch: ['returned_check_fee', 'nsf_fee', 'bounced_check_fee', 'dishonored_check'], patterns: [] },
+  cleaning_fee: { exactMatch: ['cleaning_fee', 'cleaning_deposit', 'cleaning_charge'], patterns: [] },
+  admin_fee: { exactMatch: ['admin_fee', 'administration_fee', 'processing_fee'], patterns: [] },
+  application_fee: { exactMatch: ['application_fee', 'app_fee'], patterns: [] },
+  pet_fee: { exactMatch: ['pet_fee', 'pet_deposit', 'animal_fee', 'animal_deposit'], patterns: [] },
+  pet_rent: { exactMatch: ['pet_rent', 'monthly_pet_rent', 'pet_monthly'], patterns: [] },
+  parking_fee: { exactMatch: ['parking_fee', 'garage_rent', 'garage_fee', 'parking_rent'], patterns: [] },
+  grace_period: { exactMatch: ['grace_period', 'grace_period_days', 'grace_days'], patterns: [] },
+  interest_rate: { exactMatch: ['interest_rate', 'late_interest', 'annual_rate'], patterns: [] },
+  total_rent: { exactMatch: ['total_amount', 'total_due', 'move_in_total', 'total_rent'], patterns: [] },
   
-  // Parties
-  landlord_name: ['landlord', 'lessor', 'owner', 'manager', 'management'],
-  tenant_name: ['tenant', 'lessee', 'renter'],
-  occupants: ['occupant', 'resident', 'person'],
+  // Dates - map to date-specific fields
+  lease_start_date: { 
+    exactMatch: ['lease_start', 'start_date', 'lease_start_date', 'commencement_date', 'begin_date'],
+    patterns: ['lease start', 'start date']
+  },
+  lease_end_date: { 
+    exactMatch: ['lease_end', 'end_date', 'lease_end_date', 'termination_date', 'expiration_date'],
+    patterns: ['lease end', 'end date']
+  },
+  rent_due_day: { exactMatch: ['rent_due', 'rent_due_day', 'due_date', 'payment_due'], patterns: [] },
+  
+  // Parties - map to party-specific fields
+  landlord_name: { 
+    exactMatch: ['landlord_name', 'lessor_name', 'owner_name', 'management_company', 'landlord', 'lessor'],
+    patterns: ['landlord name', 'owner name', 'management company']
+  },
+  tenant_name: { 
+    exactMatch: ['tenant_name', 'lessee_name', 'renter_name', 'guest_name', 'occupant_name'],
+    patterns: ['tenant name', 'renter name', 'guest name']
+  },
+  max_occupants: { exactMatch: ['num_occupants', 'max_occupants', 'number_of_occupants', 'occupants_allowed'], patterns: [] },
 };
 
 const PreFillFieldsStep = ({ data, updateData }: Props) => {
@@ -72,24 +101,40 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     // For each detected field, try to find a matching extracted value
     data.detectedFields.forEach(field => {
       const apiIdLower = field.api_id.toLowerCase();
+      const apiIdNormalized = apiIdLower.replace(/[_\-\.]/g, '');
       const labelLower = field.label.toLowerCase();
       
       // If field already has a value, skip
       if (matchedValues[field.api_id]) return;
       
       // Try to match against extracted fields using semantic mapping
-      for (const [extractedKey, patterns] of Object.entries(FIELD_SEMANTIC_MAP)) {
+      for (const [extractedKey, mapping] of Object.entries(FIELD_SEMANTIC_MAP)) {
         const extractedValue = extractedValues[extractedKey];
         if (!extractedValue || typeof extractedValue !== 'string') continue;
         
-        // Check if any pattern matches the field's api_id or label
-        const matches = patterns.some(pattern => 
-          apiIdLower.includes(pattern) || labelLower.includes(pattern)
+        // First check exact matches
+        const exactMatches = mapping.exactMatch.some(exact => 
+          apiIdLower === exact.toLowerCase() || 
+          apiIdNormalized === exact.replace(/[_\-]/g, '').toLowerCase()
         );
         
-        if (matches) {
+        if (exactMatches) {
           matchedValues[field.api_id] = extractedValue;
           break;
+        }
+        
+        // Then check pattern matches (only if patterns exist)
+        if (mapping.patterns.length > 0) {
+          const patternMatches = mapping.patterns.some(pattern => {
+            const patternNormalized = pattern.toLowerCase().replace(/\s+/g, '');
+            return apiIdNormalized.includes(patternNormalized) || 
+                   labelLower.replace(/\s+/g, '').includes(patternNormalized);
+          });
+          
+          if (patternMatches) {
+            matchedValues[field.api_id] = extractedValue;
+            break;
+          }
         }
       }
     });
@@ -158,13 +203,21 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
       return data.fieldValues[apiId];
     }
     
-    // Then check semantic matches from extracted data
+    // Then check semantic matches from extracted data (using strict matching)
     const apiIdLower = apiId.toLowerCase();
-    for (const [extractedKey, patterns] of Object.entries(FIELD_SEMANTIC_MAP)) {
+    const apiIdNormalized = apiIdLower.replace(/[_\-\.]/g, '');
+    
+    for (const [extractedKey, mapping] of Object.entries(FIELD_SEMANTIC_MAP)) {
       const extractedValue = data.fieldValues[extractedKey];
       if (!extractedValue) continue;
       
-      if (patterns.some(p => apiIdLower.includes(p))) {
+      // Only match on exact matches to prevent cross-contamination
+      const exactMatches = mapping.exactMatch.some(exact => 
+        apiIdLower === exact.toLowerCase() || 
+        apiIdNormalized === exact.replace(/[_\-]/g, '').toLowerCase()
+      );
+      
+      if (exactMatches) {
         return extractedValue;
       }
     }
