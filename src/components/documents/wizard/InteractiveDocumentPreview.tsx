@@ -60,28 +60,60 @@ export function InteractiveDocumentPreview({
 
   useEffect(() => {
     // Create positioned fields from detected fields
-    // Since we don't have exact positions from field_mappings, we'll create a grid layout
+    // USE ACTUAL POSITIONS from field_mappings if available
     const positioned = data.detectedFields.map((field, index) => {
-      // Try to find position from template field_mappings if available
       const value = data.fieldValues[field.api_id];
       
-      // Default grid positioning for fields - distribute across document
-      const row = Math.floor(index / 2);
+      // Check if field has position data from field_mappings (stored in the field object)
+      const fieldWithPos = field as any;
+      const hasPosition = fieldWithPos.x !== undefined && fieldWithPos.y !== undefined && fieldWithPos.page !== undefined;
+      
+      if (hasPosition) {
+        // Use actual position from field_mappings
+        return {
+          ...field,
+          x: fieldWithPos.x,
+          y: fieldWithPos.y,
+          width: fieldWithPos.width || 40,
+          height: fieldWithPos.height || 2.5,
+          page: fieldWithPos.page,
+          value,
+        };
+      }
+      
+      // Fallback: distribute across pages based on field category/type
+      // Signature fields should be on the last page
+      const isSignature = (field.type as string) === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
+      const isDate = field.type === "date" || field.api_id.includes("date");
+      
+      // Estimate page based on field type and index
+      let estimatedPage = 1;
+      if (isSignature) {
+        estimatedPage = Math.max(numPages, 10); // Signatures typically on last pages
+      } else if (isDate && field.api_id.includes("signature")) {
+        estimatedPage = Math.max(numPages, 10);
+      } else {
+        // Distribute other fields across first few pages
+        estimatedPage = Math.min(Math.floor(index / 10) + 1, 5);
+      }
+      
+      // Grid positioning within page
+      const row = Math.floor((index % 10) / 2);
       const col = index % 2;
       
       return {
         ...field,
-        x: 5 + (col * 50), // 5% or 55% from left
-        y: 10 + (row * 4), // Stack vertically with 4% spacing
+        x: 5 + (col * 50),
+        y: 10 + (row * 8),
         width: 40,
-        height: 2.5,
-        page: 1, // Default to page 1, ideally this comes from field_mappings
+        height: 3,
+        page: estimatedPage,
         value,
       };
     });
     
     setFieldsWithPositions(positioned);
-  }, [data.detectedFields, data.fieldValues]);
+  }, [data.detectedFields, data.fieldValues, numPages]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
