@@ -2442,6 +2442,14 @@ export function InboxView() {
                   selectedCategory={selectedEmailCategory}
                   onCategoryChange={setSelectedEmailCategory}
                 />
+                {/* Email Quick Filters - Priority/Promotions */}
+                <EmailQuickFilters
+                  activeFilter={emailQuickFilter}
+                  onFilterChange={setEmailQuickFilter}
+                  counts={emailClassificationCounts}
+                  hidePromotions={hidePromotions}
+                  onToggleHidePromotions={() => setHidePromotions(prev => !prev)}
+                />
                 {/* Keyboard shortcuts help */}
                 <KeyboardShortcutsHelp 
                   shortcuts={keyboardShortcuts}
@@ -2532,160 +2540,30 @@ export function InboxView() {
         {/* Message List - Clean, content-first cards */}
         <ScrollArea className="flex-1">
           {activeTab === "emails" ? (
-            // Gmail Inbox View
+            // Gmail Inbox View - Using VirtualizedEmailList with color categorization
             isLoadingGmail ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : filteredGmailEmails.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-                <Mail className="h-12 w-12 mb-3 opacity-30" />
-                <p className="text-sm">No emails</p>
-              </div>
             ) : (
-              <div>
-                {filteredGmailEmails
-                  .filter(email => !search || search === " " || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase()))
-                  .filter(email => !snoozedGmailEmails.has(email.id)) // Hide snoozed emails
-                  .sort((a, b) => {
-                    const aIsDone = doneGmailIds.has(a.id);
-                    const bIsDone = doneGmailIds.has(b.id);
-                    const aInsight = emailInsightsMap.get(a.id);
-                    const bInsight = emailInsightsMap.get(b.id);
-                    const aIsLow = aInsight?.priority === 'low' || aInsight?.category === 'promotional' || aInsight?.category === 'newsletter';
-                    const bIsLow = bInsight?.priority === 'low' || bInsight?.category === 'promotional' || bInsight?.category === 'newsletter';
-                    const aIsUrgent = aInsight?.priority === 'urgent' || aInsight?.priority === 'high' || aInsight?.action_required;
-                    const bIsUrgent = bInsight?.priority === 'urgent' || bInsight?.priority === 'high' || bInsight?.action_required;
-                    
-                    // Done emails sink to bottom
-                    if (aIsDone !== bIsDone) return aIsDone ? 1 : -1;
-                    // Low priority/promotional sink below normal
-                    if (aIsLow !== bIsLow) return aIsLow ? 1 : -1;
-                    // Urgent emails rise to top
-                    if (aIsUrgent !== bIsUrgent) return aIsUrgent ? -1 : 1;
-                    // Finally sort by date (newest first)
-                    return new Date(b.date).getTime() - new Date(a.date).getTime();
-                  })
-                  .map((email) => {
-                    const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
-                    const isDone = doneGmailIds.has(email.id);
-                    const isSnoozed = snoozedGmailEmails.has(email.id);
-                    const insight = emailInsightsMap.get(email.id);
-                    const isLowPriority = insight?.priority === 'low' || insight?.category === 'promotional' || insight?.category === 'newsletter';
-                    const shouldFade = isDone || isSnoozed || isLowPriority;
-                    
-                    return (
-                      <div 
-                        key={`${email.id}-${isDone ? 'done' : isSnoozed ? 'snoozed' : 'open'}`}
-                        onClick={() => handleSelectGmailEmailMobile(email)} 
-                        className={`group relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 
-                          ${selectedGmailEmail?.id === email.id ? "bg-primary/5" : "hover:bg-muted/30"} 
-                          ${isUnread ? "bg-primary/[0.03]" : ""} 
-                          ${shouldFade ? "opacity-50" : ""}`}
-                      >
-                        {/* Status indicator line - done/snoozed/priority */}
-                        {isDone ? (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
-                        ) : isSnoozed ? (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
-                        ) : insight?.priority === 'urgent' ? (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
-                        ) : null}
-                        
-                        <div className="relative h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-semibold text-white">{getInitials(email.fromName)}</span>
-                          {isDone && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-                              <CheckCircle className="h-2.5 w-2.5 text-white" />
-                            </div>
-                          )}
-                          {isSnoozed && !isDone && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 border-2 border-background flex items-center justify-center">
-                              <Clock className="h-2.5 w-2.5 text-white" />
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0 py-0.5">
-                          <div className="flex items-center justify-between gap-2 mb-0.5">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <span className={`text-sm truncate ${isUnread ? 'font-semibold' : shouldFade ? 'font-normal text-muted-foreground' : 'font-medium text-foreground/80'}`}>
-                                {email.fromName}
-                              </span>
-                              {isDone && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-medium">
-                                  ✓ Done
-                                </span>
-                              )}
-                              {isSnoozed && !isDone && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[10px] font-medium">
-                                  ⏰ Snoozed
-                                </span>
-                              )}
-                              {/* AI Category Badge */}
-                              {insight && (
-                                <EmailCategoryBadge 
-                                  category={insight.category}
-                                  sentiment={insight.sentiment || undefined}
-                                  priority={insight.priority || undefined}
-                                  compact
-                                />
-                              )}
-                              {/* Property/Owner indicator - clickable */}
-                              {insight?.property_id && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/properties?id=${insight.property_id}`);
-                                  }}
-                                  className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
-                                  title="View associated property"
-                                >
-                                  <Home className="h-3 w-3 text-amber-600" />
-                                </button>
-                              )}
-                              {insight?.owner_id && !insight?.property_id && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate("/property-owners");
-                                  }}
-                                  className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-purple-500/10 hover:bg-purple-500/20 transition-colors"
-                                  title="View associated owner"
-                                >
-                                  <User className="h-3 w-3 text-purple-600" />
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              {/* Quick action buttons on hover */}
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1">
-                                <ConversationQuickActions
-                                  status={isDone ? "done" : isSnoozed ? "snoozed" : "open"}
-                                  onMarkDone={() => markEmailAsDone(email.id)}
-                                  onSnooze={(hours) => handleGmailSnooze(email.id, hours)}
-                                  onReopen={() => unmarkEmailAsDone(email.id)}
-                                  isUpdating={updateGmailStatusMutation.isPending}
-                                  compact
-                                />
-                              </div>
-                              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                                {format(new Date(email.date), "MMM d")}
-                              </span>
-                            </div>
-                          </div>
-                          <p className={`text-[13px] leading-snug ${isUnread ? 'font-medium' : shouldFade ? 'text-muted-foreground' : 'text-foreground/70'}`}>
-                            {decodeHtmlEntities(email.subject)}
-                          </p>
-                          <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
-                            {decodeHtmlEntities(email.snippet)}
-                          </p>
-                        </div>
-                        {isUnread && !isDone && !isSnoozed && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-3" />}
-                      </div>
-                    );
-                  })}
-              </div>
+              <VirtualizedEmailList
+                emails={filteredGmailEmails}
+                emailInsightsMap={emailInsightsMap}
+                selectedEmail={selectedGmailEmail}
+                onSelectEmail={handleSelectGmailEmailMobile}
+                readGmailIds={readGmailIds}
+                doneGmailIds={doneGmailIds}
+                snoozedGmailEmails={snoozedGmailEmails}
+                onMarkDone={markEmailAsDone}
+                onSnooze={handleGmailSnooze}
+                onReopen={unmarkEmailAsDone}
+                isUpdating={updateGmailStatusMutation.isPending}
+                onNavigateToProperty={(propertyId) => navigate(`/properties?id=${propertyId}`)}
+                onNavigateToOwner={() => navigate("/property-owners")}
+                hidePromotions={hidePromotions}
+                priorityFilter={emailQuickFilter}
+                search={search}
+              />
             )
           ) : isLoading ? (
             <div className="flex items-center justify-center h-32">
