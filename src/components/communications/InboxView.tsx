@@ -247,17 +247,6 @@ export function InboxView() {
   const [emailQuickFilter, setEmailQuickFilter] = useState<EmailQuickFilterType>("all");
   const [hidePromotions, setHidePromotions] = useState(false);
   
-  // Email classification counts
-  const emailClassificationCounts = useMemo(() => {
-    const counts = { total: 0, important: 0, promotional: 0, normal: 0 };
-    filteredGmailEmails?.forEach(email => {
-      const classification = classifyEmail(email);
-      counts.total++;
-      counts[classification]++;
-    });
-    return counts;
-  }, [filteredGmailEmails]);
-  
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin } = useAdminCheck();
@@ -899,6 +888,17 @@ export function InboxView() {
 
     return filtered;
   }, [gmailEmails, selectedEmailInboxView, currentUserId, userGmailLabels, selectedEmailCategory, emailInsightsMap]);
+
+  // Email classification counts - computed after filteredGmailEmails is available
+  const emailClassificationCounts = useMemo(() => {
+    const counts = { total: 0, important: 0, promotional: 0, normal: 0 };
+    filteredGmailEmails?.forEach(email => {
+      const classification = classifyEmail(email);
+      counts.total++;
+      counts[classification]++;
+    });
+    return counts;
+  }, [filteredGmailEmails]);
 
   const { data: communications = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["all-communications", search, activeTab, activeFilter, selectedInboxUserId, viewAllInboxes],
