@@ -154,6 +154,14 @@ serve(async (req) => {
         ?.filter(r => r.opted_out)
         .map(r => r.guest_phone?.replace(/\D/g, '').slice(-10)) || []
     );
+    
+    // CRITICAL: Track ALL phone numbers that have already been contacted (ANY status)
+    // This prevents duplicates when the same phone has multiple reviews or GHL creates duplicate contacts
+    const alreadyContactedPhones = new Set(
+      existingRequests
+        ?.filter(r => r.workflow_status !== "pending") // Already contacted if not pending
+        .map(r => r.guest_phone?.replace(/\D/g, '').slice(-10)) || []
+    );
 
     // Find reviews that need contact - prioritize NEW reviews from today
     let reviewsToContact: typeof allReviews = [];
@@ -165,6 +173,11 @@ serve(async (req) => {
       if (existingReviewIds.has(review.id)) return false;
       const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
       if (optedOutPhones.has(phoneDigits)) return false;
+      // CRITICAL: Skip if this phone was already contacted for ANY review
+      if (alreadyContactedPhones.has(phoneDigits)) {
+        console.log(`Skipping ${review.guest_name} - phone ${phoneDigits} already contacted`);
+        return false;
+      }
       // Check if review is from today
       const reviewDate = review.review_date ? new Date(review.review_date) : null;
       return reviewDate && reviewDate >= today;
@@ -175,18 +188,59 @@ serve(async (req) => {
       if (existingReviewIds.has(review.id)) return false;
       const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
       if (optedOutPhones.has(phoneDigits)) return false;
+      // CRITICAL: Skip if this phone was already contacted for ANY review
+      if (alreadyContactedPhones.has(phoneDigits)) {
+        console.log(`Skipping ${review.guest_name} - phone ${phoneDigits} already contacted`);
+        return false;
+      }
       const reviewDate = review.review_date ? new Date(review.review_date) : null;
       return !reviewDate || reviewDate < today;
+    });
+    
+    // Also check lead_communications for phones that received Google review messages today
+    // to prevent race conditions where batch runs multiple times
+    const { data: todayGoogleReviewComms } = await supabase
+      .from("lead_communications")
+      .select("body, metadata")
+      .gte("created_at", todayStart.toISOString())
+      .eq("direction", "outbound")
+      .ilike("body", "%Google reviews%");
+    
+    const phonesContactedToday = new Set<string>();
+    (todayGoogleReviewComms || []).forEach((comm: any) => {
+      const phone = comm.metadata?.ghl_data?.contactPhone || "";
+      if (phone) {
+        phonesContactedToday.add(phone.replace(/\D/g, '').slice(-10));
+      }
+    });
+    
+    // Final filter to remove any phones already contacted today
+    const filteredTodayReviews = todayReviews.filter(review => {
+      const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
+      if (phonesContactedToday.has(phoneDigits)) {
+        console.log(`DUPLICATE PREVENTION: ${review.guest_name} (${phoneDigits}) already contacted today via lead_communications`);
+        return false;
+      }
+      return true;
+    });
+    
+    const filteredOlderReviews = olderReviews.filter(review => {
+      const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
+      if (phonesContactedToday.has(phoneDigits)) {
+        console.log(`DUPLICATE PREVENTION: ${review.guest_name} (${phoneDigits}) already contacted today via lead_communications`);
+        return false;
+      }
+      return true;
     });
 
     // Combine: today's reviews first (up to remaining quota), then fill with older ones
     // CRITICAL: Respect the remaining daily quota
     reviewsToContact = [
-      ...todayReviews.slice(0, remainingToday),
-      ...olderReviews.slice(0, Math.max(0, remainingToday - todayReviews.length))
+      ...filteredTodayReviews.slice(0, remainingToday),
+      ...filteredOlderReviews.slice(0, Math.max(0, remainingToday - filteredTodayReviews.length))
     ].slice(0, remainingToday);
 
-    console.log(`Found ${todayReviews.length} new reviews from today, ${olderReviews.length} older reviews`);
+    console.log(`Found ${filteredTodayReviews.length} eligible new reviews from today, ${filteredOlderReviews.length} eligible older reviews`);
     console.log(`Processing ${reviewsToContact.length} reviews in this batch (limited by remaining quota: ${remainingToday})`);
     console.log(`Daily send stats: ${sentToday} already sent + ${reviewsToContact.length} this batch = ${sentToday + reviewsToContact.length} total`);
 

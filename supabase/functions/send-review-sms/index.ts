@@ -510,6 +510,111 @@ serve(async (req) => {
       );
     }
 
+    // AI-powered smart follow-up action
+    if (action === "ai_followup") {
+      const { data: request, error: requestError } = await supabase
+        .from("google_review_requests")
+        .select("*, ownerrez_reviews(*)")
+        .eq("id", requestId)
+        .single();
+
+      if (requestError || !request) {
+        throw new Error("Request not found");
+      }
+
+      if (request.opted_out) {
+        console.log(`Guest ${request.guest_phone} has opted out, skipping AI follow-up`);
+        return new Response(
+          JSON.stringify({ success: false, error: "Guest has opted out of SMS", optedOut: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if already completed - don't send follow-ups to completed reviews
+      if (request.workflow_status === "completed") {
+        console.log(`Guest ${request.guest_phone} already completed review, skipping follow-up`);
+        return new Response(
+          JSON.stringify({ success: false, error: "Guest already completed their review - no follow-up needed" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const review = request.ownerrez_reviews;
+      const guestName = review?.guest_name || "there";
+      const propertyName = review?.property_name || "our property";
+      const reviewSource = review?.review_source || "Airbnb";
+      
+      // Determine the right follow-up message based on workflow status
+      let followUpMessage: string;
+      
+      if (request.workflow_status === "permission_asked" && !request.permission_granted_at) {
+        // They haven't responded yet - gentle check-in
+        followUpMessage = `Hi ${guestName}! It's Anja & Ingo from PeachHaus Group — your hosts from when you stayed with us. Just checking in, no pressure at all! We'd love it if you could share your experience on Google to help other travelers discover us. Would you like me to send over a link? 😊`;
+      } else if (request.workflow_status === "permission_granted" && !request.link_sent_at) {
+        // They said yes but never got the link
+        followUpMessage = `Hi ${guestName}! It's Anja & Ingo from PeachHaus Group. Thank you so much for agreeing to leave us a Google review! Here's the link: ${googleReviewUrl}. And here's your original ${reviewSource} review text if you'd like to paste it: "${review?.review_text || ''}"`;
+      } else if (request.workflow_status === "link_sent" && request.nudge_count < 2) {
+        // Link was sent, gentle nudge
+        const daysSinceLinkSent = request.link_sent_at 
+          ? Math.floor((Date.now() - new Date(request.link_sent_at).getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+        
+        if (daysSinceLinkSent > 3) {
+          followUpMessage = `Hi ${guestName}! It's Anja & Ingo from PeachHaus Group — hope you're doing great! Just a friendly reminder about the Google review. We know life gets busy! Here's the link again if you have a moment: ${googleReviewUrl}. Thanks so much for considering it! 🙏`;
+        } else {
+          return new Response(
+            JSON.stringify({ success: false, error: "Link sent recently - waiting before next follow-up" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else {
+        // Max nudges reached or unknown state
+        return new Response(
+          JSON.stringify({ success: false, error: "Maximum follow-ups sent or guest completed - no action needed" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const followUpResult = await sendSms(request.guest_phone, followUpMessage, request.id);
+
+      await supabase.from("sms_log").insert({
+        request_id: request.id,
+        phone_number: request.guest_phone,
+        message_type: "ai_followup",
+        message_body: followUpMessage,
+        ghl_message_id: followUpResult.messageId,
+        status: followUpResult.success ? "sent" : "failed",
+        error_message: followUpResult.error,
+      });
+
+      if (!followUpResult.success) {
+        if (followUpResult.optedOut) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Contact has opted out at carrier level", optedOut: true }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        throw new Error(followUpResult.error || "Failed to send AI follow-up SMS");
+      }
+
+      // Update nudge count
+      await supabase
+        .from("google_review_requests")
+        .update({
+          nudge_count: (request.nudge_count || 0) + 1,
+          last_nudge_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", request.id);
+
+      console.log(`AI Follow-up SMS sent to ${request.guest_phone} via GHL`);
+
+      return new Response(
+        JSON.stringify({ success: true, action: "ai_followup" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (action === "test") {
       // Send test to specified phone or default to Ingo's phone
       const adminPhone = testPhone ? formatPhoneE164(testPhone) : "+17709065022";
