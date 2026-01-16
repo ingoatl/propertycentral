@@ -102,6 +102,7 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "🏡 Core Mid-Term Rental Marketplaces", field_type: "section_header" },
       { title: "Furnished Finder", field_type: "text", description: "Enter Listing URL" },
       { title: "CHBO (Corporate Housing by Owner)", field_type: "text", description: "Enter Listing URL" },
+      { title: "Home Source", field_type: "text", description: "Corporate/insurance housing marketplace - https://www.homesourcetemphousing.com" },
       { title: "Homads", field_type: "text", description: "Enter Listing URL" },
       { title: "MidTermRentalProperties.com", field_type: "text", description: "Enter Listing URL" },
       { title: "June Homes", field_type: "text", description: "Enter Placeholder" },
