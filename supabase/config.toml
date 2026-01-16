@@ -449,3 +449,6 @@ verify_jwt = false
 
 [functions.generate-draft-reply]
 verify_jwt = true
+
+[functions.google-reviews-watchdog]
+verify_jwt = false

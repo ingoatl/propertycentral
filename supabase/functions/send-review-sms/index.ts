@@ -457,6 +457,59 @@ serve(async (req) => {
       );
     }
 
+    // Handle thank_you action - sends thank you message when guest confirms they posted review
+    if (action === "thank_you") {
+      const { data: request, error: requestError } = await supabase
+        .from("google_review_requests")
+        .select("*, ownerrez_reviews(*)")
+        .eq("id", requestId)
+        .single();
+
+      if (requestError || !request) {
+        throw new Error("Request not found");
+      }
+
+      const review = request.ownerrez_reviews;
+      const guestName = review?.guest_name || "there";
+
+      const thankYouMessage = `Hi ${guestName}! It's Anja & Ingo from PeachHaus Group. 🙏 THANK YOU so much for taking the time to leave us a Google review! It means the world to us and helps other travelers find our homes. We hope to host you again someday! ❤️`;
+      
+      const thankYouResult = await sendSms(request.guest_phone, thankYouMessage, request.id);
+
+      await supabase.from("sms_log").insert({
+        request_id: request.id,
+        phone_number: request.guest_phone,
+        message_type: "thank_you",
+        message_body: thankYouMessage,
+        ghl_message_id: thankYouResult.messageId,
+        status: thankYouResult.success ? "sent" : "failed",
+        error_message: thankYouResult.error,
+      });
+
+      if (thankYouResult.success) {
+        // Mark as completed
+        await supabase
+          .from("google_review_requests")
+          .update({
+            workflow_status: "completed",
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", request.id);
+      }
+
+      if (!thankYouResult.success) {
+        throw new Error(thankYouResult.error || "Failed to send thank you SMS");
+      }
+
+      console.log(`Thank you SMS sent to ${request.guest_phone} via GHL`);
+
+      return new Response(
+        JSON.stringify({ success: true, action: "thank_you" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (action === "test") {
       // Send test to specified phone or default to Ingo's phone
       const adminPhone = testPhone ? formatPhoneE164(testPhone) : "+17709065022";
