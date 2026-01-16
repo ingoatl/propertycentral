@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import {
-  Bookmark,
+  Archive,
   Search,
   Filter,
   Pin,
@@ -201,9 +201,9 @@ export function SavedCommunicationsDashboard() {
       {/* Stats Bar */}
       <div className="px-4 py-3 border-b bg-muted/30 flex items-center gap-4 text-sm">
         <div className="flex items-center gap-1.5">
-          <Bookmark className="h-4 w-4 text-primary" />
+          <Archive className="h-4 w-4 text-primary" />
           <span className="font-medium">{stats.total}</span>
-          <span className="text-muted-foreground">saved</span>
+          <span className="text-muted-foreground">archived</span>
         </div>
         <div className="text-muted-foreground">•</div>
         <div className="flex items-center gap-1.5">
@@ -272,9 +272,9 @@ export function SavedCommunicationsDashboard() {
       <ScrollArea className="flex-1">
         {filteredComms.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-            <Bookmark className="h-12 w-12 mb-3 opacity-30" />
-            <p className="text-sm font-medium">No saved messages yet</p>
-            <p className="text-xs">Click Save on any message to archive it here</p>
+            <Archive className="h-12 w-12 mb-3 opacity-30" />
+            <p className="text-sm font-medium">No archived messages yet</p>
+            <p className="text-xs">Click the Archive button on any message to save it here</p>
           </div>
         ) : viewMode === "cards" ? (
           <div className="p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -2385,7 +2385,7 @@ export function InboxView() {
               className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "saved" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
               <Archive className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Archive</span>
+              <span className="hidden sm:inline">My Archive</span>
             </button>
           </div>
           
@@ -2549,7 +2549,10 @@ export function InboxView() {
 
         {/* Message List - Clean, content-first cards */}
         <ScrollArea className="flex-1">
-          {activeTab === "emails" ? (
+          {activeTab === "saved" ? (
+            // My Archive - Saved Communications Dashboard
+            <SavedCommunicationsDashboard />
+          ) : activeTab === "emails" ? (
             // Gmail Inbox View - Using VirtualizedEmailList with color categorization
             isLoadingGmail ? (
               <div className="flex items-center justify-center h-32">
