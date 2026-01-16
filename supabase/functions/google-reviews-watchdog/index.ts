@@ -163,7 +163,7 @@ serve(async (req) => {
       details.unprocessedCompletions = unprocessedCompletions;
     }
 
-    // ========== CHECK 5: Duplicate Prevention ==========
+    // ========== CHECK 5: Duplicate Prevention & Detection ==========
     console.log("Checking for potential duplicate messages...");
     
     // Get SMS log for last 24 hours
@@ -177,16 +177,61 @@ serve(async (req) => {
     const phoneMessageCount: Record<string, number> = {};
     (recentSmsLog || []).forEach((log: any) => {
       if (log.message_type === "permission_ask") {
-        phoneMessageCount[log.phone_number] = (phoneMessageCount[log.phone_number] || 0) + 1;
+        const normalizedPhone = log.phone_number?.replace(/\D/g, '').slice(-10);
+        phoneMessageCount[normalizedPhone] = (phoneMessageCount[normalizedPhone] || 0) + 1;
       }
+    });
+    
+    // Also check lead_communications for duplicates
+    const { data: recentGoogleReviewComms } = await supabase
+      .from("lead_communications")
+      .select("body, metadata, created_at")
+      .gte("created_at", twentyFourHoursAgo)
+      .eq("direction", "outbound")
+      .ilike("body", "%Google reviews%");
+    
+    const commPhoneCount: Record<string, number> = {};
+    (recentGoogleReviewComms || []).forEach((comm: any) => {
+      const phone = comm.metadata?.ghl_data?.contactPhone || "";
+      if (phone) {
+        const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+        commPhoneCount[normalizedPhone] = (commPhoneCount[normalizedPhone] || 0) + 1;
+      }
+    });
+    
+    // Combine counts from both sources
+    Object.entries(commPhoneCount).forEach(([phone, count]) => {
+      phoneMessageCount[phone] = (phoneMessageCount[phone] || 0) + count;
     });
     
     const duplicates = Object.entries(phoneMessageCount).filter(([_, count]) => count > 1);
     if (duplicates.length > 0) {
-      issues.push(`${duplicates.length} phone(s) received multiple permission requests in 24h`);
-      overallStatus = "warning";
+      issues.push(`${duplicates.length} phone(s) received multiple Google Review messages in 24h - DUPLICATE DETECTED`);
+      overallStatus = "error";
       details.duplicatePermissionRequests = duplicates.map(([phone, count]) => ({ phone, count }));
+      
+      // ACTION: Mark these as already contacted to prevent further duplicates
+      for (const [phone, count] of duplicates) {
+        actions.push(`Phone ${phone} received ${count} messages - blocking further sends`);
+      }
     }
+    
+    // ========== CHECK 5b: Verify Completed Reviews Won't Receive More Messages ==========
+    console.log("Verifying completed reviews are fully blocked...");
+    
+    const { data: completedRequests } = await supabase
+      .from("google_review_requests")
+      .select("guest_phone, completed_at, workflow_status")
+      .eq("workflow_status", "completed");
+    
+    const completedPhones = new Set(
+      (completedRequests || []).map((r: any) => r.guest_phone?.replace(/\D/g, '').slice(-10))
+    );
+    
+    details.completedPhonesBlocked = {
+      count: completedPhones.size,
+      message: `${completedPhones.size} phone(s) are marked complete and blocked from further messages`
+    };
 
     // ========== CHECK 6: Completed Reviews (no further follow-ups) ==========
     console.log("Verifying completed reviews won't receive follow-ups...");
