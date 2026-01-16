@@ -6,6 +6,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Lease-specific field assignment patterns
+const LEASE_TENANT_PATTERNS = [
+  'tenant', 'lessee', 'renter', 'occupant', 'applicant', 'resident',
+  'co_tenant', 'cotenant', 'emergency_contact', 'vehicle', 'car', 
+  'license_plate', 'pet', 'employer', 'employment', 'income', 
+  'references', 'social_security', 'ssn', 'driver_license'
+];
+
+const LEASE_ADMIN_PATTERNS = [
+  'landlord', 'lessor', 'owner', 'agent', 'property_manager', 'management',
+  'premises', 'property_address', 'unit', 'apartment', 'suite',
+  'lease_start', 'lease_end', 'term', 'commencement', 'expiration',
+  'rent', 'deposit', 'fee', 'payment', 'amount', 'price', 'rate',
+  'utility', 'parking', 'amenity', 'rules', 'policy', 'late_fee'
+];
+
 interface TextPosition {
   text: string;
   x: number;
@@ -37,10 +53,67 @@ interface DetectedField {
   y: number;
   width: number;
   height: number;
-  filled_by: "admin" | "guest";
+  filled_by: "admin" | "guest" | "tenant";
   required: boolean;
   group_name?: string;
-  label_offset?: number; // X offset from label end to where value should start
+  label_offset?: number;
+}
+
+// Detect if this is a lease document
+function isLeaseDocument(textPositions: TextPosition[], fileName?: string): boolean {
+  const allText = textPositions.map(t => t.text.toLowerCase()).join(' ');
+  const lowerFileName = (fileName || '').toLowerCase();
+  
+  const leaseKeywords = [
+    'residential lease', 'lease agreement', 'rental agreement', 'tenancy',
+    'tenant', 'landlord', 'lessor', 'lessee', 'monthly rent', 'security deposit'
+  ];
+  
+  const matchCount = leaseKeywords.filter(kw => 
+    allText.includes(kw) || lowerFileName.includes(kw)
+  ).length;
+  
+  return matchCount >= 2 || 
+    lowerFileName.includes('lease') || 
+    lowerFileName.includes('rental');
+}
+
+// Apply intelligent field assignment for lease documents
+function applyLeaseFieldAssignment(fields: DetectedField[]): DetectedField[] {
+  return fields.map(field => {
+    const apiIdLower = field.api_id.toLowerCase();
+    const labelLower = field.label.toLowerCase();
+    
+    // Check tenant patterns
+    const isTenantField = LEASE_TENANT_PATTERNS.some(pattern => 
+      apiIdLower.includes(pattern) || labelLower.includes(pattern)
+    );
+    
+    // Check admin/landlord patterns  
+    const isAdminField = LEASE_ADMIN_PATTERNS.some(pattern => 
+      apiIdLower.includes(pattern) || labelLower.includes(pattern)
+    );
+    
+    if (isTenantField && !isAdminField) {
+      return { ...field, filled_by: 'tenant' as const };
+    }
+    if (isAdminField && !isTenantField) {
+      return { ...field, filled_by: 'admin' as const };
+    }
+    
+    // For signature fields
+    if (field.type === 'signature' || apiIdLower.includes('signature')) {
+      if (apiIdLower.includes('tenant') || apiIdLower.includes('lessee')) {
+        return { ...field, filled_by: 'tenant' as const };
+      }
+      if (apiIdLower.includes('landlord') || apiIdLower.includes('lessor') || apiIdLower.includes('owner')) {
+        return { ...field, filled_by: 'admin' as const };
+      }
+    }
+    
+    // Default unclear fields in lease to tenant
+    return { ...field, filled_by: field.filled_by || 'tenant' as const };
+  });
 }
 
 serve(async (req) => {
@@ -58,9 +131,13 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { textPositions, formFields, templateId, totalPages, existingContractType, mergeWithExisting, existingFields } = await req.json();
+    const { textPositions, formFields, templateId, totalPages, existingContractType, mergeWithExisting, existingFields, fileName } = await req.json();
 
     console.log(`Processing - templateId: ${templateId}, mergeWithExisting: ${mergeWithExisting}, existingFields: ${existingFields?.length || 0}`);
+
+    // Detect if this is a lease document
+    const isLease = isLeaseDocument(textPositions || [], fileName);
+    console.log(`Lease document detection: ${isLease}`);
 
     // If we have AcroForm fields from getAnnotations(), use them directly
     if (formFields && Array.isArray(formFields) && formFields.length > 0) {
@@ -70,8 +147,14 @@ serve(async (req) => {
         formFields as FormField[],
         textPositions as TextPosition[],
         lovableApiKey,
-        totalPages
+        totalPages,
+        isLease
       );
+      
+      // Apply lease-specific assignments if it's a lease
+      if (isLease) {
+        detectedFields = applyLeaseFieldAssignment(detectedFields);
+      }
       
       // Merge with existing fields if requested
       if (mergeWithExisting && existingFields && Array.isArray(existingFields)) {
@@ -95,12 +178,19 @@ serve(async (req) => {
         }
       }
 
+      // Log distribution
+      const tenantCount = detectedFields.filter(f => f.filled_by === 'tenant').length;
+      const adminCount = detectedFields.filter(f => f.filled_by === 'admin').length;
+      const guestCount = detectedFields.filter(f => f.filled_by === 'guest').length;
+      console.log(`Field distribution: Tenant=${tenantCount}, Admin=${adminCount}, Guest=${guestCount}`);
+
       return new Response(
         JSON.stringify({ 
           success: true, 
           fields: detectedFields,
           totalPages: totalPages || 1,
-          source: "acroform"
+          source: "acroform",
+          isLeaseDocument: isLease
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -130,9 +220,8 @@ serve(async (req) => {
       linesByPage[page].sort((a, b) => a.y - b.y);
     }
 
-    // Build structured document with labeled lines - chunk for large documents
+    // Build structured document
     const documentLines: string[] = [];
-    const MAX_PAGES_PER_CHUNK = 5;
     
     for (const [pageStr, lines] of Object.entries(linesByPage)) {
       const page = parseInt(pageStr);
@@ -145,7 +234,7 @@ serve(async (req) => {
 
     const documentContent = documentLines.join('\n');
     
-    // Process in chunks for large documents
+    // Process in chunks
     const allFields: DetectedField[] = [];
     const chunks: string[] = [];
     const chunkSize = 12000;
@@ -155,6 +244,26 @@ serve(async (req) => {
     }
     
     console.log(`Processing ${chunks.length} chunk(s) of document content`);
+
+    // Build lease-specific prompt instructions
+    const leaseInstructions = isLease ? `
+CRITICAL - THIS IS A LEASE/RENTAL AGREEMENT:
+Use "tenant" for tenant/renter fields and "admin" for landlord/property manager fields.
+
+TENANT fields (filled_by: "tenant"):
+- Tenant name, email, phone, address
+- Social security, driver's license
+- Employment info, income
+- Vehicle info, pet info
+- Emergency contacts
+- Tenant signatures
+
+ADMIN/LANDLORD fields (filled_by: "admin"):
+- Property address, unit number
+- Lease dates (start, end)
+- Rent amount, deposits, fees
+- Landlord info and signature
+` : '';
 
     // Use tool calling for reliable JSON output
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
@@ -169,39 +278,37 @@ serve(async (req) => {
 DOCUMENT SECTION (Part ${chunkIndex + 1}/${chunks.length}):
 ${chunk}
 
+${leaseInstructions}
+
 SIGNING PARTIES:
-- "Owner" or "guest" = property owner who signs the document
-- "Admin" = property manager/host who signs the document
+${isLease ? `
+- "Tenant" (filled_by: "tenant") = the renter/lessee
+- "Landlord" (filled_by: "admin") = property owner/manager
+` : `
+- "Owner" or "guest" (filled_by: "guest") = property owner who signs the document
+- "Admin" (filled_by: "admin") = property manager/host who signs the document
+`}
 
 FIELD DETECTION RULES:
 
 1. TEXT FIELDS:
-   - "Owner(s):" or "Owner Name:" → api_id: "owner_name", filled_by: "guest"
-   - "Address:" (owner's address) → api_id: "owner_address", filled_by: "guest"
-   - "Phone:" → api_id: "owner_phone", type: "phone", filled_by: "guest"
-   - "Email:" → api_id: "owner_email", type: "email", filled_by: "guest"
-   - "Property Address" → api_id: "property_address", filled_by: "guest"
+   - "Tenant Name:" → api_id: "tenant_name", filled_by: "${isLease ? 'tenant' : 'guest'}"
+   - "Landlord Name:" → api_id: "landlord_name", filled_by: "admin"
+   - "Property Address" → api_id: "property_address", filled_by: "admin"
 
 2. DATE FIELDS:
-   - "Effective Date:" → api_id: "effective_date", filled_by: "admin"
-   - "Date:" near Owner signature → api_id: "owner_signature_date", filled_by: "guest"
-   - "Date:" near Manager signature → api_id: "manager_signature_date", filled_by: "admin"
+   - "Lease Start Date:" → filled_by: "admin"
+   - "Date:" near Tenant signature → filled_by: "${isLease ? 'tenant' : 'guest'}"
+   - "Date:" near Landlord signature → filled_by: "admin"
 
-3. PACKAGE SELECTION (RADIO BUTTONS):
-   - Lines with ☐ or □ followed by percentage (15%, 18%, 20%, 25%) are RADIO buttons
-   - type: "radio", group_name: "package_selection", filled_by: "guest"
-
-4. SIGNATURES:
-   - "Owner Signature" → api_id: "owner_signature", filled_by: "guest"
-   - "Second Owner" or "OWNER 2" → api_id: "second_owner_signature", filled_by: "guest"
-   - "Manager" signature → api_id: "manager_signature", filled_by: "admin"
+3. SIGNATURES:
+   - "Tenant Signature" → filled_by: "${isLease ? 'tenant' : 'guest'}"
+   - "Landlord Signature" → filled_by: "admin"
 
 CRITICAL POSITIONING RULES:
 - x: The X% where the FILLABLE AREA STARTS (not where the label starts)
-- For "Name:_____", x should be AFTER the colon where the blank line starts
-- For "Signature:________", x should be where the signature line begins
-- Signatures and values must NOT overlap with label text
-- y: Use exact y% from the line position`;
+- y: Use exact y% from the line position
+- Signatures should NOT overlap with label text`;
 
           const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
@@ -232,14 +339,14 @@ CRITICAL POSITIONING RULES:
                               label: { type: "string" },
                               type: { type: "string", enum: ["text", "date", "email", "phone", "signature", "checkbox", "radio"] },
                               page: { type: "number" },
-                              x: { type: "number", description: "X position where the fillable area STARTS (after any label text)" },
+                              x: { type: "number" },
                               y: { type: "number" },
                               width: { type: "number" },
                               height: { type: "number" },
-                              filled_by: { type: "string", enum: ["admin", "guest"] },
+                              filled_by: { type: "string", enum: ["admin", "guest", "tenant"] },
                               required: { type: "boolean" },
                               group_name: { type: "string" },
-                              label_offset: { type: "number", description: "Offset in % from label start to where value should be written" }
+                              label_offset: { type: "number" }
                             },
                             required: ["api_id", "label", "type", "page", "x", "y", "filled_by"]
                           }
@@ -290,7 +397,7 @@ CRITICAL POSITIONING RULES:
                   height: field.type === 'signature' 
                     ? Math.min(4, Number(field.height) || 4)
                     : Math.min(2.5, Number(field.height) || 2.5),
-                  filled_by: field.filled_by === "admin" ? "admin" : "guest",
+                  filled_by: validateFilledBy(field.filled_by, isLease),
                   required: field.required !== false,
                   ...(field.group_name && { group_name: String(field.group_name) }),
                   ...(field.label_offset && { label_offset: Number(field.label_offset) }),
@@ -317,7 +424,7 @@ CRITICAL POSITIONING RULES:
                     height: field.type === 'signature' 
                       ? Math.min(4, Number(field.height) || 4)
                       : Math.min(2.5, Number(field.height) || 2.5),
-                    filled_by: field.filled_by === "admin" ? "admin" : "guest",
+                    filled_by: validateFilledBy(field.filled_by, isLease),
                     required: field.required !== false,
                     ...(field.group_name && { group_name: String(field.group_name) }),
                   });
@@ -348,6 +455,11 @@ CRITICAL POSITIONING RULES:
     }
     let validatedFields = Array.from(uniqueFields.values());
 
+    // Apply lease-specific assignments if it's a lease
+    if (isLease) {
+      validatedFields = applyLeaseFieldAssignment(validatedFields);
+    }
+
     // Merge with existing fields if requested
     if (mergeWithExisting && existingFields && Array.isArray(existingFields)) {
       const existingApiIds = new Set(existingFields.map((f: any) => f.api_id));
@@ -357,6 +469,12 @@ CRITICAL POSITIONING RULES:
     }
 
     console.log(`Final ${validatedFields.length} unique fields via AI`);
+
+    // Log distribution
+    const tenantCount = validatedFields.filter(f => f.filled_by === 'tenant').length;
+    const adminCount = validatedFields.filter(f => f.filled_by === 'admin').length;
+    const guestCount = validatedFields.filter(f => f.filled_by === 'guest').length;
+    console.log(`Field distribution: Tenant=${tenantCount}, Admin=${adminCount}, Guest=${guestCount}`);
 
     // Save to template
     if (templateId && validatedFields.length > 0) {
@@ -377,7 +495,8 @@ CRITICAL POSITIONING RULES:
         success: true, 
         fields: validatedFields,
         totalPages: totalPages || 1,
-        source: "ai"
+        source: "ai",
+        isLeaseDocument: isLease
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -398,18 +517,17 @@ async function mapFormFieldsToSemanticFields(
   formFields: FormField[],
   textPositions: TextPosition[],
   apiKey: string,
-  totalPages: number
+  totalPages: number,
+  isLease: boolean
 ): Promise<DetectedField[]> {
   // Build context about what text is near each field
   const fieldsWithContext = formFields.map(field => {
-    // Find text items near this field
     const nearbyText = textPositions
       .filter(t => 
         t.page === field.page &&
-        Math.abs(t.y - field.y) < 5 // Within 5% vertically
+        Math.abs(t.y - field.y) < 5
       )
       .sort((a, b) => {
-        // Prefer text to the left of the field
         const aLeft = a.x < field.x;
         const bLeft = b.x < field.x;
         if (aLeft && !bLeft) return -1;
@@ -426,28 +544,33 @@ async function mapFormFieldsToSemanticFields(
     };
   });
 
+  const leaseContext = isLease ? `
+THIS IS A LEASE/RENTAL AGREEMENT. Use these filled_by rules:
+- Tenant info fields → filled_by: "tenant"
+- Landlord/property fields → filled_by: "admin"
+- Tenant signature → filled_by: "tenant"
+- Landlord signature → filled_by: "admin"
+` : '';
+
   const prompt = `Map these PDF form fields to semantic field types. Each field has its exact position and nearby text.
+
+${leaseContext}
 
 FIELDS:
 ${JSON.stringify(fieldsWithContext, null, 2)}
 
 MAP EACH FIELD TO:
-- api_id: semantic identifier (owner_name, owner_address, property_address, owner_phone, owner_email, effective_date, owner_signature, manager_signature, second_owner_signature, package_15, package_18, package_20, package_25)
+- api_id: semantic identifier (tenant_name, landlord_signature, property_address, etc.)
 - label: human readable label
 - type: text, date, email, phone, signature, checkbox, or radio
-- filled_by: "guest" (owner) or "admin" (manager)
-- group_name: for radio buttons, use "package_selection"
+- filled_by: ${isLease ? '"tenant" (renter) or "admin" (landlord)' : '"guest" (owner) or "admin" (manager)'}
+- group_name: for radio buttons, use group name
 - required: true/false
-
-RULES:
-- Property address is filled by "guest" (owner provides this)
-- Package percentage options are radio buttons with group_name "package_selection"
-- Use exact x, y, width, height from the input
 
 Return JSON:
 {
   "fields": [
-    { "api_id": "...", "label": "...", "type": "...", "page": 1, "x": 10, "y": 20, "width": 40, "height": 3, "filled_by": "guest", "required": true }
+    { "api_id": "...", "label": "...", "type": "...", "page": 1, "x": 10, "y": 20, "width": 40, "height": 3, "filled_by": "${isLease ? 'tenant' : 'guest'}", "required": true }
   ]
 }`;
 
@@ -466,7 +589,6 @@ Return JSON:
 
   if (!response.ok) {
     console.error("AI mapping failed, using direct conversion");
-    // Fallback: directly convert fields without semantic mapping
     return formFields.map((f, i) => ({
       api_id: f.fieldName || `field_${i}`,
       label: f.fieldName || `Field ${i + 1}`,
@@ -476,7 +598,7 @@ Return JSON:
       y: f.y,
       width: f.width,
       height: f.height,
-      filled_by: "guest" as const,
+      filled_by: (isLease ? "tenant" : "guest") as "admin" | "guest" | "tenant",
       required: f.isRequired || false,
       ...(f.groupName && { group_name: f.groupName }),
     }));
@@ -498,7 +620,7 @@ Return JSON:
         y: Number(field.y),
         width: Number(field.width),
         height: Number(field.height),
-        filled_by: field.filled_by === "admin" ? "admin" : "guest",
+        filled_by: validateFilledBy(field.filled_by, isLease),
         required: field.required !== false,
         ...(field.group_name && { group_name: String(field.group_name) }),
       }));
@@ -517,7 +639,7 @@ Return JSON:
     y: f.y,
     width: f.width,
     height: f.height,
-    filled_by: "guest" as const,
+    filled_by: (isLease ? "tenant" : "guest") as "admin" | "guest" | "tenant",
     required: f.isRequired || false,
     ...(f.groupName && { group_name: f.groupName }),
   }));
@@ -526,4 +648,12 @@ Return JSON:
 function validateFieldType(type: string): DetectedField["type"] {
   const validTypes = ["text", "date", "email", "phone", "signature", "checkbox", "radio"];
   return validTypes.includes(type) ? type as DetectedField["type"] : "text";
+}
+
+function validateFilledBy(value: string, isLease: boolean): "admin" | "guest" | "tenant" {
+  if (value === "admin") return "admin";
+  if (value === "tenant") return "tenant";
+  if (value === "guest") return "guest";
+  // Default based on document type
+  return isLease ? "tenant" : "guest";
 }

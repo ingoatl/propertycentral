@@ -29,9 +29,12 @@ const AssignFieldsStep = ({ data, updateData }: Props) => {
   const toggleFieldAssignment = (fieldId: string) => {
     const updatedFields = data.detectedFields.map((field) => {
       if (field.api_id === fieldId) {
+        // Cycle through: admin -> guest -> tenant -> admin
+        const nextRole = field.filled_by === "admin" ? "guest" : 
+                        field.filled_by === "guest" ? "tenant" : "admin";
         return {
           ...field,
-          filled_by: field.filled_by === "admin" ? "guest" as const : "admin" as const,
+          filled_by: nextRole as "admin" | "guest" | "tenant",
         };
       }
       return field;
@@ -55,6 +58,7 @@ const AssignFieldsStep = ({ data, updateData }: Props) => {
   const fieldsByCategory = groupFieldsByCategory(data.detectedFields);
   const adminCount = data.detectedFields.filter(f => f.filled_by === "admin").length;
   const guestCount = data.detectedFields.filter(f => f.filled_by === "guest").length;
+  const tenantCount = data.detectedFields.filter(f => f.filled_by === "tenant").length;
 
   if (data.detectedFields.length === 0) {
     return (
@@ -85,13 +89,20 @@ const AssignFieldsStep = ({ data, updateData }: Props) => {
       </Alert>
 
       {/* Summary */}
-      <div className="flex gap-4 p-3 bg-muted rounded-lg border">
+      <div className="flex flex-wrap gap-3 p-3 bg-muted rounded-lg border">
         <Badge variant="default" className="px-3 py-1">
           Admin: {adminCount}
         </Badge>
-        <Badge variant="secondary" className="px-3 py-1">
-          Guest: {guestCount}
-        </Badge>
+        {guestCount > 0 && (
+          <Badge variant="secondary" className="px-3 py-1 bg-[#fae052]/20">
+            Owner: {guestCount}
+          </Badge>
+        )}
+        {tenantCount > 0 && (
+          <Badge variant="secondary" className="px-3 py-1 bg-green-100 text-green-700">
+            Tenant: {tenantCount}
+          </Badge>
+        )}
       </div>
 
       <ScrollArea className="h-[400px] pr-4">
@@ -122,16 +133,17 @@ const AssignFieldsStep = ({ data, updateData }: Props) => {
                       </div>
                       
                       <div className="flex items-center gap-3">
-                        <span className={`text-xs font-medium ${field.filled_by === "admin" ? "text-primary" : "text-muted-foreground"}`}>
-                          Admin
-                        </span>
-                        <Switch
-                          checked={field.filled_by === "guest"}
-                          onCheckedChange={() => toggleFieldAssignment(field.api_id)}
-                        />
-                        <span className={`text-xs font-medium ${field.filled_by === "guest" ? "text-primary" : "text-muted-foreground"}`}>
-                          Guest
-                        </span>
+                        <Badge 
+                          variant={field.filled_by === "admin" ? "default" : "secondary"}
+                          className={
+                            field.filled_by === "tenant" ? "bg-green-100 text-green-700" :
+                            field.filled_by === "guest" ? "bg-[#fae052]/30 text-amber-700" : ""
+                          }
+                          onClick={() => toggleFieldAssignment(field.api_id)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {field.filled_by === "admin" ? "Admin" : field.filled_by === "tenant" ? "Tenant" : "Owner"}
+                        </Badge>
                       </div>
                     </div>
                   ))}

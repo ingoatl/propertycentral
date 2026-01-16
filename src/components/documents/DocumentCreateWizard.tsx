@@ -14,7 +14,7 @@ export interface DetectedField {
   api_id: string;
   label: string;
   type: "text" | "number" | "date" | "email" | "phone" | "textarea" | "checkbox" | "signature";
-  filled_by: "admin" | "guest";
+  filled_by: "admin" | "guest" | "tenant";
   category: "property" | "financial" | "dates" | "occupancy" | "contact" | "identification" | "vehicle" | "emergency" | "acknowledgment" | "signature" | "other";
 }
 

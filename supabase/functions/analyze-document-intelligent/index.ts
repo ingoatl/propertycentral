@@ -7,11 +7,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Document type configurations with signing party mappings
+// Lease-specific field assignment patterns
+const LEASE_TENANT_PATTERNS = [
+  'tenant', 'lessee', 'renter', 'occupant', 'applicant', 'resident',
+  'co_tenant', 'cotenant', 'co-tenant', 'additional_tenant',
+  'emergency_contact', 'vehicle', 'car', 'license_plate', 'auto',
+  'pet_name', 'pet_breed', 'pet_weight', 'pet_description', 'animal',
+  'employer', 'employment', 'income', 'references', 'reference',
+  'social_security', 'ssn', 'driver_license', 'dl_number',
+  'bank_name', 'account_number', 'routing_number',
+  'move_in_condition', 'inventory', 'personal_property'
+];
+
+const LEASE_ADMIN_PATTERNS = [
+  'landlord', 'lessor', 'owner', 'agent', 'property_manager', 'management',
+  'premises', 'property_address', 'unit', 'apartment', 'suite',
+  'lease_start', 'lease_end', 'term', 'commencement', 'expiration',
+  'rent', 'deposit', 'fee', 'payment', 'amount', 'price', 'rate',
+  'utility', 'utilities', 'parking', 'amenity', 'amenities',
+  'rules', 'policy', 'policies', 'regulations', 'terms',
+  'late_fee', 'penalty', 'notice_period', 'renewal'
+];
+
+// Document type configurations with signing party mappings - now includes "tenant" role
 const DOCUMENT_TYPE_CONFIG: Record<string, {
   label: string;
-  signingParties: Array<{ role: string; filled_by: "admin" | "guest"; description: string }>;
-  commonFields: Array<{ api_id: string; label: string; type: string; filled_by: "admin" | "guest"; category: string }>;
+  signingParties: Array<{ role: string; filled_by: "admin" | "guest" | "tenant"; description: string }>;
+  commonFields: Array<{ api_id: string; label: string; type: string; filled_by: "admin" | "guest" | "tenant"; category: string }>;
 }> = {
   innkeeper_agreement: {
     label: "Innkeeper Agreement",
@@ -74,26 +96,73 @@ const DOCUMENT_TYPE_CONFIG: Record<string, {
       { api_id: "manager_signature_date", label: "Manager Signature Date", type: "date", filled_by: "admin", category: "signature" },
     ]
   },
+  // Enhanced rental/lease agreement with proper tenant/admin split
   rental_agreement: {
-    label: "Rental Agreement",
+    label: "Residential Lease Agreement",
     signingParties: [
-      { role: "Tenant", filled_by: "guest", description: "The tenant/renter" },
+      { role: "Tenant", filled_by: "tenant", description: "The tenant/renter who will occupy the property" },
+      { role: "Co-Tenant", filled_by: "tenant", description: "Additional tenant(s)" },
       { role: "Landlord", filled_by: "admin", description: "The landlord/property manager" }
     ],
     commonFields: [
-      { api_id: "tenant_name", label: "Tenant Name", type: "text", filled_by: "guest", category: "contact" },
-      { api_id: "tenant_email", label: "Tenant Email", type: "email", filled_by: "guest", category: "contact" },
-      { api_id: "tenant_phone", label: "Tenant Phone", type: "phone", filled_by: "guest", category: "contact" },
+      // TENANT fills these
+      { api_id: "tenant_name", label: "Tenant Name", type: "text", filled_by: "tenant", category: "contact" },
+      { api_id: "tenant_email", label: "Tenant Email", type: "email", filled_by: "tenant", category: "contact" },
+      { api_id: "tenant_phone", label: "Tenant Phone", type: "phone", filled_by: "tenant", category: "contact" },
+      { api_id: "tenant_address", label: "Tenant Current Address", type: "text", filled_by: "tenant", category: "contact" },
+      { api_id: "tenant_ssn", label: "Tenant SSN", type: "text", filled_by: "tenant", category: "identification" },
+      { api_id: "tenant_dl", label: "Driver License", type: "text", filled_by: "tenant", category: "identification" },
+      { api_id: "employer_name", label: "Employer Name", type: "text", filled_by: "tenant", category: "contact" },
+      { api_id: "employer_phone", label: "Employer Phone", type: "phone", filled_by: "tenant", category: "contact" },
+      { api_id: "monthly_income", label: "Monthly Income", type: "text", filled_by: "tenant", category: "financial" },
+      { api_id: "co_tenant_name", label: "Co-Tenant Name", type: "text", filled_by: "tenant", category: "contact" },
+      { api_id: "occupant_names", label: "Occupant Names", type: "text", filled_by: "tenant", category: "occupancy" },
+      { api_id: "num_occupants", label: "Number of Occupants", type: "text", filled_by: "tenant", category: "occupancy" },
+      { api_id: "vehicle_make", label: "Vehicle Make", type: "text", filled_by: "tenant", category: "vehicle" },
+      { api_id: "vehicle_model", label: "Vehicle Model", type: "text", filled_by: "tenant", category: "vehicle" },
+      { api_id: "vehicle_year", label: "Vehicle Year", type: "text", filled_by: "tenant", category: "vehicle" },
+      { api_id: "vehicle_color", label: "Vehicle Color", type: "text", filled_by: "tenant", category: "vehicle" },
+      { api_id: "license_plate", label: "License Plate", type: "text", filled_by: "tenant", category: "vehicle" },
+      { api_id: "emergency_contact_name", label: "Emergency Contact Name", type: "text", filled_by: "tenant", category: "emergency" },
+      { api_id: "emergency_contact_phone", label: "Emergency Contact Phone", type: "phone", filled_by: "tenant", category: "emergency" },
+      { api_id: "emergency_contact_relationship", label: "Emergency Contact Relationship", type: "text", filled_by: "tenant", category: "emergency" },
+      { api_id: "pet_type", label: "Pet Type", type: "text", filled_by: "tenant", category: "other" },
+      { api_id: "pet_breed", label: "Pet Breed", type: "text", filled_by: "tenant", category: "other" },
+      { api_id: "pet_weight", label: "Pet Weight", type: "text", filled_by: "tenant", category: "other" },
+      { api_id: "tenant_signature", label: "Tenant Signature", type: "signature", filled_by: "tenant", category: "signature" },
+      { api_id: "tenant_signature_date", label: "Tenant Signature Date", type: "date", filled_by: "tenant", category: "signature" },
+      { api_id: "co_tenant_signature", label: "Co-Tenant Signature", type: "signature", filled_by: "tenant", category: "signature" },
+      // ADMIN/LANDLORD fills these
       { api_id: "property_address", label: "Property Address", type: "text", filled_by: "admin", category: "property" },
+      { api_id: "unit_number", label: "Unit Number", type: "text", filled_by: "admin", category: "property" },
+      { api_id: "city", label: "City", type: "text", filled_by: "admin", category: "property" },
+      { api_id: "state", label: "State", type: "text", filled_by: "admin", category: "property" },
+      { api_id: "zip_code", label: "Zip Code", type: "text", filled_by: "admin", category: "property" },
       { api_id: "lease_start_date", label: "Lease Start Date", type: "date", filled_by: "admin", category: "dates" },
       { api_id: "lease_end_date", label: "Lease End Date", type: "date", filled_by: "admin", category: "dates" },
+      { api_id: "move_in_date", label: "Move-In Date", type: "date", filled_by: "admin", category: "dates" },
       { api_id: "monthly_rent", label: "Monthly Rent", type: "text", filled_by: "admin", category: "financial" },
       { api_id: "security_deposit", label: "Security Deposit", type: "text", filled_by: "admin", category: "financial" },
-      { api_id: "tenant_signature", label: "Tenant Signature", type: "signature", filled_by: "guest", category: "signature" },
-      { api_id: "tenant_signature_date", label: "Tenant Signature Date", type: "date", filled_by: "guest", category: "signature" },
+      { api_id: "pet_deposit", label: "Pet Deposit", type: "text", filled_by: "admin", category: "financial" },
+      { api_id: "late_fee", label: "Late Fee", type: "text", filled_by: "admin", category: "financial" },
+      { api_id: "rent_due_day", label: "Rent Due Day", type: "text", filled_by: "admin", category: "financial" },
+      { api_id: "parking_space", label: "Parking Space", type: "text", filled_by: "admin", category: "property" },
+      { api_id: "landlord_name", label: "Landlord Name", type: "text", filled_by: "admin", category: "contact" },
+      { api_id: "landlord_address", label: "Landlord Address", type: "text", filled_by: "admin", category: "contact" },
+      { api_id: "landlord_phone", label: "Landlord Phone", type: "phone", filled_by: "admin", category: "contact" },
       { api_id: "landlord_signature", label: "Landlord Signature", type: "signature", filled_by: "admin", category: "signature" },
       { api_id: "landlord_signature_date", label: "Landlord Signature Date", type: "date", filled_by: "admin", category: "signature" },
     ]
+  },
+  // Alias for residential_lease
+  residential_lease: {
+    label: "Residential Lease Agreement",
+    signingParties: [
+      { role: "Tenant", filled_by: "tenant", description: "The tenant/renter who will occupy the property" },
+      { role: "Co-Tenant", filled_by: "tenant", description: "Additional tenant(s)" },
+      { role: "Landlord", filled_by: "admin", description: "The landlord/property manager" }
+    ],
+    commonFields: [] // Will use rental_agreement config
   },
   pet_policy: {
     label: "Pet Policy Agreement",
@@ -113,37 +182,77 @@ const DOCUMENT_TYPE_CONFIG: Record<string, {
   }
 };
 
+// Enhanced lease detection keywords
+const LEASE_KEYWORDS = [
+  "residential lease", "lease agreement", "rental agreement", "tenancy agreement",
+  "tenant", "landlord", "lessor", "lessee", "renter",
+  "monthly rent", "security deposit", "premises", "leased premises",
+  "lease term", "rental period", "rent due", "rent payment",
+  "eviction", "late fee", "lease violation", "notice to vacate",
+  "move-in", "move-out", "occupant", "occupancy",
+  "georgia residential", "ga lease", "apartment lease", "house rental"
+];
+
 // Research document type using Firecrawl
 async function researchDocumentType(documentText: string, firecrawlApiKey: string, fileName?: string): Promise<{
   documentType: string;
   context: string;
   signingParties: string[];
   commonFieldsContext: string;
+  isLeaseDocument: boolean;
 }> {
-  // First, identify what type of document this might be
-  // Include filename in detection as it's often the most accurate indicator
+  const lowerText = documentText.toLowerCase();
+  const lowerFileName = (fileName || "").toLowerCase().replace(/[_-]/g, ' ').replace(/\.(pdf|doc|docx)$/i, '');
+  
+  // Check for lease/rental agreement first with high priority
+  const leaseScore = LEASE_KEYWORDS.reduce((score, keyword) => {
+    if (lowerFileName.includes(keyword)) return score + 5; // Filename match is strong
+    if (lowerText.includes(keyword)) return score + 1;
+    return score;
+  }, 0);
+  
+  const isLeaseDocument = leaseScore >= 3 || 
+    lowerFileName.includes('lease') || 
+    lowerFileName.includes('rental') ||
+    lowerFileName.includes('tenant') ||
+    lowerText.includes('residential lease agreement') ||
+    lowerText.includes('rental agreement') ||
+    (lowerText.includes('tenant') && lowerText.includes('landlord'));
+  
+  console.log(`Lease detection: score=${leaseScore}, isLease=${isLeaseDocument}, fileName="${fileName}"`);
+
+  // Document type detection with lease priority
   const docTypeKeywords = [
+    { type: "rental_agreement", keywords: ["lease agreement", "residential lease", "tenant", "landlord", "monthly rent", "security deposit", "rental period", "rental agreement", "tenancy", "lessee", "lessor"] },
     { type: "innkeeper_agreement", keywords: ["innkeeper", "transient occupancy", "hotel", "lodging", "guest registration", "room rental"] },
     { type: "management_agreement", keywords: ["property management", "management fee", "owner agrees", "manager shall", "exclusive right to manage", "management agreement"] },
     { type: "co_hosting", keywords: ["co-host", "cohost", "co hosting", "cohosting", "airbnb management", "vacation rental management", "host services", "co-hosting agreement"] },
-    { type: "rental_agreement", keywords: ["lease agreement", "tenant", "landlord", "monthly rent", "security deposit", "rental period", "rental agreement"] },
     { type: "pet_policy", keywords: ["pet policy", "pet agreement", "pet deposit", "pet weight", "animal policy"] },
     { type: "early_termination", keywords: ["early termination", "terminate agreement", "cancellation", "early end"] },
     { type: "addendum", keywords: ["addendum", "amendment", "supplement to", "in addition to"] },
   ];
 
-  // Check filename FIRST with high priority - filename often indicates exact document type
-  const lowerFileName = (fileName || "").toLowerCase().replace(/[_-]/g, ' ').replace(/\.(pdf|doc|docx)$/i, '');
+  // If lease document, return immediately
+  if (isLeaseDocument) {
+    const config = DOCUMENT_TYPE_CONFIG.rental_agreement;
+    return {
+      documentType: "rental_agreement",
+      context: "",
+      signingParties: config.signingParties.map(p => p.role),
+      commonFieldsContext: config.commonFields.map(f => `${f.label} (${f.filled_by})`).join(", "),
+      isLeaseDocument: true
+    };
+  }
+
   let detectedType = "other";
   let maxScore = 0;
   
-  // Give filename keywords extra weight (x3)
+  // Check filename first with high priority
   for (const { type, keywords } of docTypeKeywords) {
     let score = 0;
     for (const kw of keywords) {
       if (lowerFileName.includes(kw)) {
-        score += 3; // Filename match is worth 3 points
-        console.log(`Filename "${lowerFileName}" matches keyword "${kw}" for type ${type}`);
+        score += 3;
       }
     }
     if (score > maxScore) {
@@ -152,8 +261,7 @@ async function researchDocumentType(documentText: string, firecrawlApiKey: strin
     }
   }
   
-  // If filename didn't give us a confident match, check document text
-  const lowerText = documentText.toLowerCase();
+  // If filename didn't give confident match, check document text
   if (maxScore < 3) {
     for (const { type, keywords } of docTypeKeywords) {
       const textScore = keywords.filter(kw => lowerText.includes(kw)).length;
@@ -166,20 +274,16 @@ async function researchDocumentType(documentText: string, firecrawlApiKey: strin
   
   console.log(`Document type detection: filename="${fileName}", detected="${detectedType}", score=${maxScore}`);
 
-  // If we couldn't confidently detect the type, use web research
   let context = "";
   let signingParties: string[] = [];
   let commonFieldsContext = "";
 
+  // Web research for unclear documents
   if (maxScore < 2 && firecrawlApiKey) {
     console.log("Document type unclear, performing web research...");
-
     try {
-      // Extract potential document title from first few lines
       const lines = documentText.split('\n').filter(l => l.trim().length > 0).slice(0, 5);
       const potentialTitle = lines.find(l => l.length < 100 && l.length > 5) || "property agreement";
-
-      // Search for document type information
       const searchQuery = `"${potentialTitle}" legal document fields who signs`;
       
       const searchResponse = await fetch("https://api.firecrawl.dev/v1/search", {
@@ -188,17 +292,13 @@ async function researchDocumentType(documentText: string, firecrawlApiKey: strin
           "Authorization": `Bearer ${firecrawlApiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          query: searchQuery,
-          limit: 3,
-        }),
+        body: JSON.stringify({ query: searchQuery, limit: 3 }),
       });
 
       if (searchResponse.ok) {
         const searchData = await searchResponse.json();
         if (searchData.data && searchData.data.length > 0) {
           context = searchData.data.map((r: any) => r.description || r.title || "").join("\n");
-          console.log("Web research context:", context.substring(0, 500));
         }
       }
     } catch (error) {
@@ -206,13 +306,11 @@ async function researchDocumentType(documentText: string, firecrawlApiKey: strin
     }
   }
 
-  // Get signing parties based on detected type
   const config = DOCUMENT_TYPE_CONFIG[detectedType];
   if (config) {
     signingParties = config.signingParties.map(p => p.role);
     commonFieldsContext = config.commonFields.map(f => `${f.label} (${f.filled_by})`).join(", ");
   } else {
-    // Default for unknown documents - assume owner/manager structure
     signingParties = ["Owner/Guest", "Manager/Host"];
     commonFieldsContext = "name, email, phone, address, signature, date";
   }
@@ -221,8 +319,56 @@ async function researchDocumentType(documentText: string, firecrawlApiKey: strin
     documentType: detectedType,
     context,
     signingParties,
-    commonFieldsContext
+    commonFieldsContext,
+    isLeaseDocument: false
   };
+}
+
+// Apply intelligent field assignment based on document type
+function applyIntelligentFieldAssignment(
+  fields: any[], 
+  documentType: string, 
+  isLeaseDocument: boolean
+): any[] {
+  return fields.map(field => {
+    const apiIdLower = (field.api_id || '').toLowerCase();
+    const labelLower = (field.label || '').toLowerCase();
+    
+    // For lease documents, use tenant patterns
+    if (isLeaseDocument || documentType === 'rental_agreement' || documentType === 'residential_lease') {
+      // Check tenant patterns
+      const isTenantField = LEASE_TENANT_PATTERNS.some(pattern => 
+        apiIdLower.includes(pattern) || labelLower.includes(pattern)
+      );
+      
+      // Check admin/landlord patterns
+      const isAdminField = LEASE_ADMIN_PATTERNS.some(pattern => 
+        apiIdLower.includes(pattern) || labelLower.includes(pattern)
+      );
+      
+      if (isTenantField && !isAdminField) {
+        return { ...field, filled_by: 'tenant' };
+      }
+      if (isAdminField && !isTenantField) {
+        return { ...field, filled_by: 'admin' };
+      }
+      
+      // For signature fields in leases
+      if (field.type === 'signature' || apiIdLower.includes('signature')) {
+        if (apiIdLower.includes('tenant') || apiIdLower.includes('lessee') || apiIdLower.includes('renter')) {
+          return { ...field, filled_by: 'tenant' };
+        }
+        if (apiIdLower.includes('landlord') || apiIdLower.includes('lessor') || apiIdLower.includes('owner') || apiIdLower.includes('agent')) {
+          return { ...field, filled_by: 'admin' };
+        }
+      }
+      
+      // Default unclear fields in lease to tenant (they're the ones filling most info)
+      return { ...field, filled_by: field.filled_by || 'tenant' };
+    }
+    
+    return field;
+  });
 }
 
 serve(async (req) => {
@@ -243,7 +389,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { templateId, fileUrl, textPositions, totalPages, forceReanalyze, existingContractType, mergeWithExisting, existingFields, fileName } = await req.json();
 
-    console.log("Intelligent document analysis - templateId:", templateId, "totalPages:", totalPages, "mergeWithExisting:", mergeWithExisting);
+    console.log("Intelligent document analysis - templateId:", templateId, "totalPages:", totalPages);
 
     let documentText = "";
     let template = null;
@@ -275,9 +421,6 @@ serve(async (req) => {
         );
       }
     }
-    
-    // Use existing contract type if provided (for better context in re-analysis)
-    const knownContractType = existingContractType || template?.contract_type;
 
     // Build document text from text positions
     if (textPositions && Array.isArray(textPositions)) {
@@ -285,29 +428,20 @@ serve(async (req) => {
     }
 
     console.log("Document text length:", documentText.length);
-    console.log("Document preview:", documentText.substring(0, 500));
 
-    // Step 1: Research document type with web search if needed - pass filename for better detection
+    // Step 1: Research document type with enhanced lease detection
     const templateName = template?.name || fileName || "";
     const research = await researchDocumentType(documentText, FIRECRAWL_API_KEY || "", templateName);
     console.log("Research result:", {
       documentType: research.documentType,
       signingParties: research.signingParties,
-      templateName: templateName,
+      isLeaseDocument: research.isLeaseDocument,
     });
 
-    // Get document config or use defaults
-    const docConfig = DOCUMENT_TYPE_CONFIG[research.documentType] || {
-      label: "Document",
-      signingParties: [
-        { role: "Primary Signer", filled_by: "guest", description: "The primary signer" },
-        { role: "Secondary Signer", filled_by: "admin", description: "The secondary signer" }
-      ],
-      commonFields: []
-    };
+    // Get document config
+    const docConfig = DOCUMENT_TYPE_CONFIG[research.documentType] || DOCUMENT_TYPE_CONFIG.rental_agreement;
 
-    // Step 2: Use AI with tool calling for structured field extraction
-    // Process in chunks for large documents
+    // Step 2: Process document in chunks
     const maxChunkSize = 15000;
     const chunks: string[] = [];
     
@@ -325,20 +459,49 @@ serve(async (req) => {
       const chunk = chunks[chunkIndex];
       const chunkPages = Math.ceil((chunkIndex + 1) * (totalPages || 1) / chunks.length);
       
-      // Build context-aware prompt
+      // Build signing context based on document type
       const signingContext = docConfig.signingParties
         .map(p => `- "${p.role}" (filled_by: "${p.filled_by}"): ${p.description}`)
         .join("\n");
 
       const commonFieldsHint = docConfig.commonFields
+        .slice(0, 15) // Limit to avoid too long prompts
         .map(f => `- ${f.api_id}: ${f.label} (${f.type}, filled_by: ${f.filled_by})`)
         .join("\n");
+
+      // Enhanced system prompt for lease documents
+      const leaseSpecificInstructions = research.isLeaseDocument ? `
+CRITICAL LEASE DOCUMENT RULES:
+This is a RESIDENTIAL LEASE AGREEMENT. There are TWO signing parties:
+1. TENANT (filled_by: "tenant") - The renter/lessee who will occupy the property
+2. LANDLORD (filled_by: "admin") - The property owner/manager
+
+TENANT FILLS (filled_by: "tenant"):
+- Tenant name, email, phone, current address
+- Social security number, driver's license
+- Employment information (employer, income)
+- Co-tenant/occupant information
+- Vehicle information (make, model, license plate)
+- Emergency contact information
+- Pet information (if applicable)
+- Tenant signature and date
+
+LANDLORD/ADMIN FILLS (filled_by: "admin"):
+- Property address, unit number, city, state, zip
+- Lease start date, end date, move-in date
+- Monthly rent amount, security deposit
+- Late fees, pet deposit, other fees
+- Parking space assignments
+- Landlord name, address, phone
+- Landlord/Agent signature and date
+- Rules, policies, terms` : '';
 
       const systemPrompt = `You are an expert document analyzer specializing in property management, rental, and hospitality agreements.
 
 DOCUMENT TYPE DETECTED: ${research.documentType} (${docConfig.label})
 DOCUMENT NAME: ${templateName || 'Unknown'}
-${research.context ? `\nWEB RESEARCH CONTEXT:\n${research.context}` : ''}
+${research.isLeaseDocument ? '\n*** THIS IS A LEASE/RENTAL AGREEMENT ***\n' : ''}
+${leaseSpecificInstructions}
 
 SIGNING PARTIES FOR THIS DOCUMENT TYPE:
 ${signingContext}
@@ -347,56 +510,17 @@ COMMON FIELDS FOR THIS DOCUMENT TYPE:
 ${commonFieldsHint}
 
 CRITICAL RULES:
-1. Identify ALL fillable fields in the document including blanks, lines, checkboxes, and signature blocks
-2. Assign filled_by based on WHO should fill it:
-   - "guest" = the person signing/receiving the document (owner for management agreements, tenant for rental, guest for innkeeper)
-   - "admin" = the property manager/host (you, the company)
-3. Ensure signatures and dates are paired correctly
-4. Use standardized api_id names (snake_case)
-5. The page number should be within the document's actual page count
+1. Identify ALL fillable fields including blanks, lines, checkboxes, and signature blocks
+2. For LEASE documents, use "tenant" for tenant fields and "admin" for landlord fields
+3. For other documents, use "guest" for the signing party and "admin" for management
+4. Ensure signatures and dates are paired correctly
+5. Use standardized api_id names (snake_case)
 
-SIGNATURE DETECTION - CRITICAL:
-- Look for "Signature:", "Sign:", "X______", "__________" lines near party names
-- Every signature MUST have a corresponding date field
-- Common signature patterns:
-  * "Owner Signature" with "Date" nearby
-  * "Manager/Co-Host Signature" with "Date" nearby  
-  * Signature lines at the end of the document
-  * Multiple signature blocks for different parties
-- If you see "Owner" and "Co-Host/Manager" sections, create signatures for BOTH
-
-BLANK LINE DETECTION - VERY IMPORTANT:
-- ANY series of underscores (______) indicates a text input field
-- Common patterns to detect:
-  * "Effective Date: _______________" → date field
-  * "Owner(s): _______________" → text field for owner name
-  * "Residing at: _______________" → text field for address
-  * "Phone: _______________" → phone field
-  * "Email: _______________" → email field
-  * "Property Address: _______________" → text field
-- Look for lines like "Name: ________" or just standalone "________" after labels
-- Detect ALL blank lines, not just some - if there's an underline, there should be a field
-
-FIELD SIZE GUIDELINES - CRITICAL FOR PROPER DISPLAY:
-- Text fields: height should be 2.0-2.5 (fits single line of text)
+FIELD SIZE GUIDELINES:
+- Text fields: height 2.0-2.5
 - Date fields: width 20-25, height 2.0-2.5
-- Signature fields: width 30-40, height 3.5-4.5 (needs space for signature)
-- Email fields: width 30-40, height 2.0-2.5
-- Phone fields: width 20-25, height 2.0-2.5
-- Address fields: width 50-60, height 2.0-2.5
-- Name fields: width 35-45, height 2.0-2.5
-- Fields should NOT overlap - space them properly on the Y axis
-- If multiple fields are on the same line, adjust X positions so they don't overlap
-
-FIELD DETECTION TIPS:
-- Blank lines (______) indicate text input fields - DETECT ALL OF THEM
-- "Date:" or date format patterns indicate date fields
-- Checkbox squares (□) indicate checkbox fields
-- Email patterns or "Email:" indicate email fields
-- Phone patterns or "Phone:" indicate phone fields
-- Look at EVERY section of the document for potential fields
-- If you see "Owner(s):" followed by blank, that's an owner_name field
-- If you see "Residing at:" followed by blank, that's an owner_address field`;
+- Signature fields: width 30-40, height 3.5-4.5
+- Address fields: width 50-60, height 2.0-2.5`;
 
       const userPrompt = `Analyze this document section and extract ALL fillable fields.
 
@@ -406,25 +530,13 @@ ${chunk}
 TOTAL PAGES: ${totalPages || 1}
 APPROXIMATE PAGE FOR THIS SECTION: ${chunkPages}
 
-IMPORTANT: Look for EVERY blank line (______) in the document. Common fillable fields include:
-- Effective Date
-- Owner Name(s)
-- Owner Address (Residing at)
-- Owner Phone
-- Owner Email  
-- Property Address
-- Package Selection checkboxes
-- Signature lines
-- Date lines near signatures
-
-Extract fields using the extract_document_fields function. For EACH blank line or underline you see, create a corresponding field. Include:
+Extract fields using the extract_document_fields function. Include:
 - All text blanks (name, address, phone, email fields)
 - All date fields
-- All signature lines (owner signature, manager signature)
-- All checkboxes or radio buttons for package selection
-- Any other fillable areas
+- All signature lines
+- All checkboxes or radio buttons
 
-Return accurate field positions relative to the page layout. Ensure field heights are appropriate (2.0-2.5 for text, 3.5-4.5 for signatures).`;
+IMPORTANT: For lease documents, carefully distinguish between TENANT fields (filled_by: "tenant") and LANDLORD fields (filled_by: "admin").`;
 
       let success = false;
       while (!success && retryCount < maxRetries) {
@@ -450,21 +562,15 @@ Return accurate field positions relative to the page layout. Ensure field height
                     parameters: {
                       type: "object",
                       properties: {
-                        document_type: {
-                          type: "string",
-                          description: "The type of document detected"
-                        },
-                        suggested_name: {
-                          type: "string",
-                          description: "A suggested name for this template"
-                        },
+                        document_type: { type: "string" },
+                        suggested_name: { type: "string" },
                         signing_parties: {
                           type: "array",
                           items: {
                             type: "object",
                             properties: {
                               role: { type: "string" },
-                              filled_by: { type: "string", enum: ["admin", "guest"] }
+                              filled_by: { type: "string", enum: ["admin", "guest", "tenant"] }
                             },
                             required: ["role", "filled_by"]
                           }
@@ -474,18 +580,18 @@ Return accurate field positions relative to the page layout. Ensure field height
                           items: {
                             type: "object",
                             properties: {
-                              api_id: { type: "string", description: "Unique field identifier in snake_case" },
-                              label: { type: "string", description: "Human-readable label" },
+                              api_id: { type: "string" },
+                              label: { type: "string" },
                               type: { type: "string", enum: ["text", "date", "email", "phone", "signature", "checkbox", "radio", "textarea"] },
-                              page: { type: "number", description: "Page number (1-indexed)" },
-                              x: { type: "number", description: "X position as percentage (0-100)" },
-                              y: { type: "number", description: "Y position as percentage (0-100)" },
-                              width: { type: "number", description: "Width as percentage (0-100)" },
-                              height: { type: "number", description: "Height as percentage (0-100)" },
-                              filled_by: { type: "string", enum: ["admin", "guest"] },
+                              page: { type: "number" },
+                              x: { type: "number" },
+                              y: { type: "number" },
+                              width: { type: "number" },
+                              height: { type: "number" },
+                              filled_by: { type: "string", enum: ["admin", "guest", "tenant"] },
                               required: { type: "boolean" },
-                              category: { type: "string", enum: ["property", "financial", "dates", "occupancy", "contact", "identification", "signature", "other"] },
-                              group_name: { type: "string", description: "For radio buttons, the group name" }
+                              category: { type: "string", enum: ["property", "financial", "dates", "occupancy", "contact", "identification", "vehicle", "emergency", "signature", "other"] },
+                              group_name: { type: "string" }
                             },
                             required: ["api_id", "label", "type", "filled_by", "required"]
                           }
@@ -512,15 +618,12 @@ Return accurate field positions relative to the page layout. Ensure field height
 
           const aiData = await response.json();
           
-          // Extract tool call result
           const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
           if (toolCall && toolCall.function?.arguments) {
             const args = JSON.parse(toolCall.function.arguments);
             if (args.fields && Array.isArray(args.fields)) {
-              // Add fields with proper defaults - adjusted heights for better line fitting
               for (const field of args.fields) {
-                // Determine appropriate height based on field type
-                let fieldHeight = 2.2; // Default for text fields
+                let fieldHeight = 2.2;
                 if (field.type === 'signature') {
                   fieldHeight = Math.max(3.5, Math.min(4.5, Number(field.height) || 4));
                 } else if (field.type === 'textarea') {
@@ -538,7 +641,7 @@ Return accurate field positions relative to the page layout. Ensure field height
                   y: Math.max(0, Math.min(95, Number(field.y) || 50)),
                   width: Math.max(5, Math.min(60, Number(field.width) || 35)),
                   height: fieldHeight,
-                  filled_by: field.filled_by === "admin" ? "admin" : "guest",
+                  filled_by: ["admin", "guest", "tenant"].includes(field.filled_by) ? field.filled_by : "tenant",
                   required: field.required !== false,
                   category: field.category || "other",
                   ...(field.group_name && { group_name: String(field.group_name) }),
@@ -552,14 +655,11 @@ Return accurate field positions relative to the page layout. Ensure field height
         } catch (error) {
           console.error(`Error processing chunk ${chunkIndex + 1}:`, error);
           retryCount++;
-          if (retryCount >= maxRetries) {
-            console.log("Max retries reached, using fallback fields");
-          }
         }
       }
     }
 
-    // Deduplicate fields by api_id
+    // Deduplicate fields
     const uniqueFields = new Map();
     for (const field of allFields) {
       if (!uniqueFields.has(field.api_id)) {
@@ -568,11 +668,18 @@ Return accurate field positions relative to the page layout. Ensure field height
     }
     let finalFields = Array.from(uniqueFields.values());
 
-    // Ensure we have essential signature fields
+    // Apply intelligent field assignment based on document type
+    finalFields = applyIntelligentFieldAssignment(finalFields, research.documentType, research.isLeaseDocument);
+
+    // Ensure essential signature fields exist
+    const hasTenantSignature = finalFields.some(f => 
+      f.api_id.includes('tenant_signature') || 
+      f.api_id.includes('lessee_signature') ||
+      f.api_id.includes('renter_signature')
+    );
     const hasGuestSignature = finalFields.some(f => 
       f.api_id.includes('owner_signature') || 
-      f.api_id.includes('guest_signature') ||
-      f.api_id.includes('tenant_signature')
+      f.api_id.includes('guest_signature')
     );
     const hasAdminSignature = finalFields.some(f => 
       f.api_id.includes('manager_signature') || 
@@ -580,12 +687,15 @@ Return accurate field positions relative to the page layout. Ensure field height
       f.api_id.includes('landlord_signature')
     );
 
-    // Add missing essential signatures based on document type
-    if (!hasGuestSignature) {
-      const guestSigField = docConfig.commonFields.find(f => f.type === 'signature' && f.filled_by === 'guest');
-      if (guestSigField) {
+    // Add missing signatures based on document type
+    if (research.isLeaseDocument) {
+      if (!hasTenantSignature) {
         finalFields.push({
-          ...guestSigField,
+          api_id: 'tenant_signature',
+          label: 'Tenant Signature',
+          type: 'signature',
+          filled_by: 'tenant',
+          category: 'signature',
           page: totalPages || 1,
           x: 10,
           y: 75,
@@ -594,10 +704,10 @@ Return accurate field positions relative to the page layout. Ensure field height
           required: true
         });
         finalFields.push({
-          api_id: guestSigField.api_id.replace('_signature', '_signature_date'),
-          label: guestSigField.label.replace('Signature', 'Signature Date'),
+          api_id: 'tenant_signature_date',
+          label: 'Tenant Signature Date',
           type: 'date',
-          filled_by: 'guest',
+          filled_by: 'tenant',
           category: 'signature',
           page: totalPages || 1,
           x: 50,
@@ -607,13 +717,13 @@ Return accurate field positions relative to the page layout. Ensure field height
           required: true
         });
       }
-    }
-
-    if (!hasAdminSignature) {
-      const adminSigField = docConfig.commonFields.find(f => f.type === 'signature' && f.filled_by === 'admin');
-      if (adminSigField) {
+      if (!hasAdminSignature) {
         finalFields.push({
-          ...adminSigField,
+          api_id: 'landlord_signature',
+          label: 'Landlord Signature',
+          type: 'signature',
+          filled_by: 'admin',
+          category: 'signature',
           page: totalPages || 1,
           x: 10,
           y: 85,
@@ -622,8 +732,8 @@ Return accurate field positions relative to the page layout. Ensure field height
           required: true
         });
         finalFields.push({
-          api_id: adminSigField.api_id.replace('_signature', '_signature_date'),
-          label: adminSigField.label.replace('Signature', 'Signature Date'),
+          api_id: 'landlord_signature_date',
+          label: 'Landlord Signature Date',
           type: 'date',
           filled_by: 'admin',
           category: 'signature',
@@ -635,11 +745,47 @@ Return accurate field positions relative to the page layout. Ensure field height
           required: true
         });
       }
+    } else {
+      // For non-lease documents
+      if (!hasGuestSignature) {
+        const guestSigField = docConfig.commonFields.find(f => f.type === 'signature' && f.filled_by === 'guest');
+        if (guestSigField) {
+          finalFields.push({
+            ...guestSigField,
+            page: totalPages || 1,
+            x: 10,
+            y: 75,
+            width: 35,
+            height: 4,
+            required: true
+          });
+        }
+      }
+      if (!hasAdminSignature) {
+        const adminSigField = docConfig.commonFields.find(f => f.type === 'signature' && f.filled_by === 'admin');
+        if (adminSigField) {
+          finalFields.push({
+            ...adminSigField,
+            page: totalPages || 1,
+            x: 10,
+            y: 85,
+            width: 35,
+            height: 4,
+            required: true
+          });
+        }
+      }
     }
 
     console.log(`Total unique fields extracted: ${finalFields.length}`);
+    
+    // Log field distribution
+    const tenantCount = finalFields.filter(f => f.filled_by === 'tenant').length;
+    const adminCount = finalFields.filter(f => f.filled_by === 'admin').length;
+    const guestCount = finalFields.filter(f => f.filled_by === 'guest').length;
+    console.log(`Field distribution: Tenant=${tenantCount}, Admin=${adminCount}, Guest=${guestCount}`);
 
-    // Update template if we have one
+    // Update template
     if (template && finalFields.length > 0) {
       const { error: updateError } = await supabase
         .from("document_templates")
@@ -664,7 +810,7 @@ Return accurate field positions relative to the page layout. Ensure field height
         signing_parties: docConfig.signingParties,
         fields: finalFields,
         total_pages: totalPages,
-        web_research_used: !!research.context,
+        is_lease_document: research.isLeaseDocument,
         cached: false,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -674,10 +820,7 @@ Return accurate field positions relative to the page layout. Ensure field height
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({ success: false, error: message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

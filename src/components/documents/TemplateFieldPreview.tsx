@@ -23,7 +23,7 @@ interface FieldData {
   y: number;
   width: number;
   height: number;
-  filled_by: "admin" | "guest";
+  filled_by: "admin" | "guest" | "tenant";
   required: boolean;
   group_name?: string;
 }
@@ -31,7 +31,7 @@ interface FieldData {
 interface NewFieldFormData {
   label: string;
   type: FieldData["type"];
-  filled_by: "admin" | "guest";
+  filled_by: "admin" | "guest" | "tenant";
 }
 
 interface TemplateFieldPreviewProps {
@@ -103,12 +103,14 @@ export function TemplateFieldPreview({
 
   const fieldsOnPage = localFields.filter(f => f.page === currentPage);
   
-  // Group fields by filled_by
+  // Group fields by filled_by - now includes tenant
   const ownerFields = localFields.filter(f => f.filled_by === "guest" || f.api_id.includes("owner"));
-  const adminFields = localFields.filter(f => f.filled_by === "admin" || f.api_id.includes("manager"));
+  const tenantFields = localFields.filter(f => f.filled_by === "tenant");
+  const adminFields = localFields.filter(f => f.filled_by === "admin" || f.api_id.includes("manager") || f.api_id.includes("landlord"));
 
   const getFieldColor = (field: FieldData) => {
     if (field.filled_by === "admin") return "bg-blue-500/30 border-blue-500";
+    if (field.filled_by === "tenant") return "bg-green-500/30 border-green-500";
     if (field.type === "radio") return "bg-purple-500/30 border-purple-500";
     return "bg-[#fae052]/40 border-[#fae052]";
   };
@@ -358,8 +360,13 @@ export function TemplateFieldPreview({
           {/* Sidebar */}
           <div className="w-72 border-l bg-background flex flex-col">
             <div className="p-4 border-b">
-              <div className="flex gap-2 text-xs mb-2">
-                <Badge variant="outline" className="bg-[#fae052]/20">Owner: {ownerFields.length}</Badge>
+              <div className="flex flex-wrap gap-2 text-xs mb-2">
+                {ownerFields.length > 0 && (
+                  <Badge variant="outline" className="bg-[#fae052]/20">Owner: {ownerFields.length}</Badge>
+                )}
+                {tenantFields.length > 0 && (
+                  <Badge variant="outline" className="bg-green-100 text-green-700">Tenant: {tenantFields.length}</Badge>
+                )}
                 <Badge variant="outline" className="bg-blue-100">Admin: {adminFields.length}</Badge>
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -406,13 +413,14 @@ export function TemplateFieldPreview({
                   </Select>
                   <Select 
                     value={selectedFieldData.filled_by} 
-                    onValueChange={(v) => updateField(selectedFieldData.api_id, { filled_by: v as "admin" | "guest" })}
+                    onValueChange={(v) => updateField(selectedFieldData.api_id, { filled_by: v as "admin" | "guest" | "tenant" })}
                   >
                     <SelectTrigger className="h-7 text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="guest">Owner</SelectItem>
+                      <SelectItem value="tenant">Tenant</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
@@ -454,8 +462,12 @@ export function TemplateFieldPreview({
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
                         <span>P{field.page}</span>
-                        <span className={field.filled_by === "admin" ? "text-blue-600" : "text-amber-600"}>
-                          {field.filled_by === "admin" ? "Admin" : "Owner"}
+                        <span className={
+                          field.filled_by === "admin" ? "text-blue-600" : 
+                          field.filled_by === "tenant" ? "text-green-600" : 
+                          "text-amber-600"
+                        }>
+                          {field.filled_by === "admin" ? "Admin" : field.filled_by === "tenant" ? "Tenant" : "Owner"}
                         </span>
                       </div>
                     </button>
@@ -540,7 +552,7 @@ export function TemplateFieldPreview({
               <Label>Who fills this field?</Label>
               <Select 
                 value={newFieldData.filled_by} 
-                onValueChange={(v) => setNewFieldData(prev => ({ ...prev, filled_by: v as "admin" | "guest" }))}
+                onValueChange={(v) => setNewFieldData(prev => ({ ...prev, filled_by: v as "admin" | "guest" | "tenant" }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -549,12 +561,18 @@ export function TemplateFieldPreview({
                   <SelectItem value="guest">
                     <div className="flex flex-col">
                       <span>Owner / Guest</span>
-                      <span className="text-xs text-muted-foreground">The person signing the document</span>
+                      <span className="text-xs text-muted-foreground">Property owner (management agreements)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="tenant">
+                    <div className="flex flex-col">
+                      <span>Tenant / Renter</span>
+                      <span className="text-xs text-muted-foreground">Tenant fills this (lease agreements)</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="admin">
                     <div className="flex flex-col">
-                      <span>Admin / Manager</span>
+                      <span>Admin / Landlord</span>
                       <span className="text-xs text-muted-foreground">Your team pre-fills this</span>
                     </div>
                   </SelectItem>
