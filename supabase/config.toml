@@ -1,5 +1,8 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.extract-lease-data]
+verify_jwt = false
+
 [functions.detect-pdf-fields]
 verify_jwt = true
 
