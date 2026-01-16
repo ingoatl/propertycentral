@@ -7344,6 +7344,160 @@ export type Database = {
           },
         ]
       }
+      saved_communications: {
+        Row: {
+          ai_category: string | null
+          ai_extracted_amounts: Json | null
+          ai_extracted_contacts: Json | null
+          ai_extracted_dates: Json | null
+          ai_summary: string | null
+          id: string
+          is_pinned: boolean
+          lead_id: string | null
+          message_content: string
+          message_date: string
+          message_id: string
+          message_snippet: string | null
+          message_subject: string | null
+          message_type: string
+          owner_id: string | null
+          property_id: string | null
+          save_reason: string
+          saved_at: string
+          saved_by: string
+          sender_email: string | null
+          sender_name: string
+          sender_phone: string | null
+          tags: string[] | null
+          thread_id: string | null
+          updated_at: string
+          user_comment: string | null
+        }
+        Insert: {
+          ai_category?: string | null
+          ai_extracted_amounts?: Json | null
+          ai_extracted_contacts?: Json | null
+          ai_extracted_dates?: Json | null
+          ai_summary?: string | null
+          id?: string
+          is_pinned?: boolean
+          lead_id?: string | null
+          message_content: string
+          message_date: string
+          message_id: string
+          message_snippet?: string | null
+          message_subject?: string | null
+          message_type: string
+          owner_id?: string | null
+          property_id?: string | null
+          save_reason: string
+          saved_at?: string
+          saved_by: string
+          sender_email?: string | null
+          sender_name: string
+          sender_phone?: string | null
+          tags?: string[] | null
+          thread_id?: string | null
+          updated_at?: string
+          user_comment?: string | null
+        }
+        Update: {
+          ai_category?: string | null
+          ai_extracted_amounts?: Json | null
+          ai_extracted_contacts?: Json | null
+          ai_extracted_dates?: Json | null
+          ai_summary?: string | null
+          id?: string
+          is_pinned?: boolean
+          lead_id?: string | null
+          message_content?: string
+          message_date?: string
+          message_id?: string
+          message_snippet?: string | null
+          message_subject?: string | null
+          message_type?: string
+          owner_id?: string | null
+          property_id?: string | null
+          save_reason?: string
+          saved_at?: string
+          saved_by?: string
+          sender_email?: string | null
+          sender_name?: string
+          sender_phone?: string | null
+          tags?: string[] | null
+          thread_id?: string | null
+          updated_at?: string
+          user_comment?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_communications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_communications_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_communications_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_communications_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_communications_audit: {
+        Row: {
+          action: string
+          action_at: string
+          action_by: string
+          id: string
+          new_values: Json | null
+          previous_values: Json | null
+          saved_communication_id: string
+        }
+        Insert: {
+          action: string
+          action_at?: string
+          action_by: string
+          id?: string
+          new_values?: Json | null
+          previous_values?: Json | null
+          saved_communication_id: string
+        }
+        Update: {
+          action?: string
+          action_at?: string
+          action_by?: string
+          id?: string
+          new_values?: Json | null
+          previous_values?: Json | null
+          saved_communication_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_communications_audit_saved_communication_id_fkey"
+            columns: ["saved_communication_id"]
+            isOneToOne: false
+            referencedRelation: "saved_communications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       security_deposit_returns: {
         Row: {
           amount: number
