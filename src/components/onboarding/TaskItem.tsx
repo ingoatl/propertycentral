@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo, useMemo } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { OnboardingTask, OnboardingSOP } from "@/types/onboarding";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +39,7 @@ import { ProfessionalPhotosUpload } from "./ProfessionalPhotosUpload";
 import { PermitStatusDisplay } from "./PermitStatusDisplay";
 import { StableFieldWrapper } from "@/components/ui/stable-form";
 import { TaskSaveIndicator } from "./TaskSaveIndicator";
+import { SkeletonLine } from "@/components/ui/modal-skeleton";
 
 interface TaskItemProps {
   task: OnboardingTask;

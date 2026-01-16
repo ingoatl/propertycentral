@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
+import { ModalSkeleton } from "@/components/ui/modal-skeleton";
 interface PropertyDetailsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,6 +47,7 @@ interface FinancialData {
 export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyName, propertyId }: PropertyDetailsModalProps) {
   const [tasks, setTasks] = useState<OnboardingTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [criticalDataLoaded, setCriticalDataLoaded] = useState(false); // Phase 1: critical data
   const [searchQuery, setSearchQuery] = useState("");
   const [propertyInfo, setPropertyInfo] = useState<any>(null);
   const [emailInsights, setEmailInsights] = useState<any[]>([]);
@@ -66,12 +68,16 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   useEffect(() => {
     if (open) {
       loadData();
+    } else {
+      // Reset loading states when modal closes
+      setCriticalDataLoaded(false);
     }
   }, [open, projectId]);
 
   const loadData = async () => {
     try {
       setLoading(true);
+      setCriticalDataLoaded(false);
       
       let effectiveProjectId = projectId;
       
@@ -100,16 +106,16 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         }
       }
       
-      // Run all queries in parallel for much faster loading
-      const promises: Promise<any>[] = [];
+      // PHASE 1: Load critical data first (property info, tasks, project)
+      const criticalPromises: Promise<any>[] = [];
       
-      // Tasks query
+      // Tasks query - critical
       if (effectiveProjectId) {
-        promises.push(
+        criticalPromises.push(
           (async () => {
             const { data, error } = await supabase
               .from('onboarding_tasks')
-              .select('*')
+              .select('id, project_id, phase_number, phase_title, title, description, field_type, field_value, status, due_date, assigned_to_uuid')
               .eq('project_id', effectiveProjectId)
               .order('phase_number', { ascending: true });
             if (!error) setTasks((data || []) as OnboardingTask[]);
@@ -117,26 +123,34 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         );
       }
       
-      // Property-related queries (run in parallel)
+      // Property info - critical
       if (propertyId) {
-        // Property info
-        promises.push(
+        criticalPromises.push(
           (async () => {
             const { data } = await supabase
               .from('properties')
-              .select('*')
+              .select('id, name, address, bedrooms, bathrooms, max_guests, airbnb_url, vrbo_url, direct_booking_url, status')
               .eq('id', propertyId)
               .maybeSingle();
             if (data) setPropertyInfo(data);
           })()
         );
-
-        // Email insights (limited)
-        promises.push(
+      }
+      
+      // Wait for critical data to load first
+      await Promise.all(criticalPromises);
+      setCriticalDataLoaded(true);
+      
+      // PHASE 2: Load secondary data in background (don't block UI)
+      const secondaryPromises: Promise<any>[] = [];
+      
+      if (propertyId) {
+        // Email insights (limited) - secondary
+        secondaryPromises.push(
           (async () => {
             const { data } = await supabase
               .from('email_insights')
-              .select('*')
+              .select('id, subject, summary, category, priority, email_date, sender_email')
               .eq('property_id', propertyId)
               .order('email_date', { ascending: false })
               .limit(20);
@@ -151,8 +165,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           })()
         );
 
-        // Financial data
-        promises.push(
+        // Financial data - secondary
+        secondaryPromises.push(
           (async () => {
             const { data } = await supabase
               .from('property_financial_data')
@@ -163,8 +177,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           })()
         );
 
-        // Property intel items
-        promises.push(
+        // Property intel items - secondary
+        secondaryPromises.push(
           (async () => {
             const { data } = await supabase
               .from('property_intel_items')
@@ -176,8 +190,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           })()
         );
 
-        // Credentials
-        promises.push(
+        // Credentials - secondary
+        secondaryPromises.push(
           (async () => {
             const { data } = await supabase
               .from('property_credentials')
@@ -187,8 +201,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           })()
         );
 
-        // Appliances
-        promises.push(
+        // Appliances - secondary
+        secondaryPromises.push(
           (async () => {
             const { data } = await supabase
               .from('property_appliances')
@@ -198,8 +212,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           })()
         );
 
-        // Owner conversation actions
-        promises.push(
+        // Owner conversation actions - secondary
+        secondaryPromises.push(
           (async () => {
             const { data } = await supabase
               .from('owner_conversation_actions')
@@ -211,8 +225,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           })()
         );
 
-        // Owner documents
-        promises.push(
+        // Owner documents - secondary
+        secondaryPromises.push(
           (async () => {
             const { data } = await supabase
               .from('owner_conversation_documents')
@@ -222,8 +236,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           })()
         );
 
-        // Property documents
-        promises.push(
+        // Property documents - secondary
+        secondaryPromises.push(
           (async () => {
             const { data } = await supabase
               .from('property_documents')
@@ -235,8 +249,10 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         );
       }
       
-      // Wait for all queries to complete
-      await Promise.all(promises);
+      // Load secondary data in background - don't await to not block UI
+      Promise.all(secondaryPromises).catch(err => {
+        console.error('Error loading secondary data:', err);
+      });
       
     } catch (error: any) {
       console.error('Error loading property details:', error);
@@ -749,10 +765,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
             )}
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary max-md:h-8 max-md:w-8" />
-            </div>
+          {loading && !criticalDataLoaded ? (
+            <ModalSkeleton variant="property-details" />
            ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
               <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
