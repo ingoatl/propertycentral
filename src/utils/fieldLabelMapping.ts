@@ -3,12 +3,16 @@
  * 
  * This utility provides human-readable labels and helpful descriptions
  * for document template fields that often have confusing auto-generated names.
+ * 
+ * Labels are designed to be realtor-friendly and explain what to enter.
  */
 
 export interface FieldLabelInfo {
   label: string;
   placeholder: string;
   description?: string;
+  /** Detailed help text explaining exactly what to enter */
+  helpText?: string;
 }
 
 // Common patterns found in lease/rental agreement field names
@@ -18,43 +22,86 @@ const FIELD_PATTERNS: Array<{
   exactMatch?: string[]; // These must match exactly (case insensitive)
   info: FieldLabelInfo;
 }> = [
-  // === IDENTIFICATION (must come before generic patterns) ===
+  // === LANDLORD/MANAGEMENT (First priority - these fields identify who is renting out the property) ===
+  {
+    exactMatch: ['landlord_name', 'lessor_name', 'owner_name', 'management_company', 'property_manager_name', 'innkeeper', 'brand_name'],
+    patterns: ['landlord name', 'lessor name', 'owner name', 'management company', 'landlord means', 'innkeeper means', 'as used in this lease landlord'],
+    info: {
+      label: 'Landlord/Property Manager Name',
+      placeholder: 'e.g., PeachHaus Group LLC',
+      description: 'Enter the full legal name of the property owner or management company that is renting out the property',
+      helpText: 'This should be the official business name that will appear on the lease as the "Landlord" or "Lessor"',
+    },
+  },
+  {
+    exactMatch: ['landlord_address', 'lessor_address', 'owner_address', 'payment_address', 'management_address'],
+    patterns: ['landlord address', 'payment address', 'management address', 'lessor address', 'mail rent to'],
+    info: {
+      label: 'Landlord Mailing Address',
+      placeholder: 'e.g., 123 Office Park Dr, Suite 100, Atlanta, GA 30301',
+      description: 'Address where rent payments and correspondence should be sent',
+      helpText: 'Use the business address for the property management company or landlord',
+    },
+  },
+  {
+    exactMatch: ['landlord_phone', 'lessor_phone', 'management_phone', 'office_phone', 'owner_phone'],
+    patterns: ['landlord phone', 'office phone', 'management phone', 'lessor phone', 'contact number for landlord'],
+    info: {
+      label: 'Landlord/Office Phone',
+      placeholder: 'e.g., (404) 555-1234',
+      description: 'Main phone number for the landlord or property management office',
+    },
+  },
+  {
+    exactMatch: ['landlord_email', 'lessor_email', 'management_email', 'office_email', 'owner_email'],
+    patterns: ['landlord email', 'office email', 'management email', 'lessor email'],
+    info: {
+      label: 'Landlord/Office Email',
+      placeholder: 'e.g., leasing@peachhausgroup.com',
+      description: 'Email address for the landlord or property management office',
+    },
+  },
+
+  // === IDENTIFICATION (Tenant fills these) ===
   {
     exactMatch: ['ssn', 'social_security', 'tax_id', 'taxpayer_id'],
     patterns: ['social security', 'tax identification'],
     info: {
-      label: 'SSN / Tax ID',
+      label: 'Social Security Number (Tenant)',
       placeholder: 'XXX-XX-XXXX',
-      description: 'Social Security or Tax ID number',
+      description: 'Tenant enters their SSN for credit/background check purposes',
+      helpText: 'Tenant will fill this field when signing - leave blank for admin',
     },
   },
   {
     exactMatch: ['drivers_license', 'driver_license', 'dl_number', 'id_number', 'license_number'],
     patterns: ['driver license', 'license number', 'id number'],
     info: {
-      label: "Driver's License / ID Number",
+      label: "Driver's License Number (Tenant)",
       placeholder: 'e.g., GA123456789',
-      description: 'State-issued ID or license number',
+      description: 'Tenant enters their state-issued ID number',
+      helpText: 'Tenant will fill this field when signing',
     },
   },
   {
     exactMatch: ['dob', 'date_of_birth', 'birth_date', 'birthdate'],
     patterns: ['date of birth', 'birth date'],
     info: {
-      label: 'Date of Birth',
+      label: 'Date of Birth (Tenant)',
       placeholder: 'MM/DD/YYYY',
-      description: 'Date of birth',
+      description: 'Tenant enters their date of birth',
     },
   },
 
-  // === SPECIFIC FEES (must come before generic financial) ===
+  // === SPECIFIC FEES (Admin fills - set by lease terms) ===
   {
     exactMatch: ['returned_check_fee', 'nsf_fee', 'bounced_check_fee', 'dishonored_check_fee'],
     patterns: ['returned check', 'nsf fee', 'bounced check', 'dishonored check'],
     info: {
       label: 'Returned Check Fee',
       placeholder: 'e.g., $35',
-      description: 'Fee charged for bounced or returned checks',
+      description: 'Fee charged when a rent check bounces or is returned by the bank',
+      helpText: 'Standard fees range from $25-$50. Enter the dollar amount (e.g., "$35" or "35")',
     },
   },
   {
@@ -62,26 +109,29 @@ const FIELD_PATTERNS: Array<{
     patterns: ['late fee', 'late charge', 'late penalty'],
     info: {
       label: 'Late Fee Amount',
-      placeholder: 'e.g., $75',
-      description: 'Penalty charged when rent is paid late',
+      placeholder: 'e.g., $75 or 5%',
+      description: 'Penalty charged when rent is paid after the grace period',
+      helpText: 'Can be a flat fee (e.g., "$75") or percentage (e.g., "5% of monthly rent")',
     },
   },
   {
     exactMatch: ['grace_period', 'grace_period_days', 'grace_days'],
     patterns: ['grace period'],
     info: {
-      label: 'Grace Period (Days)',
-      placeholder: 'e.g., 5',
-      description: 'Number of days before rent is considered late',
+      label: 'Grace Period',
+      placeholder: 'e.g., 5 days',
+      description: 'Number of days after rent due date before late fees apply',
+      helpText: 'Standard is 3-5 days. Enter just the number (e.g., "5") or "5 days"',
     },
   },
   {
     exactMatch: ['interest_rate', 'late_interest', 'annual_rate'],
     patterns: ['interest rate', 'per annum'],
     info: {
-      label: 'Late Payment Interest Rate',
-      placeholder: 'e.g., 18%',
-      description: 'Annual interest rate charged on late payments',
+      label: 'Interest Rate on Late Payments',
+      placeholder: 'e.g., 18% per annum',
+      description: 'Annual interest rate charged on overdue balances',
+      helpText: 'Typically 12-18% annually. Enter as percentage (e.g., "18%" or "18% per annum")',
     },
   },
   {
@@ -90,7 +140,8 @@ const FIELD_PATTERNS: Array<{
     info: {
       label: 'Pet Deposit/Fee',
       placeholder: 'e.g., $250',
-      description: 'One-time or monthly pet fee',
+      description: 'One-time pet deposit or non-refundable pet fee',
+      helpText: 'Enter the amount, or "N/A" or "$0" if no pets allowed',
     },
   },
   {
@@ -99,7 +150,8 @@ const FIELD_PATTERNS: Array<{
     info: {
       label: 'Monthly Pet Rent',
       placeholder: 'e.g., $25/month',
-      description: 'Additional monthly rent for pets',
+      description: 'Additional monthly rent charged for pets',
+      helpText: 'Per-pet monthly fee. Enter "$0" or "N/A" if not applicable',
     },
   },
   {
@@ -157,41 +209,45 @@ const FIELD_PATTERNS: Array<{
     },
   },
 
-  // === MAIN FINANCIAL TERMS ===
+  // === MAIN FINANCIAL TERMS (Admin fills) ===
   {
     exactMatch: ['monthly_rent', 'rent_amount', 'base_rent', 'monthly_rental'],
-    patterns: ['monthly rent', 'rent amount', 'base rent'],
+    patterns: ['monthly rent', 'rent amount', 'base rent', 'monthly installment', 'rent for the premises shall be paid in monthly installments of'],
     info: {
-      label: 'Monthly Rent',
+      label: 'Monthly Rent Amount',
       placeholder: 'e.g., $1,500',
-      description: 'Amount due each month',
+      description: 'The monthly rent amount the tenant will pay',
+      helpText: 'Enter the full dollar amount (e.g., "$1,500" or "1500"). This is the base rent before any additional fees.',
     },
   },
   {
     exactMatch: ['additional_rent', 'extra_rent', 'additional_charges'],
     patterns: ['additional rent', 'extra rent', 'additional charges'],
     info: {
-      label: 'Additional Rent/Fees',
+      label: 'Additional Monthly Charges',
       placeholder: 'e.g., $50 for utilities',
-      description: 'Any extra monthly charges beyond base rent',
+      description: 'Any recurring monthly charges beyond base rent',
+      helpText: 'Enter additional fees like utility surcharges, HOA pass-throughs, etc. Enter "$0" if none.',
     },
   },
   {
     exactMatch: ['security_deposit', 'deposit_amount', 'damage_deposit'],
     patterns: ['security deposit', 'damage deposit'],
     info: {
-      label: 'Security Deposit',
+      label: 'Security Deposit Amount',
       placeholder: 'e.g., $1,500',
-      description: 'Refundable deposit held for damages',
+      description: 'Refundable deposit held for potential damages',
+      helpText: 'Typically equal to one month rent. This is returned at lease end minus any damages.',
     },
   },
   {
     exactMatch: ['total_amount', 'total_due', 'move_in_total', 'total_rent', 'amount_due'],
     patterns: ['total amount', 'total due', 'move in total'],
     info: {
-      label: 'Total Amount Due',
+      label: 'Total Move-In Amount Due',
       placeholder: 'e.g., $3,250',
-      description: 'Total of all amounts due at signing',
+      description: 'Total of all amounts due at lease signing',
+      helpText: 'Sum of first month rent + security deposit + any fees due at signing',
     },
   },
   {
