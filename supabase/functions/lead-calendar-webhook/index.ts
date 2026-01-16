@@ -45,8 +45,56 @@ serve(async (req) => {
       meeting_notes?: string;
     } | null = null;
 
+    // Server-side validation: Enforce EST business hours (11 AM - 4 PM EST on weekdays)
+    const validateBookingTime = (scheduledAtStr: string): { valid: boolean; error?: string } => {
+      const scheduledAt = new Date(scheduledAtStr);
+      
+      // Convert to EST/EDT
+      const estOptions: Intl.DateTimeFormatOptions = { 
+        timeZone: 'America/New_York', 
+        hour: 'numeric', 
+        minute: 'numeric',
+        weekday: 'long',
+        hour12: false 
+      };
+      const estFormatter = new Intl.DateTimeFormat('en-US', estOptions);
+      const estParts = estFormatter.formatToParts(scheduledAt);
+      
+      const hourPart = estParts.find(p => p.type === 'hour');
+      const weekdayPart = estParts.find(p => p.type === 'weekday');
+      
+      const estHour = hourPart ? parseInt(hourPart.value) : 0;
+      const weekday = weekdayPart?.value || '';
+      
+      // Block weekends
+      if (weekday === 'Saturday' || weekday === 'Sunday') {
+        return { valid: false, error: 'Bookings are not available on weekends' };
+      }
+      
+      // Block outside business hours (11 AM - 4 PM EST means last slot is 3:30 PM)
+      // end_time is 16:00, so slots go up to 15:30
+      if (estHour < 11 || estHour >= 16) {
+        return { valid: false, error: `Bookings are only available 11 AM - 4 PM EST. Requested: ${estHour}:00 EST` };
+      }
+      
+      return { valid: true };
+    };
+
     if (isWebsiteBooking) {
       // Website booking format - direct data
+      
+      // Validate booking time for website bookings
+      if (payload.scheduled_at) {
+        const validation = validateBookingTime(payload.scheduled_at);
+        if (!validation.valid) {
+          console.error("Booking time validation failed:", validation.error);
+          return new Response(
+            JSON.stringify({ success: false, error: validation.error }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+      
       leadData = {
         name: payload.name || "Unknown",
         email: payload.email,

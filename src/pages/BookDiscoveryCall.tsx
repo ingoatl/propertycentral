@@ -86,10 +86,56 @@ import anjaIngoHosts from "@/assets/anja-ingo-hosts.jpg";
 
 const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
 
-// Generate 30-minute time slots
-const generateTimeSlots = (startHour: number, endHour: number) => {
+// EST timezone offset (Eastern Standard Time = UTC-5, EDT = UTC-4)
+// We use EST business hours, so availability is defined in EST
+const getESTOffset = (date: Date): number => {
+  // Check if we're in daylight saving time (EDT)
+  // EDT runs from second Sunday of March to first Sunday of November
+  const year = date.getFullYear();
+  const marchSecondSunday = new Date(year, 2, 8 + (7 - new Date(year, 2, 1).getDay()) % 7);
+  const novFirstSunday = new Date(year, 10, 1 + (7 - new Date(year, 10, 1).getDay()) % 7);
+  
+  if (date >= marchSecondSunday && date < novFirstSunday) {
+    return -4; // EDT (Eastern Daylight Time)
+  }
+  return -5; // EST (Eastern Standard Time)
+};
+
+// Convert a time in EST to the user's local time for display
+const convertESTToLocal = (hour: number, minute: number, date: Date): { hour: number; minute: number } => {
+  // Create a date in EST
+  const estOffset = getESTOffset(date);
+  const estDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
+  
+  // Get local offset in hours
+  const localOffset = -date.getTimezoneOffset() / 60;
+  
+  // Calculate the difference
+  const hourDiff = localOffset - estOffset;
+  
+  let adjustedHour = hour + hourDiff;
+  let adjustedMinute = minute;
+  
+  // Handle day overflow (shouldn't happen with business hours, but be safe)
+  if (adjustedHour >= 24) adjustedHour -= 24;
+  if (adjustedHour < 0) adjustedHour += 24;
+  
+  return { hour: adjustedHour, minute: adjustedMinute };
+};
+
+// Convert local time back to EST for storage
+const convertLocalToEST = (localDate: Date): Date => {
+  const estOffset = getESTOffset(localDate);
+  const localOffset = -localDate.getTimezoneOffset() / 60;
+  const hourDiff = estOffset - localOffset;
+  
+  return new Date(localDate.getTime() + hourDiff * 60 * 60 * 1000);
+};
+
+// Generate 30-minute time slots in EST, displayed in local time
+const generateTimeSlots = (startHourEST: number, endHourEST: number) => {
   const slots: string[] = [];
-  for (let hour = startHour; hour < endHour; hour++) {
+  for (let hour = startHourEST; hour < endHourEST; hour++) {
     slots.push(`${hour.toString().padStart(2, "0")}:00`);
     slots.push(`${hour.toString().padStart(2, "0")}:30`);
   }
@@ -350,8 +396,20 @@ export default function BookDiscoveryCall() {
     mutationFn: async () => {
       if (!selectedDate || !selectedTime) throw new Error("Select date and time");
 
+      // Time slots are in EST - create the date in EST then convert to UTC
       const [hours, minutes] = selectedTime.split(":").map(Number);
-      const scheduledAt = setMinutes(setHours(selectedDate, hours), minutes);
+      
+      // Create the scheduled time - the hours are EST hours
+      // We need to convert EST to UTC for storage
+      const estOffset = getESTOffset(selectedDate);
+      
+      // Create date with EST time, then adjust to UTC
+      const localDate = setMinutes(setHours(selectedDate, hours), minutes);
+      
+      // Calculate UTC time: EST is UTC-5 or UTC-4 (during DST)
+      // So we need to ADD the offset hours to get UTC
+      const utcTime = new Date(localDate.getTime() - (estOffset * 60 * 60 * 1000));
+      const scheduledAt = utcTime;
 
       const notes = [
         `Current Situation: ${CURRENT_MANAGEMENT.find(c => c.value === formData.currentManagement)?.label || "Not specified"}`,
@@ -971,6 +1029,7 @@ export default function BookDiscoveryCall() {
                     <Clock className="h-5 w-5 text-primary" />
                     Select a time for {format(selectedDate, "MMMM d")}
                   </h3>
+                  <p className="text-xs text-muted-foreground -mt-2">All times shown in Eastern Time (EST/EDT)</p>
                   
                   {availableTimeSlots.length === 0 ? (
                     <div className="text-center py-6">
@@ -1007,7 +1066,7 @@ export default function BookDiscoveryCall() {
                         <p><strong>Time:</strong> {format(
                           setMinutes(setHours(new Date(), parseInt(selectedTime.split(":")[0])), parseInt(selectedTime.split(":")[1])),
                           "h:mm a"
-                        )} (30 min)</p>
+                        )} EST (30 min)</p>
                         <p><strong>Meeting:</strong> {formData.meetingType === "video" ? "Video Call" : "Phone Call"}</p>
                         <p><strong>Property:</strong> {formData.propertyAddress}</p>
                       </div>
