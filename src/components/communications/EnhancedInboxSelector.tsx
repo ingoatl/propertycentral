@@ -151,8 +151,14 @@ export function EnhancedInboxSelector({
       .slice(0, 2);
   };
 
+  // Get the current user's name
+  const currentUserName = useMemo(() => {
+    const currentMember = teamMembers.find((m) => m.id === currentUserId);
+    return currentMember?.full_name || "User";
+  }, [teamMembers, currentUserId]);
+
   const getSelectedLabel = () => {
-    if (selectedView === "my-inbox") return "My Inbox";
+    if (selectedView === "my-inbox") return `${currentUserName}'s Inbox`;
     if (selectedView === "all") return "All Communications";
     if (selectedView === "unassigned") return "Unassigned";
     
@@ -227,7 +233,7 @@ export function EnhancedInboxSelector({
           className={cn("gap-2", selectedView === "my-inbox" && "bg-accent")}
         >
           <User className="h-4 w-4" />
-          <span className="flex-1">My Inbox</span>
+          <span className="flex-1">{currentUserName}'s Inbox</span>
           {unreadCounts[currentUserId || ""] > 0 && (
             <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
               {unreadCounts[currentUserId || ""]}

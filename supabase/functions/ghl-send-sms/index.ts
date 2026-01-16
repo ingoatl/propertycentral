@@ -186,7 +186,16 @@ serve(async (req) => {
     
     console.log(`SMS sent successfully via GHL. Message ID: ${sendData.messageId}, Conversation ID: ${sendData.conversationId}`);
 
-    // Record communication for leads
+    // Get user ID from auth header FIRST so we can use it when recording communications
+    const authHeader = req.headers.get('Authorization');
+    let userId: string | null = null;
+    if (authHeader) {
+      const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+      userId = user?.id || null;
+    }
+    console.log(`SMS sent by user: ${userId || 'unknown'}`);
+
+    // Record communication for leads - include assigned_user_id to track who sent it
     if (leadId) {
       await supabase.from("lead_communications").insert({
         lead_id: leadId,
@@ -196,12 +205,14 @@ serve(async (req) => {
         status: "sent",
         external_id: sendData.messageId || sendData.conversationId,
         ghl_conversation_id: sendData.conversationId,
+        assigned_user_id: userId, // Track who sent this message
         metadata: {
           provider: "gohighlevel",
           ghl_contact_id: contactId,
           ghl_conversation_id: sendData.conversationId,
           from_number: formattedFromNumber,
           to_number: formattedPhone,
+          sent_by_user_id: userId, // Also store in metadata for reference
         },
       });
 
@@ -213,6 +224,7 @@ serve(async (req) => {
           ghl_contact_id: contactId,
           ghl_conversation_id: sendData.conversationId,
           from_number: formattedFromNumber,
+          sent_by_user_id: userId,
         },
       });
 
@@ -299,13 +311,7 @@ serve(async (req) => {
     }
 
     // Also store in user_phone_messages for unified tracking
-    // Get user ID from auth header
-    const authHeader = req.headers.get('Authorization');
-    let userId = null;
-    if (authHeader) {
-      const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-      userId = user?.id;
-    }
+    // userId was already extracted at line 190-195
 
     await supabase.from("user_phone_messages").insert({
       user_id: userId,
