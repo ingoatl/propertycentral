@@ -207,8 +207,10 @@ serve(async (req) => {
     console.log("Created booking document:", documentId);
 
     // Create signing tokens for each signer
+    // Note: signer_type must be 'owner', 'manager', or 'second_owner' per DB constraint
+    // We use 'owner' for the guest (property renter/owner perspective) and 'manager' for host
     const signers = [
-      { name: recipientName, email: recipientEmail, type: "guest", order: 1 },
+      { name: recipientName, email: recipientEmail, type: "owner", order: 1 },
       { name: "PeachHaus Group", email: "info@peachhausgroup.com", type: "manager", order: 2 },
     ];
 
@@ -239,7 +241,7 @@ serve(async (req) => {
     }
 
     // Build signing URLs
-    const guestToken = tokens.find(t => t.signer_type === "guest");
+    const guestToken = tokens.find(t => t.signer_type === "owner");
     const managerToken = tokens.find(t => t.signer_type === "manager");
     
     const guestSigningUrl = guestToken ? `${APP_URL}/sign/${guestToken.token}` : null;
