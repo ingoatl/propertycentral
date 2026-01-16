@@ -51,10 +51,16 @@ export function AdminInboxSelector({
       if (assignments && assignments.length > 0) {
         const userIds = [...new Set(assignments.map(a => a.user_id))];
         
+        // Helper to extract user name from display_name (e.g., "Ingo Direct Line" -> "Ingo")
+        const extractUserName = (displayName: string | null): string => {
+          if (!displayName) return "Unknown";
+          return displayName.replace(/\s*(Direct Line|Line|Inbox)$/i, '').trim() || displayName;
+        };
+        
         // Use assignments directly since they have display_name
         const usersWithPhones = assignments.map(assignment => ({
           id: assignment.user_id,
-          full_name: assignment.display_name || "Unknown",
+          full_name: extractUserName(assignment.display_name),
           phone_number: assignment.phone_number || null,
         }));
         setUsers(usersWithPhones);
@@ -73,7 +79,8 @@ export function AdminInboxSelector({
 
   const getSelectedLabel = () => {
     if (viewAll) return "All Inboxes";
-    if (selectedUserId === currentUserId) return "My Inbox";
+    const currentUser = users.find(u => u.id === currentUserId);
+    if (selectedUserId === currentUserId) return `${currentUser?.full_name || "My"}'s Inbox`;
     const user = users.find(u => u.id === selectedUserId);
     return user ? `${user.full_name}'s Inbox` : "Select Inbox";
   };

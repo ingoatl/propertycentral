@@ -14,6 +14,14 @@ export interface DetectedField {
   type: "text" | "number" | "date" | "email" | "phone" | "textarea" | "checkbox" | "signature";
   filled_by: "admin" | "guest" | "tenant";
   category: "property" | "financial" | "dates" | "occupancy" | "contact" | "identification" | "vehicle" | "emergency" | "acknowledgment" | "signature" | "other";
+  description?: string;
+  required?: boolean;
+  // Position data from field_mappings
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  page?: number;
 }
 
 interface CustomClause {

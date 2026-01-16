@@ -71,10 +71,21 @@ export function EnhancedInboxSelector({
       // Merge data by user_id
       const userMap = new Map<string, TeamMember>();
 
+      // Helper to extract first name from display_name (e.g., "Ingo Direct Line" -> "Ingo")
+      const extractUserName = (displayName: string | null): string => {
+        if (!displayName) return "Unknown";
+        // Remove common suffixes like "Direct Line", "Line", etc.
+        const cleanName = displayName
+          .replace(/\s*(Direct Line|Line|Inbox)$/i, '')
+          .trim();
+        return cleanName || displayName;
+      };
+
       phoneAssignments.data?.forEach((assignment) => {
+        const userName = extractUserName(assignment.display_name);
         userMap.set(assignment.user_id, {
           id: assignment.user_id,
-          full_name: assignment.display_name || "Unknown",
+          full_name: userName,
           email: null,
           phone_number: assignment.phone_number,
           gmail_label: null,

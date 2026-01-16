@@ -56,7 +56,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ComponentType
   other: { label: "Other Fields", icon: HelpCircle, priority: 11 },
 };
 
-// Sample default values for the lease
+// Default values for GA Residential Lease - PeachHaus standard values
 const SAMPLE_VALUES: Record<string, string> = {
   // Landlord Info
   landlord_name: "PeachHaus Group LLC",
@@ -64,40 +64,89 @@ const SAMPLE_VALUES: Record<string, string> = {
   management_company: "PeachHaus Group LLC",
   landlord_representative: "Ingo Schaer, Operations Manager",
   
-  // Property
+  // Tenants for 3708 Canadian Way
+  tenant_name: "Shankivia Daugherty, Autumn Hill, Aidan Ball",
+  tenant_names: "Shankivia Daugherty, Autumn Hill, Aidan Ball",
+  tenant_1_name: "Shankivia Daugherty",
+  tenant_2_name: "Autumn Hill",
+  tenant_3_name: "Aidan Ball",
+  number_of_occupants: "3",
+  
+  // Property - 3708 Canadian Way
   county: "DeKalb County, Georgia",
+  property_county: "DeKalb County",
+  property_state: "Georgia",
   property_address: "3708 Canadian Way, Tucker, GA 30084",
+  property_city: "Tucker",
+  property_zip: "30084",
+  
+  // Dates
+  lease_execution_date: "December 5, 2025",
+  execution_date: "December 5, 2025",
+  signing_date: "December 5, 2025",
+  lease_start_date: "December 9, 2025",
+  possession_date: "December 9, 2025",
+  first_rent_due: "December 9, 2025",
+  lease_end_date: "January 8, 2026",
+  
+  // Lease Terms
+  lease_type: "1-month lease with month-to-month extension option",
+  lease_term: "1 month",
+  notice_to_vacate: "14-day notice required by either party",
+  notice_period: "14 days",
   
   // Financial - Rent
   monthly_rent: "$6,360.00",
+  monthly_rent_amount: "6360",
   rent_amount: "$6,360.00",
   rent_due_day: "9th of each month",
+  rent_due_date: "9",
   late_after: "14th of the month",
+  grace_period_days: "5",
   
   // Fees
   late_fee: "$50.00",
+  late_fee_amount: "50",
+  initial_late_fee: "$50.00",
   daily_late_fee: "$30.00",
+  daily_late_fee_amount: "30",
   security_deposit: "$1,500.00",
+  security_deposit_amount: "1500",
+  escrow_bank: "Thread Bank, Rogersville, TN",
+  
+  // One-time fees
   cleaning_fee: "$400",
+  move_out_cleaning_fee: "$400 (one-time)",
   admin_fee: "$250",
+  administrative_fee: "$250 (one-time)",
   application_fee: "$50",
+  
+  // Conditional charges
   mandatory_cleaning: "$150",
+  monthly_cleaning_fee: "$150 (applies if extended beyond January 8, 2026)",
   
   // Payment
   payment_method: "ACH / wire (online payment preferred)",
-  escrow_bank: "Thread Bank, Rogersville, TN",
-  
-  // Terms
-  lease_type: "1-month lease with month-to-month extension option",
-  notice_period: "14-day notice required by either party",
-  furnishing_status: "Fully Furnished",
-  renters_insurance: "Optional (tenant's discretion)",
+  accepted_payment: "ACH / wire (online payment preferred)",
   
   // Utilities
   utilities_tenant: "Gas, Water, Trash, Electricity",
+  tenant_utilities: "Gas, Water, Trash, Electricity",
   
-  // Third Party
+  // Property Condition
+  furnishing_status: "Fully Furnished",
+  property_condition: "Fully Furnished",
+  
+  // Insurance
+  renters_insurance: "Optional (tenant's discretion)",
+  
+  // Third Party Authorization
   third_party_payor: "ALE Solutions, Inc.",
+  third_party_authorization: "ALE Solutions, Inc. - May pay rent/deposit, request extensions, give notice, issue notices on tenant's behalf",
+  
+  // Signatures
+  tenant_signed: "Shankivia Daugherty",
+  tenant_signature_date: "December 5, 2025",
 };
 
 // Auto-filled fields (hidden from form)

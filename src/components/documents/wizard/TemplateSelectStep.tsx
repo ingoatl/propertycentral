@@ -140,10 +140,12 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
   };
 
   // Apply smart defaults using the field assignment utility
+  // IMPORTANT: Preserve position data (x, y, page, width, height) from field_mappings
   const applyDefaultAssignments = (fields: DetectedField[]): DetectedField[] => {
     return fields.map(field => {
       // Use the centralized field assignment logic
       const assignedTo = getFieldAssignment(field.api_id, field.label, field.category);
+      // Spread the entire field object to preserve position data (x, y, page, width, height)
       return { ...field, filled_by: assignedTo };
     });
   };
