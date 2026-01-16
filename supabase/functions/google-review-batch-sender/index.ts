@@ -126,35 +126,38 @@ serve(async (req) => {
         .map(r => r.guest_phone?.replace(/\D/g, '').slice(-10)) || []
     );
 
-    // Find reviews that need contact
+    // Find reviews that need contact - prioritize NEW reviews from today
     let reviewsToContact: typeof allReviews = [];
     
-    if (retryPending) {
-      // Retry reviews with "pending" status (created but not sent)
-      const pendingRequestReviewIds = new Set(
-        existingRequests
-          ?.filter(r => r.workflow_status === 'pending')
-          .map(r => r.review_id) || []
-      );
-      reviewsToContact = (allReviews || []).filter(review => 
-        pendingRequestReviewIds.has(review.id)
-      ).slice(0, MAX_SMS_PER_RUN);
-      console.log(`Retrying ${reviewsToContact.length} pending requests`);
-    } else {
-      // Normal flow - find reviews without any request yet
-      reviewsToContact = (allReviews || []).filter(review => {
-        // Skip if already has a request
-        if (existingReviewIds.has(review.id)) return false;
-        
-        // Skip if guest has opted out
-        const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
-        if (optedOutPhones.has(phoneDigits)) return false;
-        
-        return true;
-      }).slice(0, MAX_SMS_PER_RUN);
-    }
+    // First, find reviews posted today that don't have a request yet (priority)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayReviews = (allReviews || []).filter(review => {
+      if (existingReviewIds.has(review.id)) return false;
+      const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
+      if (optedOutPhones.has(phoneDigits)) return false;
+      // Check if review is from today
+      const reviewDate = review.review_date ? new Date(review.review_date) : null;
+      return reviewDate && reviewDate >= today;
+    });
 
-    console.log(`${reviewsToContact.length} reviews to contact in this batch`);
+    // Then find older reviews without requests
+    const olderReviews = (allReviews || []).filter(review => {
+      if (existingReviewIds.has(review.id)) return false;
+      const phoneDigits = review.guest_phone?.replace(/\D/g, '').slice(-10);
+      if (optedOutPhones.has(phoneDigits)) return false;
+      const reviewDate = review.review_date ? new Date(review.review_date) : null;
+      return !reviewDate || reviewDate < today;
+    });
+
+    // Combine: today's reviews first (up to MAX), then fill with older ones
+    reviewsToContact = [
+      ...todayReviews.slice(0, MAX_SMS_PER_RUN),
+      ...olderReviews.slice(0, Math.max(0, MAX_SMS_PER_RUN - todayReviews.length))
+    ].slice(0, MAX_SMS_PER_RUN);
+
+    console.log(`Found ${todayReviews.length} new reviews from today, ${olderReviews.length} older reviews`);
+    console.log(`Processing ${reviewsToContact.length} reviews in this batch (today's reviews prioritized)`);
 
     // Provide detailed status if no reviews to contact
     if (reviewsToContact.length === 0) {

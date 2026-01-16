@@ -870,7 +870,38 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Project created:", project.id);
 
-    // 7. Pre-populate onboarding tasks from field mappings
+    // 7. PRE-CREATE ALL DEFAULT TASKS from onboarding phases
+    console.log("Creating all default onboarding tasks...");
+    let tasksCreated = 0;
+    
+    for (const phase of DEFAULT_ONBOARDING_PHASES) {
+      for (const task of phase.tasks) {
+        try {
+          const { error: insertError } = await supabase
+            .from('onboarding_tasks')
+            .insert({
+              project_id: project.id,
+              phase_number: phase.id,
+              phase_title: phase.title,
+              title: task.title,
+              field_type: task.field_type,
+              description: task.description || null,
+              status: 'pending',
+            });
+          
+          if (!insertError) {
+            tasksCreated++;
+          } else if (!insertError.message?.includes('duplicate')) {
+            console.error(`Failed to create task ${task.title}:`, insertError);
+          }
+        } catch (err) {
+          console.error(`Error creating task ${task.title}:`, err);
+        }
+      }
+    }
+    console.log(`Created ${tasksCreated} default tasks`);
+
+    // 8. Update tasks with form field values (mark as completed)
     let tasksPopulated = 0;
     for (const [field, taskInfo] of Object.entries(TASK_MAPPINGS)) {
       const value = formData[field];
@@ -886,7 +917,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // 7b. Process utilities array into individual tasks
+    // 8b. Process utilities array into individual tasks
     if (formData.utilities && Array.isArray(formData.utilities)) {
       for (const utility of formData.utilities) {
         if (utility.type && (utility.provider || utility.account_number)) {
@@ -907,7 +938,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // 7c. Handle HOA info as combined field
+    // 8c. Handle HOA info as combined field
     if (formData.has_hoa && (formData.hoa_contact_name || formData.hoa_contact_phone)) {
       const hoaInfo = `Contact: ${formData.hoa_contact_name || 'N/A'} | Phone: ${formData.hoa_contact_phone || 'N/A'}`;
       const success = await createOrUpdateTask(
@@ -920,7 +951,7 @@ const handler = async (req: Request): Promise<Response> => {
       if (success) tasksPopulated++;
     }
 
-    // 7d. Handle pets_allowed as a task
+    // 8d. Handle pets_allowed as a task
     if (formData.pets_allowed !== undefined) {
       const success = await createOrUpdateTask(
         project.id,
@@ -932,7 +963,7 @@ const handler = async (req: Request): Promise<Response> => {
       if (success) tasksPopulated++;
     }
 
-    console.log("Tasks populated:", tasksPopulated);
+    console.log(`Tasks populated with form values: ${tasksPopulated}`);
 
     // 8. Calculate actual progress based on tasks
     // Only count tasks with actual values as completed
