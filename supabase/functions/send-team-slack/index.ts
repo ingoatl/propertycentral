@@ -20,7 +20,8 @@ interface SlackRequest {
   recipientUserId?: string;
 }
 
-// Team member Slack IDs - update these with actual Slack user IDs
+// Team member Slack IDs - these need to be the ACTUAL Slack user IDs from your workspace
+// Format: U + alphanumeric string (e.g., U0123456789)
 const SLACK_USER_MAP: Record<string, { name: string; slackId: string }> = {
   'alex': { name: 'Alex', slackId: 'U_ALEX' },
   'anja': { name: 'Anja', slackId: 'U_ANJA' },
@@ -28,6 +29,107 @@ const SLACK_USER_MAP: Record<string, { name: string; slackId: string }> = {
   'chris': { name: 'Chris', slackId: 'U_CHRIS' },
   'ingo': { name: 'Ingo', slackId: 'U_INGO' },
 };
+
+const SLACK_BOT_TOKEN = Deno.env.get('SLACK_BOT_TOKEN');
+
+// Send message directly to Slack using the Web API
+async function sendSlackMessage(channel: string, text: string): Promise<{ ok: boolean; ts?: string; error?: string }> {
+  if (!SLACK_BOT_TOKEN) {
+    console.error('[Slack] SLACK_BOT_TOKEN is not configured');
+    return { ok: false, error: 'SLACK_BOT_TOKEN not configured' };
+  }
+
+  console.log(`[Slack] Sending message to channel: ${channel}`);
+
+  const response = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      channel: channel,
+      text: text,
+      unfurl_links: false,
+      unfurl_media: false,
+    }),
+  });
+
+  const result = await response.json();
+  console.log('[Slack] API response:', JSON.stringify(result).substring(0, 500));
+
+  if (!result.ok) {
+    console.error('[Slack] API error:', result.error);
+    return { ok: false, error: result.error };
+  }
+
+  return { ok: true, ts: result.ts };
+}
+
+// Open a DM conversation and send a message
+async function sendSlackDM(userId: string, text: string): Promise<{ ok: boolean; ts?: string; error?: string }> {
+  if (!SLACK_BOT_TOKEN) {
+    console.error('[Slack] SLACK_BOT_TOKEN is not configured');
+    return { ok: false, error: 'SLACK_BOT_TOKEN not configured' };
+  }
+
+  console.log(`[Slack] Opening DM with user: ${userId}`);
+
+  // First, open a DM conversation with the user
+  const openResponse = await fetch('https://slack.com/api/conversations.open', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      users: userId,
+    }),
+  });
+
+  const openResult = await openResponse.json();
+  console.log('[Slack] conversations.open response:', JSON.stringify(openResult).substring(0, 300));
+
+  if (!openResult.ok) {
+    console.error('[Slack] Failed to open DM:', openResult.error);
+    return { ok: false, error: `Failed to open DM: ${openResult.error}` };
+  }
+
+  const dmChannelId = openResult.channel?.id;
+  if (!dmChannelId) {
+    return { ok: false, error: 'Could not get DM channel ID' };
+  }
+
+  // Now send the message to the DM channel
+  return await sendSlackMessage(dmChannelId, text);
+}
+
+// Look up a Slack user by email
+async function findSlackUserByEmail(email: string): Promise<string | null> {
+  if (!SLACK_BOT_TOKEN) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`https://slack.com/api/users.lookupByEmail?email=${encodeURIComponent(email)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+    });
+
+    const result = await response.json();
+    if (result.ok && result.user?.id) {
+      console.log(`[Slack] Found user ${email}: ${result.user.id}`);
+      return result.user.id;
+    }
+    console.log(`[Slack] User not found for email ${email}:`, result.error);
+    return null;
+  } catch (e) {
+    console.error(`[Slack] Error looking up user by email:`, e);
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -85,6 +187,7 @@ serve(async (req) => {
     // Determine target - channel or DM
     let targetChannel = channel;
     let targetDescription = channel ? `#${channel}` : '';
+    let slackUserId: string | null = null;
     
     if (directMessage && recipientUserId) {
       const teamMember = SLACK_USER_MAP[recipientUserId.toLowerCase()];
@@ -95,9 +198,9 @@ serve(async (req) => {
         });
       }
       
-      // For DMs, we'll use the Slack user ID to open a conversation
       targetChannel = `@${teamMember.name}`;
       targetDescription = `DM to ${teamMember.name}`;
+      slackUserId = teamMember.slackId;
       
       console.log(`[send-team-slack] Sending DM to ${teamMember.name} (${teamMember.slackId})`);
     } else if (!channel) {
@@ -173,9 +276,12 @@ serve(async (req) => {
     // Add mentions if provided
     if (mentionUsers && mentionUsers.length > 0) {
       const mentions = mentionUsers
-        .map(u => SLACK_USER_MAP[u.toLowerCase()]?.name || u)
-        .join(', ');
-      fullMessage = `cc: ${mentions}\n\n${fullMessage}`;
+        .map(u => {
+          const member = SLACK_USER_MAP[u.toLowerCase()];
+          return member ? `<@${member.slackId}>` : u;
+        })
+        .join(' ');
+      fullMessage = `${mentions}\n\n${fullMessage}`;
     }
 
     // Log the message in database
@@ -199,50 +305,23 @@ serve(async (req) => {
       console.error('[send-team-slack] Error logging slack message:', insertError);
     }
 
-    // Send via google-calendar-sync function (which has Slack integration)
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Send directly via Slack API
+    let slackResult: { ok: boolean; ts?: string; error?: string };
     
-    // For DMs, we need to handle differently
-    const slackPayload = directMessage && recipientUserId
-      ? {
-          action: 'send-slack-dm',
-          userId: SLACK_USER_MAP[recipientUserId.toLowerCase()]?.slackId,
-          message: fullMessage
-        }
-      : {
-          action: 'send-slack-message',
-          channel: channel?.replace('#', ''),
-          message: fullMessage
-        };
-
-    console.log('[send-team-slack] Sending to google-calendar-sync:', slackPayload);
-
-    const slackResponse = await fetch(`${supabaseUrl}/functions/v1/google-calendar-sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`
-      },
-      body: JSON.stringify(slackPayload)
-    });
-
-    // Safely parse the response
-    let slackResult: any = {};
-    const responseText = await slackResponse.text();
-    console.log('[send-team-slack] Response status:', slackResponse.status, 'body:', responseText.substring(0, 500));
-    
-    try {
-      slackResult = responseText ? JSON.parse(responseText) : {};
-    } catch (parseError) {
-      console.error('[send-team-slack] Failed to parse response:', parseError);
-      slackResult = { error: `Invalid response: ${responseText.substring(0, 200)}` };
+    if (directMessage && slackUserId) {
+      // Send as DM
+      slackResult = await sendSlackDM(slackUserId, fullMessage);
+    } else {
+      // Send to channel - use channel name without # prefix
+      const channelName = channel?.replace('#', '');
+      slackResult = await sendSlackMessage(channelName!, fullMessage);
     }
-    
+
     // Update message status
     if (slackMessage) {
-      const updateData = slackResponse.ok && slackResult.success
-        ? { status: 'sent', slack_message_id: slackResult.result?.ts || slackResult.ts || null }
-        : { status: 'failed', error_message: slackResult.error || slackResult.message || 'Unknown error' };
+      const updateData = slackResult.ok
+        ? { status: 'sent', slack_message_id: slackResult.ts || null }
+        : { status: 'failed', error_message: slackResult.error || 'Unknown error' };
       
       await supabase
         .from('slack_messages')
@@ -250,12 +329,11 @@ serve(async (req) => {
         .eq('id', slackMessage.id);
     }
 
-    if (!slackResponse.ok || !slackResult.success) {
-      console.error('[send-team-slack] Slack send failed:', slackResult);
+    if (!slackResult.ok) {
+      console.error('[send-team-slack] Slack send failed:', slackResult.error);
       return new Response(JSON.stringify({ 
         success: false, 
         error: slackResult.error || 'Failed to send Slack message',
-        details: slackResult 
       }), { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -267,6 +345,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       messageId: slackMessage?.id,
+      slackTs: slackResult.ts,
       channel: targetChannel,
       isDM: directMessage || false
     }), {
