@@ -20,15 +20,17 @@ interface SlackRequest {
   recipientUserId?: string;
 }
 
-// Team member Slack IDs - these need to be the ACTUAL Slack user IDs from your workspace
-// Format: U + alphanumeric string (e.g., U0123456789)
-const SLACK_USER_MAP: Record<string, { name: string; slackId: string }> = {
-  'alex': { name: 'Alex', slackId: 'U_ALEX' },
-  'anja': { name: 'Anja', slackId: 'U_ANJA' },
-  'catherine': { name: 'Catherine', slackId: 'U_CATHERINE' },
-  'chris': { name: 'Chris', slackId: 'U_CHRIS' },
-  'ingo': { name: 'Ingo', slackId: 'U_INGO' },
+// Team member email mapping - we'll look up Slack IDs dynamically
+const TEAM_EMAIL_MAP: Record<string, string> = {
+  'alex': 'alex@peachhausgroup.com',
+  'anja': 'anja@peachhausgroup.com',
+  'catherine': 'catherine@peachhausgroup.com',
+  'chris': 'chris@peachhausgroup.com',
+  'ingo': 'ingo@peachhausgroup.com',
 };
+
+// Cache for Slack user IDs (email -> slackId)
+const slackUserCache: Record<string, string> = {};
 
 const SLACK_BOT_TOKEN = Deno.env.get('SLACK_BOT_TOKEN');
 
@@ -66,42 +68,41 @@ async function sendSlackMessage(channel: string, text: string): Promise<{ ok: bo
   return { ok: true, ts: result.ts };
 }
 
-// Open a DM conversation and send a message
+// Send a direct message to a user (using user ID as channel)
+// This works with chat:write scope - no need for im:write
 async function sendSlackDM(userId: string, text: string): Promise<{ ok: boolean; ts?: string; error?: string }> {
   if (!SLACK_BOT_TOKEN) {
     console.error('[Slack] SLACK_BOT_TOKEN is not configured');
     return { ok: false, error: 'SLACK_BOT_TOKEN not configured' };
   }
 
-  console.log(`[Slack] Opening DM with user: ${userId}`);
+  console.log(`[Slack] Sending DM to user: ${userId}`);
 
-  // First, open a DM conversation with the user
-  const openResponse = await fetch('https://slack.com/api/conversations.open', {
+  // Send directly to user ID - Slack will create/use the DM channel automatically
+  // This works with chat:write scope
+  const response = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      users: userId,
+      channel: userId, // User ID works as channel for DMs
+      text: text,
+      unfurl_links: false,
+      unfurl_media: false,
     }),
   });
 
-  const openResult = await openResponse.json();
-  console.log('[Slack] conversations.open response:', JSON.stringify(openResult).substring(0, 300));
+  const result = await response.json();
+  console.log('[Slack] DM response:', JSON.stringify(result).substring(0, 500));
 
-  if (!openResult.ok) {
-    console.error('[Slack] Failed to open DM:', openResult.error);
-    return { ok: false, error: `Failed to open DM: ${openResult.error}` };
+  if (!result.ok) {
+    console.error('[Slack] DM error:', result.error);
+    return { ok: false, error: result.error };
   }
 
-  const dmChannelId = openResult.channel?.id;
-  if (!dmChannelId) {
-    return { ok: false, error: 'Could not get DM channel ID' };
-  }
-
-  // Now send the message to the DM channel
-  return await sendSlackMessage(dmChannelId, text);
+  return { ok: true, ts: result.ts };
 }
 
 // Look up a Slack user by email
@@ -190,19 +191,27 @@ serve(async (req) => {
     let slackUserId: string | null = null;
     
     if (directMessage && recipientUserId) {
-      const teamMember = SLACK_USER_MAP[recipientUserId.toLowerCase()];
-      if (!teamMember) {
+      const teamEmail = TEAM_EMAIL_MAP[recipientUserId.toLowerCase()];
+      if (!teamEmail) {
         return new Response(JSON.stringify({ error: 'Invalid team member' }), { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         });
       }
       
-      targetChannel = `@${teamMember.name}`;
-      targetDescription = `DM to ${teamMember.name}`;
-      slackUserId = teamMember.slackId;
+      // Look up Slack user ID by email
+      slackUserId = await findSlackUserByEmail(teamEmail);
+      if (!slackUserId) {
+        return new Response(JSON.stringify({ error: `Could not find Slack user for ${teamEmail}` }), { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
       
-      console.log(`[send-team-slack] Sending DM to ${teamMember.name} (${teamMember.slackId})`);
+      targetChannel = `@${recipientUserId}`;
+      targetDescription = `DM to ${recipientUserId}`;
+      
+      console.log(`[send-team-slack] Sending DM to ${recipientUserId} (${slackUserId})`);
     } else if (!channel) {
       return new Response(JSON.stringify({ error: 'Channel or recipient is required' }), { 
         status: 400, 
@@ -273,14 +282,18 @@ serve(async (req) => {
     // Build full message
     let fullMessage = `*From ${senderName}:*\n${message}${contextString}`;
     
-    // Add mentions if provided
+    // Add mentions if provided (look up user IDs dynamically)
     if (mentionUsers && mentionUsers.length > 0) {
-      const mentions = mentionUsers
-        .map(u => {
-          const member = SLACK_USER_MAP[u.toLowerCase()];
-          return member ? `<@${member.slackId}>` : u;
-        })
-        .join(' ');
+      const mentionPromises = mentionUsers.map(async u => {
+        const email = TEAM_EMAIL_MAP[u.toLowerCase()];
+        if (email) {
+          const userId = await findSlackUserByEmail(email);
+          return userId ? `<@${userId}>` : u;
+        }
+        return u;
+      });
+      const resolvedMentions = await Promise.all(mentionPromises);
+      const mentions = resolvedMentions.join(' ');
       fullMessage = `${mentions}\n\n${fullMessage}`;
     }
 
