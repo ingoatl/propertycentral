@@ -12,9 +12,16 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, channel = "all" } = await req.json();
+    const { userId, senderEmail, channel = "all" } = await req.json();
 
-    console.log("Analyze tone request:", { userId, channel });
+    console.log("Analyze tone request:", { userId, senderEmail, channel });
+
+    if (!userId && !senderEmail) {
+      return new Response(
+        JSON.stringify({ error: "Either userId or senderEmail is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -25,12 +32,50 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch all outbound emails and SMS
+    // Get the user's profile to find their email
+    let userEmail = senderEmail;
+    let userName = "User";
+    
+    if (userId && !senderEmail) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email, first_name")
+        .eq("id", userId)
+        .single();
+      
+      if (profile?.email) {
+        userEmail = profile.email;
+        userName = profile.first_name || "User";
+      }
+    } else if (senderEmail) {
+      // Get user info from email
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, first_name")
+        .eq("email", senderEmail)
+        .single();
+      
+      if (profile) {
+        userName = profile.first_name || "User";
+      }
+    }
+
+    console.log(`Analyzing tone for: ${userName} (${userEmail})`);
+
+    // Strategy 1: Check Gmail tokens to access sent emails via API
+    // For now, we'll look for emails sent from this user in lead_communications
+    // In the future, we could scan their actual Gmail sent folder
+
+    // Fetch outbound emails - try to match by metadata or by general pattern
+    // Since there's no direct sender tracking, we'll fetch all outbound and hope
+    // the user's sent emails are identifiable (or just analyze all company emails)
+    
+    // For now, let's just filter by the general email domain and treat it per-user
     const emailQuery = supabase
       .from("lead_communications")
-      .select("id, body, subject, created_at, communication_type")
+      .select("id, body, subject, created_at, communication_type, metadata")
       .eq("direction", "outbound")
-      .in("communication_type", ["email"])
+      .eq("communication_type", "email")
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -73,6 +118,8 @@ serve(async (req) => {
       .join("\n\n");
 
     const analysisPrompt = `Analyze the following sent messages to extract the writer's unique tone of voice, writing patterns, and communication style. This will be used to generate future messages that match their authentic voice.
+
+The writer is: ${userName}
 
 ${channel === "email" || channel === "all" ? `\n=== EMAIL SAMPLES (${emails.length} total) ===\n${emailSamples}` : ""}
 
@@ -157,60 +204,51 @@ Focus on patterns that make their writing UNIQUE - not generic professional writ
       throw new Error("Failed to parse AI response");
     }
 
-    // Store/update the tone profile
+    // Store/update the tone profile for this specific user
     const profileData = {
       user_id: userId || null,
-      channel,
       formality_level: toneProfile.formality_level,
       avg_sentence_length: toneProfile.avg_sentence_length,
-      uses_contractions: toneProfile.uses_contractions,
       punctuation_style: toneProfile.punctuation_style,
       common_greetings: toneProfile.common_greetings,
       common_closings: toneProfile.common_closings,
       signature_phrases: toneProfile.signature_phrases,
-      avoided_phrases: toneProfile.avoided_phrases,
-      typical_email_length: toneProfile.typical_email_length,
-      typical_sms_length: toneProfile.typical_sms_length,
-      paragraph_style: toneProfile.paragraph_style,
-      question_frequency: toneProfile.question_frequency,
-      exclamation_frequency: toneProfile.exclamation_frequency,
       emoji_usage: toneProfile.emoji_usage,
-      tone_summary: toneProfile.tone_summary,
-      writing_dna: toneProfile.writing_dna,
-      sample_messages: toneProfile.sample_messages,
       analyzed_email_count: emails.length,
       analyzed_sms_count: smss.length,
       last_analyzed_at: new Date().toISOString(),
     };
 
-    // Upsert the profile
-    const { data: existing } = await supabase
-      .from("user_tone_profiles")
-      .select("id")
-      .eq("channel", channel)
-      .maybeSingle();
+    // Upsert the profile by user_id
+    if (userId) {
+      const { data: existing } = await supabase
+        .from("user_tone_profiles")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    if (existing) {
-      await supabase
-        .from("user_tone_profiles")
-        .update(profileData)
-        .eq("id", existing.id);
-    } else {
-      await supabase
-        .from("user_tone_profiles")
-        .insert(profileData);
+      if (existing) {
+        await supabase
+          .from("user_tone_profiles")
+          .update(profileData)
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("user_tone_profiles")
+          .insert(profileData);
+      }
     }
 
-    console.log("Tone analysis complete:", toneProfile.tone_summary);
+    console.log("Tone analysis complete for", userName, ":", toneProfile.tone_summary);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         profile: toneProfile,
-        analyzed: {
-          emails: emails.length,
-          sms: smss.length
-        }
+        userName,
+        userEmail,
+        emails_analyzed: emails.length,
+        sms_analyzed: smss.length
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

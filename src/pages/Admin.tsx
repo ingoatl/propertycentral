@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home, Presentation } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home, Presentation, Brain } from "lucide-react";
 import { Link } from "react-router-dom";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
@@ -27,6 +27,7 @@ import { PhoneAssignmentsManager } from "@/components/admin/PhoneAssignmentsMana
 import { LeadEmailTemplatesManager } from "@/components/admin/LeadEmailTemplatesManager";
 import { GRECAuditDashboard } from "@/components/admin/GRECAuditDashboard";
 import { OwnerPortalAdmin } from "@/components/admin/OwnerPortalAdmin";
+import { ToneProfilesManager } from "@/components/admin/ToneProfilesManager";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -466,6 +467,10 @@ const Admin = () => {
             <FileArchive className="w-4 h-4 mr-2" />
             GREC Audit
           </TabsTrigger>
+          <TabsTrigger value="tone-profiles">
+            <Brain className="w-4 h-4 mr-2" />
+            AI Tone Profiles
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-8 mt-8">
@@ -835,6 +840,10 @@ const Admin = () => {
 
         <TabsContent value="grec-audit" className="mt-8">
           <GRECAuditDashboard />
+        </TabsContent>
+
+        <TabsContent value="tone-profiles" className="mt-8">
+          <ToneProfilesManager />
         </TabsContent>
       </Tabs>
     </div>
