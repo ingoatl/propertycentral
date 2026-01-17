@@ -6,8 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Google Reviews GHL phone number
+// =========================================================================
+// CENTRALIZED PHONE CONFIG - Single source of truth
+// All edge functions MUST use these constants to prevent mismatches
+// =========================================================================
 const GOOGLE_REVIEWS_PHONE = "+14049247251";
+const GHL_MAIN_PHONE = "+14048005932";
+
+// Helper functions
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, "").slice(-10);
+}
+
+function formatPhoneE164(phone: string): string {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return phone.startsWith("+") ? phone : `+${digits}`;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -21,44 +38,214 @@ serve(async (req) => {
     const ghlLocationId = Deno.env.get("GHL_LOCATION_ID")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log("=== Google Reviews Watchdog Starting ===");
+    console.log("=== Google Reviews Self-Healing Watchdog Starting ===");
     const runAt = new Date().toISOString();
     const issues: string[] = [];
     const actions: string[] = [];
+    const healingActions: string[] = [];
     let overallStatus: "healthy" | "warning" | "error" = "healthy";
     const details: Record<string, any> = {};
 
-    // ========== CHECK 1: Unprocessed Inbound Messages ==========
-    console.log("Checking for unprocessed inbound messages...");
+    // ========== SELF-HEALING CHECK 1: Validate GHL Phone Configuration ==========
+    console.log("[SELF-HEAL] Validating GHL phone configuration...");
     
-    // Get all inbound Google Reviews messages from last 24 hours
+    try {
+      const phoneResponse = await fetch(
+        `https://services.leadconnectorhq.com/locations/${ghlLocationId}/phone-numbers`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${ghlApiKey}`,
+            "Version": "2021-07-28",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      if (phoneResponse.ok) {
+        const phoneData = await phoneResponse.json();
+        const ghlPhones = phoneData.phoneNumbers || [];
+        
+        // Check if our configured phone exists in GHL
+        const googleReviewsPhoneExists = ghlPhones.some((p: any) => 
+          normalizePhone(p.phoneNumber || p.phone || "") === normalizePhone(GOOGLE_REVIEWS_PHONE)
+        );
+        
+        const mainPhoneExists = ghlPhones.some((p: any) => 
+          normalizePhone(p.phoneNumber || p.phone || "") === normalizePhone(GHL_MAIN_PHONE)
+        );
+        
+        details.phoneValidation = {
+          googleReviewsPhone: GOOGLE_REVIEWS_PHONE,
+          googleReviewsPhoneValid: googleReviewsPhoneExists,
+          mainPhone: GHL_MAIN_PHONE,
+          mainPhoneValid: mainPhoneExists,
+          ghlPhonesAvailable: ghlPhones.map((p: any) => p.phoneNumber || p.phone).filter(Boolean),
+        };
+        
+        if (!googleReviewsPhoneExists) {
+          issues.push(`CRITICAL: Google Reviews phone ${GOOGLE_REVIEWS_PHONE} NOT found in GHL!`);
+          overallStatus = "error";
+          
+          // Attempt self-healing: Find an alternative phone
+          if (ghlPhones.length > 0) {
+            const suggestedPhone = ghlPhones[0].phoneNumber || ghlPhones[0].phone;
+            healingActions.push(`Suggested alternative: ${suggestedPhone}`);
+            details.suggestedAlternativePhone = suggestedPhone;
+          }
+        }
+      }
+    } catch (phoneErr) {
+      console.log("Could not validate GHL phones:", phoneErr);
+      details.phoneValidation = { error: "Could not fetch GHL phone numbers" };
+    }
+
+    // ========== SELF-HEALING CHECK 2: Process Stuck "permission_granted" Requests ==========
+    console.log("[SELF-HEAL] Checking for stuck permission_granted requests...");
+    
+    const { data: stuckRequests } = await supabase
+      .from("google_review_requests")
+      .select("id, guest_phone, workflow_status, permission_granted_at, review_id")
+      .eq("workflow_status", "permission_granted")
+      .is("link_sent_at", null);
+    
+    if (stuckRequests && stuckRequests.length > 0) {
+      issues.push(`${stuckRequests.length} request(s) stuck in permission_granted - auto-healing...`);
+      overallStatus = overallStatus === "error" ? "error" : "warning";
+      
+      // AUTO-HEAL: Trigger link sending for stuck requests
+      for (const stuckReq of stuckRequests) {
+        try {
+          console.log(`[SELF-HEAL] Auto-triggering link send for request ${stuckReq.id}`);
+          
+          // Get review details
+          const { data: reviewData } = await supabase
+            .from("ownerrez_reviews")
+            .select("guest_name, property_id, source, review_text")
+            .eq("id", stuckReq.review_id)
+            .maybeSingle();
+          
+          if (reviewData) {
+            // Get property Google review URL
+            const { data: propertyData } = await supabase
+              .from("properties")
+              .select("google_review_url, name")
+              .eq("id", reviewData.property_id)
+              .maybeSingle();
+            
+            if (propertyData?.google_review_url) {
+              // Call send-review-sms to send the link
+              const sendResult = await supabase.functions.invoke("send-review-sms", {
+                body: {
+                  phone: stuckReq.guest_phone,
+                  guestName: reviewData.guest_name,
+                  propertyName: propertyData.name,
+                  googleReviewUrl: propertyData.google_review_url,
+                  source: reviewData.source,
+                  reviewText: reviewData.review_text,
+                  requestId: stuckReq.id,
+                },
+              });
+              
+              if (sendResult.error) {
+                console.error(`[SELF-HEAL] Failed to send link for ${stuckReq.id}:`, sendResult.error);
+                healingActions.push(`Failed to heal ${stuckReq.guest_phone}: ${sendResult.error.message}`);
+              } else {
+                healingActions.push(`Auto-sent review link to ${stuckReq.guest_phone}`);
+              }
+            }
+          }
+        } catch (healErr) {
+          console.error(`[SELF-HEAL] Error healing request ${stuckReq.id}:`, healErr);
+        }
+      }
+    }
+    
+    details.stuckPermissionGranted = stuckRequests?.length || 0;
+
+    // ========== SELF-HEALING CHECK 3: Process Unhandled Inbound Replies ==========
+    console.log("[SELF-HEAL] Checking for unprocessed inbound replies...");
+    
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     
+    // Get recent inbound messages
     const { data: recentInbound } = await supabase
       .from("lead_communications")
-      .select("id, body, created_at, metadata")
+      .select("id, body, created_at, metadata, from_phone")
       .eq("direction", "inbound")
       .gte("created_at", twentyFourHoursAgo)
       .order("created_at", { ascending: false });
     
-    // Filter for Google Reviews related messages
-    const googleReviewsInbound = (recentInbound || []).filter((msg: any) => {
-      const phone = msg.metadata?.ghl_data?.contactPhone || msg.metadata?.unmatched_phone || "";
-      const contactSource = msg.metadata?.ghl_data?.contact_source || "";
-      return contactSource === "GoogleReviews" || msg.metadata?.source === "GoogleReviews";
-    });
+    // Positive reply keywords
+    const positiveKeywords = ["yes", "sure", "ok", "okay", "yeah", "yep", "definitely", "absolutely", "of course", "please", "send", "y"];
+    const completionKeywords = ["done", "posted", "left", "submitted", "completed", "wrote", "finished"];
     
-    details.inboundMessages = {
-      total24h: recentInbound?.length || 0,
-      googleReviewsRelated: googleReviewsInbound.length,
-    };
+    for (const msg of recentInbound || []) {
+      const body = (msg.body || "").toLowerCase().trim();
+      const phone = msg.from_phone || msg.metadata?.ghl_data?.contactPhone || msg.metadata?.unmatched_phone || "";
+      
+      if (!phone) continue;
+      
+      const phoneDigits = normalizePhone(phone);
+      
+      // Check if this person has a pending request
+      const { data: pendingRequest } = await supabase
+        .from("google_review_requests")
+        .select("id, workflow_status, guest_phone")
+        .or(`guest_phone.ilike.%${phoneDigits}`)
+        .in("workflow_status", ["permission_asked", "link_sent"])
+        .maybeSingle();
+      
+      if (!pendingRequest) continue;
+      
+      // Check if this is a positive reply that wasn't processed
+      const isPositiveReply = positiveKeywords.some((kw: string) => {
+        const words = body.split(/\s+/);
+        return words.some((w: string) => w === kw || w.startsWith(kw));
+      });
+      
+      const isCompletionReply = completionKeywords.some(kw => body.includes(kw));
+      
+      if (pendingRequest.workflow_status === "permission_asked" && isPositiveReply) {
+        console.log(`[SELF-HEAL] Found unprocessed positive reply from ${phone}: "${body}"`);
+        issues.push(`Unprocessed positive reply from ${phone} detected - triggering link send`);
+        
+        // AUTO-HEAL: Update status and trigger link send
+        await supabase
+          .from("google_review_requests")
+          .update({ 
+            workflow_status: "permission_granted",
+            permission_granted_at: new Date().toISOString()
+          })
+          .eq("id", pendingRequest.id);
+        
+        healingActions.push(`Updated ${phone} to permission_granted and queued for link delivery`);
+      }
+      
+      if (pendingRequest.workflow_status === "link_sent" && isCompletionReply) {
+        console.log(`[SELF-HEAL] Found unprocessed completion from ${phone}: "${body}"`);
+        issues.push(`Unprocessed completion confirmation from ${phone} - marking complete`);
+        
+        // AUTO-HEAL: Mark as complete
+        await supabase
+          .from("google_review_requests")
+          .update({ 
+            workflow_status: "completed",
+            completed_at: new Date().toISOString()
+          })
+          .eq("id", pendingRequest.id);
+        
+        healingActions.push(`Marked ${phone} as completed based on reply: "${body}"`);
+      }
+    }
 
-    // ========== CHECK 2: Requests Status Summary ==========
-    console.log("Checking request status distribution...");
+    // ========== CHECK 4: Status Summary ==========
+    console.log("Generating status summary...");
     
     const { data: allRequests } = await supabase
       .from("google_review_requests")
-      .select("id, workflow_status, guest_phone, permission_asked_at, permission_granted_at, link_sent_at, completed_at, opted_out")
+      .select("id, workflow_status, opted_out")
       .order("created_at", { ascending: false });
     
     const statusCounts = {
@@ -82,177 +269,40 @@ serve(async (req) => {
     details.requestStatus = statusCounts;
     details.totalRequests = allRequests?.length || 0;
 
-    // ========== CHECK 3: Stalled Requests (need attention) ==========
-    console.log("Checking for stalled requests...");
+    // ========== CHECK 5: Duplicate Detection ==========
+    console.log("Checking for duplicates...");
     
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    
-    // Requests stuck in permission_granted (guest said yes but link never sent)
-    const stalledPermissionGranted = (allRequests || []).filter((req: any) => 
-      req.workflow_status === "permission_granted" && 
-      !req.link_sent_at &&
-      req.permission_granted_at < oneHourAgo
-    );
-    
-    if (stalledPermissionGranted.length > 0) {
-      issues.push(`${stalledPermissionGranted.length} request(s) stuck in permission_granted - link never sent`);
-      overallStatus = "warning";
-      details.stalledPermissionGranted = stalledPermissionGranted.map((r: any) => ({
-        id: r.id,
-        phone: r.guest_phone,
-        grantedAt: r.permission_granted_at,
-      }));
-    }
-
-    // Requests in link_sent for more than 7 days without completion
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const stalledLinkSent = (allRequests || []).filter((req: any) =>
-      req.workflow_status === "link_sent" &&
-      req.link_sent_at < sevenDaysAgo
-    );
-    
-    if (stalledLinkSent.length > 0) {
-      details.stalledLinkSent = {
-        count: stalledLinkSent.length,
-        message: `${stalledLinkSent.length} request(s) waiting for completion > 7 days (may need nudge)`,
-      };
-    }
-
-    // ========== CHECK 4: Recent Completion Confirmations ==========
-    console.log("Checking for unprocessed completion confirmations...");
-    
-    // Look for messages that might be completion confirmations
-    const completionKeywords = ["done", "posted", "left", "submitted", "completed", "wrote", "finished"];
-    
-    const potentialCompletions = (recentInbound || []).filter((msg: any) => {
-      const body = (msg.body || "").toLowerCase();
-      return completionKeywords.some(kw => body.includes(kw));
-    });
-    
-    // Check if any of these are from guests with link_sent status
-    const unprocessedCompletions: any[] = [];
-    
-    for (const msg of potentialCompletions) {
-      const phone = msg.metadata?.ghl_data?.contactPhone || msg.metadata?.unmatched_phone || "";
-      if (!phone) continue;
-      
-      const phoneDigits = phone.replace(/\D/g, "").slice(-10);
-      
-      const { data: linkSentReq } = await supabase
-        .from("google_review_requests")
-        .select("id, guest_phone, workflow_status")
-        .ilike("guest_phone", `%${phoneDigits}`)
-        .eq("workflow_status", "link_sent")
-        .limit(1)
-        .maybeSingle();
-      
-      if (linkSentReq) {
-        unprocessedCompletions.push({
-          messageId: msg.id,
-          messageBody: msg.body,
-          requestId: linkSentReq.id,
-          phone: linkSentReq.guest_phone,
-        });
-      }
-    }
-    
-    if (unprocessedCompletions.length > 0) {
-      issues.push(`${unprocessedCompletions.length} potential completion confirmation(s) not yet processed`);
-      overallStatus = "warning";
-      details.unprocessedCompletions = unprocessedCompletions;
-    }
-
-    // ========== CHECK 5: Duplicate Prevention & Detection ==========
-    console.log("Checking for potential duplicate messages...");
-    
-    // Get SMS log for last 24 hours
     const { data: recentSmsLog } = await supabase
       .from("sms_log")
       .select("phone_number, message_type, created_at")
       .gte("created_at", twentyFourHoursAgo)
       .order("created_at", { ascending: false });
     
-    // Check for any phone that received multiple permission_ask in 24h
     const phoneMessageCount: Record<string, number> = {};
     (recentSmsLog || []).forEach((log: any) => {
       if (log.message_type === "permission_ask") {
-        const normalizedPhone = log.phone_number?.replace(/\D/g, '').slice(-10);
-        phoneMessageCount[normalizedPhone] = (phoneMessageCount[normalizedPhone] || 0) + 1;
+        const normalized = normalizePhone(log.phone_number || "");
+        if (normalized.length === 10) {
+          phoneMessageCount[normalized] = (phoneMessageCount[normalized] || 0) + 1;
+        }
       }
-    });
-    
-    // Also check lead_communications for duplicates
-    const { data: recentGoogleReviewComms } = await supabase
-      .from("lead_communications")
-      .select("body, metadata, created_at")
-      .gte("created_at", twentyFourHoursAgo)
-      .eq("direction", "outbound")
-      .ilike("body", "%Google reviews%");
-    
-    const commPhoneCount: Record<string, number> = {};
-    (recentGoogleReviewComms || []).forEach((comm: any) => {
-      const phone = comm.metadata?.ghl_data?.contactPhone || "";
-      if (phone) {
-        const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
-        commPhoneCount[normalizedPhone] = (commPhoneCount[normalizedPhone] || 0) + 1;
-      }
-    });
-    
-    // Combine counts from both sources
-    Object.entries(commPhoneCount).forEach(([phone, count]) => {
-      phoneMessageCount[phone] = (phoneMessageCount[phone] || 0) + count;
     });
     
     const duplicates = Object.entries(phoneMessageCount).filter(([_, count]) => count > 1);
     if (duplicates.length > 0) {
-      issues.push(`${duplicates.length} phone(s) received multiple Google Review messages in 24h - DUPLICATE DETECTED`);
+      issues.push(`${duplicates.length} phone(s) received duplicate messages`);
       overallStatus = "error";
-      details.duplicatePermissionRequests = duplicates.map(([phone, count]) => ({ phone, count }));
-      
-      // ACTION: Mark these as already contacted to prevent further duplicates
-      for (const [phone, count] of duplicates) {
-        actions.push(`Phone ${phone} received ${count} messages - blocking further sends`);
-      }
+      details.duplicates = duplicates.map(([phone, count]) => ({ phone, count }));
     }
-    
-    // ========== CHECK 5b: Verify Completed Reviews Won't Receive More Messages ==========
-    console.log("Verifying completed reviews are fully blocked...");
-    
-    const { data: completedRequests } = await supabase
-      .from("google_review_requests")
-      .select("guest_phone, completed_at, workflow_status")
-      .eq("workflow_status", "completed");
-    
-    const completedPhones = new Set(
-      (completedRequests || []).map((r: any) => r.guest_phone?.replace(/\D/g, '').slice(-10))
-    );
-    
-    details.completedPhonesBlocked = {
-      count: completedPhones.size,
-      message: `${completedPhones.size} phone(s) are marked complete and blocked from further messages`
-    };
 
-    // ========== CHECK 6: Completed Reviews (no further follow-ups) ==========
-    console.log("Verifying completed reviews won't receive follow-ups...");
-    
-    const completedCount = statusCounts.completed;
-    details.completedReviews = {
-      count: completedCount,
-      message: `${completedCount} review(s) marked complete - no follow-ups will be sent`,
-    };
-
-    // ========== CHECK 7: Today's Activity ==========
-    console.log("Summarizing today's activity...");
-    
+    // ========== CHECK 6: Today's Activity ==========
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    const todayISO = todayStart.toISOString();
     
     const { data: todaysSms } = await supabase
       .from("sms_log")
       .select("message_type, status")
-      .gte("created_at", todayISO);
+      .gte("created_at", todayStart.toISOString());
     
     const todayStats = {
       permission_ask_sent: 0,
@@ -274,8 +324,9 @@ serve(async (req) => {
     });
     
     details.todayActivity = todayStats;
+    details.healingActionsPerformed = healingActions;
 
-    // ========== Log Watchdog Results ==========
+    // ========== Log Results ==========
     const { error: logError } = await supabase
       .from("watchdog_logs")
       .insert({
@@ -290,9 +341,10 @@ serve(async (req) => {
       console.error("Failed to log watchdog results:", logError);
     }
 
-    console.log("=== Google Reviews Watchdog Complete ===");
+    console.log("=== Google Reviews Self-Healing Watchdog Complete ===");
     console.log(`Status: ${overallStatus}`);
     console.log(`Issues: ${issues.length > 0 ? issues.join(", ") : "None"}`);
+    console.log(`Healing Actions: ${healingActions.length > 0 ? healingActions.join(", ") : "None"}`);
 
     return new Response(
       JSON.stringify({
@@ -300,8 +352,12 @@ serve(async (req) => {
         runAt,
         status: overallStatus,
         issues,
-        actions,
+        healingActions,
         details,
+        configuredPhones: {
+          googleReviews: GOOGLE_REVIEWS_PHONE,
+          ghlMain: GHL_MAIN_PHONE,
+        },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
