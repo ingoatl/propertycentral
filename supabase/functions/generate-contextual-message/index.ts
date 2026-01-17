@@ -253,7 +253,7 @@ REMEMBER:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3-pro-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Generate a ${messageType} for ${lead.name}.${purpose === "first_touch" ? " This is our first message to them." : ""}` },

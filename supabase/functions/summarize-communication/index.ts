@@ -33,7 +33,7 @@ Content: ${content?.slice(0, 2000)}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3-pro-preview",
         messages: [
           { role: "system", content: "You are a concise business assistant that summarizes communications. Keep summaries brief and actionable." },
           { role: "user", content: prompt },
@@ -64,7 +64,7 @@ Respond with ONLY the category name, nothing else.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3-pro-preview",
         messages: [
           { role: "user", content: categoryPrompt },
         ],

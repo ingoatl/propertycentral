@@ -122,7 +122,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "google/gemini-3-pro-preview",
           messages: [
             { 
               role: "system", 
@@ -501,7 +501,7 @@ Draft a reply that shows you actually read their email. Start with "Hi ${contact
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-pro-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
