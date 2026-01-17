@@ -20,6 +20,7 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { VoiceDictationButton } from "./VoiceDictationButton";
 
 interface SendEmailDialogProps {
   open: boolean;
@@ -309,6 +310,11 @@ export function SendEmailDialog({
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-sm font-medium">Message</label>
               <div className="flex items-center gap-2">
+                <VoiceDictationButton
+                  onResult={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}
+                  messageType="email"
+                  contactName={contactName}
+                />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -343,13 +349,15 @@ export function SendEmailDialog({
                 </div>
               </div>
             ) : (
-              <Textarea
-                placeholder="Type your email message..."
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={8}
-                className="resize-none"
-              />
+              <div className="relative">
+                <Textarea
+                  placeholder="Type your email message..."
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  rows={8}
+                  className="resize-none"
+                />
+              </div>
             )}
           </div>
 

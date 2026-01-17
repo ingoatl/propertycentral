@@ -210,6 +210,24 @@ serve(async (req) => {
             bodyText = extracted.text;
             bodyHtml = extracted.html;
 
+            // CRITICAL: If plain text is empty but HTML exists, extract text from HTML
+            // Many emails are HTML-only and without this, AI receives empty body
+            if (!bodyText && bodyHtml) {
+              console.log(`[${accountLabel}] Extracting text from HTML for message ${msg.id}`);
+              bodyText = bodyHtml
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style blocks
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script blocks
+                .replace(/<[^>]+>/g, ' ') // Remove all HTML tags
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/\s+/g, ' ') // Collapse multiple spaces
+                .trim();
+            }
+
             // Determine targetInbox - use account label for individual accounts
             const toLower = to.toLowerCase();
             let targetInbox = tokenData.label_name || 'unknown';
