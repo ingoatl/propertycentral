@@ -184,6 +184,11 @@ serve(async (req) => {
       rawHtml,
     } = await req.json();
 
+    // Validate required fields
+    const safeSenderEmail = senderEmail || '';
+    const safeSubject = subject || '';
+    const safeBody = body || '';
+
     // PHASE 1: EMAIL FILTERING - Reject internal PeachHaus emails immediately
     const internalSenders = [
       'admin@peachhausgroup.com',
@@ -191,9 +196,9 @@ serve(async (req) => {
       'anja@peachhausgroup.com',
     ];
     
-    const isInternalSender = internalSenders.some(sender => 
-      senderEmail.toLowerCase().includes(sender.toLowerCase())
-    ) || senderEmail.toLowerCase().includes('@peachhausgroup.com');
+    const isInternalSender = safeSenderEmail && internalSenders.some(sender => 
+      safeSenderEmail.toLowerCase().includes(sender.toLowerCase())
+    ) || safeSenderEmail.toLowerCase().includes('@peachhausgroup.com');
     
     if (isInternalSender) {
       console.log('Skipping internal PeachHaus email from:', senderEmail);
@@ -218,17 +223,17 @@ serve(async (req) => {
       'owner statement',
     ];
     
-    const shouldSkipSubject = skipSubjects.some(skip => 
-      subject.toLowerCase().includes(skip)
+    const shouldSkipSubject = safeSubject && skipSubjects.some(skip => 
+      safeSubject.toLowerCase().includes(skip)
     );
     
     if (shouldSkipSubject) {
-      console.log('Skipping system email with subject:', subject);
+      console.log('Skipping system email with subject:', safeSubject);
       return new Response(
         JSON.stringify({ 
           shouldSave: false, 
           reason: 'System email filtered',
-          subject: subject 
+          subject: safeSubject 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -250,8 +255,8 @@ serve(async (req) => {
       'this is an automated', 'please do not reply to this email',
     ];
     
-    const emailContentLower = `${subject} ${body}`.toLowerCase();
-    const senderLower = senderEmail.toLowerCase();
+    const emailContentLower = `${safeSubject} ${safeBody}`.toLowerCase();
+    const senderLower = safeSenderEmail.toLowerCase();
     
     const isPromotional = promotionalKeywords.some(kw => emailContentLower.includes(kw));
     const isAutomated = automatedKeywords.some(kw => emailContentLower.includes(kw) || senderLower.includes(kw));
