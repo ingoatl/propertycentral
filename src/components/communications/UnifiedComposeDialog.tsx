@@ -18,7 +18,9 @@ import {
   Paperclip,
   Image as ImageIcon,
   Trash2,
+  Mic,
 } from "lucide-react";
+import { VoiceDictationButton } from "./VoiceDictationButton";
 import {
   Dialog,
   DialogContent,
@@ -631,15 +633,24 @@ export function UnifiedComposeDialog({
         onChange={(e) => setSubject(e.target.value)}
         className="border-0 border-b rounded-none px-0 focus-visible:ring-0 shrink-0"
       />
-      <Textarea
-        placeholder="Compose your email..."
-        value={emailBody}
-        onChange={(e) => setEmailBody(e.target.value)}
-        className={cn(
-          "flex-1 min-h-[150px] resize-none border-0 focus-visible:ring-0 px-0",
-          isExpanded && "min-h-[300px]"
-        )}
-      />
+      <div className="relative flex-1">
+        <Textarea
+          placeholder="Compose your email..."
+          value={emailBody}
+          onChange={(e) => setEmailBody(e.target.value)}
+          className={cn(
+            "flex-1 min-h-[150px] resize-none border-0 focus-visible:ring-0 px-0 pr-16",
+            isExpanded && "min-h-[300px]"
+          )}
+        />
+        <div className="absolute right-2 top-2">
+          <VoiceDictationButton
+            onResult={(text) => setEmailBody(prev => prev ? `${prev}\n\n${text}` : text)}
+            messageType="email"
+            contactName={selectedContact?.name}
+          />
+        </div>
+      </div>
       
       {/* Email Attachments */}
       <div className="shrink-0 space-y-2">
@@ -752,12 +763,21 @@ export function UnifiedComposeDialog({
       </div>
 
       {/* Message */}
-      <Textarea
-        placeholder="Type your message..."
-        value={smsMessage}
-        onChange={(e) => setSmsMessage(e.target.value)}
-        className="flex-1 min-h-[100px] resize-none rounded-lg"
-      />
+      <div className="relative flex-1">
+        <Textarea
+          placeholder="Type your message..."
+          value={smsMessage}
+          onChange={(e) => setSmsMessage(e.target.value)}
+          className="flex-1 min-h-[100px] resize-none rounded-lg pr-16"
+        />
+        <div className="absolute right-2 top-2">
+          <VoiceDictationButton
+            onResult={(text) => setSmsMessage(prev => prev ? `${prev} ${text}` : text)}
+            messageType="sms"
+            contactName={selectedContact?.name}
+          />
+        </div>
+      </div>
 
       {/* SMS Attachments (MMS) */}
       <div className="shrink-0 space-y-2">
