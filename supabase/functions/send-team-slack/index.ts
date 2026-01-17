@@ -20,17 +20,57 @@ interface SlackRequest {
   recipientUserId?: string;
 }
 
-// Team member email mapping - we'll look up Slack IDs dynamically
-const TEAM_EMAIL_MAP: Record<string, string> = {
-  'alex': 'alex@peachhausgroup.com',
-  'anja': 'anja@peachhausgroup.com',
-  'catherine': 'catherine@peachhausgroup.com',
-  'chris': 'chris@peachhausgroup.com',
-  'ingo': 'ingo@peachhausgroup.com',
+// Team member mapping - emails to try (in order) and optional direct Slack ID
+// Add your Slack user IDs here for instant lookup (find via: click profile → ⋮ → Copy member ID)
+const TEAM_MEMBERS: Record<string, { emails: string[]; slackId?: string }> = {
+  'alex': { 
+    emails: ['alex@peachhausgroup.com', 'alex@peachhg.com'],
+    // slackId: 'U0123456789' // Add actual Slack ID here
+  },
+  'anja': { 
+    emails: ['anja@peachhausgroup.com', 'anja@peachhg.com'],
+    // slackId: 'U0123456789'
+  },
+  'catherine': { 
+    emails: ['catherine@peachhausgroup.com', 'catherine@peachhg.com'],
+    // slackId: 'U0123456789'
+  },
+  'chris': { 
+    emails: ['chris@peachhausgroup.com', 'chris@peachhg.com'],
+    // slackId: 'U0123456789'
+  },
+  'ingo': { 
+    emails: ['ingo@peachhausgroup.com', 'ingo@peachhg.com'],
+    // slackId: 'U0123456789'
+  },
 };
 
 // Cache for Slack user IDs (email -> slackId)
 const slackUserCache: Record<string, string> = {};
+
+// Find Slack user ID for a team member (tries direct ID first, then email lookup)
+async function getSlackUserIdForTeamMember(memberKey: string): Promise<string | null> {
+  const member = TEAM_MEMBERS[memberKey.toLowerCase()];
+  if (!member) return null;
+  
+  // If we have a hardcoded Slack ID, use it directly
+  if (member.slackId) {
+    console.log(`[Slack] Using hardcoded ID for ${memberKey}: ${member.slackId}`);
+    return member.slackId;
+  }
+  
+  // Try each email address
+  for (const email of member.emails) {
+    const userId = await findSlackUserByEmail(email);
+    if (userId) {
+      console.log(`[Slack] Found user ${memberKey} via email ${email}: ${userId}`);
+      return userId;
+    }
+  }
+  
+  console.log(`[Slack] Could not find Slack user for ${memberKey}`);
+  return null;
+}
 
 const SLACK_BOT_TOKEN = Deno.env.get('SLACK_BOT_TOKEN');
 
@@ -191,18 +231,20 @@ serve(async (req) => {
     let slackUserId: string | null = null;
     
     if (directMessage && recipientUserId) {
-      const teamEmail = TEAM_EMAIL_MAP[recipientUserId.toLowerCase()];
-      if (!teamEmail) {
+      // Check if team member exists
+      if (!TEAM_MEMBERS[recipientUserId.toLowerCase()]) {
         return new Response(JSON.stringify({ error: 'Invalid team member' }), { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         });
       }
       
-      // Look up Slack user ID by email
-      slackUserId = await findSlackUserByEmail(teamEmail);
+      // Look up Slack user ID (tries hardcoded ID first, then email lookup)
+      slackUserId = await getSlackUserIdForTeamMember(recipientUserId);
       if (!slackUserId) {
-        return new Response(JSON.stringify({ error: `Could not find Slack user for ${teamEmail}` }), { 
+        return new Response(JSON.stringify({ 
+          error: `Could not find Slack user for ${recipientUserId}. Please add their Slack ID to TEAM_MEMBERS in the edge function.` 
+        }), { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         });
@@ -285,12 +327,8 @@ serve(async (req) => {
     // Add mentions if provided (look up user IDs dynamically)
     if (mentionUsers && mentionUsers.length > 0) {
       const mentionPromises = mentionUsers.map(async u => {
-        const email = TEAM_EMAIL_MAP[u.toLowerCase()];
-        if (email) {
-          const userId = await findSlackUserByEmail(email);
-          return userId ? `<@${userId}>` : u;
-        }
-        return u;
+        const userId = await getSlackUserIdForTeamMember(u);
+        return userId ? `<@${userId}>` : u;
       });
       const resolvedMentions = await Promise.all(mentionPromises);
       const mentions = resolvedMentions.join(' ');
