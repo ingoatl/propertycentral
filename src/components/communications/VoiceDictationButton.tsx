@@ -72,10 +72,29 @@ export function VoiceDictationButton({
 
     recognition.onerror = (event: any) => {
       console.error("Speech recognition error:", event.error);
-      if (event.error !== "aborted") {
-        toast.error(`Microphone error: ${event.error}`);
-      }
       setIsListening(false);
+      
+      // Provide helpful error messages based on error type
+      if (event.error === "aborted") {
+        return; // User cancelled, no need to show error
+      }
+      
+      if (event.error === "network") {
+        toast.error("Speech recognition requires a secure connection (HTTPS). Try on the published app.");
+        return;
+      }
+      
+      if (event.error === "not-allowed") {
+        toast.error("Microphone access denied. Please allow microphone permissions.");
+        return;
+      }
+      
+      if (event.error === "no-speech") {
+        toast.info("No speech detected. Try speaking louder or closer to the mic.");
+        return;
+      }
+      
+      toast.error(`Speech error: ${event.error}`);
     };
 
     recognition.onend = () => {

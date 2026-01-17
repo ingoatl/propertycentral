@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { MessageSquare, Send, RefreshCw, Clock, CheckCircle2, XCircle, Zap, Building2, User, Users, Hash, AtSign } from 'lucide-react';
 import { format } from 'date-fns';
@@ -39,23 +39,62 @@ interface SlackMessage {
   template_used: string | null;
 }
 
-// Team members with their Slack user IDs
+// Team members with their Slack user IDs - defined outside component to prevent recreation
 const TEAM_MEMBERS = [
   { id: 'alex', name: 'Alex', slackId: 'U_ALEX' },
   { id: 'anja', name: 'Anja', slackId: 'U_ANJA' },
   { id: 'catherine', name: 'Catherine', slackId: 'U_CATHERINE' },
   { id: 'chris', name: 'Chris', slackId: 'U_CHRIS' },
   { id: 'ingo', name: 'Ingo', slackId: 'U_INGO' },
-];
+] as const;
 
 const QUICK_TEMPLATES = [
   { id: 'update', label: 'Property Update', icon: Building2, prefix: '📍 Update: ' },
   { id: 'help', label: 'Need Help', icon: Users, prefix: '🆘 Need help: ' },
   { id: 'blocker', label: 'Blocker', icon: XCircle, prefix: '⚠️ BLOCKER: ' },
   { id: 'win', label: 'Win!', icon: CheckCircle2, prefix: '🎉 ' },
-];
+] as const;
 
-export function TeamSlackPanel({ 
+// Memoized status icon component
+const StatusIcon = memo(({ status }: { status: string }) => {
+  switch (status) {
+    case 'sent':
+      return <CheckCircle2 className="h-3 w-3 text-green-500" />;
+    case 'failed':
+      return <XCircle className="h-3 w-3 text-red-500" />;
+    default:
+      return <Clock className="h-3 w-3 text-muted-foreground" />;
+  }
+});
+StatusIcon.displayName = 'StatusIcon';
+
+// Memoized message item
+const MessageItem = memo(({ msg }: { msg: SlackMessage }) => (
+  <div className="bg-muted/30 rounded-lg p-2 text-xs space-y-1">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="text-[10px] h-5">
+          {msg.channel?.startsWith('@') ? msg.channel : `#${msg.channel}`}
+        </Badge>
+        <StatusIcon status={msg.status} />
+      </div>
+      <span className="text-muted-foreground text-[10px]">
+        {format(new Date(msg.created_at), 'MMM d, h:mm a')}
+      </span>
+    </div>
+    <p className="text-muted-foreground line-clamp-2">
+      {msg.message.replace(/\*.*?\*\n/, '').substring(0, 100)}...
+    </p>
+    {msg.sender_name && (
+      <p className="text-[10px] text-muted-foreground">
+        by {msg.sender_name}
+      </p>
+    )}
+  </div>
+));
+MessageItem.displayName = 'MessageItem';
+
+export const TeamSlackPanel = memo(function TeamSlackPanel({ 
   propertyId, 
   leadId, 
   ownerId,
@@ -71,28 +110,38 @@ export function TeamSlackPanel({
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Fetch available channels
-  const { data: channels, isLoading: channelsLoading } = useQuery({
+  // Fetch available channels - with staleTime to prevent unnecessary refetches
+  const { data: channels = [], isLoading: channelsLoading, error: channelsError } = useQuery({
     queryKey: ['slack-channels'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('slack_channel_config')
-        .select('*')
+        .select('id, channel_name, display_name, description')
         .eq('is_active', true)
         .order('display_name');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to load Slack channels:', error);
+        throw error;
+      }
       return data as SlackChannel[];
-    }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Fetch recent messages
-  const { data: recentMessages, isLoading: messagesLoading, refetch: refetchMessages } = useQuery({
-    queryKey: ['slack-messages', propertyId, leadId, ownerId],
+  // Fetch recent messages - memoized query key
+  const messagesQueryKey = useMemo(
+    () => ['slack-messages', propertyId, leadId, ownerId],
+    [propertyId, leadId, ownerId]
+  );
+
+  const { data: recentMessages = [], isLoading: messagesLoading, refetch: refetchMessages } = useQuery({
+    queryKey: messagesQueryKey,
     queryFn: async () => {
       let query = supabase
         .from('slack_messages')
-        .select('*')
+        .select('id, channel, message, sender_name, status, created_at, template_used')
         .order('created_at', { ascending: false })
         .limit(10);
       
@@ -101,9 +150,14 @@ export function TeamSlackPanel({
       else if (ownerId) query = query.eq('owner_id', ownerId);
       
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to load Slack messages:', error);
+        throw error;
+      }
       return data as SlackMessage[];
-    }
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    enabled: !!(propertyId || leadId || ownerId),
   });
 
   // Send message mutation
@@ -112,22 +166,35 @@ export function TeamSlackPanel({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const response = await supabase.functions.invoke('send-team-slack', {
-        body: {
-          channel: messageMode === 'channel' ? selectedChannel : undefined,
-          directMessage: messageMode === 'dm',
-          recipientUserId: messageMode === 'dm' ? selectedMember : undefined,
-          message,
-          template: selectedTemplate,
-          context: {
-            propertyId,
-            leadId,
-            ownerId
-          }
+      const payload = {
+        channel: messageMode === 'channel' ? selectedChannel : undefined,
+        directMessage: messageMode === 'dm',
+        recipientUserId: messageMode === 'dm' ? selectedMember : undefined,
+        message,
+        template: selectedTemplate,
+        context: {
+          propertyId: propertyId || undefined,
+          leadId: leadId || undefined,
+          ownerId: ownerId || undefined,
         }
+      };
+
+      console.log('[Slack] Sending message:', payload);
+
+      const response = await supabase.functions.invoke('send-team-slack', {
+        body: payload
       });
 
-      if (response.error) throw response.error;
+      if (response.error) {
+        console.error('[Slack] Function error:', response.error);
+        throw new Error(response.error.message || 'Failed to send message');
+      }
+      
+      if (!response.data?.success) {
+        console.error('[Slack] Response error:', response.data);
+        throw new Error(response.data?.error || 'Failed to send message');
+      }
+      
       return response.data;
     },
     onSuccess: () => {
@@ -139,18 +206,19 @@ export function TeamSlackPanel({
       setSelectedTemplate(null);
       queryClient.invalidateQueries({ queryKey: ['slack-messages'] });
     },
-    onError: (error) => {
-      console.error('Slack send error:', error);
-      toast.error('Failed to send message to Slack');
+    onError: (error: Error) => {
+      console.error('[Slack] Send error:', error);
+      toast.error(`Failed to send: ${error.message}`);
     }
   });
 
-  const handleTemplateClick = (template: typeof QUICK_TEMPLATES[0]) => {
+  // Memoized handlers
+  const handleTemplateClick = useCallback((template: typeof QUICK_TEMPLATES[number]) => {
     setSelectedTemplate(template.id);
     setMessage(template.prefix);
-  };
+  }, []);
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     if (messageMode === 'channel' && !selectedChannel) {
       toast.error('Please select a channel');
       return;
@@ -164,21 +232,29 @@ export function TeamSlackPanel({
       return;
     }
     sendMessage.mutate();
-  };
+  }, [messageMode, selectedChannel, selectedMember, message, sendMessage]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'sent':
-        return <CheckCircle2 className="h-3 w-3 text-green-500" />;
-      case 'failed':
-        return <XCircle className="h-3 w-3 text-red-500" />;
-      default:
-        return <Clock className="h-3 w-3 text-muted-foreground" />;
-    }
-  };
+  const handleRefresh = useCallback(() => {
+    refetchMessages();
+  }, [refetchMessages]);
 
-  // Context display
-  const hasContext = propertyName || leadName || ownerName;
+  const handleMessageChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+  }, []);
+
+  // Memoized context check
+  const hasContext = useMemo(
+    () => !!(propertyName || leadName || ownerName),
+    [propertyName, leadName, ownerName]
+  );
+
+  // Memoized send button disabled state
+  const isSendDisabled = useMemo(
+    () => sendMessage.isPending || !message.trim() ||
+      (messageMode === 'channel' && !selectedChannel) ||
+      (messageMode === 'dm' && !selectedMember),
+    [sendMessage.isPending, message, messageMode, selectedChannel, selectedMember]
+  );
 
   if (compact) {
     return (
@@ -187,6 +263,9 @@ export function TeamSlackPanel({
           <div className="flex items-center gap-2 mb-3">
             <MessageSquare className="h-4 w-4 text-primary" />
             <span className="font-medium text-sm">Quick Slack</span>
+            {channelsError && (
+              <Badge variant="destructive" className="text-[10px]">Error loading channels</Badge>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -206,14 +285,17 @@ export function TeamSlackPanel({
             {messageMode === 'channel' ? (
               <Select value={selectedChannel} onValueChange={setSelectedChannel}>
                 <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Select channel" />
+                  <SelectValue placeholder={channelsLoading ? "Loading..." : "Select channel"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {channels?.map((ch) => (
+                  {channels.map((ch) => (
                     <SelectItem key={ch.id} value={ch.channel_name} className="text-xs">
                       #{ch.channel_name}
                     </SelectItem>
                   ))}
+                  {channels.length === 0 && !channelsLoading && (
+                    <div className="p-2 text-xs text-muted-foreground">No channels available</div>
+                  )}
                 </SelectContent>
               </Select>
             ) : (
@@ -234,7 +316,7 @@ export function TeamSlackPanel({
             <Textarea
               placeholder="Type message..."
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={handleMessageChange}
               className="min-h-[60px] text-xs resize-none"
             />
             
@@ -242,9 +324,7 @@ export function TeamSlackPanel({
               size="sm" 
               className="w-full h-7 text-xs"
               onClick={handleSend}
-              disabled={sendMessage.isPending || !message.trim() || 
-                (messageMode === 'channel' && !selectedChannel) ||
-                (messageMode === 'dm' && !selectedMember)}
+              disabled={isSendDisabled}
             >
               <Send className="h-3 w-3 mr-1" />
               {sendMessage.isPending ? 'Sending...' : 'Send'}
@@ -266,7 +346,7 @@ export function TeamSlackPanel({
           <Button 
             variant="ghost" 
             size="sm"
-            onClick={() => refetchMessages()}
+            onClick={handleRefresh}
             disabled={messagesLoading}
           >
             <RefreshCw className={`h-4 w-4 ${messagesLoading ? 'animate-spin' : ''}`} />
@@ -307,6 +387,9 @@ export function TeamSlackPanel({
           <div className="flex items-center gap-2">
             <Send className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Send Message</span>
+            {channelsError && (
+              <Badge variant="destructive" className="text-xs">Error loading channels</Badge>
+            )}
           </div>
 
           {/* Channel vs DM Toggle */}
@@ -326,22 +409,21 @@ export function TeamSlackPanel({
           {messageMode === 'channel' ? (
             <Select value={selectedChannel} onValueChange={setSelectedChannel}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a channel" />
+                <SelectValue placeholder={channelsLoading ? "Loading channels..." : "Select a channel"} />
               </SelectTrigger>
               <SelectContent>
-                {channelsLoading ? (
-                  <SelectItem value="loading" disabled>Loading...</SelectItem>
-                ) : (
-                  channels?.map((ch) => (
-                    <SelectItem key={ch.id} value={ch.channel_name}>
-                      <div className="flex flex-col">
-                        <span>#{ch.channel_name}</span>
-                        {ch.description && (
-                          <span className="text-xs text-muted-foreground">{ch.description}</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))
+                {channels.map((ch) => (
+                  <SelectItem key={ch.id} value={ch.channel_name}>
+                    <div className="flex flex-col">
+                      <span>#{ch.channel_name}</span>
+                      {ch.description && (
+                        <span className="text-xs text-muted-foreground">{ch.description}</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+                {channels.length === 0 && !channelsLoading && (
+                  <div className="p-2 text-sm text-muted-foreground">No channels configured</div>
                 )}
               </SelectContent>
             </Select>
@@ -370,7 +452,7 @@ export function TeamSlackPanel({
               ? "Type your message to the channel..." 
               : `Type your direct message...`}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={handleMessageChange}
             className="min-h-[80px] resize-none"
           />
 
@@ -399,9 +481,7 @@ export function TeamSlackPanel({
           <Button 
             className="w-full"
             onClick={handleSend}
-            disabled={sendMessage.isPending || !message.trim() ||
-              (messageMode === 'channel' && !selectedChannel) ||
-              (messageMode === 'dm' && !selectedMember)}
+            disabled={isSendDisabled}
           >
             <Send className="h-4 w-4 mr-2" />
             {sendMessage.isPending ? 'Sending...' : 
@@ -410,7 +490,7 @@ export function TeamSlackPanel({
         </div>
 
         {/* Recent Messages */}
-        {recentMessages && recentMessages.length > 0 && (
+        {recentMessages.length > 0 && (
           <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
@@ -419,30 +499,7 @@ export function TeamSlackPanel({
             <ScrollArea className="h-[150px]">
               <div className="space-y-2">
                 {recentMessages.map((msg) => (
-                  <div 
-                    key={msg.id} 
-                    className="bg-muted/30 rounded-lg p-2 text-xs space-y-1"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] h-5">
-                          {msg.channel?.startsWith('@') ? msg.channel : `#${msg.channel}`}
-                        </Badge>
-                        {getStatusIcon(msg.status)}
-                      </div>
-                      <span className="text-muted-foreground text-[10px]">
-                        {format(new Date(msg.created_at), 'MMM d, h:mm a')}
-                      </span>
-                    </div>
-                    <p className="text-muted-foreground line-clamp-2">
-                      {msg.message.replace(/\*.*?\*\n/, '').substring(0, 100)}...
-                    </p>
-                    {msg.sender_name && (
-                      <p className="text-[10px] text-muted-foreground">
-                        by {msg.sender_name}
-                      </p>
-                    )}
-                  </div>
+                  <MessageItem key={msg.id} msg={msg} />
                 ))}
               </div>
             </ScrollArea>
@@ -451,4 +508,4 @@ export function TeamSlackPanel({
       </CardContent>
     </Card>
   );
-}
+});
