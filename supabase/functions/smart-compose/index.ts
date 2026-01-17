@@ -151,9 +151,26 @@ Rules:
         break;
 
       case "reply":
-        actionPrompt = `Generate a reply to the most recent message in the conversation.
-${context ? `Additional context: ${context}` : ""}
-${includeCalendarLink ? `Include scheduling link if appropriate: ${SCHEDULING_LINK}` : ""}`;
+        // Extract the last inbound message to ensure we address it directly
+        const lastInboundMessage = fullHistory.filter(h => h.role === "them").pop();
+        const messageToReplyTo = lastInboundMessage?.content || context || "";
+        
+        actionPrompt = `Generate a DIRECT reply that SPECIFICALLY addresses what was asked.
+
+THE MESSAGE YOU ARE REPLYING TO:
+"${messageToReplyTo}"
+
+CRITICAL INSTRUCTIONS:
+1. READ the message above carefully - what is the person ACTUALLY asking?
+2. Your FIRST paragraph MUST directly answer their specific question
+3. Do NOT give a generic response - if they ask about insurance, talk about insurance
+4. Do NOT pivot to unrelated topics like property management services unless asked
+5. If you don't know the specific answer, acknowledge the question and offer to find out
+
+${context ? `Additional context from user: ${context}` : ""}
+${includeCalendarLink ? `Only include scheduling link if relevant: ${SCHEDULING_LINK}` : ""}
+
+Remember: A good reply DIRECTLY addresses what was asked. Do not be generic.`;
         break;
 
       case "improve":
@@ -193,7 +210,13 @@ Add warmth while staying professional. Match the user's natural friendly tone.`;
         break;
     }
 
-    const systemPrompt = `You are a writing assistant that generates messages in the user's EXACT voice and style.
+    const systemPrompt = `You are a writing assistant that generates CONTEXT-AWARE replies in the user's voice.
+
+CRITICAL RULE: When replying to a message, your response MUST directly address what was asked. 
+- If they ask about insurance → answer about insurance
+- If they ask about pricing → answer about pricing  
+- If they ask a question → answer that specific question FIRST
+- NEVER give a generic response that ignores their question
 
 ${toneInstructions}
 
@@ -201,16 +224,15 @@ ${conversationContext}
 
 COMPANY CONTEXT:
 - Company: PeachHaus Group - Premium mid-term rental property management in Atlanta
-- Free income analysis offer for new leads
-- Focus on relationship building, not pushy sales
+- If you don't know specific details (like insurance companies), be honest and offer to research/follow up
 
 OUTPUT FORMAT:
 ${messageType === "email" ? `Return JSON: {"subject": "...", "body": "..."}` : `Return just the message text, no JSON.`}
 
 ${messageType === "sms" ? "SMS RULES: Max 300 chars. No formal greeting/closing. Jump right in." : "EMAIL RULES: 2-3 short paragraphs max. Clear subject line."}`;
 
-    // Try multiple models with fallback
-    const models = ["google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
+    // Try multiple models with fallback - using Gemini 3.0 pro for better context understanding
+    const models = ["google/gemini-3-pro-preview", "google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
     let content = "";
     let lastError = "";
 
