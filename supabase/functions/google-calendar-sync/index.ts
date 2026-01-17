@@ -560,16 +560,23 @@ serve(async (req) => {
       });
     }
 
-    // Send Slack message using MCP
-    if (action === "send-slack-message") {
-      const { channel, message } = body;
-      const slackUserId = userId || CALENDAR_SYNC_USER_ID;
+    // Send Slack message using MCP (channel or DM)
+    if (action === "send-slack-message" || action === "send-slack-dm") {
+      const { channel, message, userId: slackTargetUserId } = body;
+      const mcpUserId = userId || CALENDAR_SYNC_USER_ID;
       
-      if (!slackUserId) {
+      // For DMs, use the user ID as the channel
+      const targetChannel = action === "send-slack-dm" ? slackTargetUserId : channel;
+      
+      if (!mcpUserId) {
         throw new Error("No user ID provided for Slack");
       }
+      
+      if (!targetChannel) {
+        throw new Error("No channel or user ID provided for Slack message");
+      }
 
-      console.log(`Sending Slack message to ${channel}: ${message}`);
+      console.log(`Sending Slack message to ${targetChannel}: ${message?.substring(0, 100)}...`);
       
       const accessToken = await getPipedreamAccessToken();
       
@@ -583,7 +590,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
           "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
           "x-pd-environment": "development",
-          "x-pd-external-user-id": slackUserId,
+          "x-pd-external-user-id": mcpUserId,
           "x-pd-app-slug": "slack",
           "x-pd-app-discovery": "true",
         },
@@ -616,12 +623,12 @@ serve(async (req) => {
           console.log(`Trying Slack tool: ${toolName}`);
           result = await callMCPTool(
             accessToken,
-            slackUserId,
+            mcpUserId,
             toolName,
             {
-              channel: channel,
+              channel: targetChannel,
               text: message,
-              instruction: `Send a Slack message to ${channel} with the text: "${message}"`
+              instruction: `Send a Slack message to ${targetChannel} with the text: "${message?.substring(0, 200)}"`
             },
             "slack"
           );
