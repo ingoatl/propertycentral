@@ -1546,6 +1546,24 @@ serve(async (req) => {
       console.error("Error syncing to GHL:", ghlError);
     }
 
+    // Trigger ops handoff automation when lead moves to ops_handoff stage
+    if (newStage === "ops_handoff") {
+      try {
+        console.log(`Triggering ops handoff for lead ${leadId}`);
+        await fetch(`${supabaseUrl}/functions/v1/ops-handoff-trigger`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ leadId }),
+        });
+        console.log(`Ops handoff triggered successfully for lead ${leadId}`);
+      } catch (opsError) {
+        console.error("Error triggering ops handoff:", opsError);
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, automationsProcessed: automations?.length || 0 }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

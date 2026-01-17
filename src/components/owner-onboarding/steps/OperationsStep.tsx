@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { OwnerOnboardingFormData } from '@/types/owner-onboarding';
+import { BedroomConfigBuilder } from '../BedroomConfigBuilder';
 
 interface StepProps {
   formData: OwnerOnboardingFormData;
@@ -17,6 +18,12 @@ export function OperationsStep({ formData, updateFormData }: StepProps) {
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Operations</h2>
         <p className="text-gray-600">Tell us about your current property operations and cleaning setup.</p>
       </div>
+
+      {/* Bedroom Configuration */}
+      <BedroomConfigBuilder
+        configurations={formData.bedroom_configurations}
+        onChange={(configurations) => updateFormData({ bedroom_configurations: configurations })}
+      />
 
       {/* Cleaning Section */}
       <div className="space-y-4">

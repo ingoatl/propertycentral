@@ -467,3 +467,6 @@ verify_jwt = true
 
 [functions.summarize-conversation]
 verify_jwt = true
+
+[functions.ops-handoff-trigger]
+verify_jwt = true
