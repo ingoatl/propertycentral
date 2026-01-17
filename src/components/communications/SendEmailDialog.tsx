@@ -21,6 +21,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { VoiceDictationButton } from "./VoiceDictationButton";
+import { formatReplySubject } from "@/lib/email-utils";
 
 interface SendEmailDialogProps {
   open: boolean;
@@ -101,9 +102,9 @@ export function SendEmailDialog({
   // Fetch AI suggestion when dialog opens
   useEffect(() => {
     if (open) {
-      // Set reply subject if provided
+      // Set reply subject following RFC 5322 - single "Re:" prefix for threading
       if (replyToSubject) {
-        setSubject(replyToSubject.startsWith("Re:") ? replyToSubject : `Re: ${replyToSubject}`);
+        setSubject(formatReplySubject(replyToSubject));
       } else {
         setSubject("");
       }

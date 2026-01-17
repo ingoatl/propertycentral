@@ -110,10 +110,18 @@ export function VoiceDictationButton({
       return;
     }
 
+    console.log("[VoiceDictation] Starting polish with transcript:", transcript);
     setIsProcessing(true);
 
     try {
       // Use ai-message-assistant for better results
+      console.log("[VoiceDictation] Calling ai-message-assistant with:", {
+        action: "improve",
+        currentMessage: transcript,
+        contactName,
+        messageType,
+      });
+      
       const { data, error } = await supabase.functions.invoke("ai-message-assistant", {
         body: {
           action: "improve",
@@ -123,14 +131,24 @@ export function VoiceDictationButton({
         },
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      console.log("[VoiceDictation] AI response:", { data, error });
+
+      if (error) {
+        console.error("[VoiceDictation] Function error:", error);
+        throw error;
+      }
+      if (data?.error) {
+        console.error("[VoiceDictation] Data error:", data.error);
+        throw new Error(data.error);
+      }
 
       const polishedText = data?.message;
+      console.log("[VoiceDictation] Polished text:", polishedText);
 
       if (polishedText) {
         if (showPreview) {
           // Show preview instead of auto-inserting
+          console.log("[VoiceDictation] Setting polished preview");
           setPolishedPreview(polishedText);
           toast.success("AI polished your message!");
         } else {
@@ -142,7 +160,7 @@ export function VoiceDictationButton({
         }
       } else {
         // If AI failed to generate, show raw transcript in preview
-        console.warn("AI returned empty, using raw transcript");
+        console.warn("[VoiceDictation] AI returned empty, using raw transcript");
         if (showPreview) {
           setPolishedPreview(transcript);
           toast.info("Using raw transcript");
@@ -154,7 +172,7 @@ export function VoiceDictationButton({
         }
       }
     } catch (error: any) {
-      console.error("Polish error:", error);
+      console.error("[VoiceDictation] Polish error:", error);
       // Still allow inserting raw transcript on error
       if (showPreview) {
         setPolishedPreview(transcript);
@@ -172,8 +190,9 @@ export function VoiceDictationButton({
 
   const handleSend = () => {
     if (polishedPreview) {
+      console.log("[VoiceDictation] Sending polished message:", polishedPreview);
       onResult(polishedPreview);
-      toast.success("Message sent!");
+      toast.success("Message inserted!");
       resetState();
     }
   };
@@ -239,7 +258,7 @@ export function VoiceDictationButton({
               isListening ? "bg-red-500 animate-pulse" : isConnecting ? "bg-yellow-500 animate-pulse" : polishedPreview ? "bg-green-500" : "bg-muted"
             )} />
             <span className="text-sm font-medium">
-              {polishedPreview ? "Ready to Send" : isListening ? "Listening..." : isConnecting ? "Connecting..." : "Voice Dictation"}
+              {polishedPreview ? "Ready to Insert" : isListening ? "Listening..." : isConnecting ? "Connecting..." : "Voice Dictation"}
             </span>
           </div>
 
@@ -260,7 +279,7 @@ export function VoiceDictationButton({
               <div className="flex gap-2">
                 <Button onClick={handleSend} className="flex-1 gap-2">
                   <Check className="h-4 w-4" />
-                  Send
+                  Insert
                 </Button>
                 <Button variant="outline" onClick={handleCancel} className="gap-2">
                   <X className="h-4 w-4" />
