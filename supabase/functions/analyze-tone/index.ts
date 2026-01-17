@@ -161,16 +161,16 @@ Focus on patterns that make their writing UNIQUE - not generic professional writ
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { 
             role: "system", 
-            content: "You are an expert writing analyst. Analyze the provided messages to extract the unique writing patterns, tone, and voice of the author. Return only valid JSON." 
+            content: "You are an expert writing analyst. Analyze the provided messages to extract the unique writing patterns, tone, and voice of the author. Return ONLY valid JSON without any markdown formatting, code blocks, or extra text. Keep string values concise." 
           },
           { role: "user", content: analysisPrompt },
         ],
-        max_tokens: 2000,
-        temperature: 0.3,
+        max_tokens: 4000,
+        temperature: 0.2,
       }),
     });
 
@@ -193,15 +193,77 @@ Focus on patterns that make their writing UNIQUE - not generic professional writ
     const data = await response.json();
     let content = data.choices?.[0]?.message?.content?.trim() || "";
 
+    console.log("Raw AI response length:", content.length);
+
     // Clean markdown if present
-    content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    content = content.replace(/```json\n?/gi, "").replace(/```\n?/g, "").trim();
+    
+    // Try to extract JSON if wrapped in other text
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      content = jsonMatch[0];
+    }
 
     let toneProfile;
     try {
       toneProfile = JSON.parse(content);
     } catch (parseError) {
-      console.error("Failed to parse tone analysis:", content);
-      throw new Error("Failed to parse AI response");
+      console.error("Failed to parse tone analysis:", content.substring(0, 500));
+      
+      // Try to salvage partial JSON by fixing common issues
+      try {
+        // Remove trailing incomplete content and close the object
+        let fixedContent = content;
+        // Find last complete key-value pair
+        const lastCompleteComma = fixedContent.lastIndexOf('",');
+        const lastCompleteBracket = fixedContent.lastIndexOf('],');
+        const lastComplete = Math.max(lastCompleteComma, lastCompleteBracket);
+        
+        if (lastComplete > 0 && lastComplete < fixedContent.length - 10) {
+          fixedContent = fixedContent.substring(0, lastComplete + 2);
+          // Count open braces and brackets to close them
+          const openBraces = (fixedContent.match(/{/g) || []).length;
+          const closeBraces = (fixedContent.match(/}/g) || []).length;
+          const openBrackets = (fixedContent.match(/\[/g) || []).length;
+          const closeBrackets = (fixedContent.match(/]/g) || []).length;
+          
+          fixedContent += ']'.repeat(openBrackets - closeBrackets);
+          fixedContent += '}'.repeat(openBraces - closeBraces);
+          
+          toneProfile = JSON.parse(fixedContent);
+          console.log("Salvaged partial JSON successfully");
+        } else {
+          throw parseError;
+        }
+      } catch (salvageError) {
+        // Return a default profile if we can't parse
+        toneProfile = {
+          formality_level: "professional",
+          avg_sentence_length: 15,
+          uses_contractions: true,
+          punctuation_style: "Standard professional punctuation",
+          common_greetings: ["Hi", "Hello"],
+          common_closings: ["Best regards", "Thanks"],
+          signature_phrases: [],
+          avoided_phrases: [],
+          typical_email_length: 150,
+          typical_sms_length: 100,
+          paragraph_style: "short_punchy",
+          question_frequency: "medium",
+          exclamation_frequency: "medium",
+          emoji_usage: "occasional",
+          tone_summary: "Professional communication style (analysis incomplete)",
+          writing_dna: {
+            voice_characteristics: ["Professional", "Clear"],
+            sentence_starters: [],
+            transition_words: [],
+            cta_style: "Direct request",
+            warmth_indicators: []
+          },
+          sample_messages: []
+        };
+        console.log("Using default profile due to parse failure");
+      }
     }
 
     // Store/update the tone profile for this specific user
