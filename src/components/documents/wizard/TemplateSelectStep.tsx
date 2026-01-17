@@ -43,10 +43,38 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
       if (error) throw error;
       
       // Parse field_mappings from JSON - cast through unknown for safety
-      const parsedTemplates = (templatesData || []).map(t => ({
-        ...t,
-        field_mappings: (Array.isArray(t.field_mappings) ? t.field_mappings as unknown as DetectedField[] : null),
-      }));
+      // IMPORTANT: field_mappings contains position data (x, y, page, width, height) that must be preserved
+      const parsedTemplates = (templatesData || []).map(t => {
+        let parsedMappings: DetectedField[] | null = null;
+        if (Array.isArray(t.field_mappings)) {
+          // Explicitly map to ensure all properties including positions are preserved
+          parsedMappings = (t.field_mappings as any[]).map(f => ({
+            api_id: f.api_id,
+            label: f.label,
+            type: f.type,
+            filled_by: f.filled_by,
+            category: f.category,
+            description: f.description,
+            required: f.required,
+            // Preserve position data from field_mappings
+            x: f.x,
+            y: f.y,
+            width: f.width,
+            height: f.height,
+            page: f.page,
+          } as DetectedField));
+        }
+        return {
+          ...t,
+          field_mappings: parsedMappings,
+        };
+      });
+      
+      console.log('[TemplateSelectStep] Loaded templates with field positions:', parsedTemplates.map(t => ({
+        name: t.name,
+        fieldCount: t.field_mappings?.length,
+        sampleField: t.field_mappings?.[0]
+      })));
       
       setTemplates(parsedTemplates);
     } catch (error) {
@@ -145,8 +173,10 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
     return fields.map(field => {
       // Use the centralized field assignment logic
       const assignedTo = getFieldAssignment(field.api_id, field.label, field.category);
-      // Spread the entire field object to preserve position data (x, y, page, width, height)
-      return { ...field, filled_by: assignedTo };
+      // Spread the entire field object to preserve ALL data including position (x, y, page, width, height)
+      const processed = { ...field, filled_by: assignedTo };
+      console.log(`[TemplateSelectStep] Field ${field.api_id}: page=${processed.page}, x=${processed.x}, y=${processed.y}`);
+      return processed;
     });
   };
 
