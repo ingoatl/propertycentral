@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp, MessageSquare } from "lucide-react";
+import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp, MessageSquare, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { VoiceDictationButton } from "./VoiceDictationButton";
 
 const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
 
@@ -134,9 +135,16 @@ export function AIReplyButton({
   if (showContextInput && !generatedReply) {
     return (
       <div className="w-full bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-primary">
-          <MessageSquare className="h-4 w-4" />
-          <span>What would you like to say?</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-primary">
+            <MessageSquare className="h-4 w-4" />
+            <span>What would you like to say?</span>
+          </div>
+          <VoiceDictationButton
+            onResult={(text) => setUserInstructions(prev => prev ? `${prev} ${text}` : text)}
+            messageType="sms"
+            contactName={contactName}
+          />
         </div>
         
         <Textarea
@@ -206,12 +214,21 @@ export function AIReplyButton({
         </div>
         
         {isEditing ? (
-          <Textarea
-            value={editedReply}
-            onChange={(e) => setEditedReply(e.target.value)}
-            className="min-h-[120px] text-sm bg-background resize-y w-full"
-            autoFocus
-          />
+          <div className="space-y-2">
+            <div className="flex justify-end">
+              <VoiceDictationButton
+                onResult={(text) => setEditedReply(prev => prev ? `${prev} ${text}` : text)}
+                messageType="sms"
+                contactName={contactName}
+              />
+            </div>
+            <Textarea
+              value={editedReply}
+              onChange={(e) => setEditedReply(e.target.value)}
+              className="min-h-[120px] text-sm bg-background resize-y w-full"
+              autoFocus
+            />
+          </div>
         ) : (
           <div
             onClick={handleEdit}

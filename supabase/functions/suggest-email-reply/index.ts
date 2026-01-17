@@ -78,6 +78,11 @@ serve(async (req) => {
   try {
     const { contactEmail, contactName, currentSubject, incomingEmailBody, userInstructions, senderUserId } = await req.json();
     
+    // CRITICAL: Log incoming body length to debug empty body issues
+    console.log("[Suggest Email Reply] Received body length:", incomingEmailBody?.length || 0);
+    console.log("[Suggest Email Reply] Body preview:", incomingEmailBody?.substring(0, 200) || "EMPTY");
+    console.log("[Suggest Email Reply] Subject:", currentSubject || "No subject");
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
