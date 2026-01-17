@@ -54,10 +54,18 @@ export function AIReplyButton({
         })
         .join("\n");
 
+      // CRITICAL: Extract the most recent INBOUND message - this is what we're replying to
+      const lastInboundMessage = conversationThread
+        .filter(msg => msg.direction === "inbound" && msg.body)
+        .pop();
+      
+      const messageToReplyTo = lastInboundMessage?.body || "";
+      console.log("[AIReplyButton] Replying to message:", messageToReplyTo.substring(0, 100));
+
       const { data, error } = await supabase.functions.invoke("ai-message-assistant", {
         body: {
           action: "generate_contextual_reply",
-          currentMessage: "",
+          currentMessage: messageToReplyTo, // Pass the actual message we're replying to
           contactName,
           conversationContext,
           messageType: "sms",
