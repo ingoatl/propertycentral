@@ -61,56 +61,89 @@ export function InteractiveDocumentPreview({
   useEffect(() => {
     // Create positioned fields from detected fields
     // USE ACTUAL POSITIONS from field_mappings if available
-    console.log('[InteractiveDocumentPreview] Processing fields:', data.detectedFields.length);
+    console.log('[InteractiveDocumentPreview] Processing fields:', data.detectedFields.length, 'numPages:', numPages);
+    
+    // Group fields by category for better page distribution
+    const categoryPageMap: Record<string, number> = {
+      property: 1,
+      financial: 1,
+      dates: 1,
+      occupancy: 2,
+      contact: 2,
+      identification: 2,
+      vehicle: 3,
+      emergency: 3,
+      acknowledgment: Math.max(numPages - 1, 3),
+      signature: numPages || 1, // Signatures on LAST page
+      other: 1,
+    };
+    
+    // Track fields per page for Y positioning
+    const fieldsPerPage: Record<number, number> = {};
     
     const positioned = data.detectedFields.map((field, index) => {
       const value = data.fieldValues[field.api_id];
       
       // Check if field has position data from field_mappings (stored in the field object)
-      // The DetectedField interface includes x, y, page, width, height as optional properties
       const hasPosition = field.x !== undefined && field.y !== undefined && field.page !== undefined;
       
-      console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: hasPosition=${hasPosition}, page=${field.page}, x=${field.x}, y=${field.y}`);
-      
       if (hasPosition) {
-        // Use actual position from field_mappings
+        // Use actual position from field_mappings - but adjust page if it exceeds numPages
+        const actualPage = numPages > 0 ? Math.min(field.page!, numPages) : field.page!;
+        console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: using stored position page=${actualPage}, x=${field.x}, y=${field.y}`);
         return {
           ...field,
           x: field.x!,
           y: field.y!,
           width: field.width || 40,
           height: field.height || 2.5,
-          page: field.page!,
+          page: actualPage,
           value,
         };
       }
       
       // Fallback: distribute across pages based on field category/type
-      // Signature fields should be on the last page
       const isSignature = (field.type as string) === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
-      const isDate = field.type === "date" || field.api_id.includes("date");
+      const isDateField = field.type === "date" && (field.api_id.includes("sign") || field.api_id.includes("tenant") || field.api_id.includes("host"));
+      const category = field.category || "other";
       
-      // Estimate page based on field type and index
+      // Determine page based on category and numPages
       let estimatedPage = 1;
-      if (isSignature) {
-        estimatedPage = Math.max(numPages, 10); // Signatures typically on last pages
-      } else if (isDate && field.api_id.includes("signature")) {
-        estimatedPage = Math.max(numPages, 10);
+      if (isSignature || isDateField) {
+        // Signatures and related dates go on the LAST page
+        estimatedPage = numPages > 0 ? numPages : 4;
+      } else if (categoryPageMap[category]) {
+        estimatedPage = Math.min(categoryPageMap[category], numPages > 0 ? numPages : 10);
       } else {
-        // Distribute other fields across first few pages
-        estimatedPage = Math.min(Math.floor(index / 10) + 1, 5);
+        // Distribute other fields based on index
+        estimatedPage = Math.min(Math.floor(index / 8) + 1, numPages > 0 ? numPages : 5);
       }
       
-      // Grid positioning within page
-      const row = Math.floor((index % 10) / 2);
-      const col = index % 2;
+      // Track and calculate Y position based on fields already on this page
+      if (!fieldsPerPage[estimatedPage]) {
+        fieldsPerPage[estimatedPage] = 0;
+      }
+      const fieldIndexOnPage = fieldsPerPage[estimatedPage];
+      fieldsPerPage[estimatedPage]++;
+      
+      // Grid positioning within page - 2 columns
+      const row = Math.floor(fieldIndexOnPage / 2);
+      const col = fieldIndexOnPage % 2;
+      
+      // Special handling for signature fields - place them at bottom
+      let yPos = 10 + (row * 8);
+      if (isSignature) {
+        yPos = 70 + (fieldIndexOnPage * 8); // Start at 70% from top
+      }
+      
+      console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: estimated page=${estimatedPage}, y=${yPos}, category=${category}`);
       
       return {
         ...field,
-        x: 5 + (col * 50),
-        y: 10 + (row * 8),
-        width: 40,
-        height: 3,
+        x: 5 + (col * 48),
+        y: Math.min(yPos, 90), // Don't go off page
+        width: 42,
+        height: isSignature ? 5 : 3,
         page: estimatedPage,
         value,
       };

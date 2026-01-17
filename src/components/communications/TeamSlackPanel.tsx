@@ -7,8 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { MessageSquare, Send, RefreshCw, Clock, CheckCircle2, XCircle, Zap, Building2, User, Users } from 'lucide-react';
+import { MessageSquare, Send, RefreshCw, Clock, CheckCircle2, XCircle, Zap, Building2, User, Users, Hash, AtSign } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface TeamSlackPanelProps {
@@ -38,6 +39,15 @@ interface SlackMessage {
   template_used: string | null;
 }
 
+// Team members with their Slack user IDs
+const TEAM_MEMBERS = [
+  { id: 'alex', name: 'Alex', slackId: 'U_ALEX' },
+  { id: 'anja', name: 'Anja', slackId: 'U_ANJA' },
+  { id: 'catherine', name: 'Catherine', slackId: 'U_CATHERINE' },
+  { id: 'chris', name: 'Chris', slackId: 'U_CHRIS' },
+  { id: 'ingo', name: 'Ingo', slackId: 'U_INGO' },
+];
+
 const QUICK_TEMPLATES = [
   { id: 'update', label: 'Property Update', icon: Building2, prefix: '📍 Update: ' },
   { id: 'help', label: 'Need Help', icon: Users, prefix: '🆘 Need help: ' },
@@ -54,7 +64,9 @@ export function TeamSlackPanel({
   ownerName,
   compact = false 
 }: TeamSlackPanelProps) {
+  const [messageMode, setMessageMode] = useState<'channel' | 'dm'>('channel');
   const [selectedChannel, setSelectedChannel] = useState<string>('');
+  const [selectedMember, setSelectedMember] = useState<string>('');
   const [message, setMessage] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -102,7 +114,9 @@ export function TeamSlackPanel({
 
       const response = await supabase.functions.invoke('send-team-slack', {
         body: {
-          channel: selectedChannel,
+          channel: messageMode === 'channel' ? selectedChannel : undefined,
+          directMessage: messageMode === 'dm',
+          recipientUserId: messageMode === 'dm' ? selectedMember : undefined,
           message,
           template: selectedTemplate,
           context: {
@@ -117,7 +131,10 @@ export function TeamSlackPanel({
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Message sent to Slack!');
+      const target = messageMode === 'channel' 
+        ? `#${selectedChannel}` 
+        : TEAM_MEMBERS.find(m => m.id === selectedMember)?.name || 'team member';
+      toast.success(`Message sent to ${target}!`);
       setMessage('');
       setSelectedTemplate(null);
       queryClient.invalidateQueries({ queryKey: ['slack-messages'] });
@@ -134,8 +151,16 @@ export function TeamSlackPanel({
   };
 
   const handleSend = () => {
-    if (!selectedChannel || !message.trim()) {
-      toast.error('Please select a channel and enter a message');
+    if (messageMode === 'channel' && !selectedChannel) {
+      toast.error('Please select a channel');
+      return;
+    }
+    if (messageMode === 'dm' && !selectedMember) {
+      toast.error('Please select a team member');
+      return;
+    }
+    if (!message.trim()) {
+      toast.error('Please enter a message');
       return;
     }
     sendMessage.mutate();
@@ -165,18 +190,46 @@ export function TeamSlackPanel({
           </div>
           
           <div className="space-y-2">
-            <Select value={selectedChannel} onValueChange={setSelectedChannel}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Select channel" />
-              </SelectTrigger>
-              <SelectContent>
-                {channels?.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.channel_name} className="text-xs">
-                    {ch.channel_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Tabs value={messageMode} onValueChange={(v) => setMessageMode(v as 'channel' | 'dm')} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 h-8">
+                <TabsTrigger value="channel" className="text-xs h-6">
+                  <Hash className="h-3 w-3 mr-1" />
+                  Channel
+                </TabsTrigger>
+                <TabsTrigger value="dm" className="text-xs h-6">
+                  <AtSign className="h-3 w-3 mr-1" />
+                  DM
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {messageMode === 'channel' ? (
+              <Select value={selectedChannel} onValueChange={setSelectedChannel}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {channels?.map((ch) => (
+                    <SelectItem key={ch.id} value={ch.channel_name} className="text-xs">
+                      #{ch.channel_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Select value={selectedMember} onValueChange={setSelectedMember}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEAM_MEMBERS.map((member) => (
+                    <SelectItem key={member.id} value={member.id} className="text-xs">
+                      @{member.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             
             <Textarea
               placeholder="Type message..."
@@ -189,7 +242,9 @@ export function TeamSlackPanel({
               size="sm" 
               className="w-full h-7 text-xs"
               onClick={handleSend}
-              disabled={sendMessage.isPending || !selectedChannel || !message.trim()}
+              disabled={sendMessage.isPending || !message.trim() || 
+                (messageMode === 'channel' && !selectedChannel) ||
+                (messageMode === 'dm' && !selectedMember)}
             >
               <Send className="h-3 w-3 mr-1" />
               {sendMessage.isPending ? 'Sending...' : 'Send'}
@@ -253,31 +308,67 @@ export function TeamSlackPanel({
             <Send className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Send Message</span>
           </div>
+
+          {/* Channel vs DM Toggle */}
+          <Tabs value={messageMode} onValueChange={(v) => setMessageMode(v as 'channel' | 'dm')} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="channel" className="gap-2">
+                <Hash className="h-4 w-4" />
+                Channel
+              </TabsTrigger>
+              <TabsTrigger value="dm" className="gap-2">
+                <AtSign className="h-4 w-4" />
+                Direct Message
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           
-          <Select value={selectedChannel} onValueChange={setSelectedChannel}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a channel" />
-            </SelectTrigger>
-            <SelectContent>
-              {channelsLoading ? (
-                <SelectItem value="loading" disabled>Loading...</SelectItem>
-              ) : (
-                channels?.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.channel_name}>
-                    <div className="flex flex-col">
-                      <span>{ch.channel_name}</span>
-                      {ch.description && (
-                        <span className="text-xs text-muted-foreground">{ch.description}</span>
-                      )}
+          {messageMode === 'channel' ? (
+            <Select value={selectedChannel} onValueChange={setSelectedChannel}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a channel" />
+              </SelectTrigger>
+              <SelectContent>
+                {channelsLoading ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  channels?.map((ch) => (
+                    <SelectItem key={ch.id} value={ch.channel_name}>
+                      <div className="flex flex-col">
+                        <span>#{ch.channel_name}</span>
+                        {ch.description && (
+                          <span className="text-xs text-muted-foreground">{ch.description}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select value={selectedMember} onValueChange={setSelectedMember}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select team member" />
+              </SelectTrigger>
+              <SelectContent>
+                {TEAM_MEMBERS.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="text-xs font-medium">{member.name[0]}</span>
+                      </div>
+                      <span>@{member.name}</span>
                     </div>
                   </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <Textarea
-            placeholder="Type your message..."
+            placeholder={messageMode === 'channel' 
+              ? "Type your message to the channel..." 
+              : `Type your direct message...`}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             className="min-h-[80px] resize-none"
@@ -308,10 +399,13 @@ export function TeamSlackPanel({
           <Button 
             className="w-full"
             onClick={handleSend}
-            disabled={sendMessage.isPending || !selectedChannel || !message.trim()}
+            disabled={sendMessage.isPending || !message.trim() ||
+              (messageMode === 'channel' && !selectedChannel) ||
+              (messageMode === 'dm' && !selectedMember)}
           >
             <Send className="h-4 w-4 mr-2" />
-            {sendMessage.isPending ? 'Sending...' : 'Send to Slack'}
+            {sendMessage.isPending ? 'Sending...' : 
+              messageMode === 'channel' ? 'Send to Channel' : 'Send Direct Message'}
           </Button>
         </div>
 
@@ -332,7 +426,7 @@ export function TeamSlackPanel({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] h-5">
-                          {msg.channel}
+                          {msg.channel?.startsWith('@') ? msg.channel : `#${msg.channel}`}
                         </Badge>
                         {getStatusIcon(msg.status)}
                       </div>

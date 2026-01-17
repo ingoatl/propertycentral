@@ -150,24 +150,51 @@ export function VoiceDictationButton({
     }
   };
 
+  // Check browser support
+  const isSupported = typeof window !== "undefined" && 
+    (("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window));
+
+  if (!isSupported) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={cn("gap-2 text-muted-foreground cursor-not-allowed", className)}
+        disabled
+        title="Voice dictation not supported in this browser. Use Chrome for best results."
+      >
+        <Mic className="h-4 w-4" />
+        <span className="text-xs">Use Chrome</span>
+      </Button>
+    );
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
-          variant="ghost"
-          size="icon"
+          variant={isListening ? "destructive" : "outline"}
+          size="sm"
           className={cn(
-            "h-8 w-8 rounded-full transition-all",
-            isListening && "bg-red-100 text-red-600 animate-pulse",
+            "gap-2 transition-all border-2",
+            isListening && "animate-pulse border-red-500",
+            !isListening && "border-primary/50 hover:border-primary hover:bg-primary/10",
             className
           )}
-          title="Voice dictation"
+          title="Voice dictation - Click to speak"
         >
           {isListening ? (
-            <MicOff className="h-4 w-4" />
+            <>
+              <MicOff className="h-4 w-4" />
+              <span className="text-xs font-medium">Listening...</span>
+            </>
           ) : (
-            <Mic className="h-4 w-4" />
+            <>
+              <Mic className="h-4 w-4" />
+              <span className="text-xs font-medium">Dictate</span>
+            </>
           )}
         </Button>
       </PopoverTrigger>

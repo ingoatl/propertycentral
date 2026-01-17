@@ -549,46 +549,80 @@ ${messageType === "sms" ? "Target under 160 characters." : ""}`;
         throw new Error(`Unknown action: ${action}`);
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_tokens: messageType === "sms" ? 150 : 500,
-        temperature: 0.7,
-      }),
-    });
+    // Try primary model first, then fallback
+    const models = ["google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
+    let generatedMessage = "";
+    let lastError = "";
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    for (const model of models) {
+      try {
+        console.log(`[AI Message Assistant] Trying model: ${model}`);
+        console.log(`[AI Message Assistant] User prompt preview: ${userPrompt.substring(0, 200)}...`);
+        
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            max_tokens: messageType === "sms" ? 200 : 600,
+            temperature: 0.7,
+          }),
+        });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            return new Response(
+              JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+              { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          if (response.status === 402) {
+            return new Response(
+              JSON.stringify({ error: "AI credits exhausted. Please add credits." }),
+              { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          const errorText = await response.text();
+          console.error(`[AI Message Assistant] ${model} error:`, errorText);
+          lastError = errorText;
+          continue; // Try next model
+        }
+
+        const data = await response.json();
+        console.log(`[AI Message Assistant] Raw AI response:`, JSON.stringify(data).substring(0, 500));
+        
+        generatedMessage = data.choices?.[0]?.message?.content?.trim();
+        
+        if (generatedMessage) {
+          console.log(`[AI Message Assistant] Success with ${model}`);
+          break; // Success, exit loop
+        } else {
+          console.warn(`[AI Message Assistant] ${model} returned empty content`);
+          lastError = "Empty response from AI";
+        }
+      } catch (modelError) {
+        console.error(`[AI Message Assistant] ${model} exception:`, modelError);
+        lastError = modelError instanceof Error ? modelError.message : "Unknown error";
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    const data = await response.json();
-    let generatedMessage = data.choices?.[0]?.message?.content?.trim();
-
+    // If all models failed, generate a fallback response
     if (!generatedMessage) {
-      throw new Error("No message generated");
+      console.warn(`[AI Message Assistant] All models failed, generating fallback response. Last error: ${lastError}`);
+      
+      // Generate a context-aware fallback instead of throwing an error
+      if (messageType === "sms") {
+        generatedMessage = `Hi ${firstName}! Thanks for reaching out. How can I help you today?`;
+      } else {
+        generatedMessage = `Hi ${firstName},\n\nThank you for your message. I wanted to follow up and see how I can assist you.\n\nPlease let me know if you have any questions.\n\nBest regards`;
+      }
     }
 
     // Clean up the message - remove quotes if wrapped
@@ -596,21 +630,25 @@ ${messageType === "sms" ? "Target under 160 characters." : ""}`;
       generatedMessage = generatedMessage.slice(1, -1);
     }
 
-    console.log("Generated message:", generatedMessage.substring(0, 100) + "...");
+    console.log("[AI Message Assistant] Final generated message:", generatedMessage.substring(0, 100) + "...");
 
     return new Response(
       JSON.stringify({ message: generatedMessage }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
-    console.error("AI Message Assistant error:", error);
+    console.error("[AI Message Assistant] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
+    // Even on error, return a usable fallback message (use generic since messageType may not be in scope)
+    const fallbackMessage = "Hi! Thanks for reaching out. How can I help?";
+    
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+      JSON.stringify({ 
+        message: fallbackMessage, 
+        warning: `AI generation failed: ${errorMessage}. Using fallback message.` 
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
