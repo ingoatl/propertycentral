@@ -156,18 +156,28 @@ serve(async (req) => {
           messages: [
             { 
               role: "system", 
-              content: "You are an email analyst. Analyze the email and return structured data about its sentiment, intent, and urgency. Be accurate - unsubscribe requests, complaints, and declines should be identified." 
+              content: `You are an email analyst. Analyze the email and determine its intent.
+              
+CRITICAL RULES FOR INTENT DETECTION:
+- If the email contains ANY question mark (?) or asks for information/recommendations/advice, intent MUST be "question"
+- Examples of questions: "Do you recommend...", "What do you suggest...", "Can you tell me...", "How does...", "Which...", "What about..."
+- Only use "general" if there's truly no question or specific request
+- Be accurate with unsubscribe requests, complaints, and declines` 
             },
-            { role: "user", content: `Analyze this email:\n\n${incomingEmailBody.substring(0, 1500)}` }
+            { role: "user", content: `Analyze this email. Look carefully for any questions:\n\n${incomingEmailBody.substring(0, 1500)}` }
           ],
           tools: [{
             type: "function",
             function: {
               name: "analyze_email",
-              description: "Analyze the email's sentiment, intent, and urgency",
+              description: "Analyze the email's sentiment, intent, and urgency. If the email asks ANY question, set intent to 'question'.",
               parameters: {
                 type: "object",
                 properties: {
+                  has_question: {
+                    type: "boolean",
+                    description: "TRUE if the email contains any question mark or asks for information, recommendations, or advice"
+                  },
                   sentiment: { 
                     type: "string", 
                     enum: ["positive", "negative", "neutral", "frustrated", "grateful", "confused"],
@@ -176,15 +186,20 @@ serve(async (req) => {
                   intent: { 
                     type: "string", 
                     enum: ["unsubscribe", "complaint", "question", "inquiry", "schedule_meeting", "pricing_request", "decline", "follow_up", "general", "thank_you"],
-                    description: "The primary purpose of the email"
+                    description: "The primary purpose. MUST be 'question' if has_question is true"
                   },
                   urgency: { 
                     type: "string", 
                     enum: ["high", "medium", "low"],
                     description: "How urgent the response needs to be"
+                  },
+                  extracted_questions: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "List of specific questions asked in the email"
                   }
                 },
-                required: ["sentiment", "intent", "urgency"]
+                required: ["has_question", "sentiment", "intent", "urgency"]
               }
             }
           }],
@@ -199,9 +214,24 @@ serve(async (req) => {
           try {
             const analysis = JSON.parse(toolCall.function.arguments);
             sentiment = analysis.sentiment || "neutral";
-            intent = analysis.intent || "general";
+            // Force intent to "question" if has_question is true
+            if (analysis.has_question) {
+              intent = "question";
+            } else {
+              intent = analysis.intent || "general";
+            }
             urgency = analysis.urgency || "medium";
-            console.log("Email analysis:", { sentiment, intent, urgency });
+            
+            // Merge AI-extracted questions with regex-extracted ones
+            if (analysis.extracted_questions && Array.isArray(analysis.extracted_questions)) {
+              for (const q of analysis.extracted_questions) {
+                if (q && !extractedQuestions.includes(q)) {
+                  extractedQuestions.push(q);
+                }
+              }
+            }
+            
+            console.log("Email analysis:", { sentiment, intent, urgency, has_question: analysis.has_question, extractedQuestions });
           } catch (e) {
             console.error("Failed to parse analysis:", e);
           }
@@ -458,10 +488,15 @@ INTENT DETECTED: THANK YOU / GRATITUDE
       case 'question':
         intentGuidance = `
 INTENT DETECTED: QUESTION / INQUIRY
-- Answer their specific question directly first
-- Provide helpful context if needed
-- If they mentioned needing time to review something, respect that
-- Only suggest a call if it would genuinely help answer their question AND they haven't signed a contract`;
+- YOUR #1 PRIORITY: Answer their specific question(s) in your FIRST paragraph
+- Be SPECIFIC and HELPFUL - give real answers, not vague responses
+- Common topic guidance:
+  * INSURANCE: Recommend Proper Insurance (properinsurance.com) for STR/MTR, or CBIZ for comprehensive landlord policies
+  * HOA DOCS: Explain what documents you need (CC&Rs, bylaws, rental restrictions) and why
+  * PRICING: Our fee is typically 20-25% of collected rent for full-service management
+  * CONTRACTS: Be direct about terms, timeline, or any questions they have
+- After answering their question, you can add brief context if needed
+- Only suggest a call if it would genuinely help AND they haven't signed a contract`;
         break;
         
       default:
@@ -492,20 +527,49 @@ CRITICAL: Match the writing style above exactly. This is how ${senderName} actua
 `;
     }
 
-    // Build question-answering priority section
+    // Build question-answering priority section with topic knowledge
     let questionAnsweringSection = "";
     if (extractedQuestions.length > 0) {
+      // Detect topics from questions to provide relevant knowledge
+      const questionsLower = extractedQuestions.map(q => q.toLowerCase()).join(" ");
+      let topicKnowledge = "";
+      
+      if (questionsLower.includes("insurance")) {
+        topicKnowledge = `
+INSURANCE KNOWLEDGE (use this to answer):
+- For medium-term rental insurance, we recommend:
+  * Proper Insurance (properinsurance.com) - specializes in STR/MTR coverage, excellent for furnished rentals
+  * CBIZ - good for comprehensive landlord policies
+  * Some owners add a landlord endorsement to their existing homeowner's insurance
+- Each property is different, so we'd want to understand their specific situation
+- We can help coordinate with their insurance provider if needed`;
+      } else if (questionsLower.includes("hoa") || questionsLower.includes("documents")) {
+        topicKnowledge = `
+HOA/DOCUMENTS KNOWLEDGE (use this to answer):
+- HOA documents we typically need: CC&Rs, bylaws, and any rental restrictions
+- We review these to ensure the property qualifies for our program
+- Some HOAs have minimum lease term requirements we need to work around`;
+      } else if (questionsLower.includes("price") || questionsLower.includes("cost") || questionsLower.includes("fee")) {
+        topicKnowledge = `
+PRICING KNOWLEDGE (use this to answer):
+- Our management fee is typically 20-25% of collected rent
+- This covers full-service management: guest communication, cleaning coordination, maintenance
+- No hidden fees - we're transparent about costs`;
+      }
+      
       questionAnsweringSection = `
-QUESTIONS THEY ASKED (YOU MUST ANSWER THESE DIRECTLY):
+⚠️ CRITICAL - ANSWER THESE QUESTIONS FIRST (this is your #1 job):
 ${extractedQuestions.map((q, i) => `${i + 1}. "${q}"`).join("\n")}
+${topicKnowledge}
 
-CRITICAL: Your FIRST priority is to answer their specific question(s) above.
-- If they asked about insurance → provide insurance guidance or recommendations
-- If they asked for a recommendation → give an actual recommendation or explain how you'll help
-- If they asked about documents → answer about the documents
-- NEVER give a generic property management pitch when they asked a specific question
-- Answer the question FIRST, then provide any additional context
+RULES FOR ANSWERING:
+- Your FIRST paragraph MUST directly answer the question(s) above
+- Be SPECIFIC - give real recommendations, real answers, real information
+- DO NOT give a generic "we offer property management services" pitch
+- If they asked "Do you recommend X?" → Give an actual recommendation or explain your approach
+- Answer the question FIRST, then you can add brief context if needed
 `;
+      console.log("[Suggest Email Reply] Question section built with topic knowledge:", topicKnowledge ? "Yes" : "No");
     }
 
     const systemPrompt = `You are writing an email reply for PeachHaus Group, a premium property management company in Atlanta. Your goal is to sound like a real, thoughtful human - not a corporate AI.
@@ -566,7 +630,7 @@ Draft a reply that shows you actually read their email. Start with "Hi ${contact
 
     // Try multiple models with fallback
     // Use Pro model for better reasoning and context understanding
-    const models = ["google/gemini-3-pro-preview", "google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
+    const models = ["google/gemini-3-flash-preview", "google/gemini-2.5-flash", "google/gemini-2.5-pro"];
     let suggestedReply = "";
     let lastError = "";
 
