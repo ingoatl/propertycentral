@@ -39,6 +39,7 @@ import {
   Sparkles,
   Keyboard,
   Home,
+  Hash,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,8 @@ import { AIDraftReplyCard } from "./AIDraftReplyCard";
 import { SmartSchedulingCard, detectSchedulingIntent } from "./SmartSchedulingCard";
 import { SmartTaskExtractButton } from "./SmartTaskExtractButton";
 import { EmojiPicker } from "./EmojiPicker";
+import { VoiceDictationButton } from "./VoiceDictationButton";
+import { TeamSlackPanel } from "./TeamSlackPanel";
 import { FollowUpSchedulerModal } from "./FollowUpSchedulerModal";
 import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
@@ -232,6 +235,7 @@ export function InboxView() {
   const [viewAllInboxes, setViewAllInboxes] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [showEmailActionModal, setShowEmailActionModal] = useState(false);
+  const [showTeamSlack, setShowTeamSlack] = useState(false);
   
   const [showCallDialog, setShowCallDialog] = useState(false);
   const [voiceAICallerPhone, setVoiceAICallerPhone] = useState<string | null>(null);
@@ -2872,8 +2876,9 @@ export function InboxView() {
         </ScrollArea>
 
         {/* Compose button - FAB style on mobile */}
-        <div className="p-3 border-t hidden md:block">
+        <div className="p-3 border-t hidden md:block space-y-2">
           <Button onClick={() => setShowComposeEmail(true)} className="w-full" size="sm"><Plus className="h-4 w-4 mr-2" />Compose</Button>
+          <Button onClick={() => setShowTeamSlack(true)} variant="outline" className="w-full" size="sm"><Hash className="h-4 w-4 mr-2" />Team Slack</Button>
         </div>
       </div>
       
@@ -3563,6 +3568,12 @@ export function InboxView() {
                   </div>
                   <div className="flex-1 flex items-center gap-2 bg-muted/50 rounded-full px-3 py-1.5">
                     <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} />
+                    <VoiceDictationButton 
+                      onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
+                      messageType={selectedChannel === "email" ? "email" : "sms"} 
+                      contactName={selectedMessage.contact_name}
+                      className="text-muted-foreground hover:text-primary"
+                    />
                     <Input placeholder="Message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()} className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-9 text-sm" />
                     <EmojiPicker onEmojiSelect={handleEmojiSelect} />
                   </div>
@@ -3617,6 +3628,34 @@ export function InboxView() {
         />
       )}
       <UnifiedComposeDialog open={showComposeEmail} onOpenChange={setShowComposeEmail} />
+      
+      {/* Team Slack Panel - Slide-over sheet */}
+      {showTeamSlack && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowTeamSlack(false)} />
+          <div className="relative w-full max-w-md bg-background shadow-xl animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Hash className="h-5 w-5" />
+                Team Slack
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => setShowTeamSlack(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[calc(100vh-80px)]">
+              <TeamSlackPanel 
+                propertyId={selectedMessage?.owner_id ? undefined : undefined}
+                leadId={selectedMessage?.contact_type === "lead" ? selectedMessage?.contact_id : undefined}
+                ownerId={selectedMessage?.contact_type === "owner" ? selectedMessage?.contact_id : undefined}
+                leadName={selectedMessage?.contact_type === "lead" ? selectedMessage?.contact_name : undefined}
+                ownerName={selectedMessage?.contact_type === "owner" ? selectedMessage?.contact_name : undefined}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
       {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "email" ? "personal" : selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
       {selectedMessage && <ConversationNotes open={showNotes} onOpenChange={setShowNotes} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} contactName={selectedMessage.contact_name} />}
       
