@@ -473,3 +473,9 @@ verify_jwt = true
 
 [functions.send-team-slack]
 verify_jwt = false
+
+[functions.elevenlabs-scribe-token]
+verify_jwt = true
+
+[functions.suggest-email-reply]
+verify_jwt = true
