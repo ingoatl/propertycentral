@@ -1,4 +1,22 @@
+export interface BedroomConfiguration {
+  bedroom_number: number;
+  bed_type: string;
+  bed_count: number;
+  is_primary: boolean;
+}
+
 export interface OwnerOnboardingFormData {
+  // Contract Type & Platform Info
+  contract_type: 'full_service' | 'cohosting' | '';
+  has_airbnb_host_account: boolean;
+  airbnb_account_status: string;
+  airbnb_payment_method_setup: boolean;
+  has_vrbo_account: boolean;
+  vrbo_account_status: string;
+  preferred_checkin_time: string;
+  preferred_checkout_time: string;
+  bedroom_configurations: BedroomConfiguration[];
+
   // Step 1: Owner Info & Property Specifications
   owner_name: string;
   owner_email: string;
@@ -140,7 +158,30 @@ export interface UtilityInfo {
   account_number: string;
 }
 
+export const CHECKIN_TIME_OPTIONS = [
+  '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM'
+];
+
+export const CHECKOUT_TIME_OPTIONS = [
+  '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM'
+];
+
+export const BED_TYPE_OPTIONS = [
+  'King', 'Queen', 'Full', 'Twin', 'Twin XL', 'Bunk Bed', 'Sofa Bed', 'Air Mattress', 'Floor Mattress'
+];
+
 export const initialFormData: OwnerOnboardingFormData = {
+  // Contract Type & Platform Info
+  contract_type: '',
+  has_airbnb_host_account: false,
+  airbnb_account_status: '',
+  airbnb_payment_method_setup: false,
+  has_vrbo_account: false,
+  vrbo_account_status: '',
+  preferred_checkin_time: '3:00 PM',
+  preferred_checkout_time: '11:00 AM',
+  bedroom_configurations: [],
+
   // Step 1 - Owner Info
   owner_name: '',
   owner_email: '',
