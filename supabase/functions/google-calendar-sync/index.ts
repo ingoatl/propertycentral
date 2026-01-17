@@ -580,7 +580,7 @@ serve(async (req) => {
       
       const accessToken = await getPipedreamAccessToken();
       
-      // First list available Slack tools
+      // First list available Slack tools to find the correct one
       console.log("Listing available Slack tools...");
       const toolsResponse = await fetch(MCP_SERVER_URL, {
         method: "POST",
@@ -603,52 +603,75 @@ serve(async (req) => {
       });
       
       const toolsResult = await parseSSEResponse(toolsResponse);
-      console.log("Available Slack tools:", JSON.stringify(toolsResult).substring(0, 1000));
+      console.log("Available Slack tools:", JSON.stringify(toolsResult).substring(0, 2000));
       
-      // Try multiple possible tool names for posting messages
-      const possibleToolNames = [
-        "slack-post-message",
-        "slack_post_message", 
-        "slack-chat-postMessage",
-        "slack_chat_postMessage",
-        "slack-send-message",
-        "slack_send_message"
+      // Extract available tool names from the response
+      const availableTools = toolsResult?.result?.tools || [];
+      const toolNames = availableTools.map((t: any) => t.name);
+      console.log("Tool names found:", toolNames);
+      
+      // Find the send message tool - look for any tool containing 'send', 'post', or 'message'
+      const sendToolPatterns = [
+        /send.*message/i,
+        /post.*message/i,
+        /chat.*post/i,
+        /message.*send/i,
+        /slack.*send/i,
+        /slack.*post/i,
+        /slack.*message/i,
       ];
       
-      let result: any = null;
-      let lastError: string = "";
-      
-      for (const toolName of possibleToolNames) {
-        try {
-          console.log(`Trying Slack tool: ${toolName}`);
-          result = await callMCPTool(
-            accessToken,
-            mcpUserId,
-            toolName,
-            {
-              channel: targetChannel,
-              text: message,
-              instruction: `Send a Slack message to ${targetChannel} with the text: "${message?.substring(0, 200)}"`
-            },
-            "slack"
-          );
-          console.log(`Slack tool ${toolName} succeeded!`);
+      let sendToolName = "";
+      for (const pattern of sendToolPatterns) {
+        const found = toolNames.find((name: string) => pattern.test(name));
+        if (found) {
+          sendToolName = found;
           break;
-        } catch (e: any) {
-          lastError = e.message;
-          console.log(`Slack tool ${toolName} failed: ${e.message}`);
         }
       }
       
-      if (!result) {
-        throw new Error(`All Slack tool attempts failed. Last error: ${lastError}. Available tools: ${JSON.stringify(toolsResult).substring(0, 500)}`);
+      // If no pattern matched, look for common names
+      if (!sendToolName) {
+        const commonNames = [
+          "slack-send-message-to-channel",
+          "slack-send-direct-message",
+          "slack-chat-postMessage",
+          "slack-post-message",
+          "slack_send_message",
+          "slack_post_message",
+        ];
+        sendToolName = toolNames.find((name: string) => commonNames.includes(name)) || "";
       }
+      
+      if (!sendToolName) {
+        console.error("No send message tool found. Available tools:", toolNames);
+        throw new Error(`No Slack send message tool found. Available tools: ${toolNames.join(", ")}`);
+      }
+      
+      console.log(`Found Slack send tool: ${sendToolName}`);
+      
+      try {
+        const result = await callMCPTool(
+          accessToken,
+          mcpUserId,
+          sendToolName,
+          {
+            channel: targetChannel,
+            text: message,
+            instruction: `Send a Slack message to channel or user ${targetChannel} with the following message: ${message?.substring(0, 500)}`
+          },
+          "slack"
+        );
+        
+        console.log("Slack MCP result:", JSON.stringify(result).substring(0, 500));
 
-      console.log("Slack MCP result:", JSON.stringify(result).substring(0, 500));
-
-      return new Response(JSON.stringify({ success: true, result }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        return new Response(JSON.stringify({ success: true, result }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (slackError: any) {
+        console.error("Slack send failed:", slackError);
+        throw new Error(`Slack send failed: ${slackError.message}`);
+      }
     }
 
     // Create calendar event for discovery call using MCP

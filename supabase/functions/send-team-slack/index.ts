@@ -215,6 +215,8 @@ serve(async (req) => {
           message: fullMessage
         };
 
+    console.log('[send-team-slack] Sending to google-calendar-sync:', slackPayload);
+
     const slackResponse = await fetch(`${supabaseUrl}/functions/v1/google-calendar-sync`, {
       method: 'POST',
       headers: {
@@ -224,13 +226,23 @@ serve(async (req) => {
       body: JSON.stringify(slackPayload)
     });
 
-    const slackResult = await slackResponse.json();
+    // Safely parse the response
+    let slackResult: any = {};
+    const responseText = await slackResponse.text();
+    console.log('[send-team-slack] Response status:', slackResponse.status, 'body:', responseText.substring(0, 500));
+    
+    try {
+      slackResult = responseText ? JSON.parse(responseText) : {};
+    } catch (parseError) {
+      console.error('[send-team-slack] Failed to parse response:', parseError);
+      slackResult = { error: `Invalid response: ${responseText.substring(0, 200)}` };
+    }
     
     // Update message status
     if (slackMessage) {
-      const updateData = slackResponse.ok 
-        ? { status: 'sent', slack_message_id: slackResult.ts || null }
-        : { status: 'failed', error_message: slackResult.error || 'Unknown error' };
+      const updateData = slackResponse.ok && slackResult.success
+        ? { status: 'sent', slack_message_id: slackResult.result?.ts || slackResult.ts || null }
+        : { status: 'failed', error_message: slackResult.error || slackResult.message || 'Unknown error' };
       
       await supabase
         .from('slack_messages')
@@ -238,11 +250,11 @@ serve(async (req) => {
         .eq('id', slackMessage.id);
     }
 
-    if (!slackResponse.ok) {
+    if (!slackResponse.ok || !slackResult.success) {
       console.error('[send-team-slack] Slack send failed:', slackResult);
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'Failed to send Slack message',
+        error: slackResult.error || 'Failed to send Slack message',
         details: slackResult 
       }), { 
         status: 500, 
