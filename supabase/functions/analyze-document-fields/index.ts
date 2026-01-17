@@ -342,6 +342,9 @@ KEY PRINCIPLES:
     const rawFields = parsedResult.fields || [];
 
     // Post-process fields to ensure proper structure and assignments
+    // IMPORTANT: We cannot detect exact PDF positions from text analysis
+    // Positions will be set during manual review or via PDF field extraction
+    // For now, use category-based defaults that spread across pages intelligently
     const fields: Array<{
       api_id: string;
       label: string;
@@ -366,6 +369,70 @@ KEY PRINCIPLES:
       // Ensure required is boolean
       const required = f.required !== false;
       
+      // Category-based page assignment:
+      // - property, financial, dates, occupancy: page 1 (top of document)
+      // - contact, identification: page 1-2 (middle)
+      // - vehicle, emergency: page 2+
+      // - signature, acknowledgment: last pages
+      const categoryPageMap: Record<string, number> = {
+        property: 1,
+        financial: 1,
+        dates: 1,
+        occupancy: 1,
+        contact: 1,
+        identification: 2,
+        vehicle: 2,
+        emergency: 2,
+        acknowledgment: 3,
+        signature: 4, // Signatures typically at end
+        other: 1,
+      };
+      
+      // Category-based Y position (vertical spacing within page)
+      const categoryYStart: Record<string, number> = {
+        property: 10,
+        financial: 25,
+        dates: 40,
+        occupancy: 55,
+        contact: 10,
+        identification: 25,
+        vehicle: 40,
+        emergency: 55,
+        acknowledgment: 10,
+        signature: 70, // Signatures near bottom
+        other: 85,
+      };
+      
+      const basePage = categoryPageMap[category] || 1;
+      const baseY = categoryYStart[category] || 10;
+      
+      // Within each category, spread fields vertically
+      const fieldsInSameCategory = rawFields.filter(rf => 
+        (rf.type === "signature" ? "signature" : (rf.category || "other")) === category
+      );
+      const indexInCategory = fieldsInSameCategory.findIndex(rf => rf.api_id === f.api_id);
+      
+      // Signature fields: place them smartly
+      if (fieldType === "signature") {
+        const sigFieldIndex = fieldsInSameCategory.findIndex(rf => rf.api_id === f.api_id);
+        // Guest signatures first, then host
+        const yPos = f.filled_by === "guest" ? 70 + sigFieldIndex * 8 : 85 + sigFieldIndex * 8;
+        return {
+          api_id: f.api_id || `field_${index}`,
+          label: f.label || f.api_id,
+          type: fieldType,
+          filled_by: f.filled_by === "guest" ? "guest" : "admin",
+          category,
+          required,
+          description: f.description || "",
+          page: basePage,
+          x: 10,
+          y: Math.min(yPos, 90), // Don't go off page
+          width: 35,
+          height: 6,
+        };
+      }
+      
       return {
         api_id: f.api_id || `field_${index}`,
         label: f.label || f.api_id,
@@ -374,10 +441,9 @@ KEY PRINCIPLES:
         category,
         required,
         description: f.description || "",
-        // Default positioning - will be improved in future with PDF coordinate extraction
-        page: 1,
-        x: 10 + (index % 2) * 45,
-        y: 10 + Math.floor(index / 2) * 8,
+        page: basePage,
+        x: 10 + (indexInCategory % 2) * 45,
+        y: baseY + Math.floor(indexInCategory / 2) * 8,
         width: 40,
         height: 4,
       };
@@ -394,6 +460,9 @@ KEY PRINCIPLES:
         (f.filled_by === "admin" || f.api_id.includes("host") || f.api_id.includes("landlord") || f.api_id.includes("agent"))
       );
       
+      // Signature page is typically the last page - use page 4 as default (will adjust based on actual doc)
+      const signaturePage = 4;
+      
       if (!hasGuestSignature) {
         fields.push({
           api_id: "tenant_signature",
@@ -403,9 +472,9 @@ KEY PRINCIPLES:
           category: "signature",
           required: true,
           description: "Tenant signs here to agree to lease terms",
-          page: 1,
+          page: signaturePage,
           x: 10,
-          y: 85,
+          y: 70,
           width: 35,
           height: 6,
         });
@@ -417,9 +486,9 @@ KEY PRINCIPLES:
           category: "signature",
           required: true,
           description: "Date tenant signs the agreement",
-          page: 1,
+          page: signaturePage,
           x: 55,
-          y: 85,
+          y: 70,
           width: 25,
           height: 4,
         });
@@ -434,9 +503,9 @@ KEY PRINCIPLES:
           category: "signature",
           required: true,
           description: "Host/landlord signs to execute the agreement",
-          page: 1,
+          page: signaturePage,
           x: 10,
-          y: 92,
+          y: 85,
           width: 35,
           height: 6,
         });
@@ -448,9 +517,9 @@ KEY PRINCIPLES:
           category: "signature",
           required: true,
           description: "Date host signs the agreement",
-          page: 1,
+          page: signaturePage,
           x: 55,
-          y: 92,
+          y: 85,
           width: 25,
           height: 4,
         });

@@ -203,23 +203,45 @@ serve(async (req) => {
     
     const filledByValue = signerTypeToFilledBy[signingToken.signer_type] || "guest";
     
-    // Filter fields that this signer needs to fill OR see (admin-filled for context)
-    // For the signing UI, we show all fields but only make guest-filled fields editable
+    // Get pre-fill data from field_configuration
+    const fieldConfig = signingToken.booking_documents?.field_configuration || {};
+    const preFillData = fieldConfig.preFillData || fieldConfig || {};
+    
+    // Filter fields that this signer needs to fill OR see
+    // CRITICAL: For guest signers, ONLY show fields that have values (pre-filled by admin)
+    //           or are signature/date fields that guest must fill
+    // This ensures guests only see relevant fields, not empty admin fields
     const signerFields = Array.isArray(allFieldMappings) 
-      ? allFieldMappings.map((f: any) => ({
-          ...f,
-          // Include position data
-          api_id: f.api_id,
-          label: f.label,
-          type: f.type || "text",
-          page: f.page || 1,
-          x: f.x || 10,
-          y: f.y || 10,
-          width: f.width || 30,
-          height: f.height || 4,
-          filled_by: f.filled_by || "guest",
-          required: f.required !== false,
-        }))
+      ? allFieldMappings
+          .map((f: any) => ({
+            ...f,
+            // Include position data
+            api_id: f.api_id,
+            label: f.label,
+            type: f.type || "text",
+            page: f.page || 1,
+            x: f.x || 10,
+            y: f.y || 10,
+            width: f.width || 30,
+            height: f.height || 4,
+            filled_by: f.filled_by || "guest",
+            required: f.required !== false,
+          }))
+          .filter((f: any) => {
+            // Admin signers see all fields
+            if (isAdminSigner) return true;
+            
+            // Guest signers see:
+            // 1. Their own fields (signature, initials, date, contact info)
+            if (f.filled_by === "guest") return true;
+            
+            // 2. Admin fields ONLY if they have a pre-filled value
+            //    This ensures guests only see context for filled fields
+            const hasValue = preFillData[f.api_id] !== undefined && 
+                             preFillData[f.api_id] !== "" && 
+                             preFillData[f.api_id] !== null;
+            return hasValue;
+          })
       : [];
 
     return new Response(
