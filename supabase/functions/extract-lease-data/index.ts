@@ -138,7 +138,7 @@ Only include fields that have actual values in the document. Do not guess or mak
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-pro-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Extract all field values from this lease agreement:\n\n${documentText.substring(0, 15000)}` }
