@@ -20,56 +20,43 @@ interface SlackRequest {
   recipientUserId?: string;
 }
 
-// Team member mapping - emails to try (in order) and optional direct Slack ID
-// Add your Slack user IDs here for instant lookup (find via: click profile → ⋮ → Copy member ID)
-const TEAM_MEMBERS: Record<string, { emails: string[]; slackId?: string }> = {
-  'alex': { 
-    emails: ['alex@peachhausgroup.com', 'alex@peachhg.com'],
-    // slackId: 'U0123456789' // Add actual Slack ID here
-  },
-  'anja': { 
-    emails: ['anja@peachhausgroup.com', 'anja@peachhg.com'],
-    // slackId: 'U0123456789'
-  },
-  'catherine': { 
-    emails: ['catherine@peachhausgroup.com', 'catherine@peachhg.com'],
-    // slackId: 'U0123456789'
-  },
-  'chris': { 
-    emails: ['chris@peachhausgroup.com', 'chris@peachhg.com'],
-    // slackId: 'U0123456789'
-  },
-  'ingo': { 
-    emails: ['ingo@peachhausgroup.com', 'ingo@peachhg.com'],
-    // slackId: 'U0123456789'
-  },
+// Team member Slack IDs - hardcoded for reliable lookups
+const TEAM_MEMBERS: Record<string, { slackId: string }> = {
+  'alex': { slackId: 'U08B9QPLL5V' },
+  'anja': { slackId: 'U08CD5FCZNC' },
+  'catherine': { slackId: 'U08C09NHNDT' },
+  'chris': { slackId: 'U09KEFS65BJ' },
+  'ingo': { slackId: 'U08BPU3PQ9H' },
+};
+
+// Channel IDs for reliable posting
+const CHANNEL_IDS: Record<string, string> = {
+  'wins': 'C0A967MUW8K',
 };
 
 // Cache for Slack user IDs (email -> slackId)
 const slackUserCache: Record<string, string> = {};
 
-// Find Slack user ID for a team member (tries direct ID first, then email lookup)
-async function getSlackUserIdForTeamMember(memberKey: string): Promise<string | null> {
+// Get Slack user ID for a team member
+function getSlackUserIdForTeamMember(memberKey: string): string | null {
   const member = TEAM_MEMBERS[memberKey.toLowerCase()];
-  if (!member) return null;
-  
-  // If we have a hardcoded Slack ID, use it directly
-  if (member.slackId) {
-    console.log(`[Slack] Using hardcoded ID for ${memberKey}: ${member.slackId}`);
-    return member.slackId;
+  if (!member) {
+    console.log(`[Slack] Unknown team member: ${memberKey}`);
+    return null;
   }
-  
-  // Try each email address
-  for (const email of member.emails) {
-    const userId = await findSlackUserByEmail(email);
-    if (userId) {
-      console.log(`[Slack] Found user ${memberKey} via email ${email}: ${userId}`);
-      return userId;
-    }
+  console.log(`[Slack] Using ID for ${memberKey}: ${member.slackId}`);
+  return member.slackId;
+}
+
+// Get channel ID (uses hardcoded ID if available, otherwise returns channel name)
+function getChannelId(channelName: string): string {
+  const normalizedName = channelName.replace('#', '').toLowerCase();
+  const channelId = CHANNEL_IDS[normalizedName];
+  if (channelId) {
+    console.log(`[Slack] Using channel ID for ${normalizedName}: ${channelId}`);
+    return channelId;
   }
-  
-  console.log(`[Slack] Could not find Slack user for ${memberKey}`);
-  return null;
+  return normalizedName;
 }
 
 const SLACK_BOT_TOKEN = Deno.env.get('SLACK_BOT_TOKEN');
@@ -240,7 +227,7 @@ serve(async (req) => {
       }
       
       // Look up Slack user ID (tries hardcoded ID first, then email lookup)
-      slackUserId = await getSlackUserIdForTeamMember(recipientUserId);
+      slackUserId = getSlackUserIdForTeamMember(recipientUserId);
       if (!slackUserId) {
         return new Response(JSON.stringify({ 
           error: `Could not find Slack user for ${recipientUserId}. Please add their Slack ID to TEAM_MEMBERS in the edge function.` 
@@ -326,12 +313,10 @@ serve(async (req) => {
     
     // Add mentions if provided (look up user IDs dynamically)
     if (mentionUsers && mentionUsers.length > 0) {
-      const mentionPromises = mentionUsers.map(async u => {
-        const userId = await getSlackUserIdForTeamMember(u);
-        return userId ? `<@${userId}>` : u;
-      });
-      const resolvedMentions = await Promise.all(mentionPromises);
-      const mentions = resolvedMentions.join(' ');
+      const mentions = mentionUsers.map(u => {
+        const memberId = getSlackUserIdForTeamMember(u);
+        return memberId ? `<@${memberId}>` : u;
+      }).join(' ');
       fullMessage = `${mentions}\n\n${fullMessage}`;
     }
 
@@ -363,9 +348,9 @@ serve(async (req) => {
       // Send as DM
       slackResult = await sendSlackDM(slackUserId, fullMessage);
     } else {
-      // Send to channel - use channel name without # prefix
-      const channelName = channel?.replace('#', '');
-      slackResult = await sendSlackMessage(channelName!, fullMessage);
+      // Send to channel - use channel ID if available
+      const channelId = getChannelId(channel!);
+      slackResult = await sendSlackMessage(channelId, fullMessage);
     }
 
     // Update message status
