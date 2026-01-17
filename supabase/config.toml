@@ -470,3 +470,6 @@ verify_jwt = true
 
 [functions.ops-handoff-trigger]
 verify_jwt = true
+
+[functions.send-team-slack]
+verify_jwt = false
