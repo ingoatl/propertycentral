@@ -122,7 +122,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-pro-preview",
+          model: "google/gemini-3-flash-preview",
           messages: [
             { 
               role: "system", 
@@ -494,42 +494,80 @@ Draft a reply that shows you actually read their email. Start with "Hi ${contact
 
     console.log("Generating AI email suggestion for:", contactEmail, "isOwner:", isOwner, "intent:", intent, "sentiment:", sentiment, "senderName:", senderName);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_tokens: intent === 'unsubscribe' || intent === 'decline' || intent === 'thank_you' ? 150 : 400,
-      }),
-    });
+    // Try multiple models with fallback
+    const models = ["google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
+    let suggestedReply = "";
+    let lastError = "";
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+    for (const model of models) {
+      try {
+        console.log(`[Suggest Email Reply] Trying model: ${model}`);
+        
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            max_tokens: intent === 'unsubscribe' || intent === 'decline' || intent === 'thank_you' ? 200 : 500,
+            temperature: 0.7,
+          }),
         });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          if (response.status === 402) {
+            return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }), {
+              status: 402,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          const errorText = await response.text();
+          console.error(`[Suggest Email Reply] ${model} error:`, response.status, errorText);
+          lastError = errorText;
+          continue;
+        }
+
+        const data = await response.json();
+        suggestedReply = data.choices?.[0]?.message?.content?.trim() || "";
+        
+        if (suggestedReply) {
+          console.log(`[Suggest Email Reply] Success with ${model}:`, suggestedReply.substring(0, 100));
+          break;
+        } else {
+          console.warn(`[Suggest Email Reply] ${model} returned empty content`);
+          lastError = "Empty response from AI";
+        }
+      } catch (modelError) {
+        console.error(`[Suggest Email Reply] ${model} exception:`, modelError);
+        lastError = modelError instanceof Error ? modelError.message : "Unknown error";
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("Failed to generate AI response");
     }
 
-    const data = await response.json();
-    const suggestedReply = data.choices?.[0]?.message?.content || "";
+    // If all models failed, generate a fallback response
+    if (!suggestedReply) {
+      console.warn(`[Suggest Email Reply] All models failed. Last error: ${lastError}. Generating fallback.`);
+      const firstName = contactName?.split(' ')[0] || 'there';
+      suggestedReply = `Hi ${firstName},
+
+Thank you for reaching out. I wanted to follow up on your message and see how I can help.
+
+Please let me know if you have any questions or if there's anything else I can assist with.
+
+Best,
+${senderName}`;
+    }
 
     console.log("Generated suggestion successfully, isOwner:", isOwner, "intent:", intent);
 
