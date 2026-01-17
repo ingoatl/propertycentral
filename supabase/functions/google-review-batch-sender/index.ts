@@ -17,7 +17,7 @@ function formatPhoneE164(phone: string): string {
   return phone.startsWith('+') ? phone : `+${digits}`;
 }
 
-// Check if current time is within optimal send window (6pm-8pm EST)
+// Check if current time is within optimal send window (5pm-8pm EST)
 function isWithinSendWindow(): { inWindow: boolean; currentESTHour: number } {
   const now = new Date();
   // EST is UTC-5 (or EDT UTC-4, but we'll use EST for consistency)
@@ -25,8 +25,8 @@ function isWithinSendWindow(): { inWindow: boolean; currentESTHour: number } {
   const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   const estMinutes = utcMinutes + estOffset;
   const estHour = Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
-  // 6pm-8pm EST = hours 18, 19
-  return { inWindow: estHour >= 18 && estHour < 20, currentESTHour: estHour };
+  // 5pm-8pm EST = hours 17, 18, 19
+  return { inWindow: estHour >= 17 && estHour < 20, currentESTHour: estHour };
 }
 
 // Best practice: Max 5 SMS per run

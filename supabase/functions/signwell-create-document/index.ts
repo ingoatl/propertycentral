@@ -118,73 +118,9 @@ serve(async (req) => {
       ? template.name 
       : `${template.name}.${fileExtension}`;
 
-    // Build fields array - each recipient needs at least one signature field
-    // Fields are positioned on the last page of the document
-    const fields: any[][] = [];
-    
-    // Owner signature field (recipient 1)
-    fields.push([
-      {
-        type: 'signature',
-        required: true,
-        x: 100,
-        y: 650,
-        page: 1,
-        recipient_id: '1',
-      },
-      {
-        type: 'date',
-        required: true,
-        x: 350,
-        y: 650,
-        page: 1,
-        recipient_id: '1',
-      },
-    ]);
-
-    // Second owner fields if included (recipient 3, added between 1 and 2)
-    if (includeSecondOwner && secondOwnerName && secondOwnerEmail) {
-      fields.push([
-        {
-          type: 'signature',
-          required: true,
-          x: 100,
-          y: 580,
-          page: 1,
-          recipient_id: '3',
-        },
-        {
-          type: 'date',
-          required: true,
-          x: 350,
-          y: 580,
-          page: 1,
-          recipient_id: '3',
-        },
-      ]);
-    }
-
-    // Manager signature field (recipient 2)
-    fields.push([
-      {
-        type: 'signature',
-        required: true,
-        x: 100,
-        y: includeSecondOwner ? 510 : 580,
-        page: 1,
-        recipient_id: '2',
-      },
-      {
-        type: 'date',
-        required: true,
-        x: 350,
-        y: includeSecondOwner ? 510 : 580,
-        page: 1,
-        recipient_id: '2',
-      },
-    ]);
-
-    // Create and SEND document with signature fields
+    // Use SignWell's auto-generated signature page at the end of the document
+    // This eliminates the need for manual field placement on page 1
+    // Create and SEND document with auto signature page
     const requestBody = {
       test_mode: false,
       draft: false,
@@ -192,12 +128,12 @@ serve(async (req) => {
       embedded_signing: false,
       reminders: true,
       apply_signing_order: true,
+      with_signature_page: true, // Auto-generate signature page at END of document
       recipients,
       files: [
         {
           name: templateNameWithExt,
           file_url: fileUrl,
-          fields: fields.flat(),  // Flatten the fields array
         },
       ],
     };

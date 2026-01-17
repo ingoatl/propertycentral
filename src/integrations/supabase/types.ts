@@ -7618,6 +7618,7 @@ export type Database = {
           delivery_status_updated_at: string | null
           error_code: number | null
           error_message: string | null
+          ghl_message_id: string | null
           id: string
           message_body: string | null
           message_type: string | null
@@ -7633,6 +7634,7 @@ export type Database = {
           delivery_status_updated_at?: string | null
           error_code?: number | null
           error_message?: string | null
+          ghl_message_id?: string | null
           id?: string
           message_body?: string | null
           message_type?: string | null
@@ -7648,6 +7650,7 @@ export type Database = {
           delivery_status_updated_at?: string | null
           error_code?: number | null
           error_message?: string | null
+          ghl_message_id?: string | null
           id?: string
           message_body?: string | null
           message_type?: string | null
