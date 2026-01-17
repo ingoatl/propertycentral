@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface SlackRequest {
-  channel: string;
+  channel?: string;
   message: string;
   template?: string;
   context?: {
@@ -16,14 +16,17 @@ interface SlackRequest {
     ownerId?: string;
   };
   mentionUsers?: string[];
+  directMessage?: boolean;
+  recipientUserId?: string;
 }
 
-const SLACK_USER_MAP: Record<string, string> = {
-  'alex': 'Alex',
-  'anja': 'Anja',
-  'catherine': 'Catherine',
-  'chris': 'Chris',
-  'ingo': 'Ingo',
+// Team member Slack IDs - update these with actual Slack user IDs
+const SLACK_USER_MAP: Record<string, { name: string; slackId: string }> = {
+  'alex': { name: 'Alex', slackId: 'U_ALEX' },
+  'anja': { name: 'Anja', slackId: 'U_ANJA' },
+  'catherine': { name: 'Catherine', slackId: 'U_CATHERINE' },
+  'chris': { name: 'Chris', slackId: 'U_CHRIS' },
+  'ingo': { name: 'Ingo', slackId: 'U_INGO' },
 };
 
 serve(async (req) => {
@@ -70,28 +73,55 @@ serve(async (req) => {
     const senderName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : userEmail;
 
     const body: SlackRequest = await req.json();
-    const { channel, message, template, context, mentionUsers } = body;
+    const { channel, message, template, context, mentionUsers, directMessage, recipientUserId } = body;
 
-    if (!channel || !message) {
-      return new Response(JSON.stringify({ error: 'Channel and message are required' }), { 
+    if (!message) {
+      return new Response(JSON.stringify({ error: 'Message is required' }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
-    // Verify channel is allowed
-    const { data: channelConfig } = await supabase
-      .from('slack_channel_config')
-      .select('*')
-      .eq('channel_name', channel)
-      .eq('is_active', true)
-      .single();
-
-    if (!channelConfig) {
-      return new Response(JSON.stringify({ error: 'Invalid or inactive channel' }), { 
+    // Determine target - channel or DM
+    let targetChannel = channel;
+    let targetDescription = channel ? `#${channel}` : '';
+    
+    if (directMessage && recipientUserId) {
+      const teamMember = SLACK_USER_MAP[recipientUserId.toLowerCase()];
+      if (!teamMember) {
+        return new Response(JSON.stringify({ error: 'Invalid team member' }), { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+      
+      // For DMs, we'll use the Slack user ID to open a conversation
+      targetChannel = `@${teamMember.name}`;
+      targetDescription = `DM to ${teamMember.name}`;
+      
+      console.log(`[send-team-slack] Sending DM to ${teamMember.name} (${teamMember.slackId})`);
+    } else if (!channel) {
+      return new Response(JSON.stringify({ error: 'Channel or recipient is required' }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
+    }
+
+    // Verify channel is allowed (skip for DMs)
+    if (!directMessage) {
+      const { data: channelConfig } = await supabase
+        .from('slack_channel_config')
+        .select('*')
+        .eq('channel_name', channel)
+        .eq('is_active', true)
+        .single();
+
+      if (!channelConfig) {
+        return new Response(JSON.stringify({ error: 'Invalid or inactive channel' }), { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
     }
 
     // Build context string
@@ -143,7 +173,7 @@ serve(async (req) => {
     // Add mentions if provided
     if (mentionUsers && mentionUsers.length > 0) {
       const mentions = mentionUsers
-        .map(u => SLACK_USER_MAP[u.toLowerCase()] || u)
+        .map(u => SLACK_USER_MAP[u.toLowerCase()]?.name || u)
         .join(', ');
       fullMessage = `cc: ${mentions}\n\n${fullMessage}`;
     }
@@ -152,7 +182,7 @@ serve(async (req) => {
     const { data: slackMessage, error: insertError } = await supabase
       .from('slack_messages')
       .insert({
-        channel,
+        channel: targetChannel,
         message: fullMessage,
         sent_by: userId,
         sender_name: senderName,
@@ -166,23 +196,32 @@ serve(async (req) => {
       .single();
 
     if (insertError) {
-      console.error('Error logging slack message:', insertError);
+      console.error('[send-team-slack] Error logging slack message:', insertError);
     }
 
     // Send via google-calendar-sync function (which has Slack integration)
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
+    // For DMs, we need to handle differently
+    const slackPayload = directMessage && recipientUserId
+      ? {
+          action: 'send-slack-dm',
+          userId: SLACK_USER_MAP[recipientUserId.toLowerCase()]?.slackId,
+          message: fullMessage
+        }
+      : {
+          action: 'send-slack-message',
+          channel: channel?.replace('#', ''),
+          message: fullMessage
+        };
+
     const slackResponse = await fetch(`${supabaseUrl}/functions/v1/google-calendar-sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${serviceRoleKey}`
       },
-      body: JSON.stringify({
-        action: 'send-slack-message',
-        channel: channel.replace('#', ''),
-        message: fullMessage
-      })
+      body: JSON.stringify(slackPayload)
     });
 
     const slackResult = await slackResponse.json();
@@ -200,7 +239,7 @@ serve(async (req) => {
     }
 
     if (!slackResponse.ok) {
-      console.error('Slack send failed:', slackResult);
+      console.error('[send-team-slack] Slack send failed:', slackResult);
       return new Response(JSON.stringify({ 
         success: false, 
         error: 'Failed to send Slack message',
@@ -211,18 +250,19 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Slack message sent to ${channel} by ${senderName}`);
+    console.log(`[send-team-slack] Message sent to ${targetDescription} by ${senderName}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       messageId: slackMessage?.id,
-      channel 
+      channel: targetChannel,
+      isDM: directMessage || false
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error: unknown) {
-    console.error('Error in send-team-slack:', error);
+    console.error('[send-team-slack] Error:', error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
