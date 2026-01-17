@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { VoiceDictationButton } from "./VoiceDictationButton";
 
 interface SendSMSDialogProps {
   open: boolean;
@@ -190,13 +191,22 @@ export function SendSMSDialog({
 
             {/* Message input */}
             <div className="space-y-2">
-              <Textarea
-                placeholder="Type your message..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                className="resize-none rounded-xl"
-              />
+              <div className="relative">
+                <Textarea
+                  placeholder="Type your message..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={4}
+                  className="resize-none rounded-xl pr-10"
+                />
+                <div className="absolute right-2 top-2">
+                  <VoiceDictationButton
+                    onResult={(text) => setMessage(prev => prev ? `${prev}\n${text}` : text)}
+                    messageType="sms"
+                    contactName={contactName}
+                  />
+                </div>
+              </div>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{characterCount} characters</span>
                 <span>
