@@ -977,6 +977,72 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_summaries: {
+        Row: {
+          action_items: Json | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          full_summary: string | null
+          id: string
+          key_points: Json | null
+          last_message_at: string | null
+          lead_id: string | null
+          message_count: number | null
+          one_liner: string
+          owner_id: string | null
+          sentiment: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_items?: Json | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          full_summary?: string | null
+          id?: string
+          key_points?: Json | null
+          last_message_at?: string | null
+          lead_id?: string | null
+          message_count?: number | null
+          one_liner: string
+          owner_id?: string | null
+          sentiment?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_items?: Json | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          full_summary?: string | null
+          id?: string
+          key_points?: Json | null
+          last_message_at?: string | null
+          lead_id?: string | null
+          message_count?: number | null
+          one_liner?: string
+          owner_id?: string | null
+          sentiment?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_summaries_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_summaries_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_performance_entries: {
         Row: {
           created_at: string
@@ -1449,6 +1515,45 @@ export type Database = {
         }
         Relationships: []
       }
+      email_snippets: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string
+          id: string
+          name: string
+          shortcut: string
+          updated_at: string
+          use_count: number | null
+          user_id: string | null
+          variables: Json | null
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          shortcut: string
+          updated_at?: string
+          use_count?: number | null
+          user_id?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          shortcut?: string
+          updated_at?: string
+          use_count?: number | null
+          user_id?: string | null
+          variables?: Json | null
+        }
+        Relationships: []
+      }
       expense_verifications: {
         Row: {
           created_at: string
@@ -1734,6 +1839,84 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "onboarding_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_up_reminders: {
+        Row: {
+          ai_generated_followup: string | null
+          completed_at: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          lead_id: string | null
+          original_message_id: string | null
+          original_sent_at: string | null
+          owner_id: string | null
+          remind_at: string
+          reminder_type: string | null
+          status: string | null
+          suggested_draft: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          ai_generated_followup?: string | null
+          completed_at?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          lead_id?: string | null
+          original_message_id?: string | null
+          original_sent_at?: string | null
+          owner_id?: string | null
+          remind_at: string
+          reminder_type?: string | null
+          status?: string | null
+          suggested_draft?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          ai_generated_followup?: string | null
+          completed_at?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          lead_id?: string | null
+          original_message_id?: string | null
+          original_sent_at?: string | null
+          owner_id?: string | null
+          remind_at?: string
+          reminder_type?: string | null
+          status?: string | null
+          suggested_draft?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_reminders_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_reminders_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
         ]
@@ -8480,6 +8663,90 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_tone_profiles: {
+        Row: {
+          analyzed_email_count: number | null
+          analyzed_sms_count: number | null
+          avg_sentence_length: number | null
+          avoided_phrases: Json | null
+          channel: string
+          common_closings: Json | null
+          common_greetings: Json | null
+          created_at: string
+          emoji_usage: string | null
+          exclamation_frequency: string | null
+          formality_level: string | null
+          id: string
+          last_analyzed_at: string | null
+          paragraph_style: string | null
+          punctuation_style: string | null
+          question_frequency: string | null
+          sample_messages: Json | null
+          signature_phrases: Json | null
+          tone_summary: string | null
+          typical_email_length: number | null
+          typical_sms_length: number | null
+          updated_at: string
+          user_id: string | null
+          uses_contractions: boolean | null
+          writing_dna: Json | null
+        }
+        Insert: {
+          analyzed_email_count?: number | null
+          analyzed_sms_count?: number | null
+          avg_sentence_length?: number | null
+          avoided_phrases?: Json | null
+          channel?: string
+          common_closings?: Json | null
+          common_greetings?: Json | null
+          created_at?: string
+          emoji_usage?: string | null
+          exclamation_frequency?: string | null
+          formality_level?: string | null
+          id?: string
+          last_analyzed_at?: string | null
+          paragraph_style?: string | null
+          punctuation_style?: string | null
+          question_frequency?: string | null
+          sample_messages?: Json | null
+          signature_phrases?: Json | null
+          tone_summary?: string | null
+          typical_email_length?: number | null
+          typical_sms_length?: number | null
+          updated_at?: string
+          user_id?: string | null
+          uses_contractions?: boolean | null
+          writing_dna?: Json | null
+        }
+        Update: {
+          analyzed_email_count?: number | null
+          analyzed_sms_count?: number | null
+          avg_sentence_length?: number | null
+          avoided_phrases?: Json | null
+          channel?: string
+          common_closings?: Json | null
+          common_greetings?: Json | null
+          created_at?: string
+          emoji_usage?: string | null
+          exclamation_frequency?: string | null
+          formality_level?: string | null
+          id?: string
+          last_analyzed_at?: string | null
+          paragraph_style?: string | null
+          punctuation_style?: string | null
+          question_frequency?: string | null
+          sample_messages?: Json | null
+          signature_phrases?: Json | null
+          tone_summary?: string | null
+          typical_email_length?: number | null
+          typical_sms_length?: number | null
+          updated_at?: string
+          user_id?: string | null
+          uses_contractions?: boolean | null
+          writing_dna?: Json | null
+        }
+        Relationships: []
       }
       utility_accounts: {
         Row: {

@@ -458,3 +458,12 @@ verify_jwt = true
 
 [functions.google-review-batch-sender]
 verify_jwt = false
+
+[functions.analyze-tone]
+verify_jwt = true
+
+[functions.smart-compose]
+verify_jwt = true
+
+[functions.summarize-conversation]
+verify_jwt = true
