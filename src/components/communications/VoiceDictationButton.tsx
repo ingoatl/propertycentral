@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Mic, MicOff, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useScribe, CommitStrategy } from "@elevenlabs/react";
 
 interface VoiceDictationButtonProps {
   onResult: (text: string) => void;
@@ -25,93 +26,76 @@ export function VoiceDictationButton({
   placeholder = "Hold to speak...",
   className,
 }: VoiceDictationButtonProps) {
-  const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  const startListening = useCallback(() => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      toast.error("Speech recognition is not supported in your browser. Try Chrome.");
-      return;
-    }
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-
-    recognition.onstart = () => {
-      setIsListening(true);
-      setTranscript("");
-    };
-
-    recognition.onresult = (event: any) => {
-      let interimTranscript = "";
-      let finalTranscript = "";
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript;
-        } else {
-          interimTranscript += result[0].transcript;
-        }
-      }
-
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    commitStrategy: CommitStrategy.VAD,
+    onPartialTranscript: (data) => {
+      console.log("[Scribe] Partial:", data.text);
       setTranscript(prev => {
-        if (finalTranscript) {
-          return prev + finalTranscript;
+        // Replace with the latest partial
+        const parts = prev.split(/(?<=\. )/);
+        if (parts.length > 0 && !data.text.includes('.')) {
+          // This is an ongoing partial update for the current sentence
+          parts[parts.length - 1] = data.text;
+          return parts.join('');
         }
-        return prev + interimTranscript;
+        return prev + data.text;
       });
-    };
+    },
+    onCommittedTranscript: (data) => {
+      console.log("[Scribe] Committed:", data.text);
+      setTranscript(prev => {
+        // Append committed text with a space
+        const cleaned = prev.replace(/[^.]*$/, ''); // Remove incomplete partial
+        return (cleaned + ' ' + data.text).trim();
+      });
+    },
+  });
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
+  const startListening = useCallback(async () => {
+    setIsConnecting(true);
+    setTranscript("");
+    
+    try {
+      // Get token from our edge function
+      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
       
-      // Provide helpful error messages based on error type
-      if (event.error === "aborted") {
-        return; // User cancelled, no need to show error
-      }
-      
-      if (event.error === "network") {
-        toast.error("Speech recognition requires a secure connection (HTTPS). Try on the published app.");
+      if (error || !data?.token) {
+        console.error("[Scribe] Token error:", error);
+        toast.error("Failed to start speech recognition. Please try again.");
+        setIsConnecting(false);
         return;
       }
-      
-      if (event.error === "not-allowed") {
-        toast.error("Microphone access denied. Please allow microphone permissions.");
-        return;
-      }
-      
-      if (event.error === "no-speech") {
-        toast.info("No speech detected. Try speaking louder or closer to the mic.");
-        return;
-      }
-      
-      toast.error(`Speech error: ${event.error}`);
-    };
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+      console.log("[Scribe] Got token, connecting...");
 
-    recognitionRef.current = recognition;
-    recognition.start();
-  }, []);
+      await scribe.connect({
+        token: data.token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      console.log("[Scribe] Connected successfully");
+    } catch (error) {
+      console.error("[Scribe] Connection error:", error);
+      toast.error("Failed to connect to speech recognition service.");
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [scribe]);
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setIsListening(false);
-  }, []);
+    console.log("[Scribe] Stopping...");
+    scribe.disconnect();
+  }, [scribe]);
 
   const handlePolishAndInsert = async () => {
     if (!transcript.trim()) {
@@ -122,7 +106,7 @@ export function VoiceDictationButton({
     setIsProcessing(true);
 
     try {
-      // Use ai-message-assistant for better results - it handles context better
+      // Use ai-message-assistant for better results
       const { data, error } = await supabase.functions.invoke("ai-message-assistant", {
         body: {
           action: "improve",
@@ -171,25 +155,7 @@ export function VoiceDictationButton({
     }
   };
 
-  // Check browser support
-  const isSupported = typeof window !== "undefined" && 
-    (("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window));
-
-  if (!isSupported) {
-    return (
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className={cn("gap-2 text-muted-foreground cursor-not-allowed", className)}
-        disabled
-        title="Voice dictation not supported in this browser. Use Chrome for best results."
-      >
-        <Mic className="h-4 w-4" />
-        <span className="text-xs">Use Chrome</span>
-      </Button>
-    );
-  }
+  const isListening = scribe.isConnected;
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -224,10 +190,10 @@ export function VoiceDictationButton({
           <div className="flex items-center gap-2">
             <div className={cn(
               "h-3 w-3 rounded-full",
-              isListening ? "bg-red-500 animate-pulse" : "bg-muted"
+              isListening ? "bg-red-500 animate-pulse" : isConnecting ? "bg-yellow-500 animate-pulse" : "bg-muted"
             )} />
             <span className="text-sm font-medium">
-              {isListening ? "Listening..." : "Voice Dictation"}
+              {isListening ? "Listening..." : isConnecting ? "Connecting..." : "Voice Dictation"}
             </span>
           </div>
 
@@ -249,10 +215,14 @@ export function VoiceDictationButton({
                 onClick={startListening}
                 variant="outline"
                 className="flex-1"
-                disabled={isProcessing}
+                disabled={isProcessing || isConnecting}
               >
-                <Mic className="h-4 w-4 mr-2" />
-                Start
+                {isConnecting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mic className="h-4 w-4 mr-2" />
+                )}
+                {isConnecting ? "Connecting..." : "Start"}
               </Button>
             ) : (
               <Button
@@ -266,20 +236,18 @@ export function VoiceDictationButton({
             )}
 
             {transcript && !isListening && (
-              <>
-                <Button
-                  onClick={handlePolishAndInsert}
-                  disabled={isProcessing}
-                  className="flex-1 bg-gradient-to-r from-violet-500 to-violet-600"
-                >
-                  {isProcessing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 mr-2" />
-                  )}
-                  Polish & Insert
-                </Button>
-              </>
+              <Button
+                onClick={handlePolishAndInsert}
+                disabled={isProcessing}
+                className="flex-1 bg-gradient-to-r from-violet-500 to-violet-600"
+              >
+                {isProcessing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                Polish & Insert
+              </Button>
             )}
           </div>
 
