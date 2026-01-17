@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home, Presentation, Brain } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home, Presentation, Brain, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
@@ -28,6 +28,7 @@ import { LeadEmailTemplatesManager } from "@/components/admin/LeadEmailTemplates
 import { GRECAuditDashboard } from "@/components/admin/GRECAuditDashboard";
 import { OwnerPortalAdmin } from "@/components/admin/OwnerPortalAdmin";
 import { ToneProfilesManager } from "@/components/admin/ToneProfilesManager";
+import { CompanyKnowledgeManager } from "@/components/admin/CompanyKnowledgeManager";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -470,6 +471,10 @@ const Admin = () => {
           <TabsTrigger value="tone-profiles">
             <Brain className="w-4 h-4 mr-2" />
             AI Tone Profiles
+          </TabsTrigger>
+          <TabsTrigger value="knowledge-base">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Company Knowledge
           </TabsTrigger>
         </TabsList>
 

@@ -169,6 +169,39 @@ export type Database = {
           },
         ]
       }
+      ai_response_feedback: {
+        Row: {
+          context_json: Json | null
+          created_at: string | null
+          created_by: string | null
+          edit_type: string | null
+          edited_response: string | null
+          id: string
+          knowledge_used: Json | null
+          original_response: string | null
+        }
+        Insert: {
+          context_json?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          edit_type?: string | null
+          edited_response?: string | null
+          id?: string
+          knowledge_used?: Json | null
+          original_response?: string | null
+        }
+        Update: {
+          context_json?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          edit_type?: string | null
+          edited_response?: string | null
+          id?: string
+          knowledge_used?: Json | null
+          original_response?: string | null
+        }
+        Relationships: []
+      }
       appliance_warranties: {
         Row: {
           appliance_type: string
@@ -786,6 +819,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      company_knowledge_base: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          keywords: string[] | null
+          priority: number | null
+          referral_link: string | null
+          source: string | null
+          subcategory: string | null
+          title: string
+          updated_at: string | null
+          use_in_contexts: string[] | null
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          keywords?: string[] | null
+          priority?: number | null
+          referral_link?: string | null
+          source?: string | null
+          subcategory?: string | null
+          title: string
+          updated_at?: string | null
+          use_in_contexts?: string[] | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          keywords?: string[] | null
+          priority?: number | null
+          referral_link?: string | null
+          source?: string | null
+          subcategory?: string | null
+          title?: string
+          updated_at?: string | null
+          use_in_contexts?: string[] | null
+        }
+        Relationships: []
       }
       compliance_training_log: {
         Row: {
@@ -2725,6 +2809,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      knowledge_response_examples: {
+        Row: {
+          context_type: string | null
+          created_at: string | null
+          id: string
+          ideal_response: string
+          knowledge_id: string | null
+          question_pattern: string
+          rating: number | null
+        }
+        Insert: {
+          context_type?: string | null
+          created_at?: string | null
+          id?: string
+          ideal_response: string
+          knowledge_id?: string | null
+          question_pattern: string
+          rating?: number | null
+        }
+        Update: {
+          context_type?: string | null
+          created_at?: string | null
+          id?: string
+          ideal_response?: string
+          knowledge_id?: string | null
+          question_pattern?: string
+          rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_response_examples_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "company_knowledge_base"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_automations: {
         Row: {
