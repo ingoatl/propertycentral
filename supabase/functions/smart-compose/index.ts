@@ -209,41 +209,70 @@ ${messageType === "email" ? `Return JSON: {"subject": "...", "body": "..."}` : `
 
 ${messageType === "sms" ? "SMS RULES: Max 300 chars. No formal greeting/closing. Jump right in." : "EMAIL RULES: 2-3 short paragraphs max. Clear subject line."}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: actionPrompt },
-        ],
-        max_tokens: messageType === "sms" ? 150 : 800,
-        temperature: 0.7,
-      }),
-    });
+    // Try multiple models with fallback
+    const models = ["google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
+    let content = "";
+    let lastError = "";
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    for (const model of models) {
+      try {
+        console.log(`[Smart Compose] Trying model: ${model}`);
+        
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: actionPrompt },
+            ],
+            max_tokens: messageType === "sms" ? 300 : 800,
+            temperature: 0.7,
+          }),
+        });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            return new Response(
+              JSON.stringify({ error: "Rate limit exceeded" }),
+              { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          if (response.status === 402) {
+            return new Response(
+              JSON.stringify({ error: "AI credits exhausted" }),
+              { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          const errorText = await response.text();
+          console.error(`[Smart Compose] ${model} error:`, errorText);
+          lastError = errorText;
+          continue;
+        }
+
+        const data = await response.json();
+        content = data.choices?.[0]?.message?.content?.trim() || "";
+        
+        if (content) {
+          console.log(`[Smart Compose] Success with ${model}:`, content.substring(0, 100));
+          break;
+        } else {
+          lastError = "Empty response from AI";
+        }
+      } catch (modelError) {
+        console.error(`[Smart Compose] ${model} exception:`, modelError);
+        lastError = modelError instanceof Error ? modelError.message : "Unknown error";
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    const data = await response.json();
-    let content = data.choices?.[0]?.message?.content?.trim() || "";
+    if (!content) {
+      console.error(`[Smart Compose] All models failed. Last error: ${lastError}`);
+      throw new Error("Failed to generate content from AI");
+    }
 
     // Parse response based on message type
     let result: { message?: string; subject?: string; body?: string };

@@ -122,21 +122,20 @@ export function VoiceDictationButton({
     setIsProcessing(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("smart-compose", {
+      // Use ai-message-assistant for better results - it handles context better
+      const { data, error } = await supabase.functions.invoke("ai-message-assistant", {
         body: {
+          action: "improve",
+          currentMessage: transcript,
+          contactName,
           messageType,
-          action: "from_bullets",
-          context: transcript,
-          recipientName: contactName,
         },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const polishedText = messageType === "email" 
-        ? data.body || data.message 
-        : data.message || data.body;
+      const polishedText = data?.message;
 
       if (polishedText) {
         onResult(polishedText);
@@ -144,17 +143,20 @@ export function VoiceDictationButton({
         setTranscript("");
         setIsOpen(false);
       } else {
-        throw new Error("No text generated");
-      }
-    } catch (error: any) {
-      console.error("Polish error:", error);
-      toast.error(`Failed to polish: ${error.message}`);
-      // Still allow inserting raw transcript
-      if (transcript.trim()) {
+        // If AI failed to generate, just use the raw transcript
+        console.warn("AI returned empty, using raw transcript");
         onResult(transcript);
+        toast.info("Inserted raw transcript");
         setTranscript("");
         setIsOpen(false);
       }
+    } catch (error: any) {
+      console.error("Polish error:", error);
+      // Still allow inserting raw transcript on error
+      onResult(transcript);
+      toast.info("Inserted raw transcript (AI unavailable)");
+      setTranscript("");
+      setIsOpen(false);
     } finally {
       setIsProcessing(false);
     }
