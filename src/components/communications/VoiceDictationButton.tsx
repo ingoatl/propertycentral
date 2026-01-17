@@ -250,7 +250,7 @@ export function VoiceDictationButton({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80" align="end">
+      <PopoverContent className="w-80 max-h-[85vh] overflow-y-auto" align="end" sideOffset={8} collisionPadding={16}>
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <div className={cn(

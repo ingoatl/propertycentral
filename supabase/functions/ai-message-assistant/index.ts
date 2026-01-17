@@ -525,8 +525,27 @@ Be warm, specific, and action-oriented. DO NOT suggest calls or income analysis 
         break;
 
       case "improve":
-        userPrompt = `Improve this message while keeping the same meaning. Make it clearer, more natural, and more effective:
-"${currentMessage}"`;
+        userPrompt = `Transform this voice-dictated message into a polished, professional ${messageType === "sms" ? "SMS" : "email"}.
+
+VOICE DICTATION (may be rough/informal):
+"${currentMessage}"
+
+CRITICAL TRANSFORMATION RULES:
+1. **CONVERT 3RD PERSON TO 1ST PERSON** - If they say "tell him I need..." → write "I need..."
+   - "let her know that..." → "Just wanted to let you know that..."
+   - "ask them if..." → "Could you..."
+   - "tell him we can..." → "We can..."
+   - "say I'm available..." → "I'm available..."
+   - "respond saying..." → [just the response directly]
+
+2. **FIX SPEECH PATTERNS** - Remove filler words (um, uh, like, you know, basically)
+3. **WRITE IN FIRST PERSON** - The message is FROM the user TO the recipient
+4. **MAINTAIN THE INTENT** - Keep the core message and meaning
+5. **MATCH USER'S TONE** - If casual, stay casual. If professional, stay professional.
+6. **ADDRESS RECIPIENT NATURALLY** - Start with "Hi ${firstName}!" or just dive into the message
+7. ${messageType === "sms" ? "Keep under 300 characters" : "Keep concise - 2-3 short paragraphs max"}
+
+OUTPUT: The polished message ONLY, written in first person as if from the sender to "${firstName || "the recipient"}". No quotes, no explanation.`;
         break;
 
       case "shorter":
