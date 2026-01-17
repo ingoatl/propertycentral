@@ -134,6 +134,11 @@ export function SendEmailDialog({
         setBody(data.suggestion);
         setShowContextInput(false);
         setUserInstructions("");
+        
+        // If AI generated a subject and we don't have one, use it
+        if (data.suggestedSubject && !replyToSubject && !subject) {
+          setSubject(data.suggestedSubject);
+        }
       }
     } catch (err) {
       console.error("Failed to get AI suggestion:", err);

@@ -107,6 +107,36 @@ serve(async (req) => {
     }
     console.log("Using sender name:", senderName);
 
+    // Fetch user's tone profile for personalized writing style
+    let toneProfile: any = null;
+    if (senderUserId) {
+      const { data: profile } = await supabase
+        .from("user_tone_profiles")
+        .select("*")
+        .eq("user_id", senderUserId)
+        .maybeSingle();
+      
+      if (profile) {
+        toneProfile = profile;
+        console.log("Found tone profile:", {
+          formality: profile.formality_level,
+          emoji: profile.emoji_usage,
+          analyzed_emails: profile.analyzed_email_count
+        });
+      }
+    }
+
+    // Extract specific questions from the incoming email
+    let extractedQuestions: string[] = [];
+    if (incomingEmailBody) {
+      // Find all sentences ending with ?
+      const questionMatches = incomingEmailBody.match(/[^.!?\n]*\?/g);
+      if (questionMatches) {
+        extractedQuestions = questionMatches.map((q: string) => q.trim()).filter((q: string) => q.length > 5);
+        console.log("Extracted questions from email:", extractedQuestions);
+      }
+    }
+
     // Step 1: Analyze sentiment and intent of the incoming email
     let sentiment = "neutral";
     let intent = "general";
@@ -441,9 +471,47 @@ INTENT DETECTED: QUESTION / INQUIRY
     // Determine if they've signed a contract
     const hasSignedContract = isOwner || (leadData?.status === 'signed' || leadData?.status === 'active' || leadData?.status === 'converted');
     
+    // Build tone instructions if tone profile exists
+    let toneInstructions = "";
+    if (toneProfile) {
+      const greetings = Array.isArray(toneProfile.common_greetings) ? toneProfile.common_greetings.join(", ") : "";
+      const closings = Array.isArray(toneProfile.common_closings) ? toneProfile.common_closings.join(", ") : "";
+      const signaturePhrases = Array.isArray(toneProfile.signature_phrases) ? toneProfile.signature_phrases.join(", ") : "";
+      
+      toneInstructions = `
+WRITE IN THIS EXACT VOICE (learned from the user's past messages):
+- FORMALITY: ${toneProfile.formality_level || "professional"}
+- PUNCTUATION STYLE: ${toneProfile.punctuation_style || "standard"}
+- EMOJI USAGE: ${toneProfile.emoji_usage || "none"}
+- AVG SENTENCE LENGTH: ${toneProfile.avg_sentence_length || 15} words
+${greetings ? `- USE THESE GREETINGS: ${greetings}` : ""}
+${closings ? `- USE THESE CLOSINGS: ${closings}` : ""}
+${signaturePhrases ? `- SIGNATURE PHRASES TO USE: ${signaturePhrases}` : ""}
+
+CRITICAL: Match the writing style above exactly. This is how ${senderName} actually writes.
+`;
+    }
+
+    // Build question-answering priority section
+    let questionAnsweringSection = "";
+    if (extractedQuestions.length > 0) {
+      questionAnsweringSection = `
+QUESTIONS THEY ASKED (YOU MUST ANSWER THESE DIRECTLY):
+${extractedQuestions.map((q, i) => `${i + 1}. "${q}"`).join("\n")}
+
+CRITICAL: Your FIRST priority is to answer their specific question(s) above.
+- If they asked about insurance → provide insurance guidance or recommendations
+- If they asked for a recommendation → give an actual recommendation or explain how you'll help
+- If they asked about documents → answer about the documents
+- NEVER give a generic property management pitch when they asked a specific question
+- Answer the question FIRST, then provide any additional context
+`;
+    }
+
     const systemPrompt = `You are writing an email reply for PeachHaus Group, a premium property management company in Atlanta. Your goal is to sound like a real, thoughtful human - not a corporate AI.
 
 ${humanLikeGuidelines}
+${toneInstructions}
 
 CONTEXT:
 - Sender Sentiment: ${sentiment}
@@ -453,17 +521,19 @@ CONTEXT:
 ${isOwner ? `- This is a VIP PROPERTY OWNER - be a helpful partner, not salesy` : `- This is a LEAD - be welcoming but respect their pace`}
 ${intentGuidance}
 ${actionContext}
+${questionAnsweringSection}
 
 CRITICAL RULES:
 1. READ THEIR EMAIL CAREFULLY - respond to what they ACTUALLY said
-2. If they mentioned needing time (for insurance, document review, etc.) - RESPECT that, don't push
-3. If they're sending something (HOA doc) - acknowledge you'll look for it
-4. NEVER claim something was "promised," "attached," or "discussed" unless the email thread proves it
-5. ${hasSignedContract ? "DO NOT suggest sales calls - they're already a client" : "Only suggest a call if it's genuinely helpful to their situation and they haven't signed yet"}
+2. ${extractedQuestions.length > 0 ? "ANSWER THEIR SPECIFIC QUESTIONS FIRST - this is your #1 priority" : "Respond to their main point directly"}
+3. If they mentioned needing time (for insurance, document review, etc.) - RESPECT that, don't push
+4. If they're sending something (HOA doc) - acknowledge you'll look for it
+5. NEVER claim something was "promised," "attached," or "discussed" unless the email thread proves it
+6. ${hasSignedContract ? "DO NOT suggest sales calls - they're already a client" : "Only suggest a call if it's genuinely helpful to their situation and they haven't signed yet"}
 
 STRUCTURE:
 - Start with "Hi [FirstName]," 
-- First sentence = direct response to what they asked/said
+- ${extractedQuestions.length > 0 ? "First paragraph = DIRECT answer to their question(s)" : "First sentence = direct response to what they asked/said"}
 - ${intent === 'unsubscribe' || intent === 'decline' || intent === 'thank_you' ? '2-3 sentences MAX' : '2-3 short paragraphs MAX'}
 - End with an appropriate response to their situation
 - Sign off naturally with: "Best,\n${senderName}"
@@ -495,7 +565,8 @@ Draft a reply that shows you actually read their email. Start with "Hi ${contact
     console.log("Generating AI email suggestion for:", contactEmail, "isOwner:", isOwner, "intent:", intent, "sentiment:", sentiment, "senderName:", senderName);
 
     // Try multiple models with fallback
-    const models = ["google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
+    // Use Pro model for better reasoning and context understanding
+    const models = ["google/gemini-3-pro-preview", "google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
     let suggestedReply = "";
     let lastError = "";
 
@@ -571,13 +642,54 @@ ${senderName}`;
 
     console.log("Generated suggestion successfully, isOwner:", isOwner, "intent:", intent);
 
+    // Generate a contextual subject line if needed (not a reply)
+    let suggestedSubject = "";
+    if (!currentSubject && suggestedReply) {
+      try {
+        const subjectResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [
+              { 
+                role: "system", 
+                content: "Generate a short, professional email subject line (max 50 chars). Return ONLY the subject line, no quotes or explanation." 
+              },
+              { 
+                role: "user", 
+                content: `Generate a subject for this email:\n\n${suggestedReply.substring(0, 500)}` 
+              },
+            ],
+            max_tokens: 50,
+            temperature: 0.5,
+          }),
+        });
+
+        if (subjectResponse.ok) {
+          const subjectData = await subjectResponse.json();
+          suggestedSubject = subjectData.choices?.[0]?.message?.content?.trim() || "";
+          console.log("Generated subject:", suggestedSubject);
+        }
+      } catch (subjectError) {
+        console.error("Failed to generate subject:", subjectError);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         suggestion: suggestedReply,
+        suggestedSubject: suggestedSubject || undefined,
         emailHistory: emailHistory.length,
         isOwner,
-        analysis: { sentiment, intent, urgency }
+        analysis: { sentiment, intent, urgency },
+        hasQuestions: extractedQuestions.length > 0,
+        questions: extractedQuestions,
+        hasToneProfile: !!toneProfile
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
