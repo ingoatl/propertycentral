@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { VoiceDictationButton } from "./VoiceDictationButton";
 
 interface AIComposeEmailDialogProps {
   open: boolean;
@@ -141,10 +142,17 @@ export function AIComposeEmailDialog({
 
           {/* Context for AI */}
           <div className="space-y-2">
-            <Label htmlFor="context" className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Context for AI (describe what you want to say)
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="context" className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Context for AI (describe what you want to say)
+              </Label>
+              <VoiceDictationButton
+                onResult={(text) => setContext(prev => prev ? `${prev} ${text}` : text)}
+                messageType="email"
+                contactName={recipientName}
+              />
+            </div>
             <Textarea
               id="context"
               placeholder="e.g., Follow up on a discovery call we had last week about their property in Buckhead. They were interested in mid-term rental management but had questions about pricing."
