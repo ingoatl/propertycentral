@@ -7794,6 +7794,116 @@ export type Database = {
           },
         ]
       }
+      slack_channel_config: {
+        Row: {
+          allowed_roles: string[] | null
+          channel_name: string
+          created_at: string | null
+          description: string | null
+          display_name: string
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          allowed_roles?: string[] | null
+          channel_name: string
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          allowed_roles?: string[] | null
+          channel_name?: string
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      slack_messages: {
+        Row: {
+          channel: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          lead_id: string | null
+          message: string
+          owner_id: string | null
+          property_id: string | null
+          sender_name: string | null
+          sent_by: string | null
+          slack_message_id: string | null
+          status: string | null
+          template_used: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          message: string
+          owner_id?: string | null
+          property_id?: string | null
+          sender_name?: string | null
+          sent_by?: string | null
+          slack_message_id?: string | null
+          status?: string | null
+          template_used?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          message?: string
+          owner_id?: string | null
+          property_id?: string | null
+          sender_name?: string | null
+          sent_by?: string | null
+          slack_message_id?: string | null
+          status?: string | null
+          template_used?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slack_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slack_messages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slack_messages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slack_messages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_log: {
         Row: {
           created_at: string | null
