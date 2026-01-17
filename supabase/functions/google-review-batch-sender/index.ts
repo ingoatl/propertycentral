@@ -6,8 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Google Reviews dedicated phone number
-const GOOGLE_REVIEWS_PHONE = "+14046090955";
+// Google Reviews dedicated phone number - MUST match GHL location phone
+const GOOGLE_REVIEWS_PHONE = "+14049247251";
 
 // Format phone number to E.164 format
 function formatPhoneE164(phone: string): string {
