@@ -21,6 +21,7 @@ export interface NewSTROnboardingFormData {
   highSchool: string;
 
   // Step 2: Rental Strategy
+  contractType: 'full_service' | 'cohosting' | '';
   rentalStrategy: string;
   targetGuestAvatar: string;
   pricingGoal: string;
@@ -29,6 +30,17 @@ export interface NewSTROnboardingFormData {
   maxGuests: number | null;
   hasExistingListing: boolean;
   existingListingUrl: string;
+  // Cohosting-only fields (only shown if contractType === 'cohosting')
+  hasAirbnbHostAccount: boolean;
+  airbnbAccountStatus: 'verified' | 'setup_needed' | 'not_applicable' | '';
+  airbnbPaymentMethodSetup: boolean;
+  hasVrboAccount: boolean;
+  vrboAccountStatus: 'verified' | 'setup_needed' | 'not_applicable' | '';
+  // Check-in/out times
+  preferredCheckinTime: string;
+  preferredCheckoutTime: string;
+  // Bedroom configurations
+  bedroomConfigurations: BedroomConfiguration[];
 
   // Step 3: Infrastructure & Utilities
   wifiReady: boolean;
@@ -160,6 +172,14 @@ export interface NewSTROnboardingFormData {
   poolHotTubPresent: boolean;
 }
 
+// Bedroom configuration type
+export interface BedroomConfiguration {
+  bedroomNumber: number;
+  bedType: 'King' | 'Queen' | 'Full' | 'Twin' | 'Bunk' | 'Sofa Bed' | 'Air Mattress' | '';
+  bedCount: number;
+  isPrimary: boolean;
+}
+
 export const initialNewSTRFormData: NewSTROnboardingFormData = {
   // Step 1
   ownerName: '',
@@ -183,6 +203,7 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   highSchool: '',
 
   // Step 2
+  contractType: '',
   rentalStrategy: '',
   targetGuestAvatar: '',
   pricingGoal: '',
@@ -191,6 +212,14 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   maxGuests: null,
   hasExistingListing: false,
   existingListingUrl: '',
+  hasAirbnbHostAccount: false,
+  airbnbAccountStatus: '',
+  airbnbPaymentMethodSetup: false,
+  hasVrboAccount: false,
+  vrboAccountStatus: '',
+  preferredCheckinTime: '3:00 PM',
+  preferredCheckoutTime: '11:00 AM',
+  bedroomConfigurations: [],
 
   // Step 3
   wifiReady: false,
@@ -471,4 +500,40 @@ export const HOA_APPROVAL_OPTIONS = [
   'Need to Apply',
   'No HOA',
   'Not Sure',
+];
+
+export const CONTRACT_TYPE_OPTIONS = [
+  { value: 'full_service', label: 'Full Service Management', description: 'PeachHaus creates and manages your Airbnb/VRBO listings' },
+  { value: 'cohosting', label: 'Co-hosting', description: 'You have existing listings that PeachHaus will help manage' },
+];
+
+export const AIRBNB_ACCOUNT_STATUS_OPTIONS = [
+  { value: 'verified', label: 'Verified & Active' },
+  { value: 'setup_needed', label: 'Account exists but needs setup' },
+  { value: 'not_applicable', label: 'N/A - Don\'t have Airbnb' },
+];
+
+export const CHECKIN_TIME_OPTIONS = [
+  '2:00 PM',
+  '3:00 PM',
+  '4:00 PM',
+  '5:00 PM',
+  'Flexible',
+];
+
+export const CHECKOUT_TIME_OPTIONS = [
+  '10:00 AM',
+  '11:00 AM',
+  '12:00 PM',
+  'Flexible',
+];
+
+export const BED_TYPE_OPTIONS = [
+  'King',
+  'Queen',
+  'Full',
+  'Twin',
+  'Bunk',
+  'Sofa Bed',
+  'Air Mattress',
 ];
