@@ -61,22 +61,26 @@ export function InteractiveDocumentPreview({
   useEffect(() => {
     // Create positioned fields from detected fields
     // USE ACTUAL POSITIONS from field_mappings if available
+    console.log('[InteractiveDocumentPreview] Processing fields:', data.detectedFields.length);
+    
     const positioned = data.detectedFields.map((field, index) => {
       const value = data.fieldValues[field.api_id];
       
       // Check if field has position data from field_mappings (stored in the field object)
-      const fieldWithPos = field as any;
-      const hasPosition = fieldWithPos.x !== undefined && fieldWithPos.y !== undefined && fieldWithPos.page !== undefined;
+      // The DetectedField interface includes x, y, page, width, height as optional properties
+      const hasPosition = field.x !== undefined && field.y !== undefined && field.page !== undefined;
+      
+      console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: hasPosition=${hasPosition}, page=${field.page}, x=${field.x}, y=${field.y}`);
       
       if (hasPosition) {
         // Use actual position from field_mappings
         return {
           ...field,
-          x: fieldWithPos.x,
-          y: fieldWithPos.y,
-          width: fieldWithPos.width || 40,
-          height: fieldWithPos.height || 2.5,
-          page: fieldWithPos.page,
+          x: field.x!,
+          y: field.y!,
+          width: field.width || 40,
+          height: field.height || 2.5,
+          page: field.page!,
           value,
         };
       }
