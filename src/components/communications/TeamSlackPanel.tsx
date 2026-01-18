@@ -111,9 +111,11 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
   const queryClient = useQueryClient();
 
   // Fetch available channels - with staleTime to prevent unnecessary refetches
+  // NOTE: Removed allowed_roles filtering to show all active channels to all users
   const { data: channels = [], isLoading: channelsLoading, error: channelsError } = useQuery({
     queryKey: ['slack-channels'],
     queryFn: async () => {
+      console.log('[Slack Channels] Fetching all active channels...');
       const { data, error } = await supabase
         .from('slack_channel_config')
         .select('id, channel_name, display_name, description')
@@ -121,9 +123,10 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
         .order('display_name');
       
       if (error) {
-        console.error('Failed to load Slack channels:', error);
+        console.error('[Slack Channels] Failed to load:', error);
         throw error;
       }
+      console.log('[Slack Channels] Loaded:', data?.length || 0, 'channels:', data?.map(c => c.channel_name).join(', '));
       return data as SlackChannel[];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

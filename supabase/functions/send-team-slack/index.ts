@@ -184,7 +184,8 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -194,12 +195,13 @@ serve(async (req) => {
       });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    // Use anon key client for auth verification
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getUser(token);
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getUser(token);
     
     if (claimsError || !claimsData?.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
@@ -207,6 +209,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
+
+    // Use service role client for database operations (bypasses RLS)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const userId = claimsData.user.id;
     const userEmail = claimsData.user.email;

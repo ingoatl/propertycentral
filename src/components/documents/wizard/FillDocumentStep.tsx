@@ -450,6 +450,24 @@ const FillDocumentStep = ({ data, updateData }: Props) => {
 
       {/* Quick Actions Row */}
       <div className="flex flex-wrap gap-2">
+        {/* Fill Sample Data Button */}
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => {
+            const newValues: Record<string, string | boolean> = { ...data.fieldValues };
+            Object.entries(SAMPLE_VALUES).forEach(([key, value]) => {
+              newValues[key] = value;
+            });
+            updateData({ fieldValues: newValues });
+            toast.success(`Pre-filled ${Object.keys(SAMPLE_VALUES).length} fields with sample data`);
+          }}
+          className="bg-primary"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Fill Sample Data
+        </Button>
+
         {/* Property Selector */}
         {!loadingProperties && (
           <Select value={data.propertyId || "_none"} onValueChange={handlePropertySelect}>
