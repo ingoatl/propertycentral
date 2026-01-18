@@ -128,11 +128,14 @@ function buildPrompt(
   const { action, messageType, incomingMessage, currentMessage, userInstructions } = request;
   const { contactProfile, toneProfile, threadAnalysis, relevantKnowledge, memories, recentMessages } = context;
   
+  // Get first name for greetings
+  const firstName = contactProfile.name.split(' ')[0] || 'there';
+  
   // Base context section
   let prompt = `You are Ingo from PeachHaus Property Management. Your responses should feel like they come from a real person, not an AI.
 
 ## WHO YOU'RE TALKING TO
-Name: ${contactProfile.name}
+Name: ${contactProfile.name} (use "${firstName}" in greetings)
 Relationship Stage: ${contactProfile.relationshipStage}
 Communication Style Preference: ${contactProfile.communicationStyle}
 Emotional Baseline: ${contactProfile.emotionalBaseline}
@@ -145,7 +148,7 @@ Write with this exact style:
 - Average Sentence Length: ${toneProfile.avgSentenceLength} words
 - ${toneProfile.useContractions ? 'USE contractions (I\'m, we\'ll, don\'t)' : 'AVOID contractions (I am, we will, do not)'}
 - Exclamation Usage: ${toneProfile.exclamationFrequency}
-- **NEVER USE EMOJIS** - No emojis allowed in any response
+- **NEVER USE EMOJIS** - Absolutely no emojis, emoticons, or Unicode symbols in any response
 
 NEVER use these phrases: ${toneProfile.avoidedPhrases.join(', ')}
 End messages with: ${toneProfile.commonClosings[0] || '- Ingo'}
@@ -159,19 +162,33 @@ ${toneProfile.sampleMessages.slice(0, 3).map((s, i) => `${i + 1}. "${s}"`).join(
 
 `;
 
-  // Add the FULL CONVERSATION for context - this is CRITICAL
-  if (recentMessages.length > 0) {
-    prompt += `## FULL CONVERSATION HISTORY (CRITICAL - Read carefully!)
-This is the complete conversation so far. Study it to understand:
-- What has been discussed/agreed
-- What you've already sent them (income reports, links, etc.)
-- What they are specifically asking for
-- What NOT to repeat or re-offer
+  // Add the MOST RECENT MESSAGES FIRST - THIS IS WHAT WE'RE REPLYING TO
+  const inboundMessages = recentMessages.filter(m => m.direction === 'inbound');
+  const mostRecentInbound = inboundMessages.slice(-3).reverse(); // Last 3 inbound, newest first
+  
+  if (mostRecentInbound.length > 0) {
+    prompt += `## >>> MOST RECENT MESSAGES - REPLY TO THESE! <<<
+These are the LATEST messages from ${firstName}. Your reply MUST address these specifically:
 
 `;
-    recentMessages.forEach((m, idx) => {
+    mostRecentInbound.forEach((m, idx) => {
+      const date = new Date(m.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      const priority = idx === 0 ? ' [LATEST - PRIMARY FOCUS]' : '';
+      prompt += `>>> [${date}]${priority} ${firstName.toUpperCase()}: ${m.content}\n\n`;
+    });
+    prompt += '\n';
+  }
+
+  // Add earlier conversation for context
+  if (recentMessages.length > 3) {
+    prompt += `## EARLIER CONVERSATION CONTEXT
+Review this history to understand what's been discussed/agreed, but focus your reply on the MOST RECENT messages above:
+
+`;
+    const earlierMessages = recentMessages.slice(0, -3);
+    earlierMessages.forEach((m) => {
       const date = new Date(m.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      prompt += `[${date}] ${m.direction === 'inbound' ? contactProfile.name.split(' ')[0].toUpperCase() : 'YOU (INGO)'}: ${m.content}\n\n`;
+      prompt += `[${date}] ${m.direction === 'inbound' ? firstName.toUpperCase() : 'YOU (INGO)'}: ${m.content.substring(0, 200)}${m.content.length > 200 ? '...' : ''}\n\n`;
     });
     prompt += '\n';
   }
@@ -219,15 +236,15 @@ Occupancy Rate: ${context.financialContext.occupancyRate ? `${context.financialC
 Write a ${messageType === 'sms' ? 'concise SMS (under 300 characters ideally)' : 'professional email'} to ${contactProfile.name}.
 ${userInstructions ? `User's specific instructions: ${userInstructions}` : 'Write an appropriate message based on the context.'}`,
     
-    reply: `## YOUR TASK: REPLY TO THEIR LATEST MESSAGE
-Their latest message: "${incomingMessage || recentMessages.filter(m => m.direction === 'inbound').pop()?.content || 'Unknown'}"
+    reply: `## YOUR TASK: REPLY TO THEIR LATEST MESSAGE(S)
+Focus on the >>> MOST RECENT MESSAGES <<< section above. That's what you're replying to.
 
 CRITICAL RULES FOR YOUR REPLY:
-1. DIRECTLY address what they're asking for (e.g., if they want to meet in person, confirm you can meet in person)
-2. Reference specifics they mentioned (dates, locations, concerns)
-3. DON'T re-offer things you've already done (check the conversation history!)
-4. DON'T be generic - show you've read and understood their message
-5. If they're asking for a meeting/call, suggest specific times or confirm their proposed times
+1. DIRECTLY address what they're asking for in their LATEST messages
+2. Reference specifics they mentioned (dates, locations, concerns, the garage issue, etc.)
+3. DON'T re-offer things you've already done (check the earlier conversation context!)
+4. DON'T be generic - show you've read and understood their SPECIFIC request
+5. If they're asking you to do something, confirm you'll do it or explain why not
 6. Keep it conversational and human
 ${userInstructions ? `\nAdditional instructions: ${userInstructions}` : ''}`,
     
@@ -254,26 +271,32 @@ Rewrite with a warmer, more personable tone while keeping it professional.`,
 
   prompt += actionInstructions[action] || actionInstructions.compose;
 
-  // Message type specific constraints
+  // Message type specific constraints - UPDATED with greeting and formatting
   if (messageType === 'sms') {
     prompt += `
 
 ## SMS CONSTRAINTS
+- **START with a brief greeting**: "Hi ${firstName}," or "Hey ${firstName}," 
 - Keep it concise (ideally under 300 characters, max 500)
-- No formal greetings needed - jump straight to the point
-- End with "- Ingo" for signature
-- One clear call to action if needed
+- Address their specific request or concern directly
+- End with "- Ingo" signature
 - Sound like a real person texting, not a corporate message
-- **ABSOLUTELY NO EMOJIS**`;
+- **ABSOLUTELY NO EMOJIS - Never use any emoji characters**`;
   } else {
     prompt += `
 
 ## EMAIL CONSTRAINTS
-- Include a clear subject line if composing new
-- Use short paragraphs
-- End with signature: ${toneProfile.commonClosings[0] || '- Ingo'}
-- Don't be overly formal or stiff
-- **ABSOLUTELY NO EMOJIS**`;
+- **START with greeting**: "Hi ${firstName},"
+- Use 1-2 short paragraphs (3-4 sentences max each)
+- Use line breaks between paragraphs for readability
+- If action is needed, be specific about next steps
+- End with professional signature:
+
+Best,
+Ingo
+PeachHaus Group
+
+- **ABSOLUTELY NO EMOJIS - Never use any emoji characters**`;
   }
 
   // Calendar link instruction
@@ -287,8 +310,9 @@ Rewrite with a warmer, more personable tone while keeping it professional.`,
 ## OUTPUT FORMAT
 ${messageType === 'email' ? 'If this is a new email, start with "SUBJECT: " on its own line, then the body.' : ''}
 Write ONLY the message content. No explanations, no "Here's the message:" prefix.
+${messageType === 'sms' ? `Start with "Hi ${firstName}," or "Hey ${firstName},"` : `Start with "Hi ${firstName},"`}
 Sound like Ingo - a real person who's been chatting with them, not a corporate AI.
-**REMINDER: NO EMOJIS EVER.**`;
+**REMINDER: ABSOLUTELY NO EMOJIS EVER. Zero. None.**`;
 
   return prompt;
 }
