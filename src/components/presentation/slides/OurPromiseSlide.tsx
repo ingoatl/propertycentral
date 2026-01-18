@@ -11,11 +11,11 @@ export function OurPromiseSlide() {
 
   return (
     <SlideLayout overlay="gradient">
-      <div className="w-full max-w-5xl mx-auto text-center">
+      <div className="w-full max-w-6xl mx-auto text-center">
         {/* Header */}
-        <div className="mb-12">
-          <p className="text-amber-400 uppercase tracking-widest text-sm mb-4">Our Commitment</p>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-8">
+        <div className="mb-12 lg:mb-16">
+          <p className="text-amber-400 uppercase tracking-widest text-base lg:text-lg mb-4">Our Commitment</p>
+          <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-8">
             Our Promise{" "}
             <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
               to You
@@ -24,30 +24,30 @@ export function OurPromiseSlide() {
         </div>
 
         {/* Main Quote */}
-        <div className="bg-gradient-to-br from-amber-400/10 to-orange-500/10 border border-amber-400/30 rounded-3xl p-8 md:p-12 mb-12">
-          <p className="text-2xl md:text-3xl lg:text-4xl text-white font-light leading-relaxed italic">
-            "We treat every property as if it were our own home. Your success is our success, and we're committed to maximizing your investment while giving you back the freedom of truly passive income."
+        <div className="bg-gradient-to-br from-amber-400/10 to-orange-500/10 border border-amber-400/30 rounded-3xl p-10 lg:p-14 mb-12 lg:mb-16">
+          <p className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-white font-light leading-relaxed italic">
+            "We treat every property as if it were our own home. Your success is our success."
           </p>
         </div>
 
         {/* Promise Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
           {promises.map((promise, index) => (
             <div
               key={promise.title}
-              className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-amber-400/30 transition-all duration-300"
+              className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 lg:p-8 border border-white/10 hover:border-amber-400/30 transition-all duration-300"
               style={{ animationDelay: `${index * 100}ms` }}
             >
-              <promise.icon className="w-10 h-10 text-amber-400 mx-auto mb-4" />
-              <h3 className="text-base font-semibold text-white mb-2">{promise.title}</h3>
-              <p className="text-white/50 text-sm">{promise.description}</p>
+              <promise.icon className="w-12 h-12 lg:w-14 lg:h-14 text-amber-400 mx-auto mb-4" />
+              <h3 className="text-lg lg:text-xl font-semibold text-white mb-2">{promise.title}</h3>
+              <p className="text-white/50 text-base lg:text-lg">{promise.description}</p>
             </div>
           ))}
         </div>
 
         {/* Bottom emphasis */}
         <div className="mt-12">
-          <p className="text-white/60 text-lg">
+          <p className="text-white/60 text-xl lg:text-2xl">
             We don't just manage properties — we build lasting partnerships.
           </p>
         </div>
