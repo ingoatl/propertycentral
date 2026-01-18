@@ -52,6 +52,9 @@ const CATEGORIES = [
   { value: "company", label: "Company" },
   { value: "objections", label: "Objections" },
   { value: "scripts", label: "Scripts" },
+  { value: "policies", label: "Policies" },
+  { value: "networks", label: "Networks" },
+  { value: "faqs", label: "FAQs" },
 ];
 
 export function KnowledgeEntryModal({
