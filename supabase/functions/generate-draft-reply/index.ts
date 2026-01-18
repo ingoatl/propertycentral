@@ -320,6 +320,35 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // ==============================
+    // FETCH COMPANY KNOWLEDGE BASE
+    // ==============================
+    let knowledgeBaseContext = "";
+    try {
+      const { data: knowledgeEntries } = await supabase
+        .from("company_knowledge_base")
+        .select("category, title, content, keywords, referral_link, priority")
+        .eq("is_active", true)
+        .or("use_in_contexts.cs.{email},use_in_contexts.cs.{all}")
+        .order("priority", { ascending: false })
+        .limit(15);
+
+      if (knowledgeEntries && knowledgeEntries.length > 0) {
+        knowledgeBaseContext = "\n\n=== COMPANY KNOWLEDGE BASE (USE THIS FOR ACCURATE RESPONSES) ===\n";
+        for (const entry of knowledgeEntries) {
+          knowledgeBaseContext += `\n### ${entry.title} [${entry.category}]\n${entry.content}`;
+          if (entry.referral_link) {
+            knowledgeBaseContext += `\n📎 REFERRAL LINK: ${entry.referral_link}`;
+          }
+          knowledgeBaseContext += "\n";
+        }
+        knowledgeBaseContext += "\n=== END KNOWLEDGE BASE ===\n";
+        console.log(`Loaded ${knowledgeEntries.length} knowledge entries for draft generation`);
+      }
+    } catch (kbError) {
+      console.error("Error fetching knowledge base:", kbError);
+    }
+
     // Check if draft already exists for this communication
     if (communicationId) {
       const { data: existingDraft } = await supabase
@@ -586,10 +615,13 @@ Financial question detected.
     const isOwner = fullContext.includes("Contact Type: OWNER");
     const isLead = fullContext.includes("Contact Type: LEAD");
 
-    // Build the system prompt
+    // Build the system prompt with knowledge base
     const systemPrompt = `You are Ingo, an experienced property manager at PeachHaus Group, a premium mid-term rental management company in Atlanta.
 
 ${companyKnowledge}
+${knowledgeBaseContext}
+
+IMPORTANT: When answering questions, ALWAYS check the COMPANY KNOWLEDGE BASE above for accurate information, referral links, and company policies. Include referral links naturally when recommending services.
 
 ${humanLikeGuidelines}
 
