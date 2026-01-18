@@ -68,16 +68,50 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Create Supabase client to fetch knowledge base
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch company knowledge base for SMS context
+    let knowledgeBaseContext = "";
+    try {
+      const { data: knowledgeEntries } = await supabase
+        .from("company_knowledge_base")
+        .select("category, title, content, referral_link, priority")
+        .eq("is_active", true)
+        .or("use_in_contexts.cs.{sms},use_in_contexts.cs.{all}")
+        .order("priority", { ascending: false })
+        .limit(10);
+
+      if (knowledgeEntries && knowledgeEntries.length > 0) {
+        knowledgeBaseContext = "\n\nKEY KNOWLEDGE:\n";
+        for (const entry of knowledgeEntries) {
+          knowledgeBaseContext += `- ${entry.title}: ${entry.content.substring(0, 100)}...`;
+          if (entry.referral_link) {
+            knowledgeBaseContext += ` [Link: ${entry.referral_link}]`;
+          }
+          knowledgeBaseContext += "\n";
+        }
+        console.log(`Loaded ${knowledgeEntries.length} knowledge entries for SMS`);
+      }
+    } catch (kbError) {
+      console.error("Error fetching knowledge base:", kbError);
+    }
+
     const firstName = recipientName?.split(" ")[0] || "there";
 
     const systemPrompt = `You are an expert SMS copywriter for PeachHaus Group, a premium mid-term rental property management company in Atlanta.
 
 ${companyKnowledge}
+${knowledgeBaseContext}
 
 ${smsGuidelines}
 
 Your task is to compose a concise, effective SMS message based on the context provided.
 The message should feel natural and conversational.
+When answering questions, use the KEY KNOWLEDGE above for accurate information.
 
 CRITICAL: Keep the message under 160 characters when possible. Maximum 300 characters.
 ${includeLink ? `If a scheduling link is needed, you can include: ${SCHEDULING_LINK}` : "Do NOT include any links unless the context specifically requires it."}

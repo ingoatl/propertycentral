@@ -112,6 +112,35 @@ serve(async (req) => {
     }
     console.log("Using sender name:", senderName);
 
+    // ==============================
+    // FETCH COMPANY KNOWLEDGE BASE
+    // ==============================
+    let knowledgeBaseContext = "";
+    try {
+      const { data: knowledgeEntries } = await supabase
+        .from("company_knowledge_base")
+        .select("category, title, content, keywords, referral_link, priority")
+        .eq("is_active", true)
+        .or("use_in_contexts.cs.{email},use_in_contexts.cs.{all}")
+        .order("priority", { ascending: false })
+        .limit(15);
+
+      if (knowledgeEntries && knowledgeEntries.length > 0) {
+        knowledgeBaseContext = "\n\n=== COMPANY KNOWLEDGE BASE (USE THIS TO ANSWER QUESTIONS) ===\n";
+        for (const entry of knowledgeEntries) {
+          knowledgeBaseContext += `\n### ${entry.title} [${entry.category}]\n${entry.content}`;
+          if (entry.referral_link) {
+            knowledgeBaseContext += `\n📎 REFERRAL LINK: ${entry.referral_link}`;
+          }
+          knowledgeBaseContext += "\n";
+        }
+        knowledgeBaseContext += "\n=== END KNOWLEDGE BASE ===\n";
+        console.log(`Loaded ${knowledgeEntries.length} knowledge entries for email reply`);
+      }
+    } catch (kbError) {
+      console.error("Error fetching knowledge base:", kbError);
+    }
+
     // Fetch user's tone profile for personalized writing style
     let toneProfile: any = null;
     if (senderUserId) {
@@ -581,6 +610,7 @@ RULES FOR ANSWERING:
 
 ${humanLikeGuidelines}
 ${toneInstructions}
+${knowledgeBaseContext}
 
 CONTEXT:
 - Sender Sentiment: ${sentiment}
@@ -591,6 +621,8 @@ ${isOwner ? `- This is a VIP PROPERTY OWNER - be a helpful partner, not salesy` 
 ${intentGuidance}
 ${actionContext}
 ${questionAnsweringSection}
+
+IMPORTANT: When answering questions, ALWAYS check the COMPANY KNOWLEDGE BASE above for accurate information and referral links. Include referral links naturally when recommending services.
 
 CRITICAL RULES:
 1. READ THEIR EMAIL CAREFULLY - respond to what they ACTUALLY said

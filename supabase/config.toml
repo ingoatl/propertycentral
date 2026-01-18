@@ -1,5 +1,11 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.import-website-knowledge]
+verify_jwt = true
+
+[functions.analyze-emails-for-knowledge]
+verify_jwt = true
+
 [functions.extract-lease-data]
 verify_jwt = false
 

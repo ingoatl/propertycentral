@@ -151,6 +151,36 @@ serve(async (req) => {
     }
     console.log("Using sender name:", senderName);
 
+    // ==============================
+    // FETCH COMPANY KNOWLEDGE BASE
+    // ==============================
+    let knowledgeBaseContext = "";
+    try {
+      const contextType = messageType === "sms" ? "sms" : "email";
+      const { data: knowledgeEntries } = await supabase
+        .from("company_knowledge_base")
+        .select("category, title, content, keywords, referral_link, priority")
+        .eq("is_active", true)
+        .or(`use_in_contexts.cs.{${contextType}},use_in_contexts.cs.{all}`)
+        .order("priority", { ascending: false })
+        .limit(15);
+
+      if (knowledgeEntries && knowledgeEntries.length > 0) {
+        knowledgeBaseContext = "\n\n=== COMPANY KNOWLEDGE BASE (USE THIS TO ANSWER QUESTIONS) ===\n";
+        for (const entry of knowledgeEntries) {
+          knowledgeBaseContext += `\n### ${entry.title} [${entry.category}]\n${entry.content}`;
+          if (entry.referral_link) {
+            knowledgeBaseContext += `\n📎 REFERRAL LINK: ${entry.referral_link}`;
+          }
+          knowledgeBaseContext += "\n";
+        }
+        knowledgeBaseContext += "\n=== END KNOWLEDGE BASE ===\n";
+        console.log(`Loaded ${knowledgeEntries.length} knowledge entries for message assistant`);
+      }
+    } catch (kbError) {
+      console.error("Error fetching knowledge base:", kbError);
+    }
+
     // Fetch full conversation context if leadId or ownerId provided
     let fullContext = conversationContext || "";
     let commHistory = "";
@@ -419,13 +449,16 @@ serve(async (req) => {
     const isNewConversation = conversationCount <= 2;
     const isOngoingConversation = conversationCount > 2;
 
-    // Build system prompt with optional company knowledge and memories
+    // Build system prompt with optional company knowledge, memories, AND knowledge base
     let systemPrompt = `You are a professional property management assistant for PeachHaus Group helping compose ${messageType === "sms" ? "SMS messages" : "emails"}.
 
 ${humanLikeGuidelines}
 
 ${includeCompanyKnowledge ? companyKnowledge : ""}
+${knowledgeBaseContext}
 ${contactMemories}
+
+IMPORTANT: When answering questions, ALWAYS check the COMPANY KNOWLEDGE BASE above for accurate information and referral links. Include referral links naturally when recommending services.
 
 CONTACT INFO:
 Name: ${contactName || "Unknown"} (use "${firstName}" when addressing them)
