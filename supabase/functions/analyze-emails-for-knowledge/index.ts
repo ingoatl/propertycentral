@@ -34,7 +34,7 @@ serve(async (req) => {
     const { data: emails, error: emailError } = await supabase
       .from("lead_communications")
       .select("*")
-      .eq("type", "email")
+      .eq("communication_type", "email")
       .eq("direction", "outbound")
       .order("created_at", { ascending: false })
       .limit(limit);
