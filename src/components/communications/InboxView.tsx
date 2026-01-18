@@ -134,6 +134,8 @@ interface CommunicationItem {
   snoozed_until?: string;
   // Gmail email reference for rendering in All tab
   gmail_email?: GmailEmail;
+  // GHL contact ID for AI context lookup
+  ghl_contact_id?: string;
 }
 
 interface ConversationStatusRecord {
@@ -928,7 +930,7 @@ export function InboxView() {
         // Include received_on_number for proper phone-based filtering
         let commsQuery = supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, assigned_user_id, received_on_number, leads(id, name, phone, email)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, assigned_user_id, received_on_number, ghl_contact_id, leads(id, name, phone, email)`)
           .in("communication_type", ["sms", "email"])
           .order("created_at", { ascending: false })
           .limit(100);
@@ -1144,6 +1146,7 @@ export function InboxView() {
               contact_id: contactId,
               status: comm.status || undefined,
               media_urls: Array.isArray(comm.media_urls) ? comm.media_urls as string[] : undefined,
+              ghl_contact_id: (comm as any).ghl_contact_id || undefined,
             };
 
             if (search) {
@@ -3319,8 +3322,10 @@ export function InboxView() {
                           <AIReplyButton
                             contactName={selectedMessage.contact_name}
                             contactPhone={selectedMessage.contact_phone}
+                            contactEmail={selectedMessage.contact_email}
                             contactId={selectedMessage.contact_id}
                             contactType={selectedMessage.contact_type}
+                            ghlContactId={(selectedMessage as any).ghl_contact_id}
                             conversationThread={conversationThread.map(msg => ({
                               type: msg.type,
                               direction: msg.direction,
