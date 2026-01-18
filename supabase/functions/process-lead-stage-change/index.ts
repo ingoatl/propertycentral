@@ -561,9 +561,11 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
 const ANJA_INGO_PHOTO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/hosts/anja-ingo-hosts.jpg";
 const INGO_SIGNATURE_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png";
 const ANJA_SIGNATURE_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png";
+const ANJA_BOOK_URL = "https://propertycentral.lovable.app/books/hybrid-rental-strategy-book.png";
+const INGO_BOOK_URL = "https://propertycentral.lovable.app/books/propertypreneur-book.png";
 
 // Build welcome onboarding email for contract_signed stage
-// Premium, stunning first impression with personal touch
+// Matches the same style as W-9 and other stage emails
 function buildWelcomeOnboardingEmailHtml(recipientName: string, propertyAddress: string): string {
   const currentYear = new Date().getFullYear();
   
@@ -573,136 +575,125 @@ function buildWelcomeOnboardingEmailHtml(recipientName: string, propertyAddress:
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Welcome to PeachHaus</title>
     </head>
-    <body style="margin: 0; padding: 0; background-color: #f5f3ef; font-family: Georgia, 'Times New Roman', serif; -webkit-font-smoothing: antialiased;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f3ef; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="620" cellpadding="0" cellspacing="0" style="max-width: 620px; background-color: #ffffff; box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
               
-              <!-- Elegant Gold Top Border -->
+              <!-- Header -->
               <tr>
-                <td style="height: 4px; background: linear-gradient(90deg, #b8956a 0%, #d4b896 50%, #b8956a 100%);"></td>
-              </tr>
-              
-              <!-- Logo Header -->
-              <tr>
-                <td style="padding: 32px 40px 24px 40px; text-align: center; background-color: #ffffff;">
-                  <img src="${LOGO_URL}" alt="PeachHaus" style="height: 44px; width: auto;">
+                <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 32px; text-align: center;">
+                  <img src="${LOGO_URL}" alt="PeachHaus" style="height: 48px; margin-bottom: 16px;" />
+                  <div style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">Welcome to the PeachHaus Family</div>
+                  ${propertyAddress ? `<div style="font-size: 13px; color: #9ca3af; margin-top: 8px;">${propertyAddress}</div>` : ''}
                 </td>
               </tr>
               
               <!-- Hero Photo - Anja & Ingo -->
               <tr>
-                <td style="padding: 0 32px;">
-                  <table cellpadding="0" cellspacing="0" width="100%">
-                    <tr>
-                      <td style="border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-                        <img src="${ANJA_INGO_PHOTO_URL}" 
-                             alt="Anja and Ingo Schaer - Your PeachHaus Team"
-                             width="556"
-                             style="width: 100%; max-width: 556px; height: auto; display: block;">
-                      </td>
-                    </tr>
-                  </table>
+                <td style="padding: 24px 24px 0 24px;">
+                  <img src="${ANJA_INGO_PHOTO_URL}" 
+                       alt="Anja and Ingo Schaer - Your PeachHaus Team"
+                       width="552"
+                       style="width: 100%; max-width: 552px; height: auto; display: block; border-radius: 12px;">
                 </td>
               </tr>
               
-              <!-- Welcome Headline -->
+              <!-- Greeting -->
               <tr>
-                <td style="padding: 32px 40px 0 40px; text-align: center;">
-                  <h1 style="margin: 0; font-family: Georgia, serif; font-size: 28px; font-weight: 400; color: #1a1a1a; letter-spacing: 0.5px; line-height: 1.3;">
-                    Welcome to the PeachHaus Family
-                  </h1>
-                  ${propertyAddress ? `<p style="margin: 12px 0 0 0; font-size: 14px; color: #666666;">${propertyAddress}</p>` : ''}
+                <td style="padding: 24px 32px 16px 32px;">
+                  <div style="font-size: 16px; color: #111827;">Dear <strong>${recipientName}</strong>,</div>
                 </td>
               </tr>
-              
-              <!-- Personal Greeting -->
+
+              <!-- Intro Text -->
               <tr>
-                <td style="padding: 28px 48px 0 48px;">
-                  <p style="margin: 0; font-family: Georgia, serif; font-size: 17px; line-height: 1.8; color: #333333;">
-                    Dear ${recipientName},
-                  </p>
-                  <p style="margin: 20px 0 0 0; font-family: Georgia, serif; font-size: 16px; line-height: 1.9; color: #4a4a4a;">
+                <td style="padding: 0 32px 16px 32px;">
+                  <div style="font-size: 14px; color: #374151; line-height: 1.7;">
                     We are genuinely honored to welcome you to PeachHaus. Your decision to entrust us with your property means the world to us, and we don't take that responsibility lightly.
-                  </p>
-                </td>
-              </tr>
-              
-              <!-- Our Promise Section -->
-              <tr>
-                <td style="padding: 28px 48px 0 48px;">
-                  <div style="padding: 24px 28px; background: linear-gradient(135deg, #faf8f5 0%, #f5f0ea 100%); border-left: 4px solid #b8956a; border-radius: 0 12px 12px 0;">
-                    <p style="margin: 0 0 16px 0; font-family: Georgia, serif; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #b8956a; font-weight: 600;">
-                      Our Promise to You
-                    </p>
-                    <p style="margin: 0; font-family: Georgia, serif; font-size: 15px; line-height: 1.8; color: #4a4a4a; font-style: italic;">
-                      "We treat every property as if it were our own home. Your success is our success, and we're committed to maximizing your investment while giving you back the freedom of truly passive income."
-                    </p>
                   </div>
                 </td>
               </tr>
-              
+
+              <!-- Our Promise Card -->
+              <tr>
+                <td style="padding: 0 32px 24px 32px;">
+                  <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px; padding: 20px 24px;">
+                    <div style="font-size: 12px; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">Our Promise to You</div>
+                    <div style="font-size: 14px; color: #78350f; line-height: 1.6; font-style: italic;">
+                      "We treat every property as if it were our own home. Your success is our success, and we're committed to maximizing your investment while giving you back the freedom of truly passive income."
+                    </div>
+                  </div>
+                </td>
+              </tr>
+
               <!-- What Sets Us Apart -->
               <tr>
-                <td style="padding: 32px 48px 0 48px;">
-                  <p style="margin: 0 0 20px 0; font-family: Georgia, serif; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #8a8a8a;">
-                    What Sets PeachHaus Apart
-                  </p>
-                  <table cellpadding="0" cellspacing="0" width="100%">
+                <td style="padding: 0 32px 24px 32px;">
+                  <div style="padding: 12px 0; border-bottom: 2px solid #f59e0b; margin-bottom: 16px;">
+                    <span style="font-size: 14px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px;">What Sets PeachHaus Apart</span>
+                  </div>
+                  <table style="width: 100%;">
                     <tr>
-                      <td style="padding: 12px 0; border-bottom: 1px solid #e8e4de;">
-                        <table cellpadding="0" cellspacing="0" width="100%">
-                          <tr>
-                            <td style="width: 32px; vertical-align: top;">
-                              <span style="font-size: 18px;">✦</span>
-                            </td>
-                            <td style="font-family: Georgia, serif; font-size: 15px; color: #4a4a4a; line-height: 1.6;">
-                              <strong>Revenue-First Approach</strong> — Dynamic pricing and market optimization to maximize your returns
-                            </td>
-                          </tr>
-                        </table>
+                      <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #374151;">
+                        <span style="color: #f59e0b; margin-right: 8px;">✦</span>
+                        <strong>Revenue-First Approach</strong> — Dynamic pricing and market optimization to maximize your returns
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding: 12px 0; border-bottom: 1px solid #e8e4de;">
-                        <table cellpadding="0" cellspacing="0" width="100%">
-                          <tr>
-                            <td style="width: 32px; vertical-align: top;">
-                              <span style="font-size: 18px;">✦</span>
-                            </td>
-                            <td style="font-family: Georgia, serif; font-size: 15px; color: #4a4a4a; line-height: 1.6;">
-                              <strong>Owner Transparency</strong> — Real-time owner portal with complete financial visibility
-                            </td>
-                          </tr>
-                        </table>
+                      <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #374151;">
+                        <span style="color: #f59e0b; margin-right: 8px;">✦</span>
+                        <strong>Complete Transparency</strong> — Real-time owner portal with full financial visibility
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding: 12px 0; border-bottom: 1px solid #e8e4de;">
-                        <table cellpadding="0" cellspacing="0" width="100%">
-                          <tr>
-                            <td style="width: 32px; vertical-align: top;">
-                              <span style="font-size: 18px;">✦</span>
-                            </td>
-                            <td style="font-family: Georgia, serif; font-size: 15px; color: #4a4a4a; line-height: 1.6;">
-                              <strong>White-Glove Service</strong> — Direct access to us, not an overseas call center
-                            </td>
-                          </tr>
-                        </table>
+                      <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #374151;">
+                        <span style="color: #f59e0b; margin-right: 8px;">✦</span>
+                        <strong>5-Star Guest Experience</strong> — Exceptional hospitality that drives repeat bookings and reviews
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding: 12px 0;">
-                        <table cellpadding="0" cellspacing="0" width="100%">
+                      <td style="padding: 10px 0; font-size: 14px; color: #374151;">
+                        <span style="color: #f59e0b; margin-right: 8px;">✦</span>
+                        <strong>Data-Driven Decisions</strong> — We leverage technology and AI for smarter property management
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              
+              <!-- Onboarding Timeline -->
+              <tr>
+                <td style="padding: 0 32px 24px 32px;">
+                  <div style="padding: 12px 0; border-bottom: 2px solid #f59e0b; margin-bottom: 16px;">
+                    <span style="font-size: 14px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px;">Your Onboarding Journey</span>
+                  </div>
+                  <table style="width: 100%; background: #f9fafb; border-radius: 12px; padding: 16px;">
+                    <tr>
+                      <td style="padding: 16px;">
+                        <table width="100%" cellpadding="0" cellspacing="0">
                           <tr>
-                            <td style="width: 32px; vertical-align: top;">
-                              <span style="font-size: 18px;">✦</span>
+                            <td style="text-align: center; width: 25%; vertical-align: top; padding: 0 4px;">
+                              <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 50%; margin: 0 auto 8px; line-height: 36px; color: #fff; font-weight: 700; font-size: 14px;">1</div>
+                              <div style="font-size: 11px; color: #111827; font-weight: 600;">W-9 Form</div>
+                              <div style="font-size: 10px; color: #6b7280;">Coming soon</div>
                             </td>
-                            <td style="font-family: Georgia, serif; font-size: 15px; color: #4a4a4a; line-height: 1.6;">
-                              <strong>5-Star Guest Experience</strong> — Exceptional hospitality that drives repeat bookings and reviews
+                            <td style="text-align: center; width: 25%; vertical-align: top; padding: 0 4px;">
+                              <div style="width: 36px; height: 36px; background: #d1d5db; border-radius: 50%; margin: 0 auto 8px; line-height: 36px; color: #6b7280; font-weight: 700; font-size: 14px;">2</div>
+                              <div style="font-size: 11px; color: #6b7280;">Payment Setup</div>
+                              <div style="font-size: 10px; color: #9ca3af;">Secure link</div>
+                            </td>
+                            <td style="text-align: center; width: 25%; vertical-align: top; padding: 0 4px;">
+                              <div style="width: 36px; height: 36px; background: #d1d5db; border-radius: 50%; margin: 0 auto 8px; line-height: 36px; color: #6b7280; font-weight: 700; font-size: 14px;">3</div>
+                              <div style="font-size: 11px; color: #6b7280;">Property Details</div>
+                              <div style="font-size: 10px; color: #9ca3af;">Onboarding form</div>
+                            </td>
+                            <td style="text-align: center; width: 25%; vertical-align: top; padding: 0 4px;">
+                              <div style="width: 36px; height: 36px; background: #d1d5db; border-radius: 50%; margin: 0 auto 8px; line-height: 36px; color: #6b7280; font-weight: 700; font-size: 14px;">4</div>
+                              <div style="font-size: 11px; color: #6b7280;">Go Live</div>
+                              <div style="font-size: 10px; color: #9ca3af;">Start earning</div>
                             </td>
                           </tr>
                         </table>
@@ -711,128 +702,95 @@ function buildWelcomeOnboardingEmailHtml(recipientName: string, propertyAddress:
                   </table>
                 </td>
               </tr>
-              
-              <!-- Next Steps Timeline -->
+
+              <!-- What to Expect Next -->
               <tr>
-                <td style="padding: 32px 48px 0 48px;">
-                  <p style="margin: 0 0 20px 0; font-family: Georgia, serif; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #8a8a8a;">
-                    Your Onboarding Journey
-                  </p>
-                  <table cellpadding="0" cellspacing="0" width="100%" style="background: #faf9f7; border-radius: 12px; padding: 20px;">
-                    <tr>
-                      <td style="padding: 16px 20px;">
-                        <table cellpadding="0" cellspacing="0" width="100%">
-                          <tr>
-                            <td style="text-align: center; width: 25%; vertical-align: top;">
-                              <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #b8956a, #d4b896); border-radius: 50%; margin: 0 auto 8px; line-height: 36px; color: #fff; font-weight: 700; font-size: 14px;">1</div>
-                              <div style="font-size: 11px; color: #1a1a1a; font-weight: 600;">W-9 Form</div>
-                              <div style="font-size: 10px; color: #888;">Coming soon</div>
-                            </td>
-                            <td style="text-align: center; width: 25%; vertical-align: top;">
-                              <div style="width: 36px; height: 36px; background: #e5e5e5; border-radius: 50%; margin: 0 auto 8px; line-height: 36px; color: #999; font-weight: 700; font-size: 14px;">2</div>
-                              <div style="font-size: 11px; color: #666;">Payment Setup</div>
-                              <div style="font-size: 10px; color: #888;">Secure link</div>
-                            </td>
-                            <td style="text-align: center; width: 25%; vertical-align: top;">
-                              <div style="width: 36px; height: 36px; background: #e5e5e5; border-radius: 50%; margin: 0 auto 8px; line-height: 36px; color: #999; font-weight: 700; font-size: 14px;">3</div>
-                              <div style="font-size: 11px; color: #666;">Property Details</div>
-                              <div style="font-size: 10px; color: #888;">Onboarding form</div>
-                            </td>
-                            <td style="text-align: center; width: 25%; vertical-align: top;">
-                              <div style="width: 36px; height: 36px; background: #e5e5e5; border-radius: 50%; margin: 0 auto 8px; line-height: 36px; color: #999; font-weight: 700; font-size: 14px;">4</div>
-                              <div style="font-size: 11px; color: #666;">Go Live</div>
-                              <div style="font-size: 10px; color: #888;">Start earning</div>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-              
-              <!-- What to Expect -->
-              <tr>
-                <td style="padding: 28px 48px 0 48px;">
-                  <div style="padding: 20px 24px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px;">
-                    <p style="margin: 0 0 8px 0; font-family: Georgia, serif; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #166534; font-weight: 600;">
-                      What to Expect Next
-                    </p>
-                    <p style="margin: 0; font-family: Georgia, serif; font-size: 14px; line-height: 1.7; color: #166534;">
+                <td style="padding: 0 32px 24px 32px;">
+                  <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px; padding: 20px 24px;">
+                    <div style="font-size: 12px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">What to Expect Next</div>
+                    <div style="font-size: 14px; color: #166534; line-height: 1.6;">
                       You'll receive our W-9 form for your records, followed by a secure link to set up your payment details. Each step brings you closer to welcoming your first guests!
-                    </p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Closing -->
+              <tr>
+                <td style="padding: 0 32px 24px 32px;">
+                  <div style="font-size: 14px; color: #374151; line-height: 1.7;">
+                    We're here for you every step of the way. Have questions? Just reply to this email — we personally read and respond to every message.
+                  </div>
+                  <div style="font-size: 14px; color: #374151; line-height: 1.7; margin-top: 12px;">
+                    Here's to a rewarding partnership and the beginning of truly passive income.
                   </div>
                 </td>
               </tr>
               
-              <!-- Closing -->
+              <!-- Signature Section -->
               <tr>
-                <td style="padding: 28px 48px 0 48px;">
-                  <p style="margin: 0; font-family: Georgia, serif; font-size: 15px; line-height: 1.8; color: #4a4a4a;">
-                    We're here for you every step of the way. Have questions? Just reply to this email — we personally read and respond to every message.
-                  </p>
-                  <p style="margin: 20px 0 0 0; font-family: Georgia, serif; font-size: 15px; line-height: 1.8; color: #4a4a4a;">
-                    Here's to a rewarding partnership and the beginning of truly passive income.
-                  </p>
-                </td>
-              </tr>
-              
-              <!-- Elegant Divider -->
-              <tr>
-                <td style="padding: 28px 48px 0 48px;">
+                <td style="padding: 24px 32px; border-top: 1px solid #e5e7eb;">
+                  <div style="text-align: center; margin-bottom: 20px;">
+                    <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #9ca3af;">Warmest Regards</span>
+                  </div>
                   <table cellpadding="0" cellspacing="0" width="100%">
                     <tr>
-                      <td style="border-top: 1px solid #e8e4de;"></td>
+                      <td style="text-align: center; width: 50%; padding: 0 12px; vertical-align: top;">
+                        <img src="${ANJA_SIGNATURE_URL}" alt="Anja Schaer" style="height: 40px; width: auto; margin-bottom: 8px;">
+                        <div style="font-weight: 700; font-size: 14px; color: #111827;">Anja Schaer</div>
+                        <div style="font-size: 11px; color: #6b7280;">Co-Founder</div>
+                      </td>
+                      <td style="text-align: center; width: 50%; padding: 0 12px; vertical-align: top;">
+                        <img src="${INGO_SIGNATURE_URL}" alt="Ingo Schaer" style="height: 40px; width: auto; margin-bottom: 8px;">
+                        <div style="font-weight: 700; font-size: 14px; color: #111827;">Ingo Schaer</div>
+                        <div style="font-size: 11px; color: #6b7280;">Co-Founder</div>
+                      </td>
                     </tr>
                   </table>
+                  <div style="text-align: center; margin-top: 16px;">
+                    <a href="tel:+14048005932" style="color: #111827; text-decoration: none; font-size: 12px;">(404) 800-5932</a>
+                    <span style="color: #d1d5db; margin: 0 8px;">·</span>
+                    <a href="mailto:info@peachhausgroup.com" style="color: #f59e0b; text-decoration: none; font-size: 12px;">info@peachhausgroup.com</a>
+                  </div>
                 </td>
               </tr>
               
-              <!-- Dual Signature Section -->
+              <!-- Authors Section -->
               <tr>
-                <td style="padding: 28px 48px 16px 48px; text-align: center;">
-                  <p style="margin: 0 0 20px 0; font-family: Georgia, serif; font-size: 14px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
-                    Warmest Regards
-                  </p>
-                  <table cellpadding="0" cellspacing="0" width="100%" style="max-width: 360px; margin: 0 auto;">
+                <td style="padding: 24px 32px; background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); border-top: 1px solid #e5e7eb;">
+                  <div style="text-align: center; margin-bottom: 20px;">
+                    <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #9ca3af;">Our Expertise in Property Management</span>
+                  </div>
+                  <table cellpadding="0" cellspacing="0" width="100%">
                     <tr>
-                      <td style="text-align: center; width: 50%; padding: 0 8px;">
-                        <img src="${ANJA_SIGNATURE_URL}" alt="Anja Schaer" style="height: 45px; width: auto; margin-bottom: 8px;">
-                        <p style="margin: 0; font-family: Georgia, serif; font-size: 13px; color: #1a1a1a; font-weight: 600;">Anja Schaer</p>
-                        <p style="margin: 2px 0 0 0; font-family: Georgia, serif; font-size: 11px; color: #888;">Co-Founder</p>
+                      <td style="text-align: center; width: 50%; padding: 0 12px; vertical-align: top;">
+                        <img src="${ANJA_BOOK_URL}" alt="The Hybrid Rental Strategy by Anja Schaer" style="width: 120px; height: auto; margin-bottom: 12px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                        <div style="font-size: 12px; font-weight: 600; color: #111827; line-height: 1.4;">The Hybrid Rental Strategy</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">by Anja Schaer</div>
                       </td>
-                      <td style="text-align: center; width: 50%; padding: 0 8px;">
-                        <img src="${INGO_SIGNATURE_URL}" alt="Ingo Schaer" style="height: 45px; width: auto; margin-bottom: 8px;">
-                        <p style="margin: 0; font-family: Georgia, serif; font-size: 13px; color: #1a1a1a; font-weight: 600;">Ingo Schaer</p>
-                        <p style="margin: 2px 0 0 0; font-family: Georgia, serif; font-size: 11px; color: #888;">Co-Founder</p>
+                      <td style="text-align: center; width: 50%; padding: 0 12px; vertical-align: top;">
+                        <img src="${INGO_BOOK_URL}" alt="Propertypreneur by Ingo Schaer" style="width: 120px; height: auto; margin-bottom: 12px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                        <div style="font-size: 12px; font-weight: 600; color: #111827; line-height: 1.4;">Propertypreneur</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">by Ingo Schaer</div>
                       </td>
                     </tr>
                   </table>
-                  <p style="margin: 20px 0 0 0; font-family: Georgia, serif; font-size: 12px; color: #666;">
-                    <a href="tel:+14048005932" style="color: #1a1a1a; text-decoration: none;">(404) 800-5932</a> · 
-                    <a href="mailto:info@peachhausgroup.com" style="color: #b8956a; text-decoration: none;">info@peachhausgroup.com</a>
-                  </p>
+                  <div style="text-align: center; margin-top: 16px;">
+                    <div style="font-size: 12px; color: #6b7280; line-height: 1.6; max-width: 400px; margin: 0 auto;">
+                      As published authors and industry experts, we bring proven strategies and innovative approaches to every property we manage.
+                    </div>
+                  </div>
                 </td>
               </tr>
               
               <!-- Footer -->
               <tr>
-                <td style="padding: 24px 48px 32px 48px; background-color: #faf9f7; border-top: 1px solid #e8e4de;">
-                  <table cellpadding="0" cellspacing="0" width="100%">
-                    <tr>
-                      <td style="text-align: center;">
-                        <p style="margin: 0 0 8px 0; font-family: Georgia, serif; font-size: 12px; color: #8a8a8a;">
-                          PeachHaus Group · Atlanta, Georgia
-                        </p>
-                        <p style="margin: 0; font-family: Georgia, serif; font-size: 11px; color: #aaa;">
-                          © ${currentYear} PeachHaus Group LLC. All rights reserved.
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
+                <td style="background: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+                  <div style="font-size: 11px; color: #9ca3af;">
+                    © ${currentYear} PeachHaus Group LLC · Atlanta, GA
+                  </div>
                 </td>
               </tr>
-              
             </table>
           </td>
         </tr>
