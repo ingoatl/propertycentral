@@ -11,6 +11,18 @@ interface ContextRequest {
   contactId: string;
   incomingMessage?: string;
   messageType: 'sms' | 'email';
+  // NEW: Accept the full conversation thread directly from frontend as backup
+  conversationThread?: Array<{
+    direction: string;
+    body: string;
+    created_at: string;
+    type?: string;
+    subject?: string;
+  }>;
+  // NEW: Additional identifiers for fallback lookup
+  ghlContactId?: string;
+  contactPhone?: string;
+  contactEmail?: string;
 }
 
 interface QuestionItem {
@@ -141,6 +153,28 @@ function extractPromises(message: string): string[] {
   return [...new Set(promises)];
 }
 
+// Extract action requests (what they want us to do)
+function extractActionRequests(message: string): string[] {
+  const actions: string[] = [];
+  
+  const actionPatterns = [
+    /can we (meet|schedule|talk|discuss|call)[^.!?]*[.!?]?/gi,
+    /I('d| would) (like|love|want) (to |you to )[^.!?]+[.!?]?/gi,
+    /please [^.!?]+[.!?]/gi,
+    /let('s| us) [^.!?]+[.!?]/gi,
+    /can you [^.!?]+[.!?]/gi,
+    /I need [^.!?]+[.!?]/gi,
+    /meeting is [^.!?]+[.!?]/gi,
+  ];
+  
+  for (const pattern of actionPatterns) {
+    const matches = message.match(pattern) || [];
+    actions.push(...matches.map(a => a.trim()));
+  }
+  
+  return [...new Set(actions)];
+}
+
 // Detect sentiment of a message
 function detectSentiment(message: string): string {
   const lowerMessage = message.toLowerCase();
@@ -149,7 +183,7 @@ function detectSentiment(message: string): string {
   const gratefulIndicators = ['thank', 'appreciate', 'grateful', 'awesome', 'amazing', 'great job', 'love it', 'perfect', 'excellent', 'wonderful'];
   const confusedIndicators = ['confused', 'don\'t understand', 'not sure', 'unclear', 'what do you mean', 'can you explain', 'lost', 'help me understand'];
   const excitedIndicators = ['excited', 'can\'t wait', 'looking forward', 'thrilled', 'pumped', '!!!', 'so happy', 'finally'];
-  const cautiousIndicators = ['concerned', 'worried', 'hesitant', 'not certain', 'need to think', 'want to make sure', 'before I commit'];
+  const cautiousIndicators = ['concerned', 'worried', 'hesitant', 'not certain', 'need to think', 'want to make sure', 'before I commit', 'vital', 'ensure'];
   
   const countMatches = (indicators: string[]) => 
     indicators.filter(i => lowerMessage.includes(i)).length;
@@ -312,6 +346,8 @@ function analyzeThread(
     conversationPhase = 'negotiation';
   } else if (allContent.includes('onboarding') || allContent.includes('getting started') || allContent.includes('setup')) {
     conversationPhase = 'onboarding';
+  } else if (allContent.includes('meet') || allContent.includes('in person') || allContent.includes('walkthrough') || allContent.includes('see the place')) {
+    conversationPhase = 'scheduling_meeting';
   }
   
   return {
@@ -325,6 +361,26 @@ function analyzeThread(
   };
 }
 
+// Helper to normalize phone numbers for matching
+function normalizePhone(phone: string): string[] {
+  if (!phone) return [];
+  const digits = phone.replace(/\D/g, '');
+  const variants: string[] = [digits];
+  
+  // If has country code (11 digits starting with 1)
+  if (digits.length === 11 && digits.startsWith('1')) {
+    variants.push(digits.slice(1)); // Without country code
+    variants.push(`+${digits}`); // With + prefix
+  }
+  // If 10 digits (no country code)
+  if (digits.length === 10) {
+    variants.push(`1${digits}`); // Add country code
+    variants.push(`+1${digits}`); // With + prefix
+  }
+  
+  return variants;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -335,18 +391,28 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { contactType, contactId, incomingMessage, messageType }: ContextRequest = await req.json();
+    const { 
+      contactType, 
+      contactId, 
+      incomingMessage, 
+      messageType,
+      conversationThread: providedThread,
+      ghlContactId,
+      contactPhone,
+      contactEmail 
+    }: ContextRequest = await req.json();
 
     if (!contactType || !contactId) {
       throw new Error("contactType and contactId are required");
     }
 
     console.log(`Gathering context for ${contactType} ${contactId}`);
+    console.log(`Additional identifiers - GHL: ${ghlContactId}, Phone: ${contactPhone}, Email: ${contactEmail}`);
+    console.log(`Provided thread has ${providedThread?.length || 0} messages`);
 
     // Parallel data fetching
     const [
       contactResult,
-      messagesResult,
       knowledgeResult,
       intelligenceResult,
       toneResult,
@@ -356,14 +422,6 @@ serve(async (req) => {
       contactType === 'lead'
         ? supabase.from('leads').select('*').eq('id', contactId).single()
         : supabase.from('property_owners').select('*, properties(*)').eq('id', contactId).single(),
-      
-      // Get conversation history (last 50 messages)
-      supabase
-        .from('lead_communications')
-        .select('direction, message, created_at, communication_type')
-        .or(`lead_id.eq.${contactId},owner_id.eq.${contactId}`)
-        .order('created_at', { ascending: false })
-        .limit(50),
       
       // Get knowledge base
       supabase
@@ -396,12 +454,92 @@ serve(async (req) => {
         .limit(3),
     ]);
 
+    // Multi-identifier message lookup
+    let messages: Array<{ direction: string; content: string; created_at: string }> = [];
+    
+    // Strategy 1: If we have a provided thread from the frontend, use that as primary source
+    if (providedThread && providedThread.length > 0) {
+      console.log(`Using provided conversation thread with ${providedThread.length} messages`);
+      messages = providedThread
+        .filter(m => m.body && m.body.trim())
+        .map(m => ({
+          direction: m.direction,
+          content: m.body,
+          created_at: m.created_at,
+        }));
+    }
+    
+    // Strategy 2: Query database with multiple identifiers if we don't have enough messages
+    if (messages.length < 5) {
+      console.log(`Attempting database lookup with multiple identifiers...`);
+      
+      // Build OR conditions for all possible identifiers
+      const orConditions: string[] = [];
+      
+      // Try lead_id / owner_id
+      if (contactId) {
+        if (contactType === 'lead') {
+          orConditions.push(`lead_id.eq.${contactId}`);
+        } else {
+          orConditions.push(`owner_id.eq.${contactId}`);
+        }
+      }
+      
+      // Try ghl_contact_id
+      if (ghlContactId) {
+        orConditions.push(`ghl_contact_id.eq.${ghlContactId}`);
+      }
+      
+      // Try phone matching
+      if (contactPhone) {
+        const phoneVariants = normalizePhone(contactPhone);
+        for (const variant of phoneVariants) {
+          orConditions.push(`contact_phone.eq.${variant}`);
+          orConditions.push(`from_number.eq.${variant}`);
+          orConditions.push(`to_number.eq.${variant}`);
+        }
+      }
+      
+      // Try email matching
+      if (contactEmail) {
+        orConditions.push(`contact_email.eq.${contactEmail}`);
+      }
+      
+      if (orConditions.length > 0) {
+        const { data: dbMessages, error: messagesError } = await supabase
+          .from('lead_communications')
+          .select('direction, body, created_at, communication_type')
+          .or(orConditions.join(','))
+          .order('created_at', { ascending: false })
+          .limit(50);
+        
+        if (messagesError) {
+          console.error("Error fetching messages:", messagesError);
+        } else if (dbMessages && dbMessages.length > 0) {
+          console.log(`Found ${dbMessages.length} messages from database`);
+          const dbMapped = dbMessages.reverse().map(m => ({
+            direction: m.direction,
+            content: m.body || '',
+            created_at: m.created_at,
+          })).filter(m => m.content && m.content.trim());
+          
+          // Merge with provided thread (deduplicate by timestamp + content)
+          const existingKeys = new Set(messages.map(m => `${m.created_at}-${m.content.substring(0, 50)}`));
+          for (const msg of dbMapped) {
+            const key = `${msg.created_at}-${msg.content.substring(0, 50)}`;
+            if (!existingKeys.has(key)) {
+              messages.push(msg);
+            }
+          }
+        }
+      }
+    }
+    
+    // Sort messages chronologically
+    messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    console.log(`Final message count: ${messages.length}`);
+
     const contact = contactResult.data;
-    const messages = (messagesResult.data || []).reverse().map(m => ({
-      direction: m.direction,
-      content: m.message,
-      created_at: m.created_at,
-    }));
     const knowledgeEntries = knowledgeResult.data || [];
     const existingIntelligence = intelligenceResult.data;
     const toneData = toneResult.data;
@@ -410,8 +548,8 @@ serve(async (req) => {
     // Build contact profile
     const contactProfile: ContactProfile = {
       name: contact?.name || contact?.full_name || 'Unknown',
-      email: contact?.email,
-      phone: contact?.phone,
+      email: contact?.email || contactEmail,
+      phone: contact?.phone || contactPhone,
       relationshipStage: existingIntelligence?.relationship_stage || 'initial',
       communicationStyle: existingIntelligence?.communication_style || 'unknown',
       emotionalBaseline: existingIntelligence?.emotional_baseline || 'neutral',
@@ -479,9 +617,9 @@ serve(async (req) => {
       relevantKnowledge,
       memories: memories.filter(m => m).slice(0, 10),
       financialContext,
-      recentMessages: messages.slice(-10).map(m => ({
+      recentMessages: messages.slice(-15).map(m => ({
         direction: m.direction,
-        content: m.content.substring(0, 500),
+        content: m.content.substring(0, 800),
         timestamp: m.created_at,
       })),
       metadata: {
@@ -522,7 +660,7 @@ serve(async (req) => {
         });
     }
 
-    console.log(`Context gathered: ${contextPackage.metadata.totalContextItems} items`);
+    console.log(`Context gathered: ${contextPackage.metadata.totalContextItems} items, ${contextPackage.recentMessages.length} recent messages`);
 
     return new Response(
       JSON.stringify({

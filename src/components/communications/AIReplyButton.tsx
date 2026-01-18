@@ -10,8 +10,10 @@ const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call
 interface AIReplyButtonProps {
   contactName: string;
   contactPhone?: string;
+  contactEmail?: string;
   contactId?: string;
   contactType: string;
+  ghlContactId?: string;
   conversationThread: Array<{
     type: string;
     direction: string;
@@ -26,8 +28,10 @@ interface AIReplyButtonProps {
 export function AIReplyButton({
   contactName,
   contactPhone,
+  contactEmail,
   contactId,
   contactType,
+  ghlContactId,
   conversationThread,
   onSendMessage,
   isSending = false,
@@ -45,22 +49,45 @@ export function AIReplyButton({
     setGeneratedReply(null);
 
     try {
-      // Extract the most recent inbound message - this is what we're replying to
-      const lastInboundMessage = conversationThread
+      // Get the most recent inbound messages for context about what we're replying to
+      const inboundMessages = conversationThread
         .filter(msg => msg.direction === "inbound" && msg.body)
-        .pop();
+        .slice(-3); // Last 3 inbound messages for context
       
-      const messageToReplyTo = lastInboundMessage?.body || "";
-      console.log("[AIReplyButton] Replying to message:", messageToReplyTo.substring(0, 100));
+      const lastInboundMessage = inboundMessages[inboundMessages.length - 1];
+      
+      // Build a richer "incoming message" that includes recent context
+      let messageToReplyTo = lastInboundMessage?.body || "";
+      
+      // If there are multiple recent inbound messages, combine them for better context
+      if (inboundMessages.length > 1) {
+        const recentContext = inboundMessages
+          .slice(-2)
+          .map(m => m.body)
+          .join("\n\n");
+        messageToReplyTo = recentContext;
+      }
+      
+      console.log("[AIReplyButton] Generating reply with:", {
+        contactId,
+        contactType,
+        threadLength: conversationThread.length,
+        inboundMessagePreview: messageToReplyTo.substring(0, 100),
+        hasInstructions: !!withInstructions || !!userInstructions,
+      });
 
-      // Use the unified AI system for better responses
+      // Pass the FULL conversation thread to the AI
       const cType = contactType === "owner" ? "owner" : "lead";
       const response = await replyToMessage(
         cType,
         contactId || "",
         "sms",
         messageToReplyTo,
-        withInstructions || userInstructions || undefined
+        withInstructions || userInstructions || undefined,
+        conversationThread, // Pass full thread!
+        contactPhone,
+        contactEmail,
+        ghlContactId
       );
 
       if (response?.message) {
@@ -70,6 +97,13 @@ export function AIReplyButton({
         setUserInstructions("");
         
         // Log quality info for debugging
+        console.log("[AIReplyButton] Generated reply:", {
+          qualityScore: response.qualityScore,
+          messagesAnalyzed: response.contextUsed.messagesAnalyzed,
+          sentimentDetected: response.contextUsed.sentimentDetected,
+          conversationPhase: response.contextUsed.conversationPhase,
+        });
+        
         if (response.qualityScore < 70) {
           console.warn("[AIReplyButton] Low quality score:", response.qualityScore, response.validationIssues);
         }

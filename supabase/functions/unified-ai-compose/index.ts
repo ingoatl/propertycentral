@@ -17,6 +17,18 @@ interface ComposeRequest {
   includeCalendarLink?: boolean;
   includeIncomeOffer?: boolean;
   subject?: string;
+  // NEW: Accept the full conversation thread directly
+  conversationThread?: Array<{
+    direction: string;
+    body: string;
+    created_at: string;
+    type?: string;
+    subject?: string;
+  }>;
+  // NEW: Additional identifiers for context lookup
+  ghlContactId?: string;
+  contactPhone?: string;
+  contactEmail?: string;
 }
 
 interface ContextPackage {
@@ -96,7 +108,8 @@ function getSentimentInstructions(sentiment: string): string {
 - Provide extra detail and reassurance
 - Acknowledge their concerns directly
 - No pressure or urgency
-- Offer alternatives or flexibility`,
+- Offer alternatives or flexibility
+- Show that you understand meeting in person is important to them`,
     
     neutral: `EMOTIONAL APPROACH - Standard helpful tone:
 - Be warm and professional
@@ -107,7 +120,7 @@ function getSentimentInstructions(sentiment: string): string {
   return instructions[sentiment] || instructions.neutral;
 }
 
-// Build the prompt for AI generation
+// Build the prompt for AI generation with FULL conversation context
 function buildPrompt(
   request: ComposeRequest,
   context: ContextPackage
@@ -116,7 +129,7 @@ function buildPrompt(
   const { contactProfile, toneProfile, threadAnalysis, relevantKnowledge, memories, recentMessages } = context;
   
   // Base context section
-  let prompt = `You are a professional property management assistant responding on behalf of PeachHaus Property Management. Your responses should feel like they come from a real person, not an AI.
+  let prompt = `You are a professional property management assistant responding on behalf of PeachHaus Property Management. Your responses should feel like they come from a real person named Ingo, not an AI.
 
 ## WHO YOU'RE TALKING TO
 Name: ${contactProfile.name}
@@ -143,10 +156,27 @@ ${toneProfile.sampleMessages.length > 0 ? `Sample of your voice to mimic:\n"${to
 
 `;
 
+  // Add the FULL CONVERSATION for context - this is CRITICAL
+  if (recentMessages.length > 0) {
+    prompt += `## FULL CONVERSATION HISTORY (CRITICAL - Read carefully!)
+This is the complete conversation so far. Study it to understand:
+- What has been discussed/agreed
+- What you've already sent them (income reports, links, etc.)
+- What they are specifically asking for
+- What NOT to repeat or re-offer
+
+`;
+    recentMessages.forEach((m, idx) => {
+      const date = new Date(m.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      prompt += `[${date}] ${m.direction === 'inbound' ? contactProfile.name.split(' ')[0].toUpperCase() : 'YOU (INGO)'}: ${m.content}\n\n`;
+    });
+    prompt += '\n';
+  }
+
   // Add questions to answer (critical)
   if (threadAnalysis.questions.length > 0) {
-    prompt += `## QUESTIONS YOU MUST ANSWER
-These are unanswered questions from their messages. Address EACH ONE directly:
+    prompt += `## UNANSWERED QUESTIONS - YOU MUST ADDRESS THESE
+These are questions from their messages that haven't been answered yet:
 ${threadAnalysis.questions.map((q, i) => `${i + 1}. "${q.text}"`).join('\n')}
 
 `;
@@ -169,14 +199,6 @@ ${memories.slice(0, 5).map(m => `- ${m}`).join('\n')}
 `;
   }
 
-  // Add recent conversation context
-  if (recentMessages.length > 0) {
-    prompt += `## RECENT CONVERSATION
-${recentMessages.slice(-5).map(m => `${m.direction === 'inbound' ? 'THEM' : 'YOU'}: ${m.content.substring(0, 200)}`).join('\n')}
-
-`;
-  }
-
   // Add financial context for owners
   if (context.financialContext) {
     prompt += `## PROPERTY FINANCIAL CONTEXT
@@ -186,20 +208,23 @@ Occupancy Rate: ${context.financialContext.occupancyRate ? `${context.financialC
 `;
   }
 
-  // Action-specific instructions
+  // Action-specific instructions - ENHANCED
   const actionInstructions: Record<string, string> = {
     compose: `## YOUR TASK: COMPOSE A NEW ${messageType.toUpperCase()}
 Write a ${messageType === 'sms' ? 'concise SMS (under 300 characters ideally)' : 'professional email'} to ${contactProfile.name}.
 ${userInstructions ? `User's specific instructions: ${userInstructions}` : 'Write an appropriate message based on the context.'}`,
     
-    reply: `## YOUR TASK: REPLY TO THEIR MESSAGE
-Their message: "${incomingMessage}"
+    reply: `## YOUR TASK: REPLY TO THEIR LATEST MESSAGE
+Their latest message: "${incomingMessage || recentMessages.filter(m => m.direction === 'inbound').pop()?.content || 'Unknown'}"
 
-Write a ${messageType === 'sms' ? 'concise SMS reply' : 'professional email reply'} that:
-1. Addresses every question they asked
-2. Matches the emotional tone needed
-3. Moves the conversation forward
-${userInstructions ? `Additional instructions: ${userInstructions}` : ''}`,
+CRITICAL RULES FOR YOUR REPLY:
+1. DIRECTLY address what they're asking for (e.g., if they want to meet in person, confirm you can meet in person)
+2. Reference specifics they mentioned (dates, locations, concerns)
+3. DON'T re-offer things you've already done (check the conversation history!)
+4. DON'T be generic - show you've read and understood their message
+5. If they're asking for a meeting/call, suggest specific times or confirm their proposed times
+6. Keep it conversational and human
+${userInstructions ? `\nAdditional instructions: ${userInstructions}` : ''}`,
     
     improve: `## YOUR TASK: IMPROVE THIS DRAFT
 Current draft: "${currentMessage}"
@@ -229,10 +254,11 @@ Rewrite with a warmer, more personable tone while keeping it professional.`,
     prompt += `
 
 ## SMS CONSTRAINTS
-- Keep it concise (ideally under 300 characters)
-- No formal greetings or sign-offs needed
-- Get to the point quickly
-- One clear call to action if needed`;
+- Keep it concise (ideally under 300 characters, max 500)
+- No formal greetings needed - jump straight to the point
+- End with "- Ingo" for signature
+- One clear call to action if needed
+- Sound like a real person texting, not a corporate message`;
   } else {
     prompt += `
 
@@ -245,7 +271,7 @@ Rewrite with a warmer, more personable tone while keeping it professional.`,
 
   // Calendar link instruction
   if (request.includeCalendarLink) {
-    prompt += `\n\nInclude this scheduling link naturally: https://peachhaus.com/schedule`;
+    prompt += `\n\nInclude this scheduling link naturally: https://propertycentral.lovable.app/book-discovery-call`;
   }
 
   // Final output format
@@ -253,7 +279,8 @@ Rewrite with a warmer, more personable tone while keeping it professional.`,
 
 ## OUTPUT FORMAT
 ${messageType === 'email' ? 'If this is a new email, start with "SUBJECT: " on its own line, then the body.' : ''}
-Write ONLY the message content. No explanations, no "Here's the message:" prefix.`;
+Write ONLY the message content. No explanations, no "Here's the message:" prefix.
+Sound like Ingo - a real person who's been chatting with them, not a corporate AI.`;
 
   return prompt;
 }
@@ -271,7 +298,8 @@ function validateResponse(
   const bannedPhrases = [
     'just checking in', 'hope this finds you', 'per our conversation',
     'don\'t hesitate', 'at your earliest convenience', 'touch base',
-    'circle back', 'synergy', 'leverage'
+    'circle back', 'synergy', 'leverage', 'as mentioned',
+    'I understand you\'re interested', 'I\'d love to help you',
   ];
   
   const responseLower = response.toLowerCase();
@@ -324,15 +352,16 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const request: ComposeRequest = await req.json();
-    const { action, messageType, contactType, contactId } = request;
+    const { action, messageType, contactType, contactId, conversationThread, ghlContactId, contactPhone, contactEmail } = request;
 
     if (!contactType || !contactId || !messageType) {
       throw new Error("contactType, contactId, and messageType are required");
     }
 
     console.log(`Unified AI Compose: ${action} ${messageType} for ${contactType} ${contactId}`);
+    console.log(`Conversation thread provided: ${conversationThread?.length || 0} messages`);
 
-    // Step 1: Get unified context
+    // Step 1: Get unified context - pass the conversation thread for fallback
     const contextResponse = await fetch(
       `${supabaseUrl}/functions/v1/unified-context-engine`,
       {
@@ -346,6 +375,10 @@ serve(async (req) => {
           contactId,
           incomingMessage: request.incomingMessage,
           messageType,
+          conversationThread, // Pass the thread for fallback
+          ghlContactId,
+          contactPhone,
+          contactEmail,
         }),
       }
     );
@@ -356,6 +389,8 @@ serve(async (req) => {
     }
 
     const context: ContextPackage = contextResult.context;
+
+    console.log(`Context received: ${context.recentMessages?.length || 0} recent messages, ${context.threadAnalysis?.questions?.length || 0} questions`);
 
     // Step 2: Build the prompt
     const prompt = buildPrompt(request, context);
@@ -374,7 +409,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         messages: [
-          { role: "system", content: "You are a professional property management assistant. Write natural, human-like responses." },
+          { role: "system", content: "You are Ingo, a real property manager at PeachHaus Group. Write natural, human responses - not AI-sounding corporate speak. Be conversational, helpful, and specific." },
           { role: "user", content: prompt }
         ],
         model: "google/gemini-3-flash-preview",
@@ -400,6 +435,9 @@ serve(async (req) => {
 
     // Clean up the response
     generatedMessage = generatedMessage.trim();
+    
+    // Remove any meta-commentary the AI might add
+    generatedMessage = generatedMessage.replace(/^(Here's|Here is|Sure,|Okay,|Of course)[^:]*:\s*/i, '');
     
     // Extract subject if email
     let subject = request.subject;
@@ -464,6 +502,7 @@ serve(async (req) => {
           questionsAnswered: context.threadAnalysis.questions.length,
           sentimentDetected: context.threadAnalysis.lastInboundSentiment,
           conversationPhase: context.threadAnalysis.conversationPhase,
+          messagesAnalyzed: context.recentMessages.length,
         },
         metadata: {
           model: 'google/gemini-3-flash-preview',
