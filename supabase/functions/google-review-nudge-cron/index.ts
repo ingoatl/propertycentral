@@ -17,16 +17,17 @@ function formatPhoneE164(phone: string): string {
   return phone;
 }
 
-// Check if within send window (10am-6pm EST - broader window for follow-ups)
-function isWithinSendWindow(): { inWindow: boolean; currentESTHour: number } {
+// Get current EST hour for logging
+function getCurrentESTHour(): number {
   const now = new Date();
   const estOffset = -5 * 60;
   const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   const estMinutes = utcMinutes + estOffset;
-  const estHour = Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
-  // 10am-6pm EST for follow-up nudges
-  return { inWindow: estHour >= 10 && estHour < 18, currentESTHour: estHour };
+  return Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
 }
+
+// Max nudges per run to avoid rate limiting
+const MAX_NUDGES_PER_RUN = 10;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -51,22 +52,10 @@ serve(async (req) => {
       // No body or invalid JSON, use defaults
     }
 
-    // Only run during send window (unless forced)
-    const windowCheck = isWithinSendWindow();
-    console.log(`Current EST hour: ${windowCheck.currentESTHour}, In window (10am-6pm): ${windowCheck.inWindow}, Force: ${forceRun}`);
-    
-    if (!forceRun && !windowCheck.inWindow) {
-      console.log("Outside send window (10am-6pm EST), skipping nudges");
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Outside send window", 
-          nudgesSent: 0,
-          currentESTHour: windowCheck.currentESTHour 
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const currentESTHour = getCurrentESTHour();
+    console.log(`=== Google Review Nudge Cron Started ===`);
+    console.log(`Current EST hour: ${currentESTHour}`);
+    console.log(`This function runs on schedule - cron controls timing (1pm EST daily)`);
 
     console.log("Starting Google Review nudge cron...");
 
