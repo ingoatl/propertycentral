@@ -305,17 +305,33 @@ serve(async (req) => {
         }
       }
     } else if (ownerId) {
-      // Fetch owner data
+      // Fetch owner data with FULL property details (not onboarding tasks)
       const { data: owner } = await supabase
         .from("property_owners")
-        .select("*, properties(*)")
+        .select("*, properties(id, name, address, rental_type, property_type, management_fee_percentage, nightly_rate, billing_status, contract_signed_at, first_listing_live_at)")
         .eq("id", ownerId)
         .single();
       
       ownerData = owner;
       
       if (owner) {
-        fullContext = `Owner: ${owner.name}\nEmail: ${owner.email || "N/A"}\nPhone: ${owner.phone || "N/A"}\nProperties: ${owner.properties?.map((p: any) => p.name || p.address).join(", ") || "N/A"}`;
+        fullContext = `Owner: ${owner.name}\nEmail: ${owner.email || "N/A"}\nPhone: ${owner.phone || "N/A"}`;
+        
+        // Add detailed property information
+        if (owner.properties && owner.properties.length > 0) {
+          fullContext += `\n\nPROPERTIES MANAGED:`;
+          for (const p of owner.properties) {
+            fullContext += `\n• ${p.name || p.address || "Unnamed Property"}`;
+            if (p.address) fullContext += `\n  Address: ${p.address}`;
+            if (p.rental_type) fullContext += `\n  Rental Type: ${p.rental_type}`;
+            if (p.property_type) fullContext += `\n  Property Type: ${p.property_type}`;
+            if (p.management_fee_percentage) fullContext += `\n  Management Fee: ${p.management_fee_percentage}%`;
+            if (p.nightly_rate) fullContext += `\n  Nightly Rate: $${p.nightly_rate}`;
+            if (p.billing_status) fullContext += `\n  Billing Status: ${p.billing_status}`;
+            if (p.contract_signed_at) fullContext += `\n  Contract Signed: ${new Date(p.contract_signed_at).toLocaleDateString()}`;
+            if (p.first_listing_live_at) fullContext += `\n  First Listing Live: ${new Date(p.first_listing_live_at).toLocaleDateString()}`;
+          }
+        }
       }
 
       // Fetch communications
