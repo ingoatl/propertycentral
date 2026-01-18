@@ -32,7 +32,7 @@ const SIGNATURES: Record<string, string> = {
 <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse;">
   <tr>
     <td style="padding-right: 12px; border-right: 3px solid #e5a653; vertical-align: top; width: 100px;">
-      <img src="${SITE_URL}/images/ingo-headshot.png" alt="Ingo Schaer" width="80" height="80" style="border-radius: 50%; display: block; border: 2px solid #e5a653;" />
+      <img src="${SITE_URL}/images/ingo-headshot.png" alt="Ingo Schaer" width="80" height="80" style="border-radius: 50%; display: block;" />
       <img src="${SITE_URL}/images/ingo-signature.png" alt="" width="80" style="display: block; margin-top: 6px;" />
     </td>
     <td style="padding-left: 12px; vertical-align: top;">
@@ -50,7 +50,7 @@ const SIGNATURES: Record<string, string> = {
 <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse;">
   <tr>
     <td style="padding-right: 12px; border-right: 3px solid #e5a653; vertical-align: top; width: 100px;">
-      <img src="${SITE_URL}/images/anja-headshot.png" alt="Anja Schaer" width="80" height="80" style="border-radius: 50%; display: block; border: 2px solid #e5a653;" />
+      <img src="${SITE_URL}/images/anja-headshot.png" alt="Anja Schaer" width="80" height="80" style="border-radius: 50%; display: block;" />
       <img src="${SITE_URL}/images/anja-signature.png" alt="" width="80" style="display: block; margin-top: 6px;" />
     </td>
     <td style="padding-left: 12px; vertical-align: top;">
