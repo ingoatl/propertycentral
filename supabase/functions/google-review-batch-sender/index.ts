@@ -17,16 +17,13 @@ function formatPhoneE164(phone: string): string {
   return phone.startsWith('+') ? phone : `+${digits}`;
 }
 
-// Check if current time is within optimal send window (5pm-8pm EST)
-function isWithinSendWindow(): { inWindow: boolean; currentESTHour: number } {
+// Get current EST hour for logging
+function getCurrentESTHour(): number {
   const now = new Date();
-  // EST is UTC-5 (or EDT UTC-4, but we'll use EST for consistency)
   const estOffset = -5 * 60;
   const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   const estMinutes = utcMinutes + estOffset;
-  const estHour = Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
-  // 5pm-8pm EST = hours 17, 18, 19
-  return { inWindow: estHour >= 17 && estHour < 20, currentESTHour: estHour };
+  return Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
 }
 
 // Best practice: Max 5 SMS per run
@@ -59,22 +56,11 @@ serve(async (req) => {
       // No body or invalid JSON, use defaults
     }
 
-    const windowCheck = isWithinSendWindow();
-    console.log(`Current EST hour: ${windowCheck.currentESTHour}, In window (6-8pm): ${windowCheck.inWindow}, Force: ${forceRun}, Cron: ${isCronJob}`);
-
-    // Check if we're in the optimal send window (unless forced)
-    if (!forceRun && !windowCheck.inWindow) {
-      console.log("Outside send window (6-8pm EST), skipping batch send");
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: `Outside send window (6-8pm EST). Current EST hour: ${windowCheck.currentESTHour}. Use forceRun to override.`,
-          sentCount: 0,
-          currentESTHour: windowCheck.currentESTHour
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const currentESTHour = getCurrentESTHour();
+    console.log(`=== Google Review Batch Sender Started ===`);
+    console.log(`Current EST hour: ${currentESTHour}, Cron: ${isCronJob}, Force: ${forceRun}`);
+    console.log(`This function runs on schedule - no time window check needed (cron controls timing)`);
+    console.log(`Daily schedule: 5pm EST (22 UTC), 6pm EST (23 UTC), 7pm EST (00 UTC)`);
 
     // Auto-sync reviews from OwnerRez first (to get phone numbers)
     console.log("Auto-syncing reviews from OwnerRez to get latest phone numbers...");
