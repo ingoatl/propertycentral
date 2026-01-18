@@ -202,6 +202,89 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_response_quality: {
+        Row: {
+          communication_id: string | null
+          contact_id: string | null
+          contact_type: string
+          context_summary: Json | null
+          created_at: string | null
+          edit_distance: number | null
+          final_response: string | null
+          generated_response: string
+          generation_time_ms: number | null
+          id: string
+          incoming_message: string | null
+          knowledge_entries_used: Json | null
+          message_type: string
+          model_used: string | null
+          quality_score: number | null
+          questions_answered: Json | null
+          questions_detected: Json | null
+          sentiment_detected: string | null
+          tone_profile_used: Json | null
+          user_id: string | null
+          validation_issues: Json | null
+          was_sent_as_is: boolean | null
+        }
+        Insert: {
+          communication_id?: string | null
+          contact_id?: string | null
+          contact_type: string
+          context_summary?: Json | null
+          created_at?: string | null
+          edit_distance?: number | null
+          final_response?: string | null
+          generated_response: string
+          generation_time_ms?: number | null
+          id?: string
+          incoming_message?: string | null
+          knowledge_entries_used?: Json | null
+          message_type: string
+          model_used?: string | null
+          quality_score?: number | null
+          questions_answered?: Json | null
+          questions_detected?: Json | null
+          sentiment_detected?: string | null
+          tone_profile_used?: Json | null
+          user_id?: string | null
+          validation_issues?: Json | null
+          was_sent_as_is?: boolean | null
+        }
+        Update: {
+          communication_id?: string | null
+          contact_id?: string | null
+          contact_type?: string
+          context_summary?: Json | null
+          created_at?: string | null
+          edit_distance?: number | null
+          final_response?: string | null
+          generated_response?: string
+          generation_time_ms?: number | null
+          id?: string
+          incoming_message?: string | null
+          knowledge_entries_used?: Json | null
+          message_type?: string
+          model_used?: string | null
+          quality_score?: number | null
+          questions_answered?: Json | null
+          questions_detected?: Json | null
+          sentiment_detected?: string | null
+          tone_profile_used?: Json | null
+          user_id?: string | null
+          validation_issues?: Json | null
+          was_sent_as_is?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_response_quality_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "lead_communications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appliance_warranties: {
         Row: {
           appliance_type: string
@@ -926,6 +1009,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      contact_intelligence: {
+        Row: {
+          avg_response_time_hours: number | null
+          communication_style: string | null
+          contact_id: string
+          contact_type: string
+          created_at: string | null
+          decision_making_speed: string | null
+          emotional_baseline: string | null
+          id: string
+          interests: Json | null
+          last_analyzed_at: string | null
+          last_sentiment: string | null
+          our_promises: Json | null
+          pain_points: Json | null
+          preferred_channel: string | null
+          relationship_stage: string | null
+          sentiment_trajectory: string | null
+          topic_threads: Json | null
+          total_messages_received: number | null
+          total_messages_sent: number | null
+          unanswered_questions: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_response_time_hours?: number | null
+          communication_style?: string | null
+          contact_id: string
+          contact_type: string
+          created_at?: string | null
+          decision_making_speed?: string | null
+          emotional_baseline?: string | null
+          id?: string
+          interests?: Json | null
+          last_analyzed_at?: string | null
+          last_sentiment?: string | null
+          our_promises?: Json | null
+          pain_points?: Json | null
+          preferred_channel?: string | null
+          relationship_stage?: string | null
+          sentiment_trajectory?: string | null
+          topic_threads?: Json | null
+          total_messages_received?: number | null
+          total_messages_sent?: number | null
+          unanswered_questions?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_response_time_hours?: number | null
+          communication_style?: string | null
+          contact_id?: string
+          contact_type?: string
+          created_at?: string | null
+          decision_making_speed?: string | null
+          emotional_baseline?: string | null
+          id?: string
+          interests?: Json | null
+          last_analyzed_at?: string | null
+          last_sentiment?: string | null
+          our_promises?: Json | null
+          pain_points?: Json | null
+          preferred_channel?: string | null
+          relationship_stage?: string | null
+          sentiment_trajectory?: string | null
+          topic_threads?: Json | null
+          total_messages_received?: number | null
+          total_messages_sent?: number | null
+          unanswered_questions?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       conversation_notes: {
         Row: {
