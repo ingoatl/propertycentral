@@ -1,5 +1,5 @@
 import { SlideLayout } from "../SlideLayout";
-import { Star, DollarSign, Clock, TrendingUp } from "lucide-react";
+import { Star, Home, Clock, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
 function AnimatedCounter({ end, duration = 2000, prefix = "", suffix = "" }: { 
@@ -48,12 +48,11 @@ export function ByTheNumbersSlide() {
       color: "from-amber-400 to-yellow-500"
     },
     { 
-      icon: DollarSign, 
-      value: 2.2, 
-      suffix: "M+", 
-      label: "in Owner Earnings",
-      color: "from-green-400 to-emerald-500",
-      decimals: true
+      icon: Home, 
+      value: 50, 
+      suffix: "+", 
+      label: "Properties Managed",
+      color: "from-green-400 to-emerald-500"
     },
     { 
       icon: TrendingUp, 
@@ -100,16 +99,12 @@ export function ByTheNumbersSlide() {
 
                 {/* Value */}
                 <div className="text-4xl md:text-5xl font-bold text-white mb-2">
-                  {stat.decimals ? (
-                    <span>{stat.prefix}$<AnimatedCounter end={22} duration={2000} suffix=".2M+" /></span>
-                  ) : (
-                    <AnimatedCounter 
-                      end={stat.value} 
-                      prefix={stat.prefix} 
-                      suffix={stat.suffix} 
-                      duration={2000} 
-                    />
-                  )}
+                  <AnimatedCounter 
+                    end={stat.value} 
+                    prefix={stat.prefix} 
+                    suffix={stat.suffix} 
+                    duration={2000} 
+                  />
                 </div>
 
                 {/* Label */}
