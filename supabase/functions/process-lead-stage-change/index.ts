@@ -557,8 +557,7 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
   ], currentStage);
 }
 
-// GIF URL for welcome onboarding email
-const WELCOME_GIF_URL = "https://storage.googleapis.com/highlevel-backend.appspot.com/location/xlvBBzSp6gNM8H8fYNlr/workflow/929fb132-e7ea-43d8-a7d9-9aa4b4b03c66/aed8c70b-76cf-4729-971f-3a36f7125065.gif?alt=media&token=606b1c6b-6f8b-40e2-8d5d-b41413263e3f";
+// Note: We use inline emoji/text styling instead of external GIF URLs to avoid spam filters
 
 // Build welcome onboarding email for contract_signed stage (NOT payment setup - that comes later)
 function buildWelcomeOnboardingEmailHtml(recipientName: string, propertyAddress: string): string {
@@ -624,10 +623,11 @@ function buildWelcomeOnboardingEmailHtml(recipientName: string, propertyAddress:
                 </td>
               </tr>
               
-              <!-- Welcome GIF -->
+              <!-- Welcome Visual - Simple peach icon banner instead of external GIF to avoid spam filters -->
               <tr>
-                <td style="padding: 24px 32px 0 32px; text-align: center;">
-                  <img src="${WELCOME_GIF_URL}" alt="Welcome" style="max-width: 100%; height: auto; border-radius: 12px;" />
+                <td style="padding: 24px 32px 0 32px; text-align: center; background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%); border-radius: 12px; margin: 0 32px;">
+                  <div style="font-size: 64px; line-height: 1;">🍑</div>
+                  <div style="font-size: 16px; color: #92400e; font-weight: 600; padding: 8px 0 16px;">Let's get started!</div>
                 </td>
               </tr>
               
@@ -1140,9 +1140,10 @@ serve(async (req) => {
       } else if (newStage === 'contract_signed') {
         // CONTRACT_SIGNED: Send welcome onboarding email FIRST (W9 and payment setup come later)
         directEmailHtml = buildWelcomeOnboardingEmailHtml(recipientFirstName, lead.property_address || "");
-        directEmailSubject = "🎉 Welcome to the PeachHaus Family! - Your Onboarding Journey Starts Now";
+        // Clean subject line to avoid spam filters - no emojis, clear professional text
+        directEmailSubject = "Welcome to PeachHaus - Your Onboarding Has Started";
         sendAdminCopy = true;
-        adminEmailSubject = `🎉 Welcome Email Sent: ${lead.name}`;
+        adminEmailSubject = `Welcome Email Sent: ${lead.name}`;
         console.log(`Stage contract_signed: Sending welcome email FIRST for lead ${leadId}`);
       } else if (newStage === 'welcome_email_w9') {
         // WELCOME_EMAIL_W9: Send payment setup email (triggered 1 hour after contract_signed OR manually)
@@ -1252,10 +1253,15 @@ serve(async (req) => {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              from: "PeachHaus Group LLC - Ingo Schaer <ingo@peachhausgroup.com>",
+              from: "Ingo Schaer | PeachHaus <ingo@peachhausgroup.com>",
+              reply_to: "info@peachhausgroup.com",
               to: [lead.email],
               subject: directEmailSubject,
               html: directEmailHtml,
+              headers: {
+                "List-Unsubscribe": "<mailto:unsubscribe@peachhausgroup.com>",
+                "X-Priority": "3",
+              },
             }),
           });
 

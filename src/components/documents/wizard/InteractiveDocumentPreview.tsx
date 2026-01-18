@@ -59,27 +59,15 @@ export function InteractiveDocumentPreview({
   const [fieldsWithPositions, setFieldsWithPositions] = useState<FieldWithPosition[]>([]);
 
   useEffect(() => {
+    // Wait until we know the actual page count
+    if (numPages === 0) {
+      console.log('[InteractiveDocumentPreview] Waiting for PDF to load...');
+      return;
+    }
+    
     // Create positioned fields from detected fields
-    // USE ACTUAL POSITIONS from field_mappings if available
-    console.log('[InteractiveDocumentPreview] Processing fields:', data.detectedFields.length, 'numPages:', numPages);
-    
-    // Group fields by category for better page distribution
-    const categoryPageMap: Record<string, number> = {
-      property: 1,
-      financial: 1,
-      dates: 1,
-      occupancy: 2,
-      contact: 2,
-      identification: 2,
-      vehicle: 3,
-      emergency: 3,
-      acknowledgment: Math.max(numPages - 1, 3),
-      signature: numPages || 1, // Signatures on LAST page
-      other: 1,
-    };
-    
-    // Track fields per page for Y positioning
-    const fieldsPerPage: Record<number, number> = {};
+    // SCALE positions based on actual page count vs stored page numbers
+    console.log('[InteractiveDocumentPreview] Processing fields:', data.detectedFields.length, 'actualPages:', numPages);
     
     // FILTER: Only include fields that have values OR are signature fields
     // This matches the template analysis behavior - only show filled fields
@@ -93,16 +81,49 @@ export function InteractiveDocumentPreview({
     
     console.log('[InteractiveDocumentPreview] Fields with values to show:', fieldsToShow.length, 'of', data.detectedFields.length);
     
+    // Determine the max page number from stored fields to calculate scale factor
+    const maxStoredPage = Math.max(1, ...fieldsToShow.map(f => f.page || 1));
+    const scaleFactor = maxStoredPage > numPages ? numPages / maxStoredPage : 1;
+    console.log('[InteractiveDocumentPreview] Scale factor:', scaleFactor, 'maxStoredPage:', maxStoredPage);
+    
+    // Group fields by category for fallback positioning
+    const categoryPageMap: Record<string, number> = {
+      property: 1,
+      financial: 1,
+      dates: 1,
+      occupancy: Math.min(2, numPages),
+      contact: Math.min(2, numPages),
+      identification: Math.min(2, numPages),
+      vehicle: Math.min(3, numPages),
+      emergency: Math.min(3, numPages),
+      acknowledgment: Math.max(numPages - 1, 1),
+      signature: numPages, // Signatures on LAST page
+      other: 1,
+    };
+    
+    // Track fields per page for Y positioning (fallback)
+    const fieldsPerPage: Record<number, number> = {};
+    
     const positioned = fieldsToShow.map((field, index) => {
       const value = data.fieldValues[field.api_id];
       
-      // Check if field has position data from field_mappings (stored in the field object)
+      // Check if field has position data from field_mappings
       const hasPosition = field.x !== undefined && field.y !== undefined && field.page !== undefined;
+      const isSignature = (field.type as string) === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
       
-      if (hasPosition) {
-        // Use actual position from field_mappings - but adjust page if it exceeds numPages
-        const actualPage = numPages > 0 ? Math.min(field.page!, numPages) : field.page!;
-        console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: using stored position page=${actualPage}, x=${field.x}, y=${field.y}`);
+      if (hasPosition && field.page !== undefined) {
+        // SCALE the stored page number to actual document pages
+        let actualPage: number;
+        
+        if (isSignature) {
+          // Signatures ALWAYS go on the last page
+          actualPage = numPages;
+        } else {
+          // Scale other fields proportionally
+          actualPage = Math.max(1, Math.min(numPages, Math.ceil(field.page * scaleFactor)));
+        }
+        
+        console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: stored page=${field.page} -> actual page=${actualPage}`);
         return {
           ...field,
           x: field.x!,
@@ -115,20 +136,19 @@ export function InteractiveDocumentPreview({
       }
       
       // Fallback: distribute across pages based on field category/type
-      const isSignature = (field.type as string) === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
       const isDateField = field.type === "date" && (field.api_id.includes("sign") || field.api_id.includes("tenant") || field.api_id.includes("host"));
       const category = field.category || "other";
       
-      // Determine page based on category and numPages
+      // Determine page based on category and actual numPages
       let estimatedPage = 1;
       if (isSignature || isDateField) {
         // Signatures and related dates go on the LAST page
-        estimatedPage = numPages > 0 ? numPages : 4;
+        estimatedPage = numPages;
       } else if (categoryPageMap[category]) {
-        estimatedPage = Math.min(categoryPageMap[category], numPages > 0 ? numPages : 10);
+        estimatedPage = categoryPageMap[category];
       } else {
-        // Distribute other fields based on index
-        estimatedPage = Math.min(Math.floor(index / 8) + 1, numPages > 0 ? numPages : 5);
+        // Distribute other fields based on index across available pages
+        estimatedPage = Math.min(Math.floor(index / 8) + 1, numPages);
       }
       
       // Track and calculate Y position based on fields already on this page
@@ -148,7 +168,7 @@ export function InteractiveDocumentPreview({
         yPos = 70 + (fieldIndexOnPage * 8); // Start at 70% from top
       }
       
-      console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: estimated page=${estimatedPage}, y=${yPos}, category=${category}`);
+      console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: fallback page=${estimatedPage}, y=${yPos}, category=${category}`);
       
       return {
         ...field,
