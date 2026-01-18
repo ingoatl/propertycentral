@@ -3458,6 +3458,53 @@ export type Database = {
           },
         ]
       }
+      lead_scheduled_emails: {
+        Row: {
+          created_at: string | null
+          email_type: string
+          error_message: string | null
+          id: string
+          lead_id: string
+          metadata: Json | null
+          scheduled_for: string
+          sent_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email_type: string
+          error_message?: string | null
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email_type?: string
+          error_message?: string | null
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_scheduled_emails_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_timeline: {
         Row: {
           action: string
@@ -10050,6 +10097,7 @@ export type Database = {
         | "send_contract"
         | "contract_out"
         | "contract_signed"
+        | "welcome_email_w9"
         | "ach_form_signed"
         | "onboarding_form_requested"
         | "insurance_requested"
@@ -10223,6 +10271,7 @@ export const Constants = {
         "send_contract",
         "contract_out",
         "contract_signed",
+        "welcome_email_w9",
         "ach_form_signed",
         "onboarding_form_requested",
         "insurance_requested",

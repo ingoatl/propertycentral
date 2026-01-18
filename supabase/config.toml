@@ -485,3 +485,6 @@ verify_jwt = true
 
 [functions.suggest-email-reply]
 verify_jwt = true
+
+[functions.process-scheduled-emails]
+verify_jwt = false
