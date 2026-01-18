@@ -6,8 +6,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useUnifiedAI } from "@/hooks/useUnifiedAI";
 
 const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
 
@@ -17,6 +17,8 @@ interface AIWritingAssistantProps {
   contactName?: string;
   conversationContext?: string;
   messageType: "sms" | "email";
+  contactId?: string;
+  contactType?: "lead" | "owner";
 }
 
 type ActionType = "improve" | "shorter" | "professional" | "generate" | "friendly";
@@ -27,36 +29,53 @@ export function AIWritingAssistant({
   contactName,
   conversationContext,
   messageType,
+  contactId,
+  contactType,
 }: AIWritingAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // Use the unified AI hook for better context-aware responses
+  const { 
+    composeMessage, 
+    improveMessage, 
+    shortenMessage, 
+    makeProfessional, 
+    makeFriendly,
+    isLoading 
+  } = useUnifiedAI();
 
   const handleAction = async (action: ActionType) => {
-    setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-message-assistant", {
-        body: {
-          action,
-          currentMessage,
-          contactName,
-          conversationContext,
-          messageType,
-        },
-      });
+      let response = null;
+      const cType = contactType || "lead";
+      const cId = contactId || "";
+      
+      switch (action) {
+        case "generate":
+          response = await composeMessage(cType, cId, messageType);
+          break;
+        case "improve":
+          response = await improveMessage(cType, cId, messageType, currentMessage);
+          break;
+        case "shorter":
+          response = await shortenMessage(cType, cId, messageType, currentMessage);
+          break;
+        case "professional":
+          response = await makeProfessional(cType, cId, messageType, currentMessage);
+          break;
+        case "friendly":
+          response = await makeFriendly(cType, cId, messageType, currentMessage);
+          break;
+      }
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      if (data?.message) {
-        onMessageGenerated(data.message);
+      if (response?.message) {
+        onMessageGenerated(response.message);
         toast.success("Message generated!");
         setIsOpen(false);
       }
     } catch (error: any) {
       console.error("AI assistant error:", error);
       toast.error(`Failed to generate message: ${error.message}`);
-    } finally {
-      setIsLoading(false);
     }
   };
 

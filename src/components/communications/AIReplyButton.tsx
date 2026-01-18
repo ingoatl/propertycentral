@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp, MessageSquare, Mic } from "lucide-react";
+import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
 import { VoiceDictationButton } from "./VoiceDictationButton";
+import { useUnifiedAI } from "@/hooks/useUnifiedAI";
 
 const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
 
@@ -32,30 +32,20 @@ export function AIReplyButton({
   onSendMessage,
   isSending = false,
 }: AIReplyButtonProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
   const [generatedReply, setGeneratedReply] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedReply, setEditedReply] = useState("");
   const [showContextInput, setShowContextInput] = useState(false);
   const [userInstructions, setUserInstructions] = useState("");
 
+  // Use the unified AI hook for better context-aware responses
+  const { replyToMessage, isLoading } = useUnifiedAI();
+
   const handleGenerateReply = async (withInstructions?: string) => {
-    setIsGenerating(true);
     setGeneratedReply(null);
 
     try {
-      // Build full conversation context
-      const conversationContext = conversationThread
-        .slice(0, 15) // Last 15 messages for context
-        .map((msg) => {
-          const direction = msg.direction === "outbound" ? "SENT" : "RECEIVED";
-          const typeLabel = msg.type === "sms" ? "SMS" : msg.type === "call" ? "CALL" : "EMAIL";
-          const content = msg.body || (msg.type === "call" ? "Phone call" : "No content");
-          return `[${direction} ${typeLabel}]: ${content}`;
-        })
-        .join("\n");
-
-      // CRITICAL: Extract the most recent INBOUND message - this is what we're replying to
+      // Extract the most recent inbound message - this is what we're replying to
       const lastInboundMessage = conversationThread
         .filter(msg => msg.direction === "inbound" && msg.body)
         .pop();
@@ -63,33 +53,29 @@ export function AIReplyButton({
       const messageToReplyTo = lastInboundMessage?.body || "";
       console.log("[AIReplyButton] Replying to message:", messageToReplyTo.substring(0, 100));
 
-      const { data, error } = await supabase.functions.invoke("ai-message-assistant", {
-        body: {
-          action: "generate_contextual_reply",
-          currentMessage: messageToReplyTo, // Pass the actual message we're replying to
-          contactName,
-          conversationContext,
-          messageType: "sms",
-          leadId: contactType === "lead" ? contactId : undefined,
-          ownerId: contactType === "owner" ? contactId : undefined,
-          includeCompanyKnowledge: true,
-          userInstructions: withInstructions || userInstructions || undefined,
-        },
-      });
+      // Use the unified AI system for better responses
+      const cType = contactType === "owner" ? "owner" : "lead";
+      const response = await replyToMessage(
+        cType,
+        contactId || "",
+        "sms",
+        messageToReplyTo,
+        withInstructions || userInstructions || undefined
+      );
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      if (data?.message) {
-        setGeneratedReply(data.message);
-        setEditedReply(data.message);
+      if (response?.message) {
+        setGeneratedReply(response.message);
+        setEditedReply(response.message);
         setShowContextInput(false);
         setUserInstructions("");
+        
+        // Log quality info for debugging
+        if (response.qualityScore < 70) {
+          console.warn("[AIReplyButton] Low quality score:", response.qualityScore, response.validationIssues);
+        }
       }
     } catch (error: any) {
       console.error("AI reply generation error:", error);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -159,10 +145,10 @@ export function AIReplyButton({
           <Button
             size="sm"
             onClick={() => handleGenerateReply()}
-            disabled={isGenerating || !userInstructions.trim()}
+            disabled={isLoading || !userInstructions.trim()}
             className="gap-2"
           >
-            {isGenerating ? (
+            {isLoading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Sparkles className="h-3.5 w-3.5" />
@@ -289,10 +275,10 @@ export function AIReplyButton({
         variant="default"
         size="sm"
         onClick={() => handleGenerateReply()}
-        disabled={isGenerating}
+        disabled={isLoading}
         className="gap-1.5 h-8 px-3 text-xs sm:text-sm sm:gap-2 sm:px-4 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 whitespace-nowrap flex-shrink-0"
       >
-        {isGenerating ? (
+        {isLoading ? (
           <>
             <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
             <span className="hidden sm:inline">Generating...</span>
@@ -311,7 +297,7 @@ export function AIReplyButton({
         variant="outline"
         size="sm"
         onClick={() => setShowContextInput(true)}
-        disabled={isGenerating}
+        disabled={isLoading}
         className="gap-1.5 h-8 px-3 text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
         title="Generate AI reply with your context"
       >
