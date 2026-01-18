@@ -68,8 +68,11 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if this is a demo receipt path - return a sample receipt PDF for demo
-    if (receiptPath.startsWith("demo-receipts/") || receiptPath.startsWith("demo/") || expenseId?.startsWith("exp-demo-")) {
+    // Check if this is a demo receipt path with fake paths - return generated PDF
+    // But if it's a demo expense with a real storage path (e.g., starts with a UUID), use the real path
+    const isRealStoragePath = receiptPath && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i.test(receiptPath);
+    
+    if (!isRealStoragePath && (receiptPath?.startsWith("demo-receipts/") || receiptPath?.startsWith("demo/") || (expenseId?.startsWith("exp-demo-") && !receiptPath))) {
       console.log("Demo receipt requested, generating professional PDF receipt");
       
       // Import pdf-lib for PDF generation
