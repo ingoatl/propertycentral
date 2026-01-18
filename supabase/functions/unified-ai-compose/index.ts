@@ -360,31 +360,38 @@ serve(async (req) => {
     // Step 2: Build the prompt
     const prompt = buildPrompt(request, context);
 
-    // Step 3: Call OpenAI API
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiApiKey) {
-      throw new Error("OPENAI_API_KEY is not configured");
+    // Step 3: Call Lovable AI Gateway
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableApiKey) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiApiKey}`,
+        "Authorization": `Bearer ${lovableApiKey}`,
       },
       body: JSON.stringify({
         messages: [
           { role: "system", content: "You are a professional property management assistant. Write natural, human-like responses." },
           { role: "user", content: prompt }
         ],
-        model: "gpt-4o-mini",
+        model: "google/gemini-3-flash-preview",
         max_tokens: messageType === 'sms' ? 500 : 2000,
         temperature: 0.7,
       }),
     });
 
     if (!aiResponse.ok) {
+      if (aiResponse.status === 429) {
+        throw new Error("Rate limits exceeded, please try again later.");
+      }
+      if (aiResponse.status === 402) {
+        throw new Error("AI credits depleted, please add funds.");
+      }
       const errorText = await aiResponse.text();
+      console.error("Lovable AI error:", aiResponse.status, errorText);
       throw new Error(`AI generation failed: ${errorText}`);
     }
 
@@ -437,7 +444,7 @@ serve(async (req) => {
         messagesAnalyzed: context.recentMessages.length,
         conversationPhase: context.threadAnalysis.conversationPhase,
       },
-      model_used: 'gpt-4o-mini',
+      model_used: 'google/gemini-3-flash-preview',
       generation_time_ms: generationTimeMs,
       user_id: userId,
     });
@@ -459,7 +466,7 @@ serve(async (req) => {
           conversationPhase: context.threadAnalysis.conversationPhase,
         },
         metadata: {
-          model: 'gpt-4o-mini',
+          model: 'google/gemini-3-flash-preview',
           generationTimeMs,
         },
       }),

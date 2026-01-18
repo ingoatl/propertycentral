@@ -2518,8 +2518,10 @@ export function InboxView() {
                     })}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                {/* Inbox Zero Help Guide */}
-                <InboxZeroGuide />
+                {/* Inbox Zero Help Guide - hidden on mobile */}
+                <div className="hidden sm:block">
+                  <InboxZeroGuide />
+                </div>
               </>
             )}
             
