@@ -850,6 +850,10 @@ const Admin = () => {
         <TabsContent value="tone-profiles" className="mt-8">
           <ToneProfilesManager />
         </TabsContent>
+
+        <TabsContent value="knowledge-base" className="mt-8">
+          <CompanyKnowledgeManager />
+        </TabsContent>
       </Tabs>
     </div>
   );
