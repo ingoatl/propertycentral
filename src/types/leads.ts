@@ -6,6 +6,7 @@ export type LeadStage =
   | 'send_contract'
   | 'contract_out'
   | 'contract_signed'
+  | 'welcome_email_w9'
   | 'ach_form_signed'
   | 'onboarding_form_requested'
   | 'insurance_requested'
@@ -144,7 +145,8 @@ export const LEAD_STAGES: { stage: LeadStage; title: string; description: string
   { stage: 'call_attended', title: 'Call Attended', description: 'Call completed, ready for review' },
   { stage: 'send_contract', title: 'Send Contract', description: 'Ready to send management agreement' },
   { stage: 'contract_out', title: 'Contract Out', description: 'Contract sent, awaiting signature' },
-  { stage: 'contract_signed', title: 'Send Payment Link', description: '→ Sends ACH/Stripe payment setup email' },
+  { stage: 'contract_signed', title: 'Welcome + W9', description: '→ Sends welcome email + W9 form immediately' },
+  { stage: 'welcome_email_w9', title: 'Send Payment Link', description: '→ Sends payment setup email (1hr delay)' },
   { stage: 'ach_form_signed', title: 'Send Onboarding Form', description: '→ Sends property details form email' },
   { stage: 'onboarding_form_requested', title: 'Awaiting Onboarding', description: 'Waiting for owner to submit form (no email)' },
   { stage: 'insurance_requested', title: 'Send Insurance Request', description: '→ Sends insurance verification email' },
@@ -203,11 +205,18 @@ export const STAGE_CONFIG: Record<LeadStage, {
     borderColor: 'border-[hsl(45,100%,50%)]'
   },
   contract_signed: { 
-    label: 'Payment Link', 
+    label: 'Welcome + W9', 
     color: 'text-[hsl(152,100%,39%)]', 
     bgColor: 'bg-[hsl(152,100%,94%)]',
     accentColor: 'hsl(152, 100%, 39%)',
     borderColor: 'border-[hsl(152,100%,39%)]'
+  },
+  welcome_email_w9: { 
+    label: 'Payment Setup', 
+    color: 'text-[hsl(172,66%,45%)]', 
+    bgColor: 'bg-[hsl(172,66%,94%)]',
+    accentColor: 'hsl(172, 66%, 45%)',
+    borderColor: 'border-[hsl(172,66%,45%)]'
   },
   ach_form_signed: { 
     label: 'Onboarding Form', 
