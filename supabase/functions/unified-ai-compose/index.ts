@@ -129,7 +129,7 @@ function buildPrompt(
   const { contactProfile, toneProfile, threadAnalysis, relevantKnowledge, memories, recentMessages } = context;
   
   // Base context section
-  let prompt = `You are a professional property management assistant responding on behalf of PeachHaus Property Management. Your responses should feel like they come from a real person named Ingo, not an AI.
+  let prompt = `You are Ingo from PeachHaus Property Management. Your responses should feel like they come from a real person, not an AI.
 
 ## WHO YOU'RE TALKING TO
 Name: ${contactProfile.name}
@@ -139,18 +139,21 @@ Emotional Baseline: ${contactProfile.emotionalBaseline}
 ${contactProfile.painPoints.length > 0 ? `Known Pain Points: ${contactProfile.painPoints.join(', ')}` : ''}
 ${contactProfile.interests.length > 0 ? `Interests: ${contactProfile.interests.join(', ')}` : ''}
 
-## YOUR VOICE & TONE
+## YOUR VOICE & TONE - CRITICAL: MATCH THIS EXACTLY
 Write with this exact style:
 - Formality Level: ${toneProfile.formality}
 - Average Sentence Length: ${toneProfile.avgSentenceLength} words
 - ${toneProfile.useContractions ? 'USE contractions (I\'m, we\'ll, don\'t)' : 'AVOID contractions (I am, we will, do not)'}
 - Exclamation Usage: ${toneProfile.exclamationFrequency}
-- Emoji: ${toneProfile.emojiUsage}
+- **NEVER USE EMOJIS** - No emojis allowed in any response
 
 NEVER use these phrases: ${toneProfile.avoidedPhrases.join(', ')}
 End messages with: ${toneProfile.commonClosings[0] || '- Ingo'}
 
-${toneProfile.sampleMessages.length > 0 ? `Sample of your voice to mimic:\n"${toneProfile.sampleMessages[0]}"` : ''}
+${toneProfile.sampleMessages.length > 0 ? `## SAMPLE MESSAGES - MATCH THIS VOICE EXACTLY
+Here are examples of how Ingo actually writes. Study and mimic this style:
+${toneProfile.sampleMessages.slice(0, 3).map((s, i) => `${i + 1}. "${s}"`).join('\n')}
+` : ''}
 
 ## ${getSentimentInstructions(threadAnalysis.lastInboundSentiment)}
 
@@ -182,11 +185,13 @@ ${threadAnalysis.questions.map((q, i) => `${i + 1}. "${q.text}"`).join('\n')}
 `;
   }
 
-  // Add relevant knowledge
+  // Add relevant knowledge - ALWAYS include if available
   if (relevantKnowledge.length > 0) {
-    prompt += `## RELEVANT COMPANY INFORMATION
-Use this knowledge to inform your response (don't copy verbatim, integrate naturally):
-${relevantKnowledge.map(k => `- ${k.title}: ${k.content.substring(0, 300)}${k.referral_link ? ` [Referral: ${k.referral_link}]` : ''}`).join('\n')}
+    prompt += `## COMPANY KNOWLEDGE - USE THIS INFORMATION
+You MUST incorporate this company knowledge into your response where relevant:
+${relevantKnowledge.map(k => `
+### ${k.title} (${k.category})
+${k.content.substring(0, 400)}${k.referral_link ? `\nREFERRAL LINK TO INCLUDE: ${k.referral_link}` : ''}`).join('\n')}
 
 `;
   }
@@ -258,7 +263,8 @@ Rewrite with a warmer, more personable tone while keeping it professional.`,
 - No formal greetings needed - jump straight to the point
 - End with "- Ingo" for signature
 - One clear call to action if needed
-- Sound like a real person texting, not a corporate message`;
+- Sound like a real person texting, not a corporate message
+- **ABSOLUTELY NO EMOJIS**`;
   } else {
     prompt += `
 
@@ -266,7 +272,8 @@ Rewrite with a warmer, more personable tone while keeping it professional.`,
 - Include a clear subject line if composing new
 - Use short paragraphs
 - End with signature: ${toneProfile.commonClosings[0] || '- Ingo'}
-- Don't be overly formal or stiff`;
+- Don't be overly formal or stiff
+- **ABSOLUTELY NO EMOJIS**`;
   }
 
   // Calendar link instruction
@@ -280,7 +287,8 @@ Rewrite with a warmer, more personable tone while keeping it professional.`,
 ## OUTPUT FORMAT
 ${messageType === 'email' ? 'If this is a new email, start with "SUBJECT: " on its own line, then the body.' : ''}
 Write ONLY the message content. No explanations, no "Here's the message:" prefix.
-Sound like Ingo - a real person who's been chatting with them, not a corporate AI.`;
+Sound like Ingo - a real person who's been chatting with them, not a corporate AI.
+**REMINDER: NO EMOJIS EVER.**`;
 
   return prompt;
 }
@@ -390,7 +398,19 @@ serve(async (req) => {
 
     const context: ContextPackage = contextResult.context;
 
-    console.log(`Context received: ${context.recentMessages?.length || 0} recent messages, ${context.threadAnalysis?.questions?.length || 0} questions`);
+    // Log context details for debugging
+    console.log(`=== AI COMPOSE CONTEXT SUMMARY ===`);
+    console.log(`Messages analyzed: ${context.recentMessages?.length || 0}`);
+    console.log(`Unanswered questions: ${context.threadAnalysis?.questions?.length || 0}`);
+    console.log(`Sentiment detected: ${context.threadAnalysis?.lastInboundSentiment || 'unknown'}`);
+    console.log(`Conversation phase: ${context.threadAnalysis?.conversationPhase || 'unknown'}`);
+    console.log(`Knowledge entries used: ${context.relevantKnowledge?.length || 0}`);
+    if (context.relevantKnowledge?.length > 0) {
+      console.log(`Knowledge topics: ${context.relevantKnowledge.map(k => k.title).join(', ')}`);
+    }
+    console.log(`Tone profile formality: ${context.toneProfile?.formality || 'unknown'}`);
+    console.log(`Sample messages available: ${context.toneProfile?.sampleMessages?.length || 0}`);
+    console.log(`================================`);
 
     // Step 2: Build the prompt
     const prompt = buildPrompt(request, context);
@@ -409,7 +429,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         messages: [
-          { role: "system", content: "You are Ingo, a real property manager at PeachHaus Group. Write natural, human responses - not AI-sounding corporate speak. Be conversational, helpful, and specific." },
+          { role: "system", content: "You are Ingo, a real property manager at PeachHaus Group. Write natural, human responses - never use emojis. Be conversational, helpful, and specific. Match the tone profile exactly." },
           { role: "user", content: prompt }
         ],
         model: "google/gemini-3-flash-preview",
