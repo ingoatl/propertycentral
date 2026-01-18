@@ -555,6 +555,182 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
   ], currentStage);
 }
 
+// GIF URL for welcome onboarding email
+const WELCOME_GIF_URL = "https://storage.googleapis.com/highlevel-backend.appspot.com/location/xlvBBzSp6gNM8H8fYNlr/workflow/929fb132-e7ea-43d8-a7d9-9aa4b4b03c66/aed8c70b-76cf-4729-971f-3a36f7125065.gif?alt=media&token=606b1c6b-6f8b-40e2-8d5d-b41413263e3f";
+
+// Build welcome onboarding email for contract_signed stage (NOT payment setup - that comes later)
+function buildWelcomeOnboardingEmailHtml(recipientName: string, propertyAddress: string): string {
+  // Custom email with GIF and timeline - uses branded layout foundation
+  const timelineHtml = `
+    <div style="margin: 24px 0; padding: 24px 20px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; border: 1px solid #e2e8f0;">
+      <div style="text-transform: uppercase; font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1.2px; margin-bottom: 20px; text-align: center;">
+        What Happens Next
+      </div>
+      
+      <table width="100%" cellpadding="0" cellspacing="0" style="table-layout: fixed;">
+        <tr>
+          <td style="text-align: center; width: 25%; padding: 0 4px; vertical-align: top;">
+            <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 50%; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+              <span style="color: #ffffff; font-size: 16px; font-weight: 700; line-height: 40px; display: block;">1</span>
+            </div>
+            <div style="font-size: 11px; color: #111827; font-weight: 600; line-height: 1.3;">W-9 Form</div>
+            <div style="font-size: 10px; color: #6b7280; line-height: 1.3;">For your records</div>
+          </td>
+          <td style="text-align: center; width: 25%; padding: 0 4px; vertical-align: top;">
+            <div style="width: 40px; height: 40px; background: #e5e7eb; border-radius: 50%; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+              <span style="color: #9ca3af; font-size: 16px; font-weight: 700; line-height: 40px; display: block;">2</span>
+            </div>
+            <div style="font-size: 11px; color: #6b7280; font-weight: 600; line-height: 1.3;">Payment Setup</div>
+            <div style="font-size: 10px; color: #6b7280; line-height: 1.3;">Secure ACH/Card</div>
+          </td>
+          <td style="text-align: center; width: 25%; padding: 0 4px; vertical-align: top;">
+            <div style="width: 40px; height: 40px; background: #e5e7eb; border-radius: 50%; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+              <span style="color: #9ca3af; font-size: 16px; font-weight: 700; line-height: 40px; display: block;">3</span>
+            </div>
+            <div style="font-size: 11px; color: #6b7280; font-weight: 600; line-height: 1.3;">Property Details</div>
+            <div style="font-size: 10px; color: #6b7280; line-height: 1.3;">Onboarding form</div>
+          </td>
+          <td style="text-align: center; width: 25%; padding: 0 4px; vertical-align: top;">
+            <div style="width: 40px; height: 40px; background: #e5e7eb; border-radius: 50%; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+              <span style="color: #9ca3af; font-size: 16px; font-weight: 700; line-height: 40px; display: block;">4</span>
+            </div>
+            <div style="font-size: 11px; color: #6b7280; font-weight: 600; line-height: 1.3;">Go Live</div>
+            <div style="font-size: 10px; color: #6b7280; line-height: 1.3;">Start earning</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 32px; text-align: center;">
+                  <img src="${LOGO_URL}" alt="PeachHaus" style="height: 48px; margin-bottom: 16px;" />
+                  <div style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">Welcome to the PeachHaus Family!</div>
+                </td>
+              </tr>
+              
+              <!-- Welcome GIF -->
+              <tr>
+                <td style="padding: 24px 32px 0 32px; text-align: center;">
+                  <img src="${WELCOME_GIF_URL}" alt="Welcome" style="max-width: 100%; height: auto; border-radius: 12px;" />
+                </td>
+              </tr>
+              
+              <!-- Greeting -->
+              <tr>
+                <td style="padding: 24px 32px 16px 32px;">
+                  <div style="font-size: 16px; color: #111827;">Hi <strong>${recipientName}</strong>,</div>
+                </td>
+              </tr>
+
+              <!-- Welcome Message -->
+              <tr>
+                <td style="padding: 0 32px 16px 32px;">
+                  <div style="font-size: 15px; color: #374151; line-height: 1.7;">
+                    Welcome to the PeachHaus family! We're thrilled to have you on board and excited to get your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''} onboarded and earning.
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Timeline -->
+              <tr>
+                <td style="padding: 0 32px;">
+                  ${timelineHtml}
+                </td>
+              </tr>
+
+              <!-- What We're Doing Now -->
+              <tr>
+                <td style="padding: 16px 32px;">
+                  <div style="padding: 12px 0; border-bottom: 2px solid #f59e0b; margin-bottom: 16px;">
+                    <span style="font-size: 14px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px;">Behind the Scenes</span>
+                  </div>
+                  <div style="font-size: 14px; color: #374151; line-height: 1.7;">
+                    <table style="width: 100%;">
+                      <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">We're finalizing your signed contract and getting everything in order</td></tr>
+                      <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">Our team will start applying for your STR permit (if needed or requested)</td></tr>
+                      <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">We'll coordinate professional photos and walkthrough videos</td></tr>
+                      <tr><td style="padding: 8px 0;">Your property is being configured in our management system and owner portal</td></tr>
+                    </table>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- What to Expect -->
+              <tr>
+                <td style="padding: 16px 32px;">
+                  <div style="margin: 0; padding: 20px 24px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px;">
+                    <div style="font-size: 12px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">What to Expect</div>
+                    <div style="font-size: 14px; color: #166534; line-height: 1.6;">
+                      You'll receive updates as each milestone is completed. A separate email with our W-9 form is on its way for your tax records. Shortly after, you'll receive a secure link to set up your payment details.
+                    </div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Questions -->
+              <tr>
+                <td style="padding: 16px 32px 24px 32px;">
+                  <div style="font-size: 14px; color: #374151; line-height: 1.7;">
+                    If you have any questions, just reply to this email — our team is here to help.
+                    <br><br>
+                    To a smooth and profitable start!
+                  </div>
+                </td>
+              </tr>
+              
+              <!-- Signature -->
+              <tr>
+                <td style="padding: 24px 32px; border-top: 1px solid #e5e7eb;">
+                  <table cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="vertical-align: top; padding-right: 16px;">
+                        <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover;" />
+                      </td>
+                      <td style="vertical-align: top; border-left: 3px solid #f59e0b; padding-left: 12px;">
+                        <div style="font-weight: 700; font-size: 14px; color: #111827;">Ingo Schaer</div>
+                        <div style="font-size: 12px; color: #6b7280;">Co-Founder, Operations Manager</div>
+                        <div style="font-size: 12px; color: #111827; margin-top: 4px;">PeachHaus Group LLC</div>
+                        <div style="font-size: 12px; margin-top: 4px;">
+                          <a href="tel:+14048005932" style="color: #111827; text-decoration: none;">(404) 800-5932</a> · 
+                          <a href="mailto:ingo@peachhausgroup.com" style="color: #2563eb; text-decoration: none;">ingo@peachhausgroup.com</a>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="background: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+                  <div style="font-size: 11px; color: #9ca3af;">
+                    © ${new Date().getFullYear()} PeachHaus Group LLC · Atlanta, GA
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
 // Build welcome email for new leads
 function buildWelcomeEmailHtml(recipientName: string, propertyAddress: string): string {
   return buildBrandedEmailHtml(recipientName, "Welcome to PeachHaus", [
@@ -563,12 +739,12 @@ function buildWelcomeEmailHtml(recipientName: string, propertyAddress: string): 
       content: `Thank you for your interest in PeachHaus property management! We're excited to learn more about your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''}.`
     },
     {
-      title: "🏆 Why Owners Choose Us",
+      title: "Why Owners Choose Us",
       content: `
         <table style="width: 100%;">
-          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">✓ Average <strong>23% higher</strong> rental income vs. self-managed</td></tr>
-          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">✓ <strong>4.9★ rating</strong> from property owners</td></tr>
-          <tr><td style="padding: 8px 0;">✓ Full-service management with <strong>transparent reporting</strong></td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">Average <strong>23% higher</strong> rental income vs. self-managed</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>4.9 star rating</strong> from property owners</td></tr>
+          <tr><td style="padding: 8px 0;">Full-service management with <strong>transparent reporting</strong></td></tr>
         </table>
       `
     },
@@ -742,10 +918,19 @@ const STAGE_PSYCHOLOGY_TEMPLATES: Record<string, { sms?: string; email_subject?:
     principle: "Clarity + Momentum"
   },
   contract_signed: {
-    sms: "Welcome to PeachHaus, {{name}}! 🎉 Your agreement is signed. Check your email for a secure link to set up your payment details.",
+    // contract_signed now triggers welcome + W9 emails, NOT payment setup
+    // Payment setup is sent later in welcome_email_w9 stage
+    sms: "Welcome to PeachHaus, {{name}}! Your agreement is signed. Check your email for a welcome message and important documents.",
+    email_subject: "Welcome to the PeachHaus Family",
+    email_body: `WELCOME_ONBOARDING_HTML_TEMPLATE`,
+    principle: "Celebration + Momentum"
+  },
+  welcome_email_w9: {
+    // This stage is triggered 1 hour after contract_signed and sends payment setup email
+    sms: "Hi {{name}}! Time to set up your payment details. Check your email for the secure link.",
     email_subject: "Set Up Your Payment Method - PeachHaus",
     email_body: `PAYMENT_HTML_TEMPLATE`,
-    principle: "Celebration + Momentum"
+    principle: "Momentum + Next Step"
   },
   ach_form_signed: {
     sms: "Hi {{name}}! Your payment is set up. Please complete your property onboarding form - check your email for the link. This is the final step before we can start marketing your property!",
@@ -1292,8 +1477,20 @@ serve(async (req) => {
             // Use branded HTML templates for ALL stages
             let finalHtmlBody: string;
             
-            // Special handling for contract_signed - create Stripe checkout session based on service type
+            // Special handling for contract_signed - send Welcome email + W9, schedule payment for later
             if (newStage === 'contract_signed') {
+              // CONTRACT_SIGNED: Send welcome onboarding email (NOT payment setup - that comes in welcome_email_w9)
+              console.log(`Stage contract_signed: Sending welcome email for lead ${leadId}`);
+              finalHtmlBody = buildWelcomeOnboardingEmailHtml(recipientFirstName, lead.property_address || "");
+              emailSubject = "Welcome to the PeachHaus Family!";
+              
+              // Note: W9 email is sent separately after this automation loop completes
+              // Payment setup email will be triggered when lead moves to welcome_email_w9 (scheduled for 1 hour later)
+              
+            } else if (newStage === 'welcome_email_w9') {
+              // WELCOME_EMAIL_W9: This is triggered 1 hour after contract_signed - send payment setup email
+              console.log(`Stage welcome_email_w9: Sending payment setup email for lead ${leadId}`);
+              
               // Fetch owner service type to determine if co-hosting or full-service
               let serviceType = 'cohosting'; // Default to co-hosting
               if (lead.owner_id) {
@@ -1367,7 +1564,7 @@ serve(async (req) => {
                       recipientFirstName,
                       session.url!,
                       lead.property_address || "",
-                      newStage
+                      'contract_signed' // Use contract_signed for timeline display
                     );
                     emailSubject = "Set Up Your Payout Account - PeachHaus";
                   } else {
@@ -1375,7 +1572,7 @@ serve(async (req) => {
                       recipientFirstName,
                       session.url!,
                       lead.property_address || "",
-                      newStage
+                      'contract_signed' // Use contract_signed for timeline display
                     );
                     emailSubject = "Set Up Your Payment Method - PeachHaus";
                   }
@@ -1397,17 +1594,17 @@ serve(async (req) => {
                   // Fallback to static link if Stripe fails
                   const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
                   if (serviceType === 'full_service') {
-                    finalHtmlBody = buildFullServicePaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", newStage);
+                    finalHtmlBody = buildFullServicePaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", 'contract_signed');
                     emailSubject = "Set Up Your Payout Account - PeachHaus";
                   } else {
-                    finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", newStage);
+                    finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", 'contract_signed');
                     emailSubject = "Set Up Your Payment Method - PeachHaus";
                   }
                 }
               } else {
                 console.log("STRIPE_SECRET_KEY not configured, using fallback URL");
                 const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
-                finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", newStage);
+                finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", 'contract_signed');
                 emailSubject = "Set Up Your Payment Method - PeachHaus";
               }
             } else if (newStage === 'insurance_requested') {
@@ -1561,6 +1758,53 @@ serve(async (req) => {
         console.log(`Ops handoff triggered successfully for lead ${leadId}`);
       } catch (opsError) {
         console.error("Error triggering ops handoff:", opsError);
+      }
+    }
+
+    // CONTRACT_SIGNED: Send W9 email separately and schedule payment setup for 1 hour later
+    if (newStage === "contract_signed") {
+      try {
+        console.log(`Contract signed: Sending W9 email and scheduling payment setup for lead ${leadId}`);
+        
+        // Send W9 email immediately (separate from welcome email)
+        await fetch(`${supabaseUrl}/functions/v1/send-w9-email`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ leadId }),
+        });
+        console.log(`W9 email sent for lead ${leadId}`);
+
+        // Schedule payment setup email for 1 hour later
+        const scheduledFor = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour from now
+        await supabase.from("lead_scheduled_emails").insert({
+          lead_id: leadId,
+          email_type: "payment_setup",
+          scheduled_for: scheduledFor,
+          status: "pending",
+          metadata: { 
+            previous_stage: "contract_signed",
+            next_stage: "welcome_email_w9"
+          }
+        });
+        console.log(`Payment setup email scheduled for ${scheduledFor} for lead ${leadId}`);
+
+        // Add timeline entries
+        await supabase.from("lead_timeline").insert({
+          lead_id: leadId,
+          action: "W9 form email sent",
+          metadata: { email_type: "w9_form" }
+        });
+        await supabase.from("lead_timeline").insert({
+          lead_id: leadId,
+          action: "Payment setup email scheduled (1-hour delay)",
+          metadata: { scheduled_for: scheduledFor }
+        });
+
+      } catch (contractSignedError) {
+        console.error("Error processing contract_signed actions:", contractSignedError);
       }
     }
 
