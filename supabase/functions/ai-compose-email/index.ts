@@ -170,16 +170,51 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Create Supabase client to fetch knowledge base
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch company knowledge base
+    let knowledgeBaseContext = "";
+    try {
+      const { data: knowledgeEntries } = await supabase
+        .from("company_knowledge_base")
+        .select("category, title, content, keywords, referral_link, priority")
+        .eq("is_active", true)
+        .or("use_in_contexts.cs.{email},use_in_contexts.cs.{all}")
+        .order("priority", { ascending: false })
+        .limit(15);
+
+      if (knowledgeEntries && knowledgeEntries.length > 0) {
+        knowledgeBaseContext = "\n\n=== COMPANY KNOWLEDGE BASE ===\n";
+        for (const entry of knowledgeEntries) {
+          knowledgeBaseContext += `\n### ${entry.title} [${entry.category}]\n${entry.content}`;
+          if (entry.referral_link) {
+            knowledgeBaseContext += `\n📎 REFERRAL LINK: ${entry.referral_link}`;
+          }
+          knowledgeBaseContext += "\n";
+        }
+        knowledgeBaseContext += "\n=== END KNOWLEDGE BASE ===\n";
+        console.log(`Loaded ${knowledgeEntries.length} knowledge entries`);
+      }
+    } catch (kbError) {
+      console.error("Error fetching knowledge base:", kbError);
+    }
+
     const firstName = recipientName?.split(" ")[0] || "there";
 
     const systemPrompt = `You are an expert email writer for PeachHaus Group, a premium mid-term rental property management company in Atlanta.
 
 ${companyKnowledge}
+${knowledgeBaseContext}
 
 ${emailGuidelines}
 
 Your task is to compose a professional, warm, and effective email based on the context provided.
 The email should feel personal and human, not like a template.
+When relevant, use information from the COMPANY KNOWLEDGE BASE and include any referral links naturally.
 ${includeCalendarLink ? `When appropriate, naturally include the discovery call scheduling link: ${SCHEDULING_LINK}` : ""}
 
 You must respond with a JSON object containing:
@@ -197,6 +232,8 @@ First name to use in greeting: ${firstName}
 Remember to:
 - Be warm and professional
 - Reference their specific situation from the context
+- Use knowledge base information when answering questions
+- Include referral links when recommending services
 - Include the scheduling link if suggesting a call
 - Keep it concise (2-3 paragraphs)
 - End with a clear next step
