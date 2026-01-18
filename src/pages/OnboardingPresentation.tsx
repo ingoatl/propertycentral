@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 // Import slides
 import { TitleSlide } from "@/components/presentation/slides/TitleSlide";
 import { MeetTheFoundersSlide } from "@/components/presentation/slides/MeetTheFoundersSlide";
-import { MissionSlide } from "@/components/presentation/slides/MissionSlide";
+import { OurPromiseSlide } from "@/components/presentation/slides/OurPromiseSlide";
 import { ByTheNumbersSlide } from "@/components/presentation/slides/ByTheNumbersSlide";
 import { ProblemSolutionSlide } from "@/components/presentation/slides/ProblemSolutionSlide";
 import { ThreeStrategiesSlide } from "@/components/presentation/slides/ThreeStrategiesSlide";
@@ -16,7 +16,7 @@ import { CorporateNetworkSlide } from "@/components/presentation/slides/Corporat
 import { CaseStudySlide } from "@/components/presentation/slides/CaseStudySlide";
 import { WhatSetsUsApartSlide } from "@/components/presentation/slides/WhatSetsUsApartSlide";
 import { WhatWeDoMoreSlide } from "@/components/presentation/slides/WhatWeDoMoreSlide";
-import { OurPromiseSlide } from "@/components/presentation/slides/OurPromiseSlide";
+import { OwnerPortalSlide } from "@/components/presentation/slides/OwnerPortalSlide";
 import { OnboardingTimelineSlide } from "@/components/presentation/slides/OnboardingTimelineSlide";
 import { HowItWorksSlide } from "@/components/presentation/slides/HowItWorksSlide";
 import { PricingSlide } from "@/components/presentation/slides/PricingSlide";
@@ -25,7 +25,7 @@ import { ClosingSlide } from "@/components/presentation/slides/ClosingSlide";
 const SLIDES = [
   { id: "title", component: TitleSlide, label: "Welcome" },
   { id: "founders", component: MeetTheFoundersSlide, label: "Team" },
-  { id: "mission", component: MissionSlide, label: "Mission" },
+  { id: "promise", component: OurPromiseSlide, label: "Promise" },
   { id: "numbers", component: ByTheNumbersSlide, label: "Stats" },
   { id: "problem", component: ProblemSolutionSlide, label: "Solutions" },
   { id: "strategies", component: ThreeStrategiesSlide, label: "Strategies" },
@@ -36,7 +36,7 @@ const SLIDES = [
   { id: "case-lavish", component: () => <CaseStudySlide propertyName="Lavish Living" />, label: "Case 3" },
   { id: "what-more", component: WhatWeDoMoreSlide, label: "Difference" },
   { id: "apart", component: WhatSetsUsApartSlide, label: "Why Us" },
-  { id: "promise", component: OurPromiseSlide, label: "Promise" },
+  { id: "portal", component: OwnerPortalSlide, label: "Portal" },
   { id: "timeline", component: OnboardingTimelineSlide, label: "Timeline" },
   { id: "how", component: HowItWorksSlide, label: "Process" },
   { id: "pricing", component: PricingSlide, label: "Pricing" },
