@@ -73,10 +73,10 @@ export function ByTheNumbersSlide() {
 
   return (
     <SlideLayout overlay="gradient">
-      <div className="w-full max-w-6xl mx-auto">
-        <div className="text-center mb-16">
-          <p className="text-amber-400 uppercase tracking-widest text-sm mb-4">Our Track Record</p>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white">
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="text-center mb-12 lg:mb-16">
+          <p className="text-amber-400 uppercase tracking-widest text-base lg:text-lg mb-4">Our Track Record</p>
+          <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white">
             Results That{" "}
             <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
               Speak
@@ -84,21 +84,21 @@ export function ByTheNumbersSlide() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
           {stats.map((stat, index) => (
             <div
               key={stat.label}
               className="relative group"
               style={{ animationDelay: `${index * 150}ms` }}
             >
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-white/20 transition-all duration-300 text-center h-full">
+              <div className="bg-white/5 backdrop-blur-sm rounded-2xl lg:rounded-3xl p-8 lg:p-10 border border-white/10 hover:border-white/20 transition-all duration-300 text-center h-full">
                 {/* Icon */}
-                <div className={`w-16 h-16 mx-auto mb-6 rounded-xl bg-gradient-to-br ${stat.color} p-4`}>
+                <div className={`w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-6 rounded-xl bg-gradient-to-br ${stat.color} p-4`}>
                   <stat.icon className="w-full h-full text-white" />
                 </div>
 
                 {/* Value */}
-                <div className="text-4xl md:text-5xl font-bold text-white mb-2">
+                <div className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-3">
                   <AnimatedCounter 
                     end={stat.value} 
                     prefix={stat.prefix} 
@@ -108,13 +108,13 @@ export function ByTheNumbersSlide() {
                 </div>
 
                 {/* Label */}
-                <p className="text-white/60 text-sm md:text-base">{stat.label}</p>
+                <p className="text-white/60 text-lg lg:text-xl">{stat.label}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <p className="text-center text-white/40 text-sm mt-8">
+        <p className="text-center text-white/40 text-base lg:text-lg mt-10">
           Results may vary. Performance metrics represent data from current clients.
         </p>
       </div>

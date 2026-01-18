@@ -39,45 +39,45 @@ export function CaseStudySlide({ propertyName }: CaseStudySlideProps) {
   return (
     <SlideLayout overlay="gradient">
       <div className="w-full max-w-7xl mx-auto">
-        <p className="text-amber-400 uppercase tracking-widest text-base mb-3 text-center">Case Study</p>
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-10 text-center">{propertyName}</h2>
+        <p className="text-amber-400 uppercase tracking-widest text-base lg:text-lg mb-3 text-center">Case Study</p>
+        <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-10 lg:mb-12 text-center">{propertyName}</h2>
 
-        <div className="grid md:grid-cols-2 gap-10 items-center">
-          <div className="rounded-2xl overflow-hidden border border-white/20 shadow-2xl">
+        <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-center">
+          <div className="rounded-2xl lg:rounded-3xl overflow-hidden border border-white/20 shadow-2xl">
             <img 
               src={data.imageUrl} 
               alt={propertyName} 
-              className="w-full h-72 md:h-96 object-cover"
+              className="w-full h-72 md:h-80 lg:h-96 object-cover"
             />
-            <div className="bg-white/10 backdrop-blur-sm p-5">
-              <p className="text-white/70 text-base">{data.address}</p>
-              <p className="text-amber-400 font-semibold text-lg">{data.strategy}</p>
+            <div className="bg-white/10 backdrop-blur-sm p-5 lg:p-6">
+              <p className="text-white/70 text-lg lg:text-xl">{data.address}</p>
+              <p className="text-amber-400 font-semibold text-xl lg:text-2xl">{data.strategy}</p>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-5">
-              <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-center">
-                <p className="text-white/50 text-base mb-2">Before PeachHaus</p>
-                <p className="text-3xl md:text-4xl font-bold text-white">${data.before.revenue}/mo</p>
-                <p className="text-white/40 text-base mt-1">{data.before.occupancy}% occupancy</p>
+          <div className="space-y-6 lg:space-y-8">
+            <div className="grid grid-cols-2 gap-4 lg:gap-6">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-2xl lg:rounded-3xl p-6 lg:p-8 text-center">
+                <p className="text-white/50 text-lg lg:text-xl mb-2">Before PeachHaus</p>
+                <p className="text-4xl md:text-5xl lg:text-6xl font-bold text-white">${data.before.revenue}<span className="text-2xl lg:text-3xl">/mo</span></p>
+                <p className="text-white/40 text-lg lg:text-xl mt-2">{data.before.occupancy}% occupancy</p>
               </div>
-              <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-6 text-center">
-                <p className="text-white/50 text-base mb-2">After PeachHaus</p>
-                <p className="text-3xl md:text-4xl font-bold text-green-400">${data.after.revenue}/mo</p>
-                <p className="text-white/40 text-base mt-1">{data.after.occupancy}% occupancy</p>
+              <div className="bg-green-500/10 border border-green-500/30 rounded-2xl lg:rounded-3xl p-6 lg:p-8 text-center">
+                <p className="text-white/50 text-lg lg:text-xl mb-2">After PeachHaus</p>
+                <p className="text-4xl md:text-5xl lg:text-6xl font-bold text-green-400">${data.after.revenue}<span className="text-2xl lg:text-3xl">/mo</span></p>
+                <p className="text-white/40 text-lg lg:text-xl mt-2">{data.after.occupancy}% occupancy</p>
               </div>
             </div>
 
-            <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl p-8 text-center">
-              <TrendingUp className="w-12 h-12 text-amber-400 mx-auto mb-3" />
-              <p className="text-5xl md:text-6xl font-bold text-amber-400">+{revenueIncrease}%</p>
-              <p className="text-white/60 text-lg mt-2">Revenue Increase</p>
+            <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl lg:rounded-3xl p-8 lg:p-10 text-center">
+              <TrendingUp className="w-14 h-14 lg:w-16 lg:h-16 text-amber-400 mx-auto mb-4" />
+              <p className="text-6xl md:text-7xl lg:text-8xl font-bold text-amber-400">+{revenueIncrease}%</p>
+              <p className="text-white/60 text-xl lg:text-2xl mt-3">Revenue Increase</p>
             </div>
 
-            <div className="flex items-start gap-4 bg-white/5 rounded-2xl p-6">
-              <Star className="w-7 h-7 text-amber-400 flex-shrink-0 mt-1" />
-              <p className="text-white/80 italic text-lg md:text-xl">"{data.quote}"</p>
+            <div className="flex items-start gap-4 bg-white/5 rounded-2xl p-6 lg:p-8">
+              <Star className="w-8 h-8 lg:w-10 lg:h-10 text-amber-400 flex-shrink-0 mt-1" />
+              <p className="text-white/80 italic text-xl lg:text-2xl">"{data.quote}"</p>
             </div>
           </div>
         </div>

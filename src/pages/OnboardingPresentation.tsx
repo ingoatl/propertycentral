@@ -15,7 +15,7 @@ import { RevenueComparisonSlide } from "@/components/presentation/slides/Revenue
 import { CorporateNetworkSlide } from "@/components/presentation/slides/CorporateNetworkSlide";
 import { CaseStudySlide } from "@/components/presentation/slides/CaseStudySlide";
 import { WhatSetsUsApartSlide } from "@/components/presentation/slides/WhatSetsUsApartSlide";
-import { WhatWeDoMoreSlide } from "@/components/presentation/slides/WhatWeDoMoreSlide";
+import { TestimonialSlide } from "@/components/presentation/slides/TestimonialSlide";
 import { OwnerPortalSlide } from "@/components/presentation/slides/OwnerPortalSlide";
 import { OnboardingTimelineSlide } from "@/components/presentation/slides/OnboardingTimelineSlide";
 import { HowItWorksSlide } from "@/components/presentation/slides/HowItWorksSlide";
@@ -34,8 +34,8 @@ const SLIDES = [
   { id: "case-woodland", component: () => <CaseStudySlide propertyName="Woodland Lane" />, label: "Case 1" },
   { id: "case-berkley", component: () => <CaseStudySlide propertyName="The Berkley" />, label: "Case 2" },
   { id: "case-lavish", component: () => <CaseStudySlide propertyName="Lavish Living" />, label: "Case 3" },
-  { id: "what-more", component: WhatWeDoMoreSlide, label: "Difference" },
   { id: "apart", component: WhatSetsUsApartSlide, label: "Why Us" },
+  { id: "testimonials", component: TestimonialSlide, label: "Reviews" },
   { id: "portal", component: OwnerPortalSlide, label: "Portal" },
   { id: "timeline", component: OnboardingTimelineSlide, label: "Timeline" },
   { id: "how", component: HowItWorksSlide, label: "Process" },

@@ -38,7 +38,7 @@ export function SlideLayout({
       )}
 
       {/* Content */}
-      <div className="relative z-10 w-full h-full flex flex-col justify-center items-center p-8 md:p-16">
+      <div className="relative z-10 w-full h-full flex flex-col justify-center items-center p-6 md:p-12 lg:p-16 xl:p-20">
         {children}
       </div>
     </div>
