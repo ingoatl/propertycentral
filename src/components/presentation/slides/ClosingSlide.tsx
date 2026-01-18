@@ -1,5 +1,6 @@
 import { SlideLayout } from "../SlideLayout";
 import atlantaSkyline from "@/assets/presentation/atlanta-skyline-hero.jpg";
+import ingoHeadshot from "@/assets/presentation/ingo-headshot.jpg";
 import { Phone, Mail, MapPin, ArrowRight } from "lucide-react";
 
 export function ClosingSlide() {
@@ -53,7 +54,7 @@ export function ClosingSlide() {
 
         <div className="flex items-center justify-center gap-10">
           <img 
-            src="https://www.peachhausgroup.com/lovable-uploads/f48b3dd5-8cfd-4ed9-b7bb-5c1fc3e60e1d.png" 
+            src={ingoHeadshot} 
             alt="Ingo Schaer" 
             className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-amber-400/50"
           />
