@@ -3392,7 +3392,7 @@ export function InboxView() {
                                     </div>
                                   </div>
                                 )}
-                              <div className="max-w-[88%] sm:max-w-[80%] min-w-0">
+                              <div className="max-w-[calc(100%-1rem)] sm:max-w-[80%] min-w-0">
                                   <div className={`rounded-2xl px-3 py-2 sm:px-3.5 overflow-hidden ${
                                     isOutbound 
                                       ? "bg-primary text-primary-foreground" 
@@ -3482,7 +3482,7 @@ export function InboxView() {
                                         ))}
                                       </div>
                                     )}
-                                    <p className="text-sm whitespace-pre-wrap leading-relaxed break-words overflow-hidden">{msg.body}</p>
+                                    <p className="text-sm whitespace-pre-wrap leading-relaxed break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.body}</p>
                                   </div>
                                   <div className={`flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 px-1 ${isOutbound ? "justify-end" : ""}`}>
                                     {isOutbound && currentUserProfile?.first_name && (
@@ -3500,11 +3500,11 @@ export function InboxView() {
                       </>
                     ) : (
                       /* Single message fallback */
-                      <div className={`flex ${selectedMessage.direction === "outbound" ? "justify-end" : "justify-start"}`}>
-                        <div className="max-w-[85%]">
-                          <div className={`rounded-2xl px-3.5 py-2 ${selectedMessage.direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                      <div className={`flex ${selectedMessage.direction === "outbound" ? "justify-end" : "justify-start"} w-full`}>
+                        <div className="max-w-[calc(100%-1rem)] sm:max-w-[85%] min-w-0">
+                          <div className={`rounded-2xl px-3.5 py-2 overflow-hidden ${selectedMessage.direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                             {selectedMessage.subject && <p className={`text-sm font-medium mb-1 ${selectedMessage.direction === "outbound" ? "opacity-90" : ""}`}>{selectedMessage.subject}</p>}
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed break-words overflow-hidden">{selectedMessage.body}</p>
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedMessage.body}</p>
                           </div>
                           <div className={`text-[10px] text-muted-foreground mt-0.5 px-1 ${selectedMessage.direction === "outbound" ? "text-right" : ""}`}>
                             {format(new Date(selectedMessage.created_at), "h:mm a")}
@@ -3560,24 +3560,78 @@ export function InboxView() {
             </ScrollArea>
 
             {!selectedMessage.is_draft && (
-              <div className="p-3 md:p-4 border-t safe-area-bottom">
-                <div className="flex items-center gap-2 max-w-3xl mx-auto">
-                  <div className="hidden md:flex items-center gap-1 mr-2">
-                    <Button variant={selectedChannel === "sms" ? "default" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setSelectedChannel("sms")} disabled={!selectedMessage.contact_phone}><MessageSquare className="h-3.5 w-3.5" /></Button>
-                    <Button variant={selectedChannel === "email" ? "default" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setSelectedChannel("email")} disabled={!selectedMessage.contact_email}><Mail className="h-3.5 w-3.5" /></Button>
+              <div className="p-2 md:p-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 safe-area-bottom">
+                {/* Smart toolbar - AI and tools above input on mobile */}
+                <div className="flex items-center gap-1.5 px-1 pb-2 overflow-x-auto scrollbar-hide md:hidden">
+                  <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} />
+                  <VoiceDictationButton 
+                    onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
+                    messageType={selectedChannel === "email" ? "email" : "sms"} 
+                    contactName={selectedMessage.contact_name}
+                  />
+                  <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                  <div className="w-px h-6 bg-border mx-1" />
+                  <Button 
+                    variant={selectedChannel === "sms" ? "default" : "ghost"} 
+                    size="sm" 
+                    className="h-8 px-2.5 rounded-full text-xs" 
+                    onClick={() => setSelectedChannel("sms")} 
+                    disabled={!selectedMessage.contact_phone}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 mr-1" />SMS
+                  </Button>
+                  <Button 
+                    variant={selectedChannel === "email" ? "default" : "ghost"} 
+                    size="sm" 
+                    className="h-8 px-2.5 rounded-full text-xs" 
+                    onClick={() => setSelectedChannel("email")} 
+                    disabled={!selectedMessage.contact_email}
+                  >
+                    <Mail className="h-3.5 w-3.5 mr-1" />Email
+                  </Button>
+                </div>
+                
+                {/* iMessage-style composer */}
+                <div className="flex items-end gap-2 max-w-3xl mx-auto">
+                  {/* Desktop channel selector */}
+                  <div className="hidden md:flex items-center gap-1 mr-1">
+                    <Button variant={selectedChannel === "sms" ? "default" : "ghost"} size="sm" className="h-8 px-2" onClick={() => setSelectedChannel("sms")} disabled={!selectedMessage.contact_phone}><MessageSquare className="h-3.5 w-3.5" /></Button>
+                    <Button variant={selectedChannel === "email" ? "default" : "ghost"} size="sm" className="h-8 px-2" onClick={() => setSelectedChannel("email")} disabled={!selectedMessage.contact_email}><Mail className="h-3.5 w-3.5" /></Button>
                   </div>
-                  <div className="flex-1 flex items-center gap-2 bg-muted/50 rounded-full px-3 py-1.5">
-                    <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} />
-                    <VoiceDictationButton 
-                      onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
-                      messageType={selectedChannel === "email" ? "email" : "sms"} 
-                      contactName={selectedMessage.contact_name}
-                      className="text-muted-foreground hover:text-primary"
+                  
+                  {/* Input container */}
+                  <div className="flex-1 flex items-end gap-2 bg-muted/50 rounded-3xl px-3 py-2 min-h-[44px]">
+                    {/* Desktop tools */}
+                    <div className="hidden md:flex items-center gap-1">
+                      <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} />
+                      <VoiceDictationButton 
+                        onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
+                        messageType={selectedChannel === "email" ? "email" : "sms"} 
+                        contactName={selectedMessage.contact_name}
+                      />
+                    </div>
+                    
+                    <Input 
+                      placeholder="Message..." 
+                      value={newMessage} 
+                      onChange={(e) => setNewMessage(e.target.value)} 
+                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()} 
+                      className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-auto min-h-[28px] text-base md:text-sm py-0" 
                     />
-                    <Input placeholder="Message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()} className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-9 text-sm" />
-                    <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                    
+                    {/* Desktop emoji picker */}
+                    <div className="hidden md:block">
+                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                    </div>
                   </div>
-                  <Button size="icon" className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90" onClick={handleSendMessage} disabled={!newMessage.trim() || sendSmsMutation.isPending}>
+                  
+                  {/* Send button - larger on mobile */}
+                  <Button 
+                    size="icon" 
+                    className="h-11 w-11 md:h-10 md:w-10 rounded-full bg-primary hover:bg-primary/90 flex-shrink-0" 
+                    onClick={handleSendMessage} 
+                    disabled={!newMessage.trim() || sendSmsMutation.isPending}
+                  >
                     {sendSmsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-primary-foreground" /> : <Send className="h-4 w-4 text-primary-foreground" />}
                   </Button>
                 </div>

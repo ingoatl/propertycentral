@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from "@/components/ui/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -123,16 +123,16 @@ export function ConversationNotes({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
+      <ResponsiveModalContent className="sm:max-w-md">
+        <ResponsiveModalHeader>
+          <ResponsiveModalTitle className="flex items-center gap-2">
             <StickyNote className="h-5 w-5" />
             Notes for {contactName}
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveModalTitle>
+        </ResponsiveModalHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 p-4 md:p-6">
           {/* Add new note */}
           <div className="space-y-2">
             <Textarea
@@ -140,13 +140,13 @@ export function ConversationNotes({
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               rows={3}
-              className="resize-none"
+              className="resize-none text-base md:text-sm"
             />
             <Button
               onClick={handleAddNote}
               disabled={!newNote.trim() || isSaving}
               size="sm"
-              className="w-full"
+              className="w-full h-10"
             >
               {isSaving ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -158,7 +158,7 @@ export function ConversationNotes({
           </div>
 
           {/* Notes list */}
-          <ScrollArea className="h-[300px]">
+          <ScrollArea className="h-[250px] md:h-[300px]">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -176,12 +176,12 @@ export function ConversationNotes({
                     className="p-3 bg-muted/50 rounded-lg group"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm whitespace-pre-wrap">{note.note}</p>
+                      <p className="text-sm whitespace-pre-wrap break-words">{note.note}</p>
                       <button
                         onClick={() => handleDeleteNote(note.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex-shrink-0 p-1"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4 md:h-3.5 md:w-3.5" />
                       </button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
@@ -193,7 +193,7 @@ export function ConversationNotes({
             )}
           </ScrollArea>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   );
 }
