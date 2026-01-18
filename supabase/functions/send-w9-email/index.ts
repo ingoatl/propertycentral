@@ -102,11 +102,11 @@ function buildW9EmailHtml(firstName: string, w9DownloadUrl: string, hasAttachmen
                 </td>
               </tr>
 
-              <!-- No Action Needed -->
+              <!-- What's Next -->
               <tr>
                 <td style="padding: 0 32px 24px 32px;">
                   <div style="margin: 20px 0; padding: 16px 20px; background: #f8fafc; border-left: 4px solid #64748b; border-radius: 0 8px 8px 0;">
-                    <div style="font-size: 14px; color: #475569; font-weight: 500;">No action is needed beyond saving this form - just hold onto it for your records.</div>
+                    <div style="font-size: 14px; color: #475569; font-weight: 500;">📧 <strong>What's Next:</strong> Shortly you'll receive a secure link to set up your payment details for our management services.</div>
                   </div>
                 </td>
               </tr>
@@ -242,26 +242,30 @@ const handler = async (req: Request): Promise<Response> => {
 
     const firstName = recipientName.split(" ")[0];
     
-    // Fetch the W-9 PDF from storage
+    // Fetch the W-9 PDF from public URL (always attach it)
     let w9Attachment: { filename: string; content: string } | null = null;
     
     try {
-      // Try to fetch from Supabase storage first
-      const { data: storageData } = await supabase.storage
-        .from("documents")
-        .download("w9_Peachhausgroup.pdf");
-      
-      if (storageData) {
-        const arrayBuffer = await storageData.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      // Fetch from public URL
+      const pdfResponse = await fetch(W9_URL);
+      if (pdfResponse.ok) {
+        const arrayBuffer = await pdfResponse.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
         w9Attachment = {
           filename: "PeachHaus_Group_W9.pdf",
           content: base64,
         };
-        console.log("W-9 PDF loaded from storage");
+        console.log("W-9 PDF fetched and attached from public URL");
+      } else {
+        console.log("Could not fetch PDF from URL:", pdfResponse.status);
       }
-    } catch (storageError) {
-      console.log("Could not load from storage, will use download link instead");
+    } catch (pdfError) {
+      console.log("Could not fetch PDF, will use download link instead:", pdfError);
     }
 
     // Build beautiful HTML email

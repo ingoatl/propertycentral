@@ -1138,12 +1138,12 @@ serve(async (req) => {
         // No admin copy - admin gets notified when lead actually books
         console.log(`Sending direct inspection scheduling email for stage ${newStage}`);
       } else if (newStage === 'contract_signed') {
-        // CONTRACT_SIGNED: Send welcome onboarding email (payment setup comes later in welcome_email_w9)
+        // CONTRACT_SIGNED: Send welcome onboarding email FIRST (W9 and payment setup come later)
         directEmailHtml = buildWelcomeOnboardingEmailHtml(recipientFirstName, lead.property_address || "");
-        directEmailSubject = "Welcome to the PeachHaus Family!";
+        directEmailSubject = "🎉 Welcome to the PeachHaus Family! - Your Onboarding Journey Starts Now";
         sendAdminCopy = true;
-        adminEmailSubject = `Welcome Email Sent: ${lead.name}`;
-        console.log(`Sending direct welcome onboarding email for stage ${newStage}`);
+        adminEmailSubject = `🎉 Welcome Email Sent: ${lead.name}`;
+        console.log(`Stage contract_signed: Sending welcome email FIRST for lead ${leadId}`);
       } else if (newStage === 'welcome_email_w9') {
         // WELCOME_EMAIL_W9: Send payment setup email (triggered 1 hour after contract_signed OR manually)
         console.log(`Stage welcome_email_w9: Creating payment setup email for lead ${leadId}`);
