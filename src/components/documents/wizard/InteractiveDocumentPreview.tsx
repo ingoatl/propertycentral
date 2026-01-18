@@ -123,11 +123,20 @@ export function InteractiveDocumentPreview({
           actualPage = Math.max(1, Math.min(numPages, Math.ceil(field.page * scaleFactor)));
         }
         
-        console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: stored page=${field.page} -> actual page=${actualPage}`);
+        // IMPORTANT: Adjust stored Y position to avoid overlapping document header
+        // Stored positions from AI analysis may place fields too high
+        // Add a minimum Y offset of 25% to skip headers/titles on first page
+        let adjustedY = field.y!;
+        if (actualPage === 1 && adjustedY < 25) {
+          // Push fields below the typical document header area
+          adjustedY = 25 + (adjustedY * 0.5); // Compress and offset
+        }
+        
+        console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: stored page=${field.page} -> actual page=${actualPage}, y=${field.y} -> ${adjustedY}`);
         return {
           ...field,
           x: field.x!,
-          y: field.y!,
+          y: adjustedY,
           width: field.width || 40,
           height: field.height || 2.5,
           page: actualPage,
@@ -162,10 +171,14 @@ export function InteractiveDocumentPreview({
       const row = Math.floor(fieldIndexOnPage / 2);
       const col = fieldIndexOnPage % 2;
       
+      // Start fields lower on the page to avoid document headers
+      // For first page, start at 30% to skip title/header
+      const pageYOffset = estimatedPage === 1 ? 30 : 15;
+      
       // Special handling for signature fields - place them at bottom
-      let yPos = 10 + (row * 8);
+      let yPos = pageYOffset + (row * 8);
       if (isSignature) {
-        yPos = 70 + (fieldIndexOnPage * 8); // Start at 70% from top
+        yPos = 65 + (fieldIndexOnPage * 10); // Start at 65% from top
       }
       
       console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: fallback page=${estimatedPage}, y=${yPos}, category=${category}`);
@@ -173,7 +186,7 @@ export function InteractiveDocumentPreview({
       return {
         ...field,
         x: 5 + (col * 48),
-        y: Math.min(yPos, 90), // Don't go off page
+        y: Math.min(yPos, 88), // Don't go off page
         width: 42,
         height: isSignature ? 5 : 3,
         page: estimatedPage,

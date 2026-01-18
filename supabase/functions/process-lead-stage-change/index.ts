@@ -31,7 +31,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
+const LOGO_URL = "https://propertycentral.lovable.app/images/peachhaus-logo.png";
 
 // Owner-facing onboarding timeline steps (5 steps including payment)
 const OWNER_TIMELINE_STEPS = [
@@ -557,12 +557,13 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
   ], currentStage);
 }
 
-// Hosted assets for welcome email
-const ANJA_INGO_PHOTO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/hosts/anja-ingo-hosts.jpg";
-const INGO_SIGNATURE_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png";
-const ANJA_SIGNATURE_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png";
-const ANJA_BOOK_URL = "https://propertycentral.lovable.app/books/hybrid-rental-strategy-book.png";
-const INGO_BOOK_URL = "https://propertycentral.lovable.app/books/propertypreneur-book.png";
+// Hosted assets for welcome email - use public app URLs for reliable delivery
+const APP_BASE_URL = "https://propertycentral.lovable.app";
+const ANJA_INGO_PHOTO_URL = `${APP_BASE_URL}/images/anja-ingo-hosts.jpg`;
+const INGO_SIGNATURE_URL = `${APP_BASE_URL}/images/ingo-signature.png`;
+const ANJA_SIGNATURE_URL = `${APP_BASE_URL}/images/anja-signature.png`;
+const ANJA_BOOK_URL = `${APP_BASE_URL}/books/hybrid-rental-strategy-book.png`;
+const INGO_BOOK_URL = `${APP_BASE_URL}/books/propertypreneur-book.png`;
 
 // Build welcome onboarding email for contract_signed stage
 // Matches the same style as W-9 and other stage emails
