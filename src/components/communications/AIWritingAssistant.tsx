@@ -46,25 +46,46 @@ export function AIWritingAssistant({
 
   const handleAction = async (action: ActionType) => {
     try {
+      // Validate required fields
+      if (!contactId) {
+        toast.error("Contact information is missing. Please select a conversation first.");
+        return;
+      }
+      
       let response = null;
       const cType = contactType || "lead";
-      const cId = contactId || "";
       
       switch (action) {
         case "generate":
-          response = await composeMessage(cType, cId, messageType);
+          response = await composeMessage(cType, contactId, messageType);
           break;
         case "improve":
-          response = await improveMessage(cType, cId, messageType, currentMessage);
+          if (!currentMessage) {
+            toast.error("Please write a message first to improve it.");
+            return;
+          }
+          response = await improveMessage(cType, contactId, messageType, currentMessage);
           break;
         case "shorter":
-          response = await shortenMessage(cType, cId, messageType, currentMessage);
+          if (!currentMessage) {
+            toast.error("Please write a message first to shorten it.");
+            return;
+          }
+          response = await shortenMessage(cType, contactId, messageType, currentMessage);
           break;
         case "professional":
-          response = await makeProfessional(cType, cId, messageType, currentMessage);
+          if (!currentMessage) {
+            toast.error("Please write a message first.");
+            return;
+          }
+          response = await makeProfessional(cType, contactId, messageType, currentMessage);
           break;
         case "friendly":
-          response = await makeFriendly(cType, cId, messageType, currentMessage);
+          if (!currentMessage) {
+            toast.error("Please write a message first.");
+            return;
+          }
+          response = await makeFriendly(cType, contactId, messageType, currentMessage);
           break;
       }
 
