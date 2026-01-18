@@ -62,6 +62,16 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
+    // Fetch company knowledge for context
+    const { data: companyKnowledge } = await supabase
+      .from("company_knowledge_base")
+      .select("category, title, content, keywords, referral_link")
+      .eq("is_active", true)
+      .order("priority", { ascending: false })
+      .limit(15);
+
+    console.log(`[Smart Compose] Loaded ${companyKnowledge?.length || 0} knowledge entries`);
+
     // Fetch conversation history if we have a lead/owner
     let fullHistory = conversationHistory || [];
     if ((leadId || ownerId) && fullHistory.length === 0) {
@@ -210,21 +220,38 @@ Add warmth while staying professional. Match the user's natural friendly tone.`;
         break;
     }
 
+    // Build company knowledge context
+    let knowledgeContext = "";
+    if (companyKnowledge && companyKnowledge.length > 0) {
+      knowledgeContext = `
+COMPANY KNOWLEDGE BASE (use this information in your responses):
+${companyKnowledge.map(k => {
+  let entry = `[${k.category.toUpperCase()}] ${k.title}: ${k.content}`;
+  if (k.referral_link) entry += ` (Link: ${k.referral_link})`;
+  return entry;
+}).join("\n\n")}
+`;
+    }
+
     const systemPrompt = `You are a writing assistant that generates CONTEXT-AWARE replies in the user's voice.
 
 CRITICAL RULE: When replying to a message, your response MUST directly address what was asked. 
-- If they ask about insurance → answer about insurance
-- If they ask about pricing → answer about pricing  
+- If they ask about insurance → answer about insurance using knowledge base
+- If they ask about pricing → answer about pricing using knowledge base
 - If they ask a question → answer that specific question FIRST
 - NEVER give a generic response that ignores their question
+- Use SPECIFIC details from the COMPANY KNOWLEDGE BASE below
 
 ${toneInstructions}
 
 ${conversationContext}
 
+${knowledgeContext}
+
 COMPANY CONTEXT:
 - Company: PeachHaus Group - Premium mid-term rental property management in Atlanta
-- If you don't know specific details (like insurance companies), be honest and offer to research/follow up
+- Use the knowledge base above for accurate answers about services, pricing, insurance, etc.
+- If information isn't in the knowledge base, be honest and offer to research/follow up
 
 OUTPUT FORMAT:
 ${messageType === "email" ? `Return JSON: {"subject": "...", "body": "..."}` : `Return just the message text, no JSON.`}
