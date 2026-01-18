@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Send, Mail, Loader2, Sparkles, MessageSquare } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from "@/components/ui/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -99,17 +99,13 @@ export function SendEmailDialog({
   const [userInstructions, setUserInstructions] = useState("");
   const queryClient = useQueryClient();
 
-  // Fetch AI suggestion when dialog opens
   useEffect(() => {
     if (open) {
-      // Set reply subject following RFC 5322 - single "Re:" prefix for threading
       if (replyToSubject) {
         setSubject(formatReplySubject(replyToSubject));
       } else {
         setSubject("");
       }
-      
-      // Fetch AI suggestion
       fetchAISuggestion();
     }
   }, [open, contactEmail, contactName, replyToSubject, replyToBody]);
@@ -137,7 +133,6 @@ export function SendEmailDialog({
         setShowContextInput(false);
         setUserInstructions("");
         
-        // If AI generated a subject and we don't have one, use it
         if (data.suggestedSubject && !replyToSubject && !subject) {
           setSubject(data.suggestedSubject);
         }
@@ -177,7 +172,6 @@ export function SendEmailDialog({
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
       queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
       queryClient.invalidateQueries({ queryKey: ["gmail-emails"] });
-      // Mark email as done after sending reply
       if (onEmailSent) {
         onEmailSent();
       }
@@ -195,21 +189,21 @@ export function SendEmailDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
+      <ResponsiveModalContent className="max-w-lg md:max-h-[90vh] flex flex-col">
+        <ResponsiveModalHeader>
+          <ResponsiveModalTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
             Email {contactName}
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveModalTitle>
+        </ResponsiveModalHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-4 p-4 md:p-6">
           {/* Sender selection */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Send as</label>
             <Select value={selectedSender} onValueChange={setSelectedSender}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11 md:h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -230,20 +224,20 @@ export function SendEmailDialog({
           {/* Email display */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>To:</span>
-            <Badge variant="secondary">{contactEmail}</Badge>
+            <Badge variant="secondary" className="truncate max-w-[200px]">{contactEmail}</Badge>
           </div>
 
-          {/* Quick templates */}
+          {/* Quick templates - horizontal scroll on mobile */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Quick Templates</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
               {EMAIL_TEMPLATES.map((template, idx) => (
                 <Button
                   key={idx}
                   variant="outline"
                   size="sm"
                   onClick={() => applyTemplate(template)}
-                  className="text-xs"
+                  className="text-sm whitespace-nowrap flex-shrink-0 h-9"
                 >
                   {template.label}
                 </Button>
@@ -258,6 +252,7 @@ export function SendEmailDialog({
               placeholder="Email subject..."
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
+              className="h-11 md:h-10 text-base md:text-sm"
             />
           </div>
 
@@ -273,21 +268,21 @@ export function SendEmailDialog({
                 value={userInstructions}
                 onChange={(e) => setUserInstructions(e.target.value)}
                 placeholder="Enter context or key points... e.g. 'Tell them we can do a walkthrough next Tuesday'"
-                className="min-h-[80px] text-sm bg-background resize-y w-full"
+                className="min-h-[80px] text-base md:text-sm bg-background resize-y w-full"
                 autoFocus
               />
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   size="sm"
                   onClick={() => fetchAISuggestion()}
                   disabled={isLoadingAI || !userInstructions.trim()}
-                  className="gap-2"
+                  className="gap-2 h-10 md:h-9"
                 >
                   {isLoadingAI ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Sparkles className="h-3.5 w-3.5" />
+                    <Sparkles className="h-4 w-4" />
                   )}
                   Generate Email
                 </Button>
@@ -299,6 +294,7 @@ export function SendEmailDialog({
                     setShowContextInput(false);
                     setUserInstructions("");
                   }}
+                  className="h-10 md:h-9"
                 >
                   Cancel
                 </Button>
@@ -310,7 +306,7 @@ export function SendEmailDialog({
           <div className="space-y-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-sm font-medium">Message</label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <VoiceDictationButton
                   onResult={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}
                   messageType="email"
@@ -321,12 +317,12 @@ export function SendEmailDialog({
                   size="sm"
                   onClick={() => fetchAISuggestion()}
                   disabled={isLoadingAI}
-                  className="h-7 text-xs"
+                  className="h-9 text-sm"
                 >
                   {isLoadingAI ? (
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                   ) : (
-                    <Sparkles className="h-3 w-3 mr-1" />
+                    <Sparkles className="h-4 w-4 mr-1" />
                   )}
                   {isLoadingAI ? "Generating..." : "AI Suggest"}
                 </Button>
@@ -335,52 +331,56 @@ export function SendEmailDialog({
                   size="sm"
                   onClick={() => setShowContextInput(!showContextInput)}
                   disabled={isLoadingAI}
-                  className="h-7 text-xs gap-1"
+                  className="h-9 text-sm gap-1"
                 >
-                  <MessageSquare className="h-3 w-3" />
-                  Reply with Context
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="hidden sm:inline">Reply with Context</span>
+                  <span className="sm:hidden">Context</span>
                 </Button>
               </div>
             </div>
             {isLoadingAI ? (
-              <div className="flex items-center justify-center h-48 border rounded-md bg-muted/30">
+              <div className="flex items-center justify-center h-40 md:h-48 border rounded-md bg-muted/30">
                 <div className="text-center text-muted-foreground">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                   <p className="text-sm">AI is drafting a response...</p>
                 </div>
               </div>
             ) : (
-              <div className="relative">
-                <Textarea
-                  placeholder="Type your email message..."
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  rows={8}
-                  className="resize-none"
-                />
-              </div>
+              <Textarea
+                placeholder="Type your email message..."
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={8}
+                className="resize-none text-base md:text-sm min-h-[160px] md:min-h-[200px]"
+              />
             )}
           </div>
-
-          {/* Send button */}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => sendEmail.mutate()}
-              disabled={!subject.trim() || !body.trim() || sendEmail.isPending}
-            >
-              {sendEmail.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
-              {sendEmail.isPending ? "Sending..." : "Send Email"}
-            </Button>
-          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Send button - sticky at bottom */}
+        <div className="flex justify-end gap-3 p-4 md:p-6 border-t bg-background safe-area-bottom">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            className="h-11 md:h-10 px-6"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => sendEmail.mutate()}
+            disabled={!subject.trim() || !body.trim() || sendEmail.isPending}
+            className="h-11 md:h-10 px-6"
+          >
+            {sendEmail.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            {sendEmail.isPending ? "Sending..." : "Send Email"}
+          </Button>
+        </div>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   );
 }

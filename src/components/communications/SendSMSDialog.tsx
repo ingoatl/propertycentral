@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { Send, MessageSquare, Clock, CheckCheck } from "lucide-react";
+import { Send, CheckCheck } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from "@/components/ui/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,14 +78,13 @@ export function SendSMSDialog({
 
   const sendSMS = useMutation({
     mutationFn: async () => {
-      // Use GHL for ALL SMS (unified A2P compliant sending)
       const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
         body: {
           leadId: contactType === "lead" ? contactId : undefined,
           ownerId: contactType === "owner" ? contactId : undefined,
           phone: contactPhone,
           message: message,
-          fromNumber: "+14048005932", // GHL main number
+          fromNumber: "+14048005932",
         },
       });
       if (error) throw error;
@@ -128,26 +126,26 @@ export function SendSMSDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-emerald-500 flex items-center justify-center">
+    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
+      <ResponsiveModalContent className="max-w-lg p-0 md:max-h-[90vh]">
+        <ResponsiveModalHeader className="px-4 md:px-6 py-4 border-b">
+          <ResponsiveModalTitle className="flex items-center gap-3">
+            <div className="h-11 w-11 md:h-10 md:w-10 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
               <span className="text-sm font-medium text-white">
                 {getInitials(contactName)}
               </span>
             </div>
-            <div>
-              <div className="font-semibold">{contactName}</div>
+            <div className="min-w-0">
+              <div className="font-semibold text-base truncate">{contactName}</div>
               <div className="text-sm text-muted-foreground font-normal">{contactPhone}</div>
             </div>
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveModalTitle>
+        </ResponsiveModalHeader>
 
-        <div className="flex flex-col">
+        <div className="flex flex-col flex-1 overflow-hidden">
           {/* Recent messages */}
           {recentMessages.length > 0 && (
-            <ScrollArea className="h-48 px-6 py-4 border-b">
+            <ScrollArea className="h-40 md:h-48 px-4 md:px-6 py-4 border-b">
               <div className="space-y-3">
                 {recentMessages.map((msg: any) => (
                   <div
@@ -156,13 +154,13 @@ export function SendSMSDialog({
                   >
                     <div className="max-w-[80%]">
                       <div
-                        className={`rounded-2xl px-4 py-2 text-sm ${
+                        className={`rounded-2xl px-4 py-2.5 text-sm ${
                           msg.direction === "outbound"
                             ? "bg-gradient-to-br from-violet-500 to-violet-600 text-white"
                             : "bg-muted"
                         }`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.body}</p>
+                        <p className="whitespace-pre-wrap break-words">{msg.body}</p>
                       </div>
                       <div className={`flex items-center gap-1 mt-1 text-xs text-muted-foreground ${msg.direction === "outbound" ? "justify-end" : ""}`}>
                         {msg.direction === "outbound" && <CheckCheck className="h-3 w-3" />}
@@ -175,14 +173,14 @@ export function SendSMSDialog({
             </ScrollArea>
           )}
 
-          <div className="p-6 space-y-4">
-            {/* Quick templates */}
-            <div className="flex flex-wrap gap-2">
+          <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
+            {/* Quick templates - horizontal scroll on mobile */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
               {SMS_TEMPLATES.map((template, idx) => (
                 <button
                   key={idx}
                   onClick={() => applyTemplate(template)}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-background hover:bg-muted transition-colors"
+                  className="px-3.5 py-2 rounded-full text-sm font-medium border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   {template.label}
                 </button>
@@ -197,7 +195,7 @@ export function SendSMSDialog({
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={4}
-                  className="resize-none rounded-xl pr-10"
+                  className="resize-none rounded-xl pr-12 text-base md:text-sm min-h-[120px] md:min-h-[100px]"
                 />
                 <div className="absolute right-2 top-2">
                   <VoiceDictationButton
@@ -207,31 +205,35 @@ export function SendSMSDialog({
                   />
                 </div>
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
+              <div className="flex justify-between text-xs text-muted-foreground px-1">
                 <span>{characterCount} characters</span>
                 <span>
                   {segmentCount} SMS segment{segmentCount > 1 ? "s" : ""}
                 </span>
               </div>
             </div>
+          </div>
 
-            {/* Send button */}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-full">
-                Cancel
-              </Button>
-              <Button
-                onClick={() => sendSMS.mutate()}
-                disabled={!message.trim() || sendSMS.isPending}
-                className="rounded-full bg-gradient-to-br from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {sendSMS.isPending ? "Sending..." : "Send"}
-              </Button>
-            </div>
+          {/* Send button - sticky at bottom on mobile */}
+          <div className="flex justify-end gap-3 p-4 md:p-6 border-t bg-background safe-area-bottom">
+            <Button 
+              variant="outline" 
+              onClick={() => onOpenChange(false)} 
+              className="rounded-full h-11 md:h-10 px-6"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => sendSMS.mutate()}
+              disabled={!message.trim() || sendSMS.isPending}
+              className="rounded-full bg-gradient-to-br from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 h-11 md:h-10 px-6"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {sendSMS.isPending ? "Sending..." : "Send"}
+            </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   );
 }
