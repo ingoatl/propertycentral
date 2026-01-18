@@ -3565,7 +3565,7 @@ export function InboxView() {
               <div className="p-2 md:p-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 safe-area-bottom">
                 {/* Smart toolbar - AI and tools above input on mobile */}
                 <div className="flex items-center gap-1.5 px-1 pb-2 overflow-x-auto scrollbar-hide md:hidden">
-                  <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} />
+                  <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type as "lead" | "owner"} />
                   <VoiceDictationButton 
                     onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
                     messageType={selectedChannel === "email" ? "email" : "sms"} 
@@ -3605,7 +3605,7 @@ export function InboxView() {
                   <div className="flex-1 flex items-end gap-2 bg-muted/50 rounded-3xl px-3 py-2 min-h-[44px]">
                     {/* Desktop tools */}
                     <div className="hidden md:flex items-center gap-1">
-                      <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} />
+                      <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type as "lead" | "owner"} />
                       <VoiceDictationButton 
                         onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
                         messageType={selectedChannel === "email" ? "email" : "sms"} 
