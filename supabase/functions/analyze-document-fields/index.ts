@@ -341,10 +341,13 @@ KEY PRINCIPLES:
     const suggestedName = parsedResult.suggested_name || "Document Template";
     const rawFields = parsedResult.fields || [];
 
+    // Try to determine actual page count from PDF if possible
+    // For now, estimate based on document text length
+    const estimatedPages = Math.max(4, Math.ceil(documentText.length / 3000));
+    console.log(`Estimated document pages: ${estimatedPages} (based on ${documentText.length} chars)`);
+
     // Post-process fields to ensure proper structure and assignments
-    // IMPORTANT: We cannot detect exact PDF positions from text analysis
-    // Positions will be set during manual review or via PDF field extraction
-    // For now, use category-based defaults that spread across pages intelligently
+    // Use SMARTER page distribution based on document structure
     const fields: Array<{
       api_id: string;
       label: string;
@@ -358,7 +361,14 @@ KEY PRINCIPLES:
       y: number;
       width: number;
       height: number;
-    }> = rawFields.map((f, index) => {
+    }> = [];
+    
+    // Track fields per category for Y positioning
+    const categoryFieldCounts: Record<string, number> = {};
+    
+    for (let index = 0; index < rawFields.length; index++) {
+      const f = rawFields[index];
+      
       // Ensure proper type
       const validTypes = ["text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"];
       const fieldType = validTypes.includes(f.type) ? f.type : "text";
@@ -366,74 +376,56 @@ KEY PRINCIPLES:
       // Force signature fields to signature category
       const category = fieldType === "signature" ? "signature" : (f.category || "other");
       
+      // Track how many fields in this category
+      if (!categoryFieldCounts[category]) categoryFieldCounts[category] = 0;
+      const indexInCategory = categoryFieldCounts[category]++;
+      
       // Ensure required is boolean
       const required = f.required !== false;
       
-      // Category-based page assignment:
-      // - property, financial, dates, occupancy: page 1 (top of document)
-      // - contact, identification: page 1-2 (middle)
-      // - vehicle, emergency: page 2+
-      // - signature, acknowledgment: last pages
-      const categoryPageMap: Record<string, number> = {
-        property: 1,
-        financial: 1,
-        dates: 1,
-        occupancy: 1,
-        contact: 1,
-        identification: 2,
-        vehicle: 2,
-        emergency: 2,
-        acknowledgment: 3,
-        signature: 4, // Signatures typically at end
-        other: 1,
-      };
+      // IMPROVED PAGE DISTRIBUTION based on document sections
+      // Signatures always go on the LAST page
+      // Other fields spread across first 75% of document
+      let assignedPage = 1;
+      let baseY = 10;
       
-      // Category-based Y position (vertical spacing within page)
-      const categoryYStart: Record<string, number> = {
-        property: 10,
-        financial: 25,
-        dates: 40,
-        occupancy: 55,
-        contact: 10,
-        identification: 25,
-        vehicle: 40,
-        emergency: 55,
-        acknowledgment: 10,
-        signature: 70, // Signatures near bottom
-        other: 85,
-      };
-      
-      const basePage = categoryPageMap[category] || 1;
-      const baseY = categoryYStart[category] || 10;
-      
-      // Within each category, spread fields vertically
-      const fieldsInSameCategory = rawFields.filter(rf => 
-        (rf.type === "signature" ? "signature" : (rf.category || "other")) === category
-      );
-      const indexInCategory = fieldsInSameCategory.findIndex(rf => rf.api_id === f.api_id);
-      
-      // Signature fields: place them smartly
-      if (fieldType === "signature") {
-        const sigFieldIndex = fieldsInSameCategory.findIndex(rf => rf.api_id === f.api_id);
-        // Guest signatures first, then host
-        const yPos = f.filled_by === "guest" ? 70 + sigFieldIndex * 8 : 85 + sigFieldIndex * 8;
-        return {
-          api_id: f.api_id || `field_${index}`,
-          label: f.label || f.api_id,
-          type: fieldType,
-          filled_by: f.filled_by === "guest" ? "guest" : "admin",
-          category,
-          required,
-          description: f.description || "",
-          page: basePage,
-          x: 10,
-          y: Math.min(yPos, 90), // Don't go off page
-          width: 35,
-          height: 6,
+      if (fieldType === "signature" || category === "signature") {
+        // Signatures on last page
+        assignedPage = estimatedPages;
+        // Stack signatures vertically
+        baseY = 50 + (indexInCategory * 12);
+      } else {
+        // Distribute non-signature fields across pages based on category priority
+        const categoryPageOffset: Record<string, number> = {
+          property: 0,
+          financial: 0,
+          dates: 0.1,
+          occupancy: 0.2,
+          contact: 0.3,
+          identification: 0.4,
+          vehicle: 0.5,
+          emergency: 0.6,
+          acknowledgment: 0.7,
+          other: 0.3,
         };
+        
+        // Spread across 75% of document pages (leave last 25% for signatures)
+        const offset = categoryPageOffset[category] || 0;
+        const pagesForContent = Math.max(1, Math.floor(estimatedPages * 0.75));
+        assignedPage = Math.max(1, Math.min(pagesForContent, Math.floor(1 + offset * pagesForContent)));
+        
+        // Within page, stack fields vertically with 2-column layout
+        const row = Math.floor(indexInCategory / 2);
+        baseY = 10 + (row * 8);
       }
       
-      return {
+      // Column positioning (2 columns)
+      const col = indexInCategory % 2;
+      const xPos = fieldType === "signature" ? 10 : (5 + col * 48);
+      const fieldWidth = fieldType === "signature" ? 35 : 42;
+      const fieldHeight = fieldType === "signature" ? 6 : 4;
+      
+      fields.push({
         api_id: f.api_id || `field_${index}`,
         label: f.label || f.api_id,
         type: fieldType,
@@ -441,13 +433,13 @@ KEY PRINCIPLES:
         category,
         required,
         description: f.description || "",
-        page: basePage,
-        x: 10 + (indexInCategory % 2) * 45,
-        y: baseY + Math.floor(indexInCategory / 2) * 8,
-        width: 40,
-        height: 4,
-      };
-    });
+        page: assignedPage,
+        x: xPos,
+        y: Math.min(baseY, 90), // Don't go off page
+        width: fieldWidth,
+        height: fieldHeight,
+      });
+    }
 
     // Ensure we have essential signature fields
     if (!detectTypeOnly && fields.length > 0) {

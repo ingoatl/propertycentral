@@ -568,10 +568,13 @@ serve(async (req) => {
         contextUsed: {
           memoriesCount: context.memories.length,
           knowledgeEntriesUsed: context.relevantKnowledge.map(k => k.title),
+          toneEntriesUsed: toneKnowledge?.map(t => t.title) || [],
           questionsAnswered: context.threadAnalysis.questions.length,
           sentimentDetected: context.threadAnalysis.lastInboundSentiment,
           conversationPhase: context.threadAnalysis.conversationPhase,
           messagesAnalyzed: context.recentMessages.length,
+          relationshipStage: context.contactProfile.relationshipStage,
+          toneFormality: context.toneProfile.formality,
         },
         metadata: {
           model: 'google/gemini-3-flash-preview',
