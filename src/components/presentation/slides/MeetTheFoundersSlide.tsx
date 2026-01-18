@@ -1,5 +1,6 @@
 import { SlideLayout } from "../SlideLayout";
 import { BookOpen } from "lucide-react";
+import ingoHeadshot from "@/assets/presentation/ingo-headshot.jpg";
 
 export function MeetTheFoundersSlide() {
   return (
@@ -15,7 +16,7 @@ export function MeetTheFoundersSlide() {
           <div className="bg-white/5 backdrop-blur-sm rounded-3xl p-10 border border-white/10 hover:border-amber-400/30 transition-all duration-300 group">
             <div className="flex flex-col items-center text-center">
               <img
-                src="https://www.peachhausgroup.com/lovable-uploads/f48b3dd5-8cfd-4ed9-b7bb-5c1fc3e60e1d.png"
+                src={ingoHeadshot}
                 alt="Ingo Schaer"
                 className="w-44 h-44 md:w-56 md:h-56 rounded-full object-cover border-4 border-amber-400/30 mb-6 group-hover:border-amber-400 transition-all duration-300 shadow-2xl"
               />

@@ -1,75 +1,55 @@
 import { SlideLayout } from "../SlideLayout";
-import { Shield, Heart, Target, Handshake } from "lucide-react";
+import { Shield, Heart, TrendingUp, Clock } from "lucide-react";
 
 export function OurPromiseSlide() {
   const promises = [
-    {
-      icon: Shield,
-      title: "Full Transparency",
-      description: "Real-time access to bookings, revenue, and expenses. No hidden fees, ever."
-    },
-    {
-      icon: Heart,
-      title: "Your Property, Our Priority",
-      description: "We treat every home as if it were our own. Your investment deserves nothing less."
-    },
-    {
-      icon: Target,
-      title: "Results-Driven",
-      description: "Our success is measured by your returns. We're only satisfied when you are."
-    },
-    {
-      icon: Handshake,
-      title: "Partnership, Not Just Service",
-      description: "We're invested in your long-term wealth, not just short-term bookings."
-    }
+    { icon: Shield, title: "Your Property, Our Priority", description: "We protect your investment like it's our own" },
+    { icon: Heart, title: "Genuine Partnership", description: "Your success is our success" },
+    { icon: TrendingUp, title: "Maximize Returns", description: "Committed to growing your investment" },
+    { icon: Clock, title: "True Passive Income", description: "Giving you back your freedom" },
   ];
 
   return (
     <SlideLayout overlay="gradient">
-      <div className="w-full max-w-6xl mx-auto">
+      <div className="w-full max-w-5xl mx-auto text-center">
         {/* Header */}
-        <div className="text-center mb-16">
-          <p className="text-amber-400 uppercase tracking-widest text-sm mb-4">Our Commitment to You</p>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
-            Our{" "}
+        <div className="mb-12">
+          <p className="text-amber-400 uppercase tracking-widest text-sm mb-4">Our Commitment</p>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-8">
+            Our Promise{" "}
             <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
-              Promise
+              to You
             </span>
           </h2>
-          <p className="text-xl md:text-2xl text-white/70 max-w-3xl mx-auto leading-relaxed">
-            "We treat every property as if it were our own home. Your success is our success."
+        </div>
+
+        {/* Main Quote */}
+        <div className="bg-gradient-to-br from-amber-400/10 to-orange-500/10 border border-amber-400/30 rounded-3xl p-8 md:p-12 mb-12">
+          <p className="text-2xl md:text-3xl lg:text-4xl text-white font-light leading-relaxed italic">
+            "We treat every property as if it were our own home. Your success is our success, and we're committed to maximizing your investment while giving you back the freedom of truly passive income."
           </p>
         </div>
 
         {/* Promise Cards */}
-        <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {promises.map((promise, index) => (
             <div
               key={promise.title}
-              className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-amber-400/30 transition-all duration-300 group"
+              className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-amber-400/30 transition-all duration-300"
               style={{ animationDelay: `${index * 100}ms` }}
             >
-              <div className="flex items-start gap-5">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                  <promise.icon className="w-7 h-7 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl md:text-2xl font-bold text-white mb-2">{promise.title}</h3>
-                  <p className="text-white/60 text-base md:text-lg leading-relaxed">{promise.description}</p>
-                </div>
-              </div>
+              <promise.icon className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+              <h3 className="text-base font-semibold text-white mb-2">{promise.title}</h3>
+              <p className="text-white/50 text-sm">{promise.description}</p>
             </div>
           ))}
         </div>
 
-        {/* Bottom Emphasis */}
-        <div className="mt-12 text-center">
-          <div className="inline-block bg-amber-400/10 border border-amber-400/30 rounded-full px-8 py-4">
-            <p className="text-amber-400 text-lg md:text-xl font-semibold">
-              🤝 Your Freedom is Our Mission
-            </p>
-          </div>
+        {/* Bottom emphasis */}
+        <div className="mt-12">
+          <p className="text-white/60 text-lg">
+            We don't just manage properties — we build lasting partnerships.
+          </p>
         </div>
       </div>
     </SlideLayout>

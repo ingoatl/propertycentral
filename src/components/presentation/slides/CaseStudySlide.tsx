@@ -10,7 +10,6 @@ interface CaseStudySlideProps {
 const caseStudies = {
   "Woodland Lane": {
     address: "184 Woodland Ln SW, Mableton",
-    fallbackImage: "https://www.peachhausgroup.com/lovable-uploads/6a187675-4db9-49e8-b0ad-ca1e121aff1a.png",
     before: { revenue: 1800, occupancy: 75 },
     after: { revenue: 3200, occupancy: 92 },
     strategy: "Hybrid (STR + MTR)",
@@ -18,7 +17,6 @@ const caseStudies = {
   },
   "The Berkley": {
     address: "3419 Smoke Hollow Pl, Roswell",
-    fallbackImage: "https://www.peachhausgroup.com/lovable-uploads/1d9f37d8-b296-4310-ada6-54ee6bd52625.jpg",
     before: { revenue: 2100, occupancy: 80 },
     after: { revenue: 3800, occupancy: 95 },
     strategy: "Mid-Term Focus",
@@ -26,7 +24,6 @@ const caseStudies = {
   },
   "Lavish Living": {
     address: "3069 Rita Way, Smyrna",
-    fallbackImage: "https://www.peachhausgroup.com/lovable-uploads/35c18a51-5bad-4ff6-9e27-993af0747653.jpg",
     before: { revenue: 2400, occupancy: 70 },
     after: { revenue: 4200, occupancy: 93 },
     strategy: "Hybrid Premium",
@@ -38,9 +35,9 @@ export function CaseStudySlide({ propertyName }: CaseStudySlideProps) {
   const data = caseStudies[propertyName];
   const revenueIncrease = Math.round(((data.after.revenue - data.before.revenue) / data.before.revenue) * 100);
 
-  // Fetch real property image from onboarding if available
+  // Fetch real property image from the properties table
   const { data: propertyImage, isLoading } = useQuery({
-    queryKey: ['case-study-image', propertyName],
+    queryKey: ['case-study-property-image', propertyName],
     queryFn: async () => {
       // Try to find property by name match
       const { data: properties } = await supabase
@@ -51,7 +48,11 @@ export function CaseStudySlide({ propertyName }: CaseStudySlideProps) {
         .limit(1);
       
       if (properties && properties.length > 0 && properties[0].image_path) {
-        return properties[0].image_path;
+        // Get public URL for the image
+        const { data: urlData } = supabase.storage
+          .from('property-images')
+          .getPublicUrl(properties[0].image_path);
+        return urlData.publicUrl;
       }
       
       // Try to find by address match
@@ -64,17 +65,45 @@ export function CaseStudySlide({ propertyName }: CaseStudySlideProps) {
         .limit(1);
       
       if (propsByAddress && propsByAddress.length > 0 && propsByAddress[0].image_path) {
-        return propsByAddress[0].image_path;
+        const { data: urlData } = supabase.storage
+          .from('property-images')
+          .getPublicUrl(propsByAddress[0].image_path);
+        return urlData.publicUrl;
       }
       
       return null;
     },
-    staleTime: Infinity, // Don't refetch
+    staleTime: Infinity,
     gcTime: Infinity,
   });
 
-  // Always use fallback image - don't flash database images
-  const imageUrl = data.fallbackImage;
+  // Show loading skeleton while fetching
+  if (isLoading) {
+    return (
+      <SlideLayout overlay="gradient">
+        <div className="w-full max-w-7xl mx-auto">
+          <p className="text-amber-400 uppercase tracking-widest text-base mb-3 text-center">Case Study</p>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-10 text-center">{propertyName}</h2>
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div className="rounded-2xl overflow-hidden border border-white/20 shadow-2xl">
+              <div className="w-full h-72 md:h-96 bg-white/5 animate-pulse" />
+              <div className="bg-white/10 backdrop-blur-sm p-5">
+                <div className="h-4 bg-white/10 rounded w-2/3 mb-2" />
+                <div className="h-5 bg-amber-400/20 rounded w-1/3" />
+              </div>
+            </div>
+            <div className="space-y-6">
+              <div className="h-32 bg-white/5 rounded-2xl animate-pulse" />
+              <div className="h-40 bg-white/5 rounded-2xl animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </SlideLayout>
+    );
+  }
+
+  // Use property image if found, otherwise use a gradient placeholder
+  const hasImage = !!propertyImage;
 
   return (
     <SlideLayout overlay="gradient">
@@ -84,11 +113,22 @@ export function CaseStudySlide({ propertyName }: CaseStudySlideProps) {
 
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div className="rounded-2xl overflow-hidden border border-white/20 shadow-2xl">
-            <img 
-              src={imageUrl} 
-              alt={propertyName} 
-              className="w-full h-72 md:h-96 object-cover"
-            />
+            {hasImage ? (
+              <img 
+                src={propertyImage} 
+                alt={propertyName} 
+                className="w-full h-72 md:h-96 object-cover"
+              />
+            ) : (
+              <div className="w-full h-72 md:h-96 bg-gradient-to-br from-amber-400/20 to-orange-500/20 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-white/10 rounded-xl mx-auto mb-4 flex items-center justify-center">
+                    <TrendingUp className="w-10 h-10 text-amber-400" />
+                  </div>
+                  <p className="text-white/50 text-lg">{propertyName}</p>
+                </div>
+              </div>
+            )}
             <div className="bg-white/10 backdrop-blur-sm p-5">
               <p className="text-white/70 text-base">{data.address}</p>
               <p className="text-amber-400 font-semibold text-lg">{data.strategy}</p>

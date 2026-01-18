@@ -1,5 +1,5 @@
 import { SlideLayout } from "../SlideLayout";
-import { Star, Home, Clock, TrendingUp } from "lucide-react";
+import { Star, Clock, TrendingUp, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 function AnimatedCounter({ end, duration = 2000, prefix = "", suffix = "" }: { 
@@ -48,10 +48,10 @@ export function ByTheNumbersSlide() {
       color: "from-amber-400 to-yellow-500"
     },
     { 
-      icon: Home, 
-      value: 50, 
+      icon: Users, 
+      value: 10, 
       suffix: "+", 
-      label: "Properties Managed",
+      label: "Years Combined Experience",
       color: "from-green-400 to-emerald-500"
     },
     { 

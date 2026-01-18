@@ -1,5 +1,4 @@
 import { SlideLayout } from "../SlideLayout";
-import ingoProfessional from "@/assets/presentation/ingo-professional.jpg";
 import { Lightbulb, Award, Heart, Zap } from "lucide-react";
 
 export function MissionSlide() {
@@ -11,7 +10,7 @@ export function MissionSlide() {
   ];
 
   return (
-    <SlideLayout backgroundImage={ingoProfessional} overlay="gradient">
+    <SlideLayout overlay="gradient">
       <div className="w-full max-w-5xl mx-auto text-center">
         {/* Mission Statement */}
         <div className="mb-16">
