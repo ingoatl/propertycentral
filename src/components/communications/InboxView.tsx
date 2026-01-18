@@ -2447,45 +2447,10 @@ export function InboxView() {
               isAdmin={isAdmin}
             />
             
-            {/* Compose button - only for emails tab */}
-            {activeTab === "emails" && (
-              <>
-                <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
-                <Button 
-                  onClick={() => setShowAIComposeEmail(true)} 
-                  size="sm"
-                  className="gap-1.5 h-8"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Compose</span>
-                </Button>
-                <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
-                {/* AI Category Filter */}
-                <EmailCategoryFilter 
-                  selectedCategory={selectedEmailCategory}
-                  onCategoryChange={setSelectedEmailCategory}
-                />
-                {/* Email Quick Filters - Priority/Promotions */}
-                <EmailQuickFilters
-                  activeFilter={emailQuickFilter}
-                  onFilterChange={setEmailQuickFilter}
-                  counts={emailClassificationCounts}
-                  hidePromotions={hidePromotions}
-                  onToggleHidePromotions={() => setHidePromotions(prev => !prev)}
-                />
-                {/* Keyboard shortcuts help */}
-                <KeyboardShortcutsHelp 
-                  shortcuts={keyboardShortcuts}
-                  open={showKeyboardHelp}
-                  onOpenChange={setShowKeyboardHelp}
-                />
-              </>
-            )}
-            
-            {/* Quick filters for chats/calls - Dropdown instead of horizontal buttons */}
+            {/* Quick filters for chats/calls - Now on same row for mobile */}
             {activeTab !== "emails" && (
               <>
-                {/* Filter dropdown for mobile-friendly access */}
+                {/* Filter dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -2512,11 +2477,11 @@ export function InboxView() {
                               <span className={`w-2 h-2 rounded-full ${config.dotColor}`} />
                             )}
                             {Icon && <Icon className="h-4 w-4" />}
-                            <span>{config.label}</span>
+                            <span className="hidden sm:inline">{config.label}</span>
                           </>
                         );
                       })()}
-                      <Filter className="h-3.5 w-3.5 ml-1 opacity-50" />
+                      <Filter className="h-3.5 w-3.5 ml-0.5 opacity-50" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-48">
@@ -2555,6 +2520,41 @@ export function InboxView() {
                 </DropdownMenu>
                 {/* Inbox Zero Help Guide */}
                 <InboxZeroGuide />
+              </>
+            )}
+            
+            {/* Compose button - only for emails tab */}
+            {activeTab === "emails" && (
+              <>
+                <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+                <Button 
+                  onClick={() => setShowAIComposeEmail(true)} 
+                  size="sm"
+                  className="gap-1.5 h-8"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Compose</span>
+                </Button>
+                <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+                {/* AI Category Filter */}
+                <EmailCategoryFilter 
+                  selectedCategory={selectedEmailCategory}
+                  onCategoryChange={setSelectedEmailCategory}
+                />
+                {/* Email Quick Filters - Priority/Promotions */}
+                <EmailQuickFilters
+                  activeFilter={emailQuickFilter}
+                  onFilterChange={setEmailQuickFilter}
+                  counts={emailClassificationCounts}
+                  hidePromotions={hidePromotions}
+                  onToggleHidePromotions={() => setHidePromotions(prev => !prev)}
+                />
+                {/* Keyboard shortcuts help */}
+                <KeyboardShortcutsHelp 
+                  shortcuts={keyboardShortcuts}
+                  open={showKeyboardHelp}
+                  onOpenChange={setShowKeyboardHelp}
+                />
               </>
             )}
           </div>
