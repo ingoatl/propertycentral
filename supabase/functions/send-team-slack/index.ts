@@ -69,30 +69,39 @@ async function sendSlackMessage(channel: string, text: string): Promise<{ ok: bo
   }
 
   console.log(`[Slack] Sending message to channel: ${channel}`);
+  console.log(`[Slack] Message preview: ${text.substring(0, 100)}...`);
 
-  const response = await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      channel: channel,
-      text: text,
-      unfurl_links: false,
-      unfurl_media: false,
-    }),
-  });
+  try {
+    const response = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: channel,
+        text: text,
+        unfurl_links: false,
+        unfurl_media: false,
+      }),
+    });
 
-  const result = await response.json();
-  console.log('[Slack] API response:', JSON.stringify(result).substring(0, 500));
+    console.log(`[Slack] HTTP status: ${response.status}`);
+    
+    const result = await response.json();
+    console.log('[Slack] API response:', JSON.stringify(result).substring(0, 500));
 
-  if (!result.ok) {
-    console.error('[Slack] API error:', result.error);
-    return { ok: false, error: result.error };
+    if (!result.ok) {
+      console.error('[Slack] API error:', result.error, result.response_metadata || '');
+      return { ok: false, error: result.error || 'Unknown Slack error' };
+    }
+
+    console.log(`[Slack] Message sent successfully, ts: ${result.ts}`);
+    return { ok: true, ts: result.ts };
+  } catch (error) {
+    console.error('[Slack] Fetch error:', error);
+    return { ok: false, error: error instanceof Error ? error.message : 'Network error' };
   }
-
-  return { ok: true, ts: result.ts };
 }
 
 // Send a direct message to a user (using user ID as channel)
@@ -104,32 +113,41 @@ async function sendSlackDM(userId: string, text: string): Promise<{ ok: boolean;
   }
 
   console.log(`[Slack] Sending DM to user: ${userId}`);
+  console.log(`[Slack] DM message preview: ${text.substring(0, 100)}...`);
 
-  // Send directly to user ID - Slack will create/use the DM channel automatically
-  // This works with chat:write scope
-  const response = await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      channel: userId, // User ID works as channel for DMs
-      text: text,
-      unfurl_links: false,
-      unfurl_media: false,
-    }),
-  });
+  try {
+    // Send directly to user ID - Slack will create/use the DM channel automatically
+    // This works with chat:write scope
+    const response = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: userId, // User ID works as channel for DMs
+        text: text,
+        unfurl_links: false,
+        unfurl_media: false,
+      }),
+    });
 
-  const result = await response.json();
-  console.log('[Slack] DM response:', JSON.stringify(result).substring(0, 500));
+    console.log(`[Slack] DM HTTP status: ${response.status}`);
+    
+    const result = await response.json();
+    console.log('[Slack] DM response:', JSON.stringify(result).substring(0, 500));
 
-  if (!result.ok) {
-    console.error('[Slack] DM error:', result.error);
-    return { ok: false, error: result.error };
+    if (!result.ok) {
+      console.error('[Slack] DM error:', result.error, result.response_metadata || '');
+      return { ok: false, error: result.error || 'Unknown Slack error' };
+    }
+
+    console.log(`[Slack] DM sent successfully, ts: ${result.ts}`);
+    return { ok: true, ts: result.ts };
+  } catch (error) {
+    console.error('[Slack] DM fetch error:', error);
+    return { ok: false, error: error instanceof Error ? error.message : 'Network error' };
   }
-
-  return { ok: true, ts: result.ts };
 }
 
 // Look up a Slack user by email
@@ -353,16 +371,24 @@ serve(async (req) => {
       slackResult = await sendSlackMessage(channelId, fullMessage);
     }
 
-    // Update message status
+    // Update message status - AWAIT this properly!
     if (slackMessage) {
       const updateData = slackResult.ok
         ? { status: 'sent', slack_message_id: slackResult.ts || null }
         : { status: 'failed', error_message: slackResult.error || 'Unknown error' };
       
-      await supabase
+      console.log(`[Slack] Updating message ${slackMessage.id} with status:`, updateData);
+      
+      const { error: updateError } = await supabase
         .from('slack_messages')
         .update(updateData)
         .eq('id', slackMessage.id);
+      
+      if (updateError) {
+        console.error('[Slack] Failed to update message status:', updateError);
+      } else {
+        console.log('[Slack] Message status updated successfully');
+      }
     }
 
     if (!slackResult.ok) {

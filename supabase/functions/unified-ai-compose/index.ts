@@ -123,13 +123,17 @@ function getSentimentInstructions(sentiment: string): string {
 // Build the prompt for AI generation with FULL conversation context
 function buildPrompt(
   request: ComposeRequest,
-  context: ContextPackage
+  context: ContextPackage,
+  toneKnowledge?: Array<{ title: string; content: string }>
 ): string {
   const { action, messageType, incomingMessage, currentMessage, userInstructions } = request;
   const { contactProfile, toneProfile, threadAnalysis, relevantKnowledge, memories, recentMessages } = context;
   
   // Get first name for greetings
   const firstName = contactProfile.name.split(' ')[0] || 'there';
+  
+  // Determine recipient type for tone adaptation
+  const isClient = true; // For leads/owners, use client style. For vendors, would use vendor style.
   
   // Base context section
   let prompt = `You are Ingo from PeachHaus Property Management. Your responses should feel like they come from a real person, not an AI.
@@ -142,16 +146,27 @@ Emotional Baseline: ${contactProfile.emotionalBaseline}
 ${contactProfile.painPoints.length > 0 ? `Known Pain Points: ${contactProfile.painPoints.join(', ')}` : ''}
 ${contactProfile.interests.length > 0 ? `Interests: ${contactProfile.interests.join(', ')}` : ''}
 
-## YOUR VOICE & TONE - CRITICAL: MATCH THIS EXACTLY
-Write with this exact style:
+## INGO'S TONE OF VOICE - MANDATORY STYLE GUIDE
+${toneKnowledge && toneKnowledge.length > 0 ? toneKnowledge.map(t => `### ${t.title}\n${t.content}`).join('\n\n') : `Primary tone: Professional, Detail-Oriented, and Proactive.
+
+FOR CLIENTS:
+- Welcoming, reassuring, and highly structured
+- Summarize complex information in concise, bulleted recaps
+- Use phrases like "Thank you again for taking the time to speak with us"
+- Proactively address next steps or follow-up actions
+
+SIGNATURE STYLE:
+- SMS: Always end with "- Ingo"
+- Email: End with "Best,\\nIngo\\nPeachHaus Group"
+- NEVER use emojis`}
+
+## YOUR VOICE & TONE - MATCH THIS EXACTLY
 - Formality Level: ${toneProfile.formality}
 - Average Sentence Length: ${toneProfile.avgSentenceLength} words
 - ${toneProfile.useContractions ? 'USE contractions (I\'m, we\'ll, don\'t)' : 'AVOID contractions (I am, we will, do not)'}
-- Exclamation Usage: ${toneProfile.exclamationFrequency}
-- **NEVER USE EMOJIS** - Absolutely no emojis, emoticons, or Unicode symbols in any response
+- **ABSOLUTELY NO EMOJIS** - Never use any emoji, emoticon, or Unicode symbol
 
 NEVER use these phrases: ${toneProfile.avoidedPhrases.join(', ')}
-End messages with: ${toneProfile.commonClosings[0] || '- Ingo'}
 
 ${toneProfile.sampleMessages.length > 0 ? `## SAMPLE MESSAGES - MATCH THIS VOICE EXACTLY
 Here are examples of how Ingo actually writes. Study and mimic this style:
@@ -436,10 +451,20 @@ serve(async (req) => {
     console.log(`Sample messages available: ${context.toneProfile?.sampleMessages?.length || 0}`);
     console.log(`================================`);
 
-    // Step 2: Build the prompt
-    const prompt = buildPrompt(request, context);
+    // Step 2: Fetch Ingo's tone of voice from knowledge base
+    const { data: toneKnowledge } = await supabase
+      .from('company_knowledge_base')
+      .select('title, content')
+      .eq('category', 'tone')
+      .eq('is_active', true)
+      .order('priority', { ascending: false });
+    
+    console.log(`Tone knowledge entries loaded: ${toneKnowledge?.length || 0}`);
 
-    // Step 3: Call Lovable AI Gateway
+    // Step 3: Build the prompt with tone knowledge
+    const prompt = buildPrompt(request, context, toneKnowledge || []);
+
+    // Step 4: Call Lovable AI Gateway
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableApiKey) {
       throw new Error("LOVABLE_API_KEY is not configured");
@@ -491,12 +516,12 @@ serve(async (req) => {
       generatedMessage = lines.slice(1).join('\n').trim();
     }
 
-    // Step 4: Validate response quality
+    // Step 5: Validate response quality
     const validation = validateResponse(generatedMessage, context, messageType);
 
     const generationTimeMs = Date.now() - startTime;
 
-    // Step 5: Log for quality tracking
+    // Step 6: Log for quality tracking
     const authHeader = req.headers.get("authorization");
     let userId: string | null = null;
     if (authHeader) {
