@@ -398,31 +398,32 @@ function buildOnboardingEmailHtml(recipientName: string, currentStage: string): 
 }
 
 // Build CO-HOSTING payment email - We CHARGE them (ACH 1% or Card 3%)
+// Note: This is sent AFTER the welcome email, so content reflects they're already onboarded
 function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Set Up Your Payment Method", [
     {
       isIntro: true,
-      content: "Congratulations on signing your co-hosting agreement with PeachHaus Group LLC! 🎉"
+      content: `As mentioned in our welcome email, the next step is to set up your payment method${propertyAddress ? ` for <strong>${propertyAddress}</strong>` : ''}.`
     },
     {
-      title: "📋 This Will Be Used For",
+      title: "This Will Be Used For",
       highlight: true,
-      content: `<strong>Property Expenses & Management Fees</strong><br>For any management fees or property expenses when needed${propertyAddress ? ` for <strong>${propertyAddress}</strong>` : ''}.`
+      content: `<strong>Property Expenses & Management Fees</strong><br>For any management fees or property expenses when needed. We only charge when there are actual costs to cover.`
     },
     {
-      title: "💳 Choose Your Payment Method",
+      title: "Choose Your Payment Method",
       content: `
         <table style="width: 100%;">
           <tr>
             <td style="padding: 16px; background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px; margin-bottom: 8px;">
-              <div style="font-weight: 700; color: #166534; font-size: 15px;">🏦 US Bank Account (ACH)</div>
-              <div style="font-size: 13px; color: #374151; margin-top: 4px;"><strong>1% processing fee</strong> — Recommended</div>
+              <div style="font-weight: 700; color: #166534; font-size: 15px;">US Bank Account (ACH)</div>
+              <div style="font-size: 13px; color: #374151; margin-top: 4px;"><strong>1% processing fee</strong> - Recommended</div>
             </td>
           </tr>
           <tr><td style="height: 8px;"></td></tr>
           <tr>
             <td style="padding: 16px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
-              <div style="font-weight: 600; color: #374151;">💳 Credit/Debit Card</div>
+              <div style="font-weight: 600; color: #374151;">Credit/Debit Card</div>
               <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">3% processing fee</div>
             </td>
           </tr>
@@ -430,11 +431,11 @@ function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string
       `
     },
     {
-      cta: { text: "Set Up Payment Method →", url: stripeUrl }
+      cta: { text: "Set Up Payment Method", url: stripeUrl }
     },
     {
       highlight: true,
-      content: "🔒 <strong>Secure & Encrypted</strong><br>We use Stripe, the industry leader in payment security. Your information is never stored on our servers."
+      content: "<strong>Secure and Encrypted</strong><br>We use Stripe, the industry leader in payment security. Your information is never stored on our servers."
     },
     {
       warning: true,
@@ -447,24 +448,25 @@ function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string
 }
 
 // Build FULL-SERVICE payment email - We PAY them (ACH only, no fees)
+// Note: This is sent AFTER the welcome email, so content reflects they're already onboarded
 function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Set Up Your Payout Account", [
     {
       isIntro: true,
-      content: "Congratulations on signing your property management agreement with PeachHaus Group LLC! 🎉"
+      content: `As mentioned in our welcome email, the next step is to set up your payout account so we can deposit your rental earnings${propertyAddress ? ` from <strong>${propertyAddress}</strong>` : ''}.`
     },
     {
-      title: "📋 This Will Be Used For",
+      title: "This Will Be Used For",
       highlight: true,
-      content: `<strong>✓ Receiving Rental Income</strong><br>We'll deposit your rental earnings directly to your account${propertyAddress ? ` from <strong>${propertyAddress}</strong>` : ''}.`
+      content: `<strong>Receiving Rental Income</strong><br>We'll deposit your rental earnings directly to your bank account after each guest checkout.`
     },
     {
-      title: "🏦 Payout Method",
+      title: "Payout Method",
       content: `
         <table style="width: 100%;">
           <tr>
             <td style="padding: 16px; background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px;">
-              <div style="font-weight: 700; color: #166534; font-size: 15px;">🏦 US Bank Account (ACH)</div>
+              <div style="font-weight: 700; color: #166534; font-size: 15px;">US Bank Account (ACH)</div>
               <div style="font-size: 13px; color: #166534; margin-top: 4px;"><strong>No processing fees</strong></div>
             </td>
           </tr>
@@ -473,11 +475,11 @@ function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: stri
       `
     },
     {
-      cta: { text: "Set Up Payout Account →", url: stripeUrl }
+      cta: { text: "Set Up Payout Account", url: stripeUrl }
     },
     {
       highlight: true,
-      content: "🔒 <strong>Secure & Encrypted</strong><br>We use Stripe, the industry leader in payment security. Your information is never stored on our servers."
+      content: "<strong>Secure and Encrypted</strong><br>We use Stripe, the industry leader in payment security. Your information is never stored on our servers."
     },
     {
       warning: true,
@@ -1135,6 +1137,109 @@ serve(async (req) => {
         directEmailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
         // No admin copy - admin gets notified when lead actually books
         console.log(`Sending direct inspection scheduling email for stage ${newStage}`);
+      } else if (newStage === 'contract_signed') {
+        // CONTRACT_SIGNED: Send welcome onboarding email (payment setup comes later in welcome_email_w9)
+        directEmailHtml = buildWelcomeOnboardingEmailHtml(recipientFirstName, lead.property_address || "");
+        directEmailSubject = "Welcome to the PeachHaus Family!";
+        sendAdminCopy = true;
+        adminEmailSubject = `Welcome Email Sent: ${lead.name}`;
+        console.log(`Sending direct welcome onboarding email for stage ${newStage}`);
+      } else if (newStage === 'welcome_email_w9') {
+        // WELCOME_EMAIL_W9: Send payment setup email (triggered 1 hour after contract_signed OR manually)
+        console.log(`Stage welcome_email_w9: Creating payment setup email for lead ${leadId}`);
+        
+        // Fetch owner service type
+        let serviceType = 'cohosting';
+        if (lead.owner_id) {
+          const { data: owner } = await supabase
+            .from("property_owners")
+            .select("service_type")
+            .eq("id", lead.owner_id)
+            .single();
+          if (owner?.service_type) {
+            serviceType = owner.service_type;
+          }
+        }
+        
+        const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+        if (stripeKey) {
+          try {
+            const Stripe = (await import("https://esm.sh/stripe@18.5.0")).default;
+            const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+            
+            // Find or create Stripe customer
+            const customers = await stripe.customers.list({ email: lead.email, limit: 1 });
+            let customerId = customers.data[0]?.id;
+            
+            if (!customerId) {
+              const customer = await stripe.customers.create({
+                email: lead.email,
+                name: lead.name || undefined,
+                metadata: { lead_id: leadId, service_type: serviceType }
+              });
+              customerId = customer.id;
+            }
+            
+            const siteUrl = "https://propertycentral.lovable.app";
+            const paymentMethodTypes = serviceType === 'full_service' 
+              ? ["us_bank_account" as const]
+              : ["us_bank_account" as const, "card" as const];
+            
+            const session = await stripe.checkout.sessions.create({
+              customer: customerId,
+              mode: "setup",
+              currency: "usd",
+              payment_method_types: paymentMethodTypes,
+              payment_method_options: {
+                us_bank_account: {
+                  financial_connections: { permissions: ["payment_method"] }
+                }
+              },
+              success_url: `${siteUrl}/payment-success?lead=${leadId}&session_id={CHECKOUT_SESSION_ID}`,
+              cancel_url: `${siteUrl}/payment-setup?lead=${leadId}&canceled=true`,
+              metadata: { lead_id: leadId, type: "lead_payment_setup", service_type: serviceType }
+            });
+            
+            // Update lead with Stripe info
+            await supabase.from("leads").update({
+              stripe_customer_id: customerId,
+              stripe_setup_intent_id: session.id,
+              last_contacted_at: new Date().toISOString()
+            }).eq("id", leadId);
+            
+            if (serviceType === 'full_service') {
+              directEmailHtml = buildFullServicePaymentEmailHtml(recipientFirstName, session.url!, lead.property_address || "", 'contract_signed');
+              directEmailSubject = "Set Up Your Payout Account - PeachHaus";
+            } else {
+              directEmailHtml = buildCoHostingPaymentEmailHtml(recipientFirstName, session.url!, lead.property_address || "", 'contract_signed');
+              directEmailSubject = "Set Up Your Payment Method - PeachHaus";
+            }
+            
+            // Add timeline entry for Stripe session
+            await supabase.from("lead_timeline").insert({
+              lead_id: leadId,
+              action: `Stripe payment setup session created (${serviceType})`,
+              metadata: { stripe_session_id: session.id, stripe_customer_id: customerId }
+            });
+            
+          } catch (stripeError) {
+            console.error("Stripe error in direct email:", stripeError);
+            const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
+            if (serviceType === 'full_service') {
+              directEmailHtml = buildFullServicePaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", 'contract_signed');
+              directEmailSubject = "Set Up Your Payout Account - PeachHaus";
+            } else {
+              directEmailHtml = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", 'contract_signed');
+              directEmailSubject = "Set Up Your Payment Method - PeachHaus";
+            }
+          }
+        } else {
+          const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
+          directEmailHtml = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", 'contract_signed');
+          directEmailSubject = "Set Up Your Payment Method - PeachHaus";
+        }
+        sendAdminCopy = true;
+        adminEmailSubject = `Payment Setup Email Sent: ${lead.name}`;
       }
       
       // Send the direct email if we have HTML content

@@ -81,7 +81,19 @@ export function InteractiveDocumentPreview({
     // Track fields per page for Y positioning
     const fieldsPerPage: Record<number, number> = {};
     
-    const positioned = data.detectedFields.map((field, index) => {
+    // FILTER: Only include fields that have values OR are signature fields
+    // This matches the template analysis behavior - only show filled fields
+    const fieldsToShow = data.detectedFields.filter(field => {
+      const value = data.fieldValues[field.api_id];
+      const hasValue = value !== undefined && value !== null && value.toString().trim() !== "";
+      const isSignature = (field.type as string) === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
+      // Show fields with values or signature fields
+      return hasValue || isSignature;
+    });
+    
+    console.log('[InteractiveDocumentPreview] Fields with values to show:', fieldsToShow.length, 'of', data.detectedFields.length);
+    
+    const positioned = fieldsToShow.map((field, index) => {
       const value = data.fieldValues[field.api_id];
       
       // Check if field has position data from field_mappings (stored in the field object)
