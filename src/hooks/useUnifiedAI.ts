@@ -13,6 +13,18 @@ export interface UnifiedAIRequest {
   includeCalendarLink?: boolean;
   includeIncomeOffer?: boolean;
   subject?: string;
+  // NEW: Pass the full conversation thread for context
+  conversationThread?: Array<{
+    direction: string;
+    body: string;
+    created_at: string;
+    type?: string;
+    subject?: string;
+  }>;
+  // NEW: Additional identifiers for fallback lookup
+  ghlContactId?: string;
+  contactPhone?: string;
+  contactEmail?: string;
 }
 
 export interface UnifiedAIResponse {
@@ -27,6 +39,7 @@ export interface UnifiedAIResponse {
     questionsAnswered: number;
     sentimentDetected: string;
     conversationPhase: string;
+    messagesAnalyzed?: number;
   };
   metadata: {
     model: string;
@@ -42,6 +55,15 @@ export function useUnifiedAI() {
     setIsLoading(true);
     
     try {
+      console.log('[useUnifiedAI] Generating response with request:', {
+        action: request.action,
+        messageType: request.messageType,
+        contactType: request.contactType,
+        contactId: request.contactId,
+        threadLength: request.conversationThread?.length || 0,
+        hasIncomingMessage: !!request.incomingMessage,
+      });
+
       const { data, error } = await supabase.functions.invoke('unified-ai-compose', {
         body: request,
       });
@@ -59,12 +81,18 @@ export function useUnifiedAI() {
 
       // Show quality feedback if there are issues
       if (response.validationIssues.length > 0) {
-        console.log('AI Response Quality Issues:', response.validationIssues);
+        console.log('[useUnifiedAI] Quality Issues:', response.validationIssues);
       }
+      
+      console.log('[useUnifiedAI] Generated response:', {
+        qualityScore: response.qualityScore,
+        messagesAnalyzed: response.contextUsed.messagesAnalyzed,
+        sentimentDetected: response.contextUsed.sentimentDetected,
+      });
 
       return response;
     } catch (error) {
-      console.error('Unified AI Error:', error);
+      console.error('[useUnifiedAI] Error:', error);
       toast({
         title: 'AI Generation Failed',
         description: error instanceof Error ? error.message : 'Failed to generate response',
@@ -81,7 +109,10 @@ export function useUnifiedAI() {
     contactType: 'lead' | 'owner',
     contactId: string,
     messageType: 'sms' | 'email',
-    instructions?: string
+    instructions?: string,
+    conversationThread?: UnifiedAIRequest['conversationThread'],
+    contactPhone?: string,
+    contactEmail?: string
   ) => {
     return generateResponse({
       action: 'compose',
@@ -89,6 +120,9 @@ export function useUnifiedAI() {
       contactType,
       contactId,
       userInstructions: instructions,
+      conversationThread,
+      contactPhone,
+      contactEmail,
     });
   };
 
@@ -97,7 +131,11 @@ export function useUnifiedAI() {
     contactId: string,
     messageType: 'sms' | 'email',
     incomingMessage: string,
-    instructions?: string
+    instructions?: string,
+    conversationThread?: UnifiedAIRequest['conversationThread'],
+    contactPhone?: string,
+    contactEmail?: string,
+    ghlContactId?: string
   ) => {
     return generateResponse({
       action: 'reply',
@@ -106,6 +144,10 @@ export function useUnifiedAI() {
       contactId,
       incomingMessage,
       userInstructions: instructions,
+      conversationThread,
+      contactPhone,
+      contactEmail,
+      ghlContactId,
     });
   };
 
@@ -113,7 +155,8 @@ export function useUnifiedAI() {
     contactType: 'lead' | 'owner',
     contactId: string,
     messageType: 'sms' | 'email',
-    currentMessage: string
+    currentMessage: string,
+    conversationThread?: UnifiedAIRequest['conversationThread']
   ) => {
     return generateResponse({
       action: 'improve',
@@ -121,6 +164,7 @@ export function useUnifiedAI() {
       contactType,
       contactId,
       currentMessage,
+      conversationThread,
     });
   };
 
@@ -128,7 +172,8 @@ export function useUnifiedAI() {
     contactType: 'lead' | 'owner',
     contactId: string,
     messageType: 'sms' | 'email',
-    currentMessage: string
+    currentMessage: string,
+    conversationThread?: UnifiedAIRequest['conversationThread']
   ) => {
     return generateResponse({
       action: 'shorten',
@@ -136,6 +181,7 @@ export function useUnifiedAI() {
       contactType,
       contactId,
       currentMessage,
+      conversationThread,
     });
   };
 
@@ -143,7 +189,8 @@ export function useUnifiedAI() {
     contactType: 'lead' | 'owner',
     contactId: string,
     messageType: 'sms' | 'email',
-    currentMessage: string
+    currentMessage: string,
+    conversationThread?: UnifiedAIRequest['conversationThread']
   ) => {
     return generateResponse({
       action: 'professional',
@@ -151,6 +198,7 @@ export function useUnifiedAI() {
       contactType,
       contactId,
       currentMessage,
+      conversationThread,
     });
   };
 
@@ -158,7 +206,8 @@ export function useUnifiedAI() {
     contactType: 'lead' | 'owner',
     contactId: string,
     messageType: 'sms' | 'email',
-    currentMessage: string
+    currentMessage: string,
+    conversationThread?: UnifiedAIRequest['conversationThread']
   ) => {
     return generateResponse({
       action: 'friendly',
@@ -166,6 +215,7 @@ export function useUnifiedAI() {
       contactType,
       contactId,
       currentMessage,
+      conversationThread,
     });
   };
 
