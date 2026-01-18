@@ -16,6 +16,7 @@ import { CorporateNetworkSlide } from "@/components/presentation/slides/Corporat
 import { CaseStudySlide } from "@/components/presentation/slides/CaseStudySlide";
 import { WhatSetsUsApartSlide } from "@/components/presentation/slides/WhatSetsUsApartSlide";
 import { WhatWeDoMoreSlide } from "@/components/presentation/slides/WhatWeDoMoreSlide";
+import { OurPromiseSlide } from "@/components/presentation/slides/OurPromiseSlide";
 import { OnboardingTimelineSlide } from "@/components/presentation/slides/OnboardingTimelineSlide";
 import { HowItWorksSlide } from "@/components/presentation/slides/HowItWorksSlide";
 import { PricingSlide } from "@/components/presentation/slides/PricingSlide";
@@ -35,6 +36,7 @@ const SLIDES = [
   { id: "case-lavish", component: () => <CaseStudySlide propertyName="Lavish Living" />, label: "Case 3" },
   { id: "what-more", component: WhatWeDoMoreSlide, label: "Difference" },
   { id: "apart", component: WhatSetsUsApartSlide, label: "Why Us" },
+  { id: "promise", component: OurPromiseSlide, label: "Promise" },
   { id: "timeline", component: OnboardingTimelineSlide, label: "Timeline" },
   { id: "how", component: HowItWorksSlide, label: "Process" },
   { id: "pricing", component: PricingSlide, label: "Pricing" },

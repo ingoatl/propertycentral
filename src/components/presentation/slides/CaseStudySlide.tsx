@@ -39,7 +39,7 @@ export function CaseStudySlide({ propertyName }: CaseStudySlideProps) {
   const revenueIncrease = Math.round(((data.after.revenue - data.before.revenue) / data.before.revenue) * 100);
 
   // Fetch real property image from onboarding if available
-  const { data: propertyImage } = useQuery({
+  const { data: propertyImage, isLoading } = useQuery({
     queryKey: ['case-study-image', propertyName],
     queryFn: async () => {
       // Try to find property by name match
@@ -69,9 +69,12 @@ export function CaseStudySlide({ propertyName }: CaseStudySlideProps) {
       
       return null;
     },
+    staleTime: Infinity, // Don't refetch
+    gcTime: Infinity,
   });
 
-  const imageUrl = propertyImage || data.fallbackImage;
+  // Always use fallback image - don't flash database images
+  const imageUrl = data.fallbackImage;
 
   return (
     <SlideLayout overlay="gradient">
@@ -81,7 +84,11 @@ export function CaseStudySlide({ propertyName }: CaseStudySlideProps) {
 
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div className="rounded-2xl overflow-hidden border border-white/20 shadow-2xl">
-            <img src={imageUrl} alt={propertyName} className="w-full h-72 md:h-96 object-cover" />
+            <img 
+              src={imageUrl} 
+              alt={propertyName} 
+              className="w-full h-72 md:h-96 object-cover"
+            />
             <div className="bg-white/10 backdrop-blur-sm p-5">
               <p className="text-white/70 text-base">{data.address}</p>
               <p className="text-amber-400 font-semibold text-lg">{data.strategy}</p>
