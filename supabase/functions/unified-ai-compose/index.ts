@@ -360,18 +360,24 @@ serve(async (req) => {
     // Step 2: Build the prompt
     const prompt = buildPrompt(request, context);
 
-    // Step 3: Call Lovable AI
-    const aiResponse = await fetch("https://ijsxcaaqphaciaenlegl.supabase.co/functions/v1/ai-proxy", {
+    // Step 3: Call OpenAI API
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiApiKey) {
+      throw new Error("OPENAI_API_KEY is not configured");
+    }
+
+    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${supabaseKey}`,
+        "Authorization": `Bearer ${openaiApiKey}`,
       },
       body: JSON.stringify({
         messages: [
+          { role: "system", content: "You are a professional property management assistant. Write natural, human-like responses." },
           { role: "user", content: prompt }
         ],
-        model: "google/gemini-2.5-flash",
+        model: "gpt-4o-mini",
         max_tokens: messageType === 'sms' ? 500 : 2000,
         temperature: 0.7,
       }),
@@ -383,7 +389,7 @@ serve(async (req) => {
     }
 
     const aiResult = await aiResponse.json();
-    let generatedMessage = aiResult.choices?.[0]?.message?.content || aiResult.content || "";
+    let generatedMessage = aiResult.choices?.[0]?.message?.content || "";
 
     // Clean up the response
     generatedMessage = generatedMessage.trim();
@@ -431,7 +437,7 @@ serve(async (req) => {
         messagesAnalyzed: context.recentMessages.length,
         conversationPhase: context.threadAnalysis.conversationPhase,
       },
-      model_used: 'google/gemini-2.5-flash',
+      model_used: 'gpt-4o-mini',
       generation_time_ms: generationTimeMs,
       user_id: userId,
     });
@@ -453,7 +459,7 @@ serve(async (req) => {
           conversationPhase: context.threadAnalysis.conversationPhase,
         },
         metadata: {
-          model: 'google/gemini-2.5-flash',
+          model: 'gpt-4o-mini',
           generationTimeMs,
         },
       }),
