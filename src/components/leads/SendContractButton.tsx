@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { FileSignature, Loader2 } from "lucide-react";
 import { Lead } from "@/types/leads";
+import { LEASE_SAMPLE_VALUES } from "@/utils/leaseDefaults";
 
 interface SendContractButtonProps {
   lead: Lead;
@@ -33,6 +34,15 @@ interface DocumentTemplate {
   name: string;
   contract_type: string | null;
   is_active: boolean;
+  field_mappings: any;
+}
+
+interface DetectedField {
+  api_id: string;
+  label: string;
+  type: string;
+  category: string;
+  filled_by: string;
 }
 
 export function SendContractButton({ lead, onContractSent }: SendContractButtonProps) {
@@ -53,7 +63,7 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
   const loadTemplates = async () => {
     const { data, error } = await supabase
       .from("document_templates")
-      .select("id, name, contract_type, is_active")
+      .select("id, name, contract_type, is_active, field_mappings")
       .eq("is_active", true)
       .order("name");
 
@@ -68,6 +78,63 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
     if (data && data.length === 1) {
       setSelectedTemplateId(data[0].id);
     }
+  };
+
+  // Build pre-fill data from sample values and detected fields
+  const buildPreFillData = (template: DocumentTemplate): Record<string, string> => {
+    const preFillData: Record<string, string> = { ...LEASE_SAMPLE_VALUES };
+    
+    // Add recipient info
+    preFillData.guest_name = recipientName;
+    preFillData.tenant_name = recipientName;
+    preFillData.guest_email = recipientEmail;
+    preFillData.tenant_email = recipientEmail;
+    
+    return preFillData;
+  };
+
+  // Build detected fields array from template's field_mappings
+  const buildDetectedFields = (template: DocumentTemplate): DetectedField[] => {
+    const fieldMappings = template.field_mappings;
+    if (!fieldMappings) return [];
+
+    // If field_mappings has a detectedFields array, use it
+    if (fieldMappings.detectedFields && Array.isArray(fieldMappings.detectedFields)) {
+      return fieldMappings.detectedFields;
+    }
+
+    // Otherwise build from mapping keys
+    const fields: DetectedField[] = [];
+    const sampleKeys = Object.keys(LEASE_SAMPLE_VALUES);
+    
+    sampleKeys.forEach((key) => {
+      fields.push({
+        api_id: key,
+        label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        type: 'text',
+        category: getCategoryForField(key),
+        filled_by: 'admin',
+      });
+    });
+
+    // Add guest/signature fields
+    fields.push(
+      { api_id: 'guest_name', label: 'Guest Name', type: 'text', category: 'identification', filled_by: 'guest' },
+      { api_id: 'guest_email', label: 'Guest Email', type: 'text', category: 'contact', filled_by: 'guest' },
+      { api_id: 'guest_signature', label: 'Guest Signature', type: 'signature', category: 'signature', filled_by: 'guest' },
+      { api_id: 'host_signature', label: 'Host Signature', type: 'signature', category: 'signature', filled_by: 'admin' }
+    );
+
+    return fields;
+  };
+
+  const getCategoryForField = (fieldId: string): string => {
+    if (fieldId.includes('landlord') || fieldId.includes('tenant') || fieldId.includes('name')) return 'identification';
+    if (fieldId.includes('property') || fieldId.includes('address') || fieldId.includes('county')) return 'property';
+    if (fieldId.includes('date') || fieldId.includes('lease_start') || fieldId.includes('lease_end')) return 'dates';
+    if (fieldId.includes('rent') || fieldId.includes('fee') || fieldId.includes('deposit') || fieldId.includes('payment')) return 'financial';
+    if (fieldId.includes('utilities') || fieldId.includes('furnish')) return 'property';
+    return 'other';
   };
 
   const sendContract = useMutation({
@@ -86,43 +153,35 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         throw new Error("Selected template not found");
       }
 
-      // NOTE: Owner record will be created ONLY when agreement is fully executed
-      // (in the submit-signature edge function after all parties sign)
+      // Build pre-fill data with sample values
+      const preFillData = buildPreFillData(template);
+      const detectedFields = buildDetectedFields(template);
 
-      // Create the booking document record (no owner_id yet)
-      const { data: bookingDoc, error: docError } = await supabase
-        .from("booking_documents")
-        .insert({
-          template_id: template.id,
-          owner_id: null, // Owner will be created upon full agreement execution
-          recipient_name: recipientName,
-          recipient_email: recipientEmail,
-          document_name: `${template.name} - ${recipientName}`,
-          document_type: "contract",
-          contract_type: template.contract_type,
-          status: "draft",
-          is_draft: true,
-        })
-        .select()
-        .single();
+      console.log("Sending contract with pre-fill data:", Object.keys(preFillData));
+      console.log("Detected fields count:", detectedFields.length);
 
-      if (docError) throw docError;
-
-      // Create signing session using our custom signing solution
+      // Use create-document-for-signing edge function (same as DocumentCreateWizard)
       const { data: signingResult, error: signingError } = await supabase.functions.invoke(
-        "create-signing-session",
+        "create-document-for-signing",
         {
           body: {
-            documentId: bookingDoc.id,
             templateId: template.id,
-            ownerName: recipientName,
-            ownerEmail: recipientEmail,
+            documentName: `${template.name} - ${recipientName}`,
+            recipientName,
+            recipientEmail,
+            propertyId: null,
+            bookingId: null,
+            preFillData,
+            detectedFields,
             leadId: lead.id,
           },
         }
       );
 
       if (signingError) throw signingError;
+      if (!signingResult?.success) {
+        throw new Error(signingResult?.error || "Failed to create signing session");
+      }
 
       // Update lead and advance stage
       const { data: { user } } = await supabase.auth.getUser();
@@ -146,15 +205,16 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         metadata: {
           contract_type: template.contract_type,
           template_name: template.name,
-          document_id: bookingDoc.id,
-          signing_url: signingResult.signingUrl,
+          document_id: signingResult.documentId,
+          signing_url: signingResult.guestSigningUrl,
+          pre_filled_fields: Object.keys(preFillData).length,
         },
       });
 
       return signingResult;
     },
     onSuccess: () => {
-      toast.success("Contract sent successfully!");
+      toast.success("Contract sent successfully with pre-filled data!");
       setOpen(false);
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["lead-timeline", lead.id] });
@@ -203,7 +263,7 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
           <DialogHeader>
             <DialogTitle>Send Contract to {lead.name}</DialogTitle>
             <DialogDescription>
-              Select the contract template and confirm recipient details. The owner will fill in their address, property details, and select their package during signing.
+              Select the contract template and confirm recipient details. Standard lease terms will be pre-filled automatically.
             </DialogDescription>
           </DialogHeader>
 
@@ -257,13 +317,14 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
             </div>
 
             <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">Owner will fill during signing:</p>
+              <p className="font-medium text-foreground mb-1">Pre-filled automatically:</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>Their mailing address</li>
-                <li>Property address</li>
-                <li>Service package selection</li>
-                <li>Signature</li>
+                <li>Landlord: PeachHaus Group LLC</li>
+                <li>Financial terms (rent, fees, deposits)</li>
+                <li>Lease dates and terms</li>
+                <li>Property policies</li>
               </ul>
+              <p className="mt-2 text-xs">Owner will complete their signature during signing.</p>
             </div>
           </div>
 
