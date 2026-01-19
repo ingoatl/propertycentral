@@ -20,6 +20,7 @@ interface QuickSMSDialogProps {
   recipientName: string;
   leadId?: string;
   ownerId?: string;
+  vendorId?: string;
 }
 
 export function QuickSMSDialog({
@@ -29,6 +30,7 @@ export function QuickSMSDialog({
   recipientName,
   leadId,
   ownerId,
+  vendorId,
 }: QuickSMSDialogProps) {
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -48,6 +50,7 @@ export function QuickSMSDialog({
           leadId,
           ownerId,
           recipientName,
+          vendorId, // Include vendorId for vendor communications
         },
       });
 

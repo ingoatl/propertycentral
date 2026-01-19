@@ -269,8 +269,35 @@ serve(async (req) => {
       console.log(`Marked inbound communications as read for owner ${ownerId}`);
     }
 
-    // For unmatched contacts (no leadId or ownerId), mark by phone number or ghl_contact_id
+    // For unmatched contacts (no leadId or ownerId), log to lead_communications with metadata
+    // so they appear in the conversation thread
     if (!leadId && !ownerId) {
+      // Insert outbound message into lead_communications with phone in metadata
+      await supabase.from("lead_communications").insert({
+        communication_type: "sms",
+        direction: "outbound",
+        body: message,
+        status: "sent",
+        external_id: sendData.messageId || sendData.conversationId,
+        ghl_contact_id: contactId,
+        ghl_conversation_id: sendData.conversationId,
+        metadata: {
+          provider: "gohighlevel",
+          ghl_contact_id: contactId,
+          ghl_conversation_id: sendData.conversationId,
+          from_number: formattedFromNumber,
+          to_number: formattedPhone,
+          unmatched_phone: formattedPhone,
+          contact_name: contactName,
+          sent_by_user_id: userId,
+          ghl_data: {
+            contactPhone: formattedPhone,
+            contactName: contactName,
+          },
+        },
+      });
+      console.log(`Logged outbound SMS to lead_communications for unmatched contact: ${formattedPhone}`);
+
       // Try to mark by ghl_contact_id first (most accurate)
       const { count: ghlCount } = await supabase
         .from("lead_communications")
