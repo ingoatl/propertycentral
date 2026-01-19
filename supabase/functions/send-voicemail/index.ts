@@ -62,6 +62,7 @@ serve(async (req) => {
       recipientName,
       leadId,
       ownerId,
+      vendorId,
       senderName,
       messageText,
       audioBase64,
@@ -204,7 +205,7 @@ serve(async (req) => {
         video_url: mediaType === "video" ? videoUrl : null,
         media_type: mediaType,
         audio_source: audioSource || "ai_generated",
-        voice_id: voiceId || "nPczCjzI2devNBz1zQrb",
+        voice_id: voiceId || "HXPJDxQ2YWg0wT4IBlof",
         duration_seconds: durationInt,
         status: "pending",
       })
@@ -413,6 +414,33 @@ serve(async (req) => {
           ghl_message_id: messageId,
           from_number: fromNumber,
           transcript: finalMessageText,
+        },
+      });
+    }
+
+    // Log to lead_communications for vendors if we have vendor ID
+    if (vendorId) {
+      await supabase.from("lead_communications").insert({
+        communication_type: "voicemail",
+        direction: "outbound",
+        body: finalMessageText || "(Voice recording)",
+        status: "sent",
+        ghl_contact_id: contactId,
+        ghl_conversation_id: sendData.conversationId,
+        assigned_user_id: senderUserId, // Track who sent this (for inbox view)
+        metadata: {
+          voicemail_id: voicemail.id,
+          audio_url: audioUrl,
+          video_url: mediaType === "video" ? videoUrl : null,
+          player_url: playerUrl,
+          provider: "gohighlevel",
+          ghl_message_id: messageId,
+          from_number: fromNumber,
+          transcript: finalMessageText,
+          vendor_id: vendorId,
+          vendor_phone: formattedPhone,
+          contact_type: "vendor",
+          media_type: mediaType,
         },
       });
     }

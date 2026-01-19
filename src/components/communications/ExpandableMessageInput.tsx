@@ -29,7 +29,7 @@ interface ExpandableMessageInputProps {
   messageType?: "sms" | "email";
   contactName?: string;
   contactId?: string;
-  contactType?: "lead" | "owner";
+  contactType?: "lead" | "owner" | "vendor";
   minRows?: number;
   maxRows?: number;
   showCharacterCount?: boolean;

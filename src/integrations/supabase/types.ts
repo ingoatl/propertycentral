@@ -9718,7 +9718,7 @@ export type Database = {
       voicemail_messages: {
         Row: {
           audio_source: string
-          audio_url: string
+          audio_url: string | null
           callback_clicked: boolean | null
           created_at: string | null
           duration_seconds: number | null
@@ -9751,7 +9751,7 @@ export type Database = {
         }
         Insert: {
           audio_source?: string
-          audio_url: string
+          audio_url?: string | null
           callback_clicked?: boolean | null
           created_at?: string | null
           duration_seconds?: number | null
@@ -9784,7 +9784,7 @@ export type Database = {
         }
         Update: {
           audio_source?: string
-          audio_url?: string
+          audio_url?: string | null
           callback_clicked?: boolean | null
           created_at?: string | null
           duration_seconds?: number | null

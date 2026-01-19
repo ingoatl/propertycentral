@@ -14,7 +14,7 @@ import VendorDetailModal from "@/components/maintenance/VendorDetailModal";
 import ServiceSignupDialog from "@/components/maintenance/ServiceSignupDialog";
 import ActiveServicesOverview from "@/components/maintenance/ActiveServicesOverview";
 import { CallDialog } from "@/components/communications/CallDialog";
-import { QuickSMSDialog } from "@/components/communications/QuickSMSDialog";
+import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 
 const Vendors = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -406,11 +406,13 @@ const Vendors = () => {
 
       {/* GHL SMS Dialog */}
       {smsDialogVendor && (
-        <QuickSMSDialog
+        <SendSMSDialog
           open={!!smsDialogVendor}
           onOpenChange={(open) => !open && setSmsDialogVendor(null)}
-          recipientPhone={smsDialogVendor.phone}
-          recipientName={smsDialogVendor.name}
+          contactPhone={smsDialogVendor.phone}
+          contactName={smsDialogVendor.name}
+          contactType="vendor"
+          contactId={smsDialogVendor.id}
         />
       )}
     </>

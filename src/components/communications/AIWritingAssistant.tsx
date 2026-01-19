@@ -18,7 +18,7 @@ interface AIWritingAssistantProps {
   conversationContext?: string;
   messageType: "sms" | "email";
   contactId?: string;
-  contactType?: "lead" | "owner";
+  contactType?: "lead" | "owner" | "vendor";
 }
 
 type ActionType = "improve" | "shorter" | "professional" | "generate" | "friendly";
