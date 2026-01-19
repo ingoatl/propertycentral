@@ -294,27 +294,40 @@ export function ExpandableMessageInput({
           isFocused ? "ring-2 ring-primary/20 border-primary/50" : "border-input",
           "bg-background"
         )}>
-          <Textarea
-            ref={textareaRef}
-            value={localValue}
-            onChange={(e) => handleChange(e.target.value)}
-            onFocus={() => {
-              setIsFocused(true);
-              // Always open full-screen on mobile when tapping input
-              if (isMobile) handleExpand();
-            }}
-            onBlur={() => setIsFocused(false)}
-            placeholder={placeholder}
-            disabled={disabled}
-            className={cn(
-              "min-h-[56px] resize-none border-0 focus-visible:ring-0 rounded-2xl",
-              "text-[18px] leading-relaxed py-4 px-4 pr-14",
-              "placeholder:text-muted-foreground/60",
-              isMobile && "cursor-pointer"
-            )}
-            rows={minRows}
-            readOnly={isMobile} // Make read-only on mobile since we open fullscreen
-          />
+          {/* On mobile, use a clickable div overlay to trigger expansion */}
+          {isMobile ? (
+            <div
+              onClick={handleExpand}
+              className={cn(
+                "min-h-[56px] resize-none border-0 rounded-2xl cursor-pointer",
+                "text-[18px] leading-relaxed py-4 px-4 pr-14",
+                "flex items-start"
+              )}
+            >
+              <span className={cn(
+                "text-[18px] leading-relaxed",
+                localValue ? "text-foreground" : "text-muted-foreground/60"
+              )}>
+                {localValue || placeholder}
+              </span>
+            </div>
+          ) : (
+            <Textarea
+              ref={textareaRef}
+              value={localValue}
+              onChange={(e) => handleChange(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder={placeholder}
+              disabled={disabled}
+              className={cn(
+                "min-h-[56px] resize-none border-0 focus-visible:ring-0 rounded-2xl",
+                "text-[18px] leading-relaxed py-4 px-4 pr-14",
+                "placeholder:text-muted-foreground/60"
+              )}
+              rows={minRows}
+            />
+          )}
           
           {/* Expand button */}
           <Button
