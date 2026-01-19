@@ -178,7 +178,11 @@ export function TwilioCallDialog({
   };
 
   const formatPhoneDisplay = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, "");
+    let cleaned = phone.replace(/\D/g, "");
+    // Remove leading 1 (US country code) for display
+    if (cleaned.startsWith("1") && cleaned.length === 11) {
+      cleaned = cleaned.slice(1);
+    }
     if (cleaned.length <= 3) return cleaned;
     if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
     return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;

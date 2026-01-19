@@ -115,11 +115,15 @@ export function AIReplyButton({
 
   const handleSend = () => {
     const messageToSend = isEditing ? editedReply : generatedReply;
+    console.log("[AIReplyButton] handleSend called:", { isEditing, editedReply: editedReply?.substring(0, 50), generatedReply: generatedReply?.substring(0, 50), messageToSend: messageToSend?.substring(0, 50) });
     if (messageToSend) {
+      console.log("[AIReplyButton] Calling onSendMessage with:", messageToSend.substring(0, 100));
       onSendMessage(messageToSend);
       setGeneratedReply(null);
       setIsEditing(false);
       setEditedReply("");
+    } else {
+      console.warn("[AIReplyButton] No message to send!");
     }
   };
 
@@ -259,10 +263,16 @@ export function AIReplyButton({
           </div>
         )}
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap relative z-10">
           <Button
+            type="button"
             size="sm"
-            onClick={handleSend}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log("[AIReplyButton] Send button clicked");
+              handleSend();
+            }}
             disabled={isSending || (!generatedReply && !editedReply.trim())}
             className="gap-2"
           >
@@ -275,16 +285,29 @@ export function AIReplyButton({
           </Button>
           
           {!isEditing && (
-            <Button variant="outline" size="sm" onClick={handleEdit} className="gap-2">
+            <Button 
+              type="button"
+              variant="outline" 
+              size="sm" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleEdit();
+              }} 
+              className="gap-2"
+            >
               <Edit3 className="h-3.5 w-3.5" />
               Edit
             </Button>
           )}
           
           <Button 
+            type="button"
             variant="outline" 
             size="sm" 
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               setShowContextInput(true);
               setGeneratedReply(null);
             }} 
@@ -294,7 +317,17 @@ export function AIReplyButton({
             Regenerate with Context
           </Button>
           
-          <Button variant="ghost" size="sm" onClick={handleCancel} className="gap-2">
+          <Button 
+            type="button"
+            variant="ghost" 
+            size="sm" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleCancel();
+            }} 
+            className="gap-2"
+          >
             <X className="h-3.5 w-3.5" />
             Cancel
           </Button>
