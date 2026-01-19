@@ -48,6 +48,7 @@ const BookInspection = lazy(() => import("./pages/BookInspection"));
 const OnboardingPresentation = lazy(() => import("./pages/OnboardingPresentation"));
 const RescheduleCall = lazy(() => import("./pages/RescheduleCall"));
 const VoicemailPlayer = lazy(() => import("./pages/VoicemailPlayer"));
+const VendorJobPortal = lazy(() => import("./pages/VendorJobPortal"));
 
 // QueryClient configured with optimized caching and stale time settings
 const queryClient = new QueryClient({
@@ -116,6 +117,7 @@ const App = () => (
             <Route path="/onboarding-presentation" element={<OnboardingPresentation />} />
             <Route path="/reschedule/:callId" element={<RescheduleCall />} />
             <Route path="/vm/:token" element={<VoicemailPlayer />} />
+            <Route path="/vendor-job/:token" element={<VendorJobPortal />} />
             <Route path="*" element={
               <Layout>
                 <Suspense fallback={<PageLoader />}>
