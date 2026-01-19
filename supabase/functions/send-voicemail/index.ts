@@ -109,54 +109,9 @@ serve(async (req) => {
       // VIDEO MESSAGE: Video was already uploaded by the client
       console.log("Processing video message with URL:", videoUrl);
       
-      // Transcribe video using Whisper (it supports video files)
-      const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-      if (openaiApiKey && (!messageText || messageText === "(Video message)")) {
-        try {
-          console.log("Fetching video for transcription:", videoUrl);
-          const videoResponse = await fetch(videoUrl);
-          if (videoResponse.ok) {
-            const videoBytes = new Uint8Array(await videoResponse.arrayBuffer());
-            console.log(`Video fetched, size: ${videoBytes.length} bytes`);
-            
-            const formData = new FormData();
-            const videoBlob = new Blob([videoBytes], { type: "video/mp4" });
-            formData.append("file", videoBlob, "video.mp4");
-            formData.append("model", "whisper-1");
-            formData.append("language", "en");
-            
-            const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${openaiApiKey}`,
-              },
-              body: formData,
-            });
-            
-            if (whisperResponse.ok) {
-              const result = await whisperResponse.json();
-              if (result.text && result.text.trim().length > 0) {
-                finalMessageText = result.text;
-                console.log("Video transcription complete:", finalMessageText.substring(0, 100));
-              } else {
-                finalMessageText = "(Video message)";
-              }
-            } else {
-              const errorText = await whisperResponse.text();
-              console.error("Whisper video transcription error:", whisperResponse.status, errorText);
-              finalMessageText = "(Video message)";
-            }
-          } else {
-            console.error("Failed to fetch video for transcription:", videoResponse.status);
-            finalMessageText = "(Video message)";
-          }
-        } catch (error) {
-          console.error("Video transcription failed:", error);
-          finalMessageText = "(Video message)";
-        }
-      } else {
-        finalMessageText = messageText || "(Video message)";
-      }
+      // Note: Whisper doesn't support video files directly, so we skip transcription for videos
+      // The user should speak clearly in the video - we'll use the provided messageText or default
+      finalMessageText = messageText || "(Video message)";
       // audioUrl stays empty for video
     } else {
       // AUDIO MESSAGE: Need to process and upload audio
@@ -232,6 +187,9 @@ serve(async (req) => {
     }
 
     // Create voicemail record with actual transcript
+    // Ensure duration_seconds is an integer
+    const durationInt = durationSeconds ? Math.round(durationSeconds) : null;
+    
     const { data: voicemail, error: voicemailError } = await supabase
       .from("voicemail_messages")
       .insert({
@@ -247,7 +205,7 @@ serve(async (req) => {
         media_type: mediaType,
         audio_source: audioSource || "ai_generated",
         voice_id: voiceId || "nPczCjzI2devNBz1zQrb",
-        duration_seconds: durationSeconds || null,
+        duration_seconds: durationInt,
         status: "pending",
       })
       .select()
