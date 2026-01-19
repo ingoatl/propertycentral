@@ -23,8 +23,9 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall, Inbox, Play, Volume2 } from "lucide-react";
+import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall, Inbox, Play, Volume2, Building2 } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
+import { VendorServicesTab } from "./VendorServicesTab";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import { format } from "date-fns";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -246,6 +247,10 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
           <Tabs defaultValue="details" className="mt-4">
             <TabsList className="flex-wrap">
               <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="services">
+                <Building2 className="h-4 w-4 mr-1" />
+                Services
+              </TabsTrigger>
               <TabsTrigger value="comms">Communications ({vendorComms.length})</TabsTrigger>
               <TabsTrigger value="jobs">Work Orders ({workOrders.length})</TabsTrigger>
               <TabsTrigger value="billing">Bill.com</TabsTrigger>
@@ -535,6 +540,14 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
                   ))}
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="services" className="mt-4">
+              <VendorServicesTab
+                vendorId={vendor.id}
+                vendorName={vendor.name}
+                vendorEmail={vendor.email}
+              />
             </TabsContent>
 
             <TabsContent value="billing" className="mt-4">
