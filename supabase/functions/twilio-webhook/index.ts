@@ -304,7 +304,7 @@ async function checkVendorResponse(
 
   console.log(`Vendor response type: ${parsed.type} for work order ${workOrder.id}`);
 
-  // Log the vendor message
+  // Log the vendor message to maintenance_messages
   await supabase.from("maintenance_messages").insert({
     work_order_id: workOrder.id,
     sender_type: "vendor",
@@ -312,6 +312,22 @@ async function checkVendorResponse(
     message_text: body,
     visible_to_owner: true,
     visible_to_vendor: true,
+  });
+
+  // Also log to lead_communications with vendor metadata for inbox display
+  await supabase.from("lead_communications").insert({
+    communication_type: "sms",
+    direction: "inbound",
+    body: body,
+    from_phone: vendor.phone,
+    metadata: {
+      vendor_id: vendor.id,
+      vendor_name: vendor.name,
+      vendor_phone: vendor.phone,
+      contact_type: "vendor",
+      work_order_id: workOrder.id,
+      response_type: parsed.type,
+    },
   });
 
   switch (parsed.type) {
@@ -338,7 +354,7 @@ async function checkVendorResponse(
 
     case "quote":
       // Check if quote needs owner approval (over threshold)
-      const threshold = workOrder.properties?.auto_approve_threshold || 200;
+      const threshold = workOrder.properties?.auto_approve_threshold || 300;
       if (parsed.quote && parsed.quote > threshold) {
         await supabase.from("work_orders").update({
           status: "pending_approval",

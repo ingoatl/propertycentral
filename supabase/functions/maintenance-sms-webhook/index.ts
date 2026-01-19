@@ -294,7 +294,7 @@ async function handleVendorQuote(
     .single();
 
   const maintenanceBook = property?.property_maintenance_books?.[0];
-  const approvalThreshold = maintenanceBook?.require_owner_approval_above || 500; // Default $500
+  const approvalThreshold = maintenanceBook?.require_owner_approval_above || 300; // Default $300
 
   // Update work order with quote
   await supabase

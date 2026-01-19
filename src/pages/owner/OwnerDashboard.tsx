@@ -30,6 +30,7 @@ import {
   AlertCircle,
   CheckCircle2,
   MessageCircle,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -46,6 +47,7 @@ import { StatementViewer } from "./components/StatementViewer";
 import { OwnerOnboardingTimeline } from "./components/OwnerOnboardingTimeline";
 import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfButton";
 import { OwnerMessagesTab } from "./components/OwnerMessagesTab";
+import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
@@ -901,6 +903,10 @@ export default function OwnerDashboard() {
               <MessageCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Messages</span>
             </TabsTrigger>
+            <TabsTrigger value="maintenance" className="gap-2">
+              <Wrench className="h-4 w-4" />
+              <span className="hidden sm:inline">Maintenance</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Show onboarding timeline if property is in onboarding */}
@@ -1159,6 +1165,15 @@ export default function OwnerDashboard() {
 
           <TabsContent value="messages">
             {session && <OwnerMessagesTab ownerId={session.ownerId} />}
+          </TabsContent>
+
+          <TabsContent value="maintenance">
+            {session && (
+              <OwnerMaintenanceTab 
+                ownerId={session.ownerId} 
+                propertyId={property?.id}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </main>
