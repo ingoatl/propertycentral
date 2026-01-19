@@ -9472,6 +9472,92 @@ export type Database = {
           },
         ]
       }
+      vendor_service_requests: {
+        Row: {
+          assignment_id: string | null
+          confirmed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          email_sent_at: string | null
+          id: string
+          pause_end_date: string | null
+          pause_start_date: string | null
+          property_id: string | null
+          reason: string | null
+          reference_number: string | null
+          request_type: string
+          status: string | null
+          updated_at: string | null
+          vendor_id: string | null
+          vendor_response: string | null
+        }
+        Insert: {
+          assignment_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email_sent_at?: string | null
+          id?: string
+          pause_end_date?: string | null
+          pause_start_date?: string | null
+          property_id?: string | null
+          reason?: string | null
+          reference_number?: string | null
+          request_type: string
+          status?: string | null
+          updated_at?: string | null
+          vendor_id?: string | null
+          vendor_response?: string | null
+        }
+        Update: {
+          assignment_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email_sent_at?: string | null
+          id?: string
+          pause_end_date?: string | null
+          pause_start_date?: string | null
+          property_id?: string | null
+          reason?: string | null
+          reference_number?: string | null
+          request_type?: string
+          status?: string | null
+          updated_at?: string | null
+          vendor_id?: string | null
+          vendor_response?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_service_requests_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "property_vendor_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_service_requests_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_service_requests_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_service_requests_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           average_rating: number | null
