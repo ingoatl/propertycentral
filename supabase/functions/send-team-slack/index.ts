@@ -8,6 +8,7 @@ const corsHeaders = {
 
 interface SlackRequest {
   channel?: string;
+  channelId?: string; // Direct Slack channel ID for reliable posting
   message: string;
   template?: string;
   context?: {
@@ -29,18 +30,11 @@ const TEAM_MEMBERS: Record<string, { slackId: string }> = {
   'ingo': { slackId: 'U08BPU3PQ9H' },
 };
 
-// Channel IDs for reliable posting - add actual Slack channel IDs
-// Find these in Slack by right-clicking channel > View channel details > scroll to bottom
-const CHANNEL_IDS: Record<string, string> = {
+// Legacy channel IDs - now we prefer channelId passed from frontend
+// These are kept as fallback only
+const LEGACY_CHANNEL_IDS: Record<string, string> = {
   'wins': 'C0A967MUW8K',
-  'team-wins': 'C0A967MUW8K', // Update with actual ID
-  'finance-onboarding': '', // Add actual channel ID
-  'marketing-va': '', // Add actual channel ID
-  'ops-escalation': '', // Add actual channel ID
-  'ops-onboarding': '', // Add actual channel ID  
-  'owner-urgent': '', // Add actual channel ID
-  'sales-pipeline': '', // Add actual channel ID
-  'sales-wins': '', // Add actual channel ID
+  'team-wins': 'C0A967MUW8K',
 };
 
 // Cache for Slack user IDs (email -> slackId)
@@ -57,14 +51,24 @@ function getSlackUserIdForTeamMember(memberKey: string): string | null {
   return member.slackId;
 }
 
-// Get channel ID (uses hardcoded ID if available, otherwise returns channel name)
-function getChannelId(channelName: string): string {
-  const normalizedName = channelName.replace('#', '').toLowerCase();
-  const channelId = CHANNEL_IDS[normalizedName];
-  if (channelId) {
-    console.log(`[Slack] Using channel ID for ${normalizedName}: ${channelId}`);
+// Get channel ID - prefers passed channelId, falls back to legacy mapping, then name
+function getChannelId(channelName: string, channelId?: string): string {
+  // If we have a direct channel ID from the frontend, use it
+  if (channelId && channelId.startsWith('C')) {
+    console.log(`[Slack] Using provided channel ID: ${channelId}`);
     return channelId;
   }
+  
+  // Try legacy mapping
+  const normalizedName = channelName.replace('#', '').toLowerCase();
+  const legacyId = LEGACY_CHANNEL_IDS[normalizedName];
+  if (legacyId) {
+    console.log(`[Slack] Using legacy channel ID for ${normalizedName}: ${legacyId}`);
+    return legacyId;
+  }
+  
+  // Fall back to channel name (Slack API can handle names for public channels)
+  console.log(`[Slack] Using channel name: ${normalizedName}`);
   return normalizedName;
 }
 
@@ -268,7 +272,7 @@ serve(async (req) => {
     const senderName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : userEmail;
 
     const body: SlackRequest = await req.json();
-    const { channel, message, template, context, mentionUsers, directMessage, recipientUserId } = body;
+    const { channel, channelId, message, template, context, mentionUsers, directMessage, recipientUserId } = body;
 
     if (!message) {
       return new Response(JSON.stringify({ error: 'Message is required' }), { 
@@ -413,9 +417,10 @@ serve(async (req) => {
       // Send as DM
       slackResult = await sendSlackDM(slackUserId, fullMessage);
     } else {
-      // Send to channel - use channel ID if available
-      const channelId = getChannelId(channel!);
-      slackResult = await sendSlackMessage(channelId, fullMessage);
+      // Send to channel - use channel ID if available from frontend, otherwise lookup
+      const targetChannelId = getChannelId(channel!, channelId);
+      console.log(`[Slack] Sending to channel: ${channel} -> ${targetChannelId}`);
+      slackResult = await sendSlackMessage(targetChannelId, fullMessage);
     }
 
     // Update message status - AWAIT this properly!

@@ -497,3 +497,6 @@ verify_jwt = false
 
 [functions.elevenlabs-tts]
 verify_jwt = true
+
+[functions.fetch-slack-channels]
+verify_jwt = true
