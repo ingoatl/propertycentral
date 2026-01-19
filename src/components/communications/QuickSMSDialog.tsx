@@ -1,0 +1,121 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Loader2, Send, User } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { formatPhoneForDisplay } from "@/lib/phoneUtils";
+
+interface QuickSMSDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  recipientPhone: string;
+  recipientName: string;
+  leadId?: string;
+  ownerId?: string;
+}
+
+export function QuickSMSDialog({
+  open,
+  onOpenChange,
+  recipientPhone,
+  recipientName,
+  leadId,
+  ownerId,
+}: QuickSMSDialogProps) {
+  const [message, setMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!message.trim()) {
+      toast.error("Please enter a message");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
+        body: {
+          to: recipientPhone,
+          message: message.trim(),
+          leadId,
+          ownerId,
+          recipientName,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
+
+      toast.success("SMS sent successfully");
+      setMessage("");
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("SMS send error:", error);
+      toast.error(error.message || "Failed to send SMS");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>Send SMS</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Recipient info */}
+          <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <User className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium">{recipientName}</p>
+              <p className="text-sm text-muted-foreground">
+                {formatPhoneForDisplay(recipientPhone)}
+              </p>
+            </div>
+          </div>
+
+          {/* Message input */}
+          <div className="space-y-2">
+            <Textarea
+              placeholder="Type your message..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={4}
+              className="resize-none"
+              disabled={isSending}
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {message.length} / 160 characters
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSending}>
+            Cancel
+          </Button>
+          <Button onClick={handleSend} disabled={isSending || !message.trim()}>
+            {isSending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            Send SMS
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

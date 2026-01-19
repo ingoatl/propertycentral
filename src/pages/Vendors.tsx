@@ -13,6 +13,9 @@ import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
 import VendorDetailModal from "@/components/maintenance/VendorDetailModal";
 import ServiceSignupDialog from "@/components/maintenance/ServiceSignupDialog";
 import ActiveServicesOverview from "@/components/maintenance/ActiveServicesOverview";
+import { CallDialog } from "@/components/communications/CallDialog";
+import { QuickSMSDialog } from "@/components/communications/QuickSMSDialog";
+
 const Vendors = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
@@ -20,6 +23,8 @@ const Vendors = () => {
   const [showServiceSignupDialog, setShowServiceSignupDialog] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [callDialogVendor, setCallDialogVendor] = useState<Vendor | null>(null);
+  const [smsDialogVendor, setSmsDialogVendor] = useState<Vendor | null>(null);
   const queryClient = useQueryClient();
 
   const extractVendorsFromEmails = async () => {
@@ -313,9 +318,9 @@ const Vendors = () => {
                           className="h-8 w-8 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.location.href = `tel:${vendor.phone}`;
+                            setCallDialogVendor(vendor);
                           }}
-                          title="Call"
+                          title="Call via Twilio"
                         >
                           <PhoneCall className="h-4 w-4 text-green-600" />
                         </Button>
@@ -325,9 +330,9 @@ const Vendors = () => {
                           className="h-8 w-8 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.location.href = `sms:${vendor.phone}`;
+                            setSmsDialogVendor(vendor);
                           }}
-                          title="SMS"
+                          title="Send SMS via GHL"
                         >
                           <MessageSquare className="h-4 w-4 text-blue-600" />
                         </Button>
@@ -388,6 +393,26 @@ const Vendors = () => {
         open={showServiceSignupDialog}
         onOpenChange={setShowServiceSignupDialog}
       />
+
+      {/* Twilio Call Dialog */}
+      {callDialogVendor && (
+        <CallDialog
+          open={!!callDialogVendor}
+          onOpenChange={(open) => !open && setCallDialogVendor(null)}
+          contactName={callDialogVendor.name}
+          contactPhone={callDialogVendor.phone}
+        />
+      )}
+
+      {/* GHL SMS Dialog */}
+      {smsDialogVendor && (
+        <QuickSMSDialog
+          open={!!smsDialogVendor}
+          onOpenChange={(open) => !open && setSmsDialogVendor(null)}
+          recipientPhone={smsDialogVendor.phone}
+          recipientName={smsDialogVendor.name}
+        />
+      )}
     </>
   );
 };
