@@ -1156,6 +1156,10 @@ export default function OwnerDashboard() {
               />
             )}
           </TabsContent>
+
+          <TabsContent value="messages">
+            {session && <OwnerMessagesTab ownerId={session.ownerId} />}
+          </TabsContent>
         </Tabs>
       </main>
 

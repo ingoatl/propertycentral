@@ -101,85 +101,85 @@ serve(async (req) => {
       senderUserId = user?.id;
     }
 
-    // Convert base64 to Uint8Array
-    const audioBytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
-
-    // Normalize mime type (remove codecs parameter which can cause issues)
-    let normalizedMimeType = audioMimeType || "audio/mpeg";
-    if (normalizedMimeType.includes(";")) {
-      normalizedMimeType = normalizedMimeType.split(";")[0].trim();
-    }
-
-    // Determine actual message text - transcribe if it's a recording without text
-    let finalMessageText = messageText;
-    
-    // If it's a recording (not AI-generated) and no real transcript, transcribe it
-    if (audioSource === "recording" || !messageText || messageText === "(Voice recording)") {
-      console.log("Transcribing recorded audio...");
-      const transcript = await transcribeAudio(audioBytes, normalizedMimeType);
-      if (transcript) {
-        finalMessageText = transcript;
-        console.log("Transcription complete:", transcript.substring(0, 100));
-      } else {
-        // Keep original message if transcription fails
-        finalMessageText = messageText || "(Voice recording)";
-      }
-    }
-
-    // Determine file extension and upload content type
-    // Use application/octet-stream for upload to avoid mime type restrictions
-    // but keep the correct extension for playback
-    let extension = "mp3";
-    let uploadContentType = "audio/mpeg";
-    
-    if (normalizedMimeType.includes("webm")) {
-      extension = "webm";
-      uploadContentType = "application/octet-stream";
-    } else if (normalizedMimeType.includes("mp4") || normalizedMimeType.includes("m4a")) {
-      extension = "m4a";
-      uploadContentType = "audio/mp4";
-    } else if (normalizedMimeType.includes("wav")) {
-      extension = "wav";
-      uploadContentType = "audio/wav";
-    } else if (normalizedMimeType.includes("ogg")) {
-      extension = "ogg";
-      uploadContentType = "application/octet-stream";
-    } else if (normalizedMimeType.includes("mpeg") || normalizedMimeType.includes("mp3")) {
-      extension = "mp3";
-      uploadContentType = "audio/mpeg";
-    }
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const filename = `voicemail_${timestamp}.${extension}`;
-    const storagePath = `voicemails/${filename}`;
-
-    console.log(`Uploading audio: ${storagePath}, contentType: ${uploadContentType}, originalMime: ${audioMimeType}`);
-
-    // Upload audio to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("message-attachments")
-      .upload(storagePath, audioBytes, {
-        contentType: uploadContentType,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      throw new Error("Failed to upload audio: " + uploadError.message);
-    }
-
-    // For video messages, use the pre-uploaded video URL
+    // Variables for the final message
     let audioUrl = "";
     let finalMessageText = messageText;
     
     if (mediaType === "video") {
-      // Video was already uploaded by the client
+      // VIDEO MESSAGE: Video was already uploaded by the client
       console.log("Processing video message with URL:", videoUrl);
-      audioUrl = ""; // Not used for video
       finalMessageText = messageText || "(Video message)";
+      // audioUrl stays empty for video
     } else {
-      // Audio message - upload to storage
+      // AUDIO MESSAGE: Need to process and upload audio
+      
+      // Convert base64 to Uint8Array
+      const audioBytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
+
+      // Normalize mime type (remove codecs parameter which can cause issues)
+      let normalizedMimeType = audioMimeType || "audio/mpeg";
+      if (normalizedMimeType.includes(";")) {
+        normalizedMimeType = normalizedMimeType.split(";")[0].trim();
+      }
+
+      // Transcribe if it's a recording without text
+      if (audioSource === "recording" || !messageText || messageText === "(Voice recording)") {
+        console.log("Transcribing recorded audio...");
+        const transcript = await transcribeAudio(audioBytes, normalizedMimeType);
+        if (transcript) {
+          finalMessageText = transcript;
+          console.log("Transcription complete:", transcript.substring(0, 100));
+        } else {
+          finalMessageText = messageText || "(Voice recording)";
+        }
+      }
+
+      // Determine file extension and upload content type
+      let extension = "mp3";
+      let uploadContentType = "audio/mpeg";
+      
+      if (normalizedMimeType.includes("webm")) {
+        extension = "webm";
+        uploadContentType = "application/octet-stream";
+      } else if (normalizedMimeType.includes("mp4") || normalizedMimeType.includes("m4a")) {
+        extension = "m4a";
+        uploadContentType = "audio/mp4";
+      } else if (normalizedMimeType.includes("wav")) {
+        extension = "wav";
+        uploadContentType = "audio/wav";
+      } else if (normalizedMimeType.includes("ogg")) {
+        extension = "ogg";
+        uploadContentType = "application/octet-stream";
+      } else if (normalizedMimeType.includes("mpeg") || normalizedMimeType.includes("mp3")) {
+        extension = "mp3";
+        uploadContentType = "audio/mpeg";
+      }
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const filename = `voicemail_${timestamp}.${extension}`;
+      const storagePath = `voicemails/${filename}`;
+
+      console.log(`Uploading audio: ${storagePath}, contentType: ${uploadContentType}, originalMime: ${audioMimeType}`);
+
+      // Upload audio to storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("message-attachments")
+        .upload(storagePath, audioBytes, {
+          contentType: uploadContentType,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw new Error("Failed to upload audio: " + uploadError.message);
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("message-attachments")
+        .getPublicUrl(storagePath);
+
       audioUrl = urlData.publicUrl;
     }
 
