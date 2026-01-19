@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature, MessageSquare, Mic, PhoneCall } from "lucide-react";
+import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
 import VendorDetailModal from "@/components/maintenance/VendorDetailModal";
@@ -299,6 +300,61 @@ const Vendors = () => {
                         <Shield className="h-3 w-3 mr-1" />
                         Insured
                       </Badge>
+                    )}
+                  </div>
+
+                  {/* Quick Action Buttons */}
+                  <div className="flex gap-1.5 pt-2 border-t">
+                    {vendor.phone && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `tel:${vendor.phone}`;
+                          }}
+                          title="Call"
+                        >
+                          <PhoneCall className="h-4 w-4 text-green-600" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `sms:${vendor.phone}`;
+                          }}
+                          title="SMS"
+                        >
+                          <MessageSquare className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <SendVoicemailButton
+                            recipientPhone={vendor.phone}
+                            recipientName={vendor.name}
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 p-0"
+                          />
+                        </div>
+                      </>
+                    )}
+                    {vendor.email && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.location.href = `mailto:${vendor.email}`;
+                        }}
+                        title="Email"
+                      >
+                        <Mail className="h-4 w-4 text-purple-600" />
+                      </Button>
                     )}
                   </div>
                 </CardContent>
