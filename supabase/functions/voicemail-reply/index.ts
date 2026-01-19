@@ -79,6 +79,7 @@ serve(async (req) => {
     console.log("Reply audio uploaded:", replyAudioUrl);
 
     // Update voicemail record with reply info
+    // Note: status 'replied' must be in the voicemail_messages_status_check constraint
     const { error: updateError } = await supabase
       .from("voicemail_messages")
       .update({
@@ -92,30 +93,45 @@ serve(async (req) => {
 
     if (updateError) {
       console.error("Update error:", updateError);
-      throw new Error("Failed to update voicemail record");
+      throw new Error(`Failed to update voicemail record: ${updateError.message}`);
     }
 
-    // Create a lead communication entry to track the reply
+    console.log("Voicemail record updated successfully");
+
+    // Create a lead communication entry to track the reply and show in sender's inbox
+    // recipient_user_id = original sender, so they see it in their inbox
     const { error: commError } = await supabase
       .from("lead_communications")
       .insert({
         lead_id: voicemail.lead_id,
         owner_id: voicemail.owner_id,
-        type: "voicemail_reply",
+        communication_type: "voicemail",
         direction: "inbound",
-        subject: `Voice reply from ${voicemail.recipient_name || "Owner"}`,
-        content: `Voice message reply received (${duration}s)`,
+        subject: `Voice reply from ${voicemail.recipient_name || "Property Owner"}`,
+        body: `🎙️ Voice reply received (${duration || 0}s) - Click to play`,
+        status: "received",
+        is_read: false,
+        media_urls: [replyAudioUrl],
+        recipient_user_id: voicemail.sender_user_id, // Show in original sender's inbox
         metadata: {
           voicemail_id: voicemailId,
           reply_audio_url: replyAudioUrl,
           reply_duration: duration,
-          original_sender: voicemail.sender_name,
+          original_sender_name: voicemail.sender_name,
+          is_voicemail_reply: true,
         },
       });
 
     if (commError) {
       console.error("Failed to create communication record:", commError);
-      // Don't throw - this is a secondary operation
+      // Log more details for debugging
+      console.error("Insert payload:", {
+        lead_id: voicemail.lead_id,
+        owner_id: voicemail.owner_id,
+        sender_user_id: voicemail.sender_user_id,
+      });
+    } else {
+      console.log("Communication record created for sender's inbox");
     }
 
     // Send Slack notification if configured
