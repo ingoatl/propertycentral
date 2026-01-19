@@ -57,23 +57,41 @@ serve(async (req) => {
       normalizedMimeType = normalizedMimeType.split(";")[0].trim();
     }
 
-    // Determine file extension from mime type
+    // Determine file extension and upload content type
+    // Use application/octet-stream for upload to avoid mime type restrictions
+    // but keep the correct extension for playback
     let extension = "mp3";
-    if (normalizedMimeType.includes("webm")) extension = "webm";
-    else if (normalizedMimeType.includes("mp4")) extension = "mp4";
-    else if (normalizedMimeType.includes("wav")) extension = "wav";
-    else if (normalizedMimeType.includes("ogg")) extension = "ogg";
+    let uploadContentType = "audio/mpeg";
+    
+    if (normalizedMimeType.includes("webm")) {
+      extension = "webm";
+      uploadContentType = "application/octet-stream";
+    } else if (normalizedMimeType.includes("mp4") || normalizedMimeType.includes("m4a")) {
+      extension = "m4a";
+      uploadContentType = "audio/mp4";
+    } else if (normalizedMimeType.includes("wav")) {
+      extension = "wav";
+      uploadContentType = "audio/wav";
+    } else if (normalizedMimeType.includes("ogg")) {
+      extension = "ogg";
+      uploadContentType = "application/octet-stream";
+    } else if (normalizedMimeType.includes("mpeg") || normalizedMimeType.includes("mp3")) {
+      extension = "mp3";
+      uploadContentType = "audio/mpeg";
+    }
 
     // Generate unique filename
     const timestamp = Date.now();
     const filename = `voicemail_${timestamp}.${extension}`;
     const storagePath = `voicemails/${filename}`;
 
+    console.log(`Uploading audio: ${storagePath}, contentType: ${uploadContentType}, originalMime: ${audioMimeType}`);
+
     // Upload audio to storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("message-attachments")
       .upload(storagePath, audioBytes, {
-        contentType: normalizedMimeType,
+        contentType: uploadContentType,
         upsert: false,
       });
 
