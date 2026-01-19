@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Maximize2, Send, X, Check, Type } from "lucide-react";
+import { Maximize2, Send, X, Check, Type, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -49,7 +49,7 @@ export function ExpandableMessageInput({
   contactName,
   contactId,
   contactType = "lead",
-  minRows = 2,
+  minRows = 3,
   maxRows = 8,
   showCharacterCount = true,
   showSegmentCount = true,
@@ -62,6 +62,7 @@ export function ExpandableMessageInput({
   const [localValue, setLocalValue] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const expandedTextareaRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = useIsMobile();
 
   // Sync local value with external value
@@ -72,15 +73,14 @@ export function ExpandableMessageInput({
   // Character and segment counting for SMS
   const characterCount = localValue.length;
   const segmentCount = Math.ceil(characterCount / 160) || 1;
-  const isLongMessage = characterCount > 200 || localValue.split('\n').length > 3;
 
-  // Auto-resize textarea with smooth animation
+  // Auto-resize textarea
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
-      const lineHeight = 26; // Larger line height for readability
-      const minHeight = Math.max(minRows * lineHeight, 56); // Minimum 56px (touch-friendly)
+      const lineHeight = 26;
+      const minHeight = Math.max(minRows * lineHeight, 80);
       const maxHeight = maxRows * lineHeight;
       const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
       textarea.style.height = `${newHeight}px`;
@@ -106,7 +106,7 @@ export function ExpandableMessageInput({
   };
 
   const handleCancel = () => {
-    setLocalValue(value); // Reset to original value
+    setLocalValue(value);
     setIsExpanded(false);
   };
 
@@ -119,20 +119,20 @@ export function ExpandableMessageInput({
   };
 
   // Action buttons component
-  const ActionButtons = ({ expanded = false }: { expanded?: boolean }) => (
-    <div className="flex items-center gap-2">
+  const ActionButtons = ({ expanded = false, compact = false }: { expanded?: boolean; compact?: boolean }) => (
+    <div className={cn("flex items-center", compact ? "gap-1" : "gap-2")}>
       {showVoiceDictation && (
         <VoiceDictationButton
           onResult={(text) => {
             const newValue = localValue ? `${localValue}\n${text}` : text;
             setLocalValue(newValue);
-            if (!expanded) onChange(newValue);
+            onChange(newValue);
           }}
           messageType={messageType}
           contactName={contactName}
           className={cn(
             "transition-all duration-200 active:scale-95",
-            expanded ? "h-12 w-12 md:h-11 md:w-11" : "h-11 w-11 md:h-10 md:w-10"
+            compact ? "h-9 w-9" : expanded ? "h-12 w-12 md:h-11 md:w-11" : "h-10 w-10"
           )}
         />
       )}
@@ -141,7 +141,7 @@ export function ExpandableMessageInput({
           currentMessage={localValue}
           onMessageGenerated={(msg) => {
             setLocalValue(msg);
-            if (!expanded) onChange(msg);
+            onChange(msg);
           }}
           contactName={contactName}
           messageType={messageType}
@@ -152,13 +152,12 @@ export function ExpandableMessageInput({
     </div>
   );
 
-  // Expanded content - shared between Dialog and Drawer
+  // Expanded content with EDITABLE textarea
   const ExpandedContent = (
     <div className="flex flex-col h-full">
-      {/* Action bar at TOP of expanded view with better positioning */}
+      {/* Action bar at TOP */}
       <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
         <ActionButtons expanded />
-        {/* Character/segment count inline */}
         {(showCharacterCount || showSegmentCount) && messageType === "sms" && (
           <div className="flex items-center gap-2">
             {showCharacterCount && (
@@ -181,8 +180,11 @@ export function ExpandableMessageInput({
       </div>
 
       <Textarea
+        ref={expandedTextareaRef}
         value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
+        onChange={(e) => {
+          setLocalValue(e.target.value);
+        }}
         placeholder={placeholder}
         className={cn(
           "flex-1 min-h-[280px] md:min-h-[320px] resize-none border-0 focus-visible:ring-0",
@@ -193,13 +195,13 @@ export function ExpandableMessageInput({
     </div>
   );
 
-  // Mobile: Use Drawer (bottom sheet) for expanded view - FULL SCREEN with upscale effect
+  // Mobile: Full screen Drawer
   const MobileExpandedView = (
     <Drawer open={isExpanded} onOpenChange={setIsExpanded}>
-      <DrawerContent className="h-[100dvh] flex flex-col data-[state=open]:animate-drawer-scale-in">
-        <DrawerHeader className="border-b px-5 py-5 bg-gradient-to-b from-background to-background/95">
-          <DrawerTitle className="text-xl font-semibold tracking-tight">
-            {contactName ? `Message to ${contactName}` : "Compose Message"}
+      <DrawerContent className="h-[100dvh] flex flex-col">
+        <DrawerHeader className="border-b px-5 py-4 bg-gradient-to-b from-background to-background/95">
+          <DrawerTitle className="text-lg font-semibold">
+            {contactName ? `Message to ${contactName}` : "Edit Message"}
           </DrawerTitle>
         </DrawerHeader>
         
@@ -207,31 +209,31 @@ export function ExpandableMessageInput({
           {ExpandedContent}
         </div>
         
-        <DrawerFooter className="border-t pt-5 pb-8 safe-area-bottom bg-gradient-to-t from-muted/50 to-background">
-          <div className="flex gap-4">
+        <DrawerFooter className="border-t pt-4 pb-6 safe-area-bottom bg-gradient-to-t from-muted/50 to-background">
+          <div className="flex gap-3">
             <Button 
               variant="outline" 
               onClick={handleCancel} 
-              className="flex-1 h-14 text-lg rounded-2xl active:scale-[0.97] transition-all duration-200 shadow-sm"
+              className="flex-1 h-12 text-base rounded-xl"
             >
-              <X className="h-5 w-5 mr-2" />
+              <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
             {onSend ? (
               <Button 
                 onClick={handleSend} 
                 disabled={!localValue.trim()} 
-                className="flex-1 h-14 text-lg rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/25 active:scale-[0.97] transition-all duration-200"
+                className="flex-1 h-12 text-base rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg"
               >
-                <Send className="h-5 w-5 mr-2" />
+                <Send className="h-4 w-4 mr-2" />
                 Send
               </Button>
             ) : (
               <Button 
                 onClick={handleSaveAndClose} 
-                className="flex-1 h-14 text-lg rounded-2xl shadow-lg active:scale-[0.97] transition-all duration-200"
+                className="flex-1 h-12 text-base rounded-xl"
               >
-                <Check className="h-5 w-5 mr-2" />
+                <Check className="h-4 w-4 mr-2" />
                 Done
               </Button>
             )}
@@ -241,13 +243,13 @@ export function ExpandableMessageInput({
     </Drawer>
   );
 
-  // Desktop: Use Dialog for expanded view - WIDER modal with upscale effect
+  // Desktop: Dialog
   const DesktopExpandedView = (
     <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
-      <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col p-0 gap-0 rounded-3xl shadow-2xl shadow-black/10 data-[state=open]:animate-scale-in-premium">
-        <DialogHeader className="px-8 py-6 border-b bg-gradient-to-b from-muted/30 to-background">
-          <DialogTitle className="text-xl font-semibold tracking-tight">
-            Review Message
+      <DialogContent className="max-w-2xl w-[90vw] max-h-[85vh] flex flex-col p-0 gap-0 rounded-2xl">
+        <DialogHeader className="px-6 py-4 border-b">
+          <DialogTitle className="text-lg font-semibold">
+            Edit Message
             {contactName && (
               <span className="text-muted-foreground font-normal ml-2">
                 to {contactName}
@@ -260,23 +262,23 @@ export function ExpandableMessageInput({
           {ExpandedContent}
         </div>
         
-        <DialogFooter className="px-8 py-5 border-t gap-4 sm:gap-4 bg-gradient-to-t from-muted/30 to-background">
-          <Button variant="outline" onClick={handleCancel} className="h-13 px-6 text-base rounded-xl">
-            <X className="h-5 w-5 mr-2" />
+        <DialogFooter className="px-6 py-4 border-t gap-3 sm:gap-3">
+          <Button variant="outline" onClick={handleCancel} className="h-11 px-5 rounded-lg">
+            <X className="h-4 w-4 mr-2" />
             Cancel
           </Button>
           {onSend ? (
             <Button 
               onClick={handleSend} 
               disabled={!localValue.trim()}
-              className="h-13 px-8 text-base rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/20"
+              className="h-11 px-6 rounded-lg"
             >
-              <Send className="h-5 w-5 mr-2" />
-              Send Message
+              <Send className="h-4 w-4 mr-2" />
+              Send
             </Button>
           ) : (
-            <Button onClick={handleSaveAndClose} className="h-13 px-6 text-base rounded-xl">
-              <Check className="h-5 w-5 mr-2" />
+            <Button onClick={handleSaveAndClose} className="h-11 px-5 rounded-lg">
+              <Check className="h-4 w-4 mr-2" />
               Done
             </Button>
           )}
@@ -287,61 +289,52 @@ export function ExpandableMessageInput({
 
   return (
     <>
-      {/* Compact input view with enhanced styling */}
+      {/* COMPACT VIEW - Now with actual editable textarea */}
       <div className={cn("relative", className)}>
         <div className={cn(
-          "relative rounded-2xl border-2 transition-all duration-200",
+          "relative rounded-xl border transition-all duration-200",
           isFocused ? "ring-2 ring-primary/20 border-primary/50" : "border-input",
           "bg-background"
         )}>
-          {/* Clickable input area - always triggers expansion on click */}
-          <div
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleExpand();
-            }}
+          {/* Actual editable textarea */}
+          <Textarea
+            ref={textareaRef}
+            value={localValue}
+            onChange={(e) => handleChange(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder={placeholder}
+            disabled={disabled}
             className={cn(
-              "min-h-[56px] rounded-2xl cursor-pointer",
-              "text-[18px] leading-relaxed py-4 px-4 pr-14",
-              "flex items-start"
+              "resize-none border-0 focus-visible:ring-0 bg-transparent",
+              "text-base leading-relaxed py-3 px-4 pr-12",
+              "min-h-[80px]"
             )}
-          >
-            <span className={cn(
-              "text-[18px] leading-relaxed",
-              localValue ? "text-foreground" : "text-muted-foreground/60"
-            )}>
-              {localValue || placeholder}
-            </span>
-          </div>
+            rows={minRows}
+          />
           
-          {/* Expand button */}
+          {/* Expand button - overlaid */}
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={handleExpand}
-            className="absolute right-2 top-2 h-10 w-10 rounded-full hover:bg-muted transition-all duration-200 active:scale-95"
-            title="Expand to review"
+            className="absolute right-2 top-2 h-8 w-8 rounded-full hover:bg-muted/80 transition-all"
+            title="Expand to full screen"
           >
-            <Maximize2 className="h-5 w-5 text-muted-foreground" />
+            <Maximize2 className="h-4 w-4 text-muted-foreground" />
           </Button>
         </div>
         
-        {/* Action bar and segment count below input */}
-        <div className="flex items-center justify-between mt-2 px-1">
-          {!isMobile && <ActionButtons />}
-          {isMobile && (
-            <div className="flex items-center gap-2">
-              <ActionButtons />
-            </div>
-          )}
+        {/* Action bar and counts below */}
+        <div className="flex items-center justify-between mt-2.5 px-1">
+          <ActionButtons compact />
           
           {/* Character/segment count */}
           {(showCharacterCount || showSegmentCount) && messageType === "sms" && characterCount > 0 && (
             <div className="flex items-center gap-2 text-sm">
               {showCharacterCount && (
-                <span className="text-muted-foreground">{characterCount}</span>
+                <span className="text-muted-foreground text-xs">{characterCount}</span>
               )}
               {showSegmentCount && (
                 <span className={cn(
@@ -353,23 +346,12 @@ export function ExpandableMessageInput({
                   {segmentCount} SMS
                 </span>
               )}
-              {isLongMessage && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleExpand}
-                  className="h-7 px-2 text-xs text-primary"
-                >
-                  <Type className="h-3 w-3 mr-1" />
-                  Review
-                </Button>
-              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Expanded view - platform specific */}
+      {/* Expanded view */}
       {isMobile ? MobileExpandedView : DesktopExpandedView}
     </>
   );
