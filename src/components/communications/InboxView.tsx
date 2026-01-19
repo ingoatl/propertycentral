@@ -1890,13 +1890,13 @@ export function InboxView() {
       
       // For leads, fetch all communications for the same lead_id AND user_phone_messages by phone
       if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
-        // Always fetch all types for unified view
-        const commTypes = ["sms", "call", "email"];
+        // Always fetch all types for unified view - include voicemail
+        const commTypes = ["sms", "call", "email", "voicemail"];
         
-        // Fetch from lead_communications
+        // Fetch from lead_communications - include metadata for voicemail audio URLs
         const { data: leadComms, error } = await supabase
           .from("lead_communications")
-          .select("id, communication_type, direction, body, subject, created_at, status, media_urls, call_duration, call_recording_url")
+          .select("id, communication_type, direction, body, subject, created_at, status, media_urls, metadata, call_duration, call_recording_url")
           .eq("lead_id", selectedMessage.contact_id)
           .in("communication_type", commTypes)
           .order("created_at", { ascending: false });
@@ -1908,6 +1908,12 @@ export function InboxView() {
           if (!body || body.trim().length === 0 || body === "SMS message") {
             body = comm.direction === "inbound" ? "(Received message)" : "(Sent message)";
           }
+          // For voicemails, get audio URL from metadata if media_urls is empty
+          const metadata = comm.metadata as { audio_url?: string; reply_audio_url?: string; transcript?: string } | null;
+          let mediaUrls = Array.isArray(comm.media_urls) ? comm.media_urls : [];
+          if (comm.communication_type === "voicemail" && mediaUrls.length === 0 && metadata?.audio_url) {
+            mediaUrls = [metadata.audio_url];
+          }
           return {
             id: comm.id,
             type: comm.communication_type,
@@ -1915,9 +1921,10 @@ export function InboxView() {
             body,
             subject: comm.subject,
             created_at: comm.created_at,
-            media_urls: comm.media_urls || [],
+            media_urls: mediaUrls,
             call_duration: comm.call_duration,
             call_recording_url: comm.call_recording_url,
+            transcript: metadata?.transcript,
           };
         });
         
@@ -1966,9 +1973,9 @@ export function InboxView() {
       if (selectedMessage.contact_type === "owner" && selectedMessage.owner_id) {
         const { data, error } = await supabase
           .from("lead_communications")
-          .select("id, communication_type, direction, body, subject, created_at, status, media_urls")
+          .select("id, communication_type, direction, body, subject, created_at, status, media_urls, metadata")
           .eq("owner_id", selectedMessage.owner_id)
-          .in("communication_type", ["sms", "call", "email"])
+          .in("communication_type", ["sms", "call", "email", "voicemail"])
           .order("created_at", { ascending: false });
         
         if (error) throw error;
@@ -1977,13 +1984,20 @@ export function InboxView() {
           const body = (!comm.body || comm.body.trim().length === 0 || comm.body === "SMS message")
             ? (comm.direction === "inbound" ? "(Received message)" : "(Sent message)")
             : comm.body;
+          // For voicemails, get audio URL from metadata if media_urls is empty
+          const metadata = comm.metadata as { audio_url?: string; reply_audio_url?: string; transcript?: string } | null;
+          let mediaUrls = Array.isArray(comm.media_urls) ? comm.media_urls : [];
+          if (comm.communication_type === "voicemail" && mediaUrls.length === 0 && metadata?.audio_url) {
+            mediaUrls = [metadata.audio_url];
+          }
           return {
             id: comm.id,
             type: comm.communication_type,
             direction: comm.direction,
             body,
             created_at: comm.created_at,
-            media_urls: (Array.isArray(comm.media_urls) ? comm.media_urls : []) as string[],
+            media_urls: mediaUrls as string[],
+            transcript: metadata?.transcript,
           };
         });
       }
@@ -2008,11 +2022,11 @@ export function InboxView() {
         });
         
         // Also fetch from lead_communications by searching in metadata for this phone/tenant
-        // Include ALL communication types for unified thread
+        // Include ALL communication types for unified thread including voicemail
         const { data: leadComms } = await supabase
           .from("lead_communications")
           .select("id, communication_type, direction, body, subject, created_at, media_urls, metadata, ghl_contact_id, call_duration, call_recording_url")
-          .in("communication_type", ["sms", "call", "email"])
+          .in("communication_type", ["sms", "call", "email", "voicemail"])
           .order("created_at", { ascending: false });
         
         // Check metadata for phone or tenant_id matching
@@ -2060,17 +2074,26 @@ export function InboxView() {
             created_at: msg.created_at,
             media_urls: (Array.isArray(msg.media_urls) ? msg.media_urls : []) as string[],
           })),
-          ...filteredLeadComms.map(msg => ({
-            id: msg.id,
-            type: msg.communication_type as "sms" | "call" | "email",
-            direction: msg.direction as "inbound" | "outbound",
-            body: msg.body || "(No content)",
-            subject: msg.subject || undefined,
-            created_at: msg.created_at,
-            media_urls: (Array.isArray(msg.media_urls) ? msg.media_urls : []) as string[],
-            call_duration: msg.call_duration,
-            call_recording_url: msg.call_recording_url,
-          })),
+          ...filteredLeadComms.map(msg => {
+            // For voicemails, get audio URL from metadata if media_urls is empty
+            const metadata = msg.metadata as { audio_url?: string; transcript?: string } | null;
+            let mediaUrls = Array.isArray(msg.media_urls) ? msg.media_urls : [];
+            if (msg.communication_type === "voicemail" && mediaUrls.length === 0 && metadata?.audio_url) {
+              mediaUrls = [metadata.audio_url];
+            }
+            return {
+              id: msg.id,
+              type: msg.communication_type as "sms" | "call" | "email" | "voicemail",
+              direction: msg.direction as "inbound" | "outbound",
+              body: msg.body || "(No content)",
+              subject: msg.subject || undefined,
+              created_at: msg.created_at,
+              media_urls: mediaUrls as string[],
+              call_duration: msg.call_duration,
+              call_recording_url: msg.call_recording_url,
+              transcript: metadata?.transcript,
+            };
+          }),
         ];
         
         // Sort by timestamp
@@ -3600,8 +3623,8 @@ export function InboxView() {
                                           
                                           if (isAudio) {
                                             return (
-                                              <div key={imgIdx} className="bg-background/30 rounded-lg p-3">
-                                                <div className="flex items-center gap-2 mb-2">
+                                              <div key={imgIdx} className="bg-background/30 rounded-lg p-3 space-y-2">
+                                                <div className="flex items-center gap-2">
                                                   <div className="p-1.5 rounded-full bg-primary/20">
                                                     <Mic className="h-3.5 w-3.5 text-primary" />
                                                   </div>
@@ -3617,6 +3640,16 @@ export function InboxView() {
                                                   <source src={url} type={url.includes('.mp3') ? 'audio/mpeg' : 'audio/webm'} />
                                                   Your browser does not support audio playback.
                                                 </audio>
+                                                {/* Show transcript if available */}
+                                                {msg.transcript && (
+                                                  <div className={`text-sm p-2 rounded-md ${isOutbound ? 'bg-primary-foreground/10' : 'bg-muted'}`}>
+                                                    <div className="flex items-center gap-1.5 text-xs font-medium opacity-70 mb-1">
+                                                      <FileText className="h-3 w-3" />
+                                                      Transcript
+                                                    </div>
+                                                    <p className="leading-relaxed">{msg.transcript}</p>
+                                                  </div>
+                                                )}
                                               </div>
                                             );
                                           }

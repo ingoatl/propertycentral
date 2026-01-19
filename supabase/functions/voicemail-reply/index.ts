@@ -1,11 +1,61 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Transcribe audio using OpenAI Whisper
+async function transcribeAudio(audioUrl: string): Promise<string | null> {
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openaiKey) {
+    console.log("No OpenAI API key, skipping transcription");
+    return null;
+  }
+
+  try {
+    console.log("Fetching audio for transcription:", audioUrl);
+    
+    // Fetch the audio file
+    const audioResponse = await fetch(audioUrl);
+    if (!audioResponse.ok) {
+      console.error("Failed to fetch audio:", audioResponse.status);
+      return null;
+    }
+    
+    const audioBlob = await audioResponse.blob();
+    console.log("Audio blob size:", audioBlob.size, "type:", audioBlob.type);
+    
+    // Create form data for Whisper API
+    const formData = new FormData();
+    formData.append("file", audioBlob, "audio.webm");
+    formData.append("model", "whisper-1");
+    formData.append("language", "en");
+    
+    // Call OpenAI Whisper
+    const transcribeResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openaiKey}`,
+      },
+      body: formData,
+    });
+    
+    if (!transcribeResponse.ok) {
+      const errorText = await transcribeResponse.text();
+      console.error("Whisper API error:", transcribeResponse.status, errorText);
+      return null;
+    }
+    
+    const result = await transcribeResponse.json();
+    console.log("Transcription result:", result.text?.substring(0, 100));
+    return result.text || null;
+  } catch (err) {
+    console.error("Transcription error:", err);
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -78,6 +128,10 @@ serve(async (req) => {
     const replyAudioUrl = urlData.publicUrl;
     console.log("Reply audio uploaded:", replyAudioUrl);
 
+    // Transcribe the audio
+    const transcript = await transcribeAudio(replyAudioUrl);
+    console.log("Transcript generated:", transcript ? "yes" : "no");
+
     // Update voicemail record with reply info
     // Note: status 'replied' must be in the voicemail_messages_status_check constraint
     const { error: updateError } = await supabase
@@ -86,6 +140,7 @@ serve(async (req) => {
         reply_audio_url: replyAudioUrl,
         reply_recorded_at: new Date().toISOString(),
         reply_duration_seconds: duration || 0,
+        reply_transcript: transcript,
         status: "replied",
         updated_at: new Date().toISOString(),
       })
@@ -108,7 +163,7 @@ serve(async (req) => {
         communication_type: "voicemail",
         direction: "inbound",
         subject: `Voice reply from ${voicemail.recipient_name || "Property Owner"}`,
-        body: `🎙️ Voice reply received (${duration || 0}s) - Click to play`,
+        body: transcript || `🎙️ Voice reply received (${duration || 0}s) - Click to play`,
         status: "received",
         is_read: false,
         media_urls: [replyAudioUrl],
@@ -119,6 +174,7 @@ serve(async (req) => {
           reply_duration: duration,
           original_sender_name: voicemail.sender_name,
           is_voicemail_reply: true,
+          transcript: transcript,
         },
       });
 
@@ -143,7 +199,7 @@ serve(async (req) => {
         
         const slackMessage = {
           channel: "#owner-communications", // Update channel as needed
-          text: `🎙️ *Voice Reply Received*\n\n*From:* ${recipientName}\n*Property:* ${propertyAddress}\n*Duration:* ${duration}s\n\n<${replyAudioUrl}|Listen to Reply>`,
+          text: `🎙️ *Voice Reply Received*\n\n*From:* ${recipientName}\n*Property:* ${propertyAddress}\n*Duration:* ${duration}s\n${transcript ? `\n*Transcript:* ${transcript.substring(0, 500)}${transcript.length > 500 ? '...' : ''}` : ''}\n\n<${replyAudioUrl}|Listen to Reply>`,
         };
 
         await fetch("https://slack.com/api/chat.postMessage", {
@@ -165,6 +221,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         replyAudioUrl,
+        transcript,
         message: "Reply sent successfully",
       }),
       {
