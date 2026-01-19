@@ -47,15 +47,21 @@ serve(async (req) => {
     // Decode base64 audio
     const audioBytes = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
     
-    // Determine file extension from mime type
-    const extension = mimeType?.includes("webm") ? "webm" : "mp4";
+    // Determine file extension from mime type - strip codec info that causes issues
+    // e.g. "audio/webm; codecs=opus" -> "audio/webm"
+    const cleanMimeType = mimeType?.split(';')[0]?.trim() || "audio/webm";
+    const extension = cleanMimeType.includes("webm") ? "webm" : 
+                      cleanMimeType.includes("mp4") ? "mp4" :
+                      cleanMimeType.includes("mp3") ? "mp3" : "webm";
     const fileName = `voicemail-replies/${voicemailId}-reply-${Date.now()}.${extension}`;
 
-    // Upload to storage
+    console.log(`Uploading reply audio: ${fileName} with content type: ${cleanMimeType}`);
+
+    // Upload to storage with clean MIME type
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("message-attachments")
       .upload(fileName, audioBytes, {
-        contentType: mimeType || "audio/webm",
+        contentType: cleanMimeType,
         upsert: false,
       });
 
