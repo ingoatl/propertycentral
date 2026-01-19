@@ -1,0 +1,438 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { format } from "date-fns";
+import {
+  Wrench,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  DollarSign,
+  Camera,
+  ChevronRight,
+  Loader2,
+  CalendarDays,
+  Image,
+  X,
+} from "lucide-react";
+
+interface OwnerMaintenanceTabProps {
+  ownerId: string;
+  propertyId?: string;
+}
+
+interface WorkOrder {
+  id: string;
+  work_order_number: number;
+  title: string;
+  description: string | null;
+  status: string;
+  urgency: string;
+  category: string | null;
+  quoted_cost: number | null;
+  actual_cost: number | null;
+  created_at: string;
+  completed_at: string | null;
+  owner_approved: boolean | null;
+  vendors: {
+    name: string;
+  } | null;
+  properties: {
+    name: string;
+    address: string;
+  } | null;
+}
+
+interface WorkOrderPhoto {
+  id: string;
+  photo_url: string;
+  photo_type: string;
+  caption: string | null;
+  created_at: string;
+}
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  new: { label: "New", color: "bg-blue-100 text-blue-800", icon: AlertCircle },
+  assigned: { label: "Assigned", color: "bg-yellow-100 text-yellow-800", icon: Clock },
+  scheduled: { label: "Scheduled", color: "bg-purple-100 text-purple-800", icon: CalendarDays },
+  in_progress: { label: "In Progress", color: "bg-orange-100 text-orange-800", icon: Wrench },
+  pending_approval: { label: "Awaiting Approval", color: "bg-amber-100 text-amber-800", icon: Clock },
+  pending_verification: { label: "Pending Verification", color: "bg-indigo-100 text-indigo-800", icon: CheckCircle },
+  completed: { label: "Completed", color: "bg-green-100 text-green-800", icon: CheckCircle },
+  cancelled: { label: "Cancelled", color: "bg-gray-100 text-gray-800", icon: AlertCircle },
+};
+
+export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTabProps) {
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"active" | "completed" | "all">("all");
+
+  // Fetch work orders for this owner's properties
+  const { data: workOrders = [], isLoading } = useQuery({
+    queryKey: ["owner-work-orders", ownerId, propertyId, statusFilter],
+    queryFn: async () => {
+      let query = supabase
+        .from("work_orders")
+        .select(`
+          id,
+          work_order_number,
+          title,
+          description,
+          status,
+          urgency,
+          category,
+          quoted_cost,
+          actual_cost,
+          created_at,
+          completed_at,
+          owner_approved,
+          vendors!work_orders_assigned_vendor_id_fkey(name),
+          properties!inner(name, address, owner_id)
+        `)
+        .eq("properties.owner_id", ownerId)
+        .order("created_at", { ascending: false });
+
+      if (propertyId) {
+        query = query.eq("property_id", propertyId);
+      }
+
+      if (statusFilter === "active") {
+        query = query.not("status", "in", '("completed","cancelled")');
+      } else if (statusFilter === "completed") {
+        query = query.in("status", ["completed", "cancelled"]);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as WorkOrder[];
+    },
+  });
+
+  // Fetch photos for selected work order
+  const { data: workOrderPhotos = [] } = useQuery({
+    queryKey: ["work-order-photos-owner", selectedWorkOrder?.id],
+    queryFn: async () => {
+      if (!selectedWorkOrder?.id) return [];
+      const { data, error } = await supabase
+        .from("work_order_photos")
+        .select("*")
+        .eq("work_order_id", selectedWorkOrder.id)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as WorkOrderPhoto[];
+    },
+    enabled: !!selectedWorkOrder?.id,
+  });
+
+  // Group photos by type
+  const photosByType = {
+    before: workOrderPhotos.filter(p => p.photo_type === "before"),
+    during: workOrderPhotos.filter(p => p.photo_type === "during"),
+    after: workOrderPhotos.filter(p => p.photo_type === "after"),
+  };
+
+  // Calculate stats
+  const totalCost = workOrders.reduce((sum, wo) => sum + (wo.actual_cost || wo.quoted_cost || 0), 0);
+  const completedCount = workOrders.filter(wo => wo.status === "completed").length;
+  const pendingApprovalCount = workOrders.filter(wo => wo.status === "pending_approval").length;
+
+  const renderWorkOrderCard = (wo: WorkOrder) => {
+    const statusConfig = STATUS_CONFIG[wo.status] || STATUS_CONFIG.new;
+    const StatusIcon = statusConfig.icon;
+
+    return (
+      <Card
+        key={wo.id}
+        className="cursor-pointer hover:shadow-md transition-shadow border-l-4"
+        style={{ borderLeftColor: wo.status === "pending_approval" ? "#f59e0b" : "transparent" }}
+        onClick={() => setSelectedWorkOrder(wo)}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-xs text-muted-foreground font-mono">
+                  #{wo.work_order_number}
+                </span>
+                <Badge className={statusConfig.color} variant="secondary">
+                  <StatusIcon className="h-3 w-3 mr-1" />
+                  {statusConfig.label}
+                </Badge>
+                {wo.urgency === "emergency" && (
+                  <Badge variant="destructive">Emergency</Badge>
+                )}
+                {wo.status === "pending_approval" && (
+                  <Badge className="bg-amber-500 text-white">Needs Your Approval</Badge>
+                )}
+              </div>
+              <h4 className="font-medium text-sm">{wo.title}</h4>
+              {wo.properties && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {wo.properties.name}
+                </p>
+              )}
+              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                <span>{format(new Date(wo.created_at), "MMM d, yyyy")}</span>
+                {wo.vendors && (
+                  <span className="flex items-center gap-1">
+                    <Wrench className="h-3 w-3" />
+                    {wo.vendors.name}
+                  </span>
+                )}
+                {(wo.actual_cost || wo.quoted_cost) && (
+                  <span className="flex items-center gap-1 font-medium">
+                    <DollarSign className="h-3 w-3" />
+                    ${(wo.actual_cost || wo.quoted_cost)?.toLocaleString()}
+                  </span>
+                )}
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderPhotoGrid = (photos: WorkOrderPhoto[], label: string) => {
+    if (photos.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-muted-foreground">{label} Photos</h4>
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map((photo) => (
+            <div
+              key={photo.id}
+              className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity relative group"
+              onClick={() => setSelectedPhoto(photo.photo_url)}
+            >
+              <img
+                src={photo.photo_url}
+                alt={photo.caption || label}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                <Image className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold">{workOrders.length}</div>
+            <div className="text-xs text-muted-foreground">Total Work Orders</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-green-600">{completedCount}</div>
+            <div className="text-xs text-muted-foreground">Completed</div>
+          </CardContent>
+        </Card>
+        <Card className={pendingApprovalCount > 0 ? "ring-2 ring-amber-500" : ""}>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-amber-600">{pendingApprovalCount}</div>
+            <div className="text-xs text-muted-foreground">Awaiting Approval</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold">${totalCost.toLocaleString()}</div>
+            <div className="text-xs text-muted-foreground">Total Cost</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Pending Approval Alert */}
+      {pendingApprovalCount > 0 && (
+        <Card className="bg-amber-50 border-amber-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="font-medium text-amber-800">
+                  {pendingApprovalCount} work order{pendingApprovalCount > 1 ? "s" : ""} awaiting your approval
+                </p>
+                <p className="text-sm text-amber-600">
+                  Reply APPROVE or DECLINE via SMS, or click to view details
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filter Tabs */}
+      <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Work Orders List */}
+      {workOrders.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Wrench className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+            <p className="text-muted-foreground">No maintenance work orders yet</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              When maintenance is needed, you'll see the details here
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <ScrollArea className="h-[500px]">
+          <div className="space-y-3 pr-4">
+            {workOrders.map(renderWorkOrderCard)}
+          </div>
+        </ScrollArea>
+      )}
+
+      {/* Work Order Detail Dialog */}
+      <Dialog open={!!selectedWorkOrder} onOpenChange={() => setSelectedWorkOrder(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              Work Order #{selectedWorkOrder?.work_order_number}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedWorkOrder && (
+            <div className="space-y-6">
+              {/* Status & Details */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge className={STATUS_CONFIG[selectedWorkOrder.status]?.color || ""}>
+                    {STATUS_CONFIG[selectedWorkOrder.status]?.label || selectedWorkOrder.status}
+                  </Badge>
+                  {selectedWorkOrder.urgency === "emergency" && (
+                    <Badge variant="destructive">Emergency</Badge>
+                  )}
+                  {selectedWorkOrder.category && (
+                    <Badge variant="outline">{selectedWorkOrder.category}</Badge>
+                  )}
+                </div>
+                
+                <h3 className="text-lg font-semibold">{selectedWorkOrder.title}</h3>
+                
+                {selectedWorkOrder.description && (
+                  <p className="text-muted-foreground">{selectedWorkOrder.description}</p>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Property:</span>
+                    <p className="font-medium">{selectedWorkOrder.properties?.name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Vendor:</span>
+                    <p className="font-medium">{selectedWorkOrder.vendors?.name || "Not assigned"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Created:</span>
+                    <p className="font-medium">{format(new Date(selectedWorkOrder.created_at), "MMM d, yyyy")}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Cost:</span>
+                    <p className="font-medium text-lg">
+                      ${(selectedWorkOrder.actual_cost || selectedWorkOrder.quoted_cost || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Photos Section */}
+              {workOrderPhotos.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    Photos
+                  </h4>
+                  
+                  <Tabs defaultValue="before" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="before" disabled={photosByType.before.length === 0}>
+                        Before ({photosByType.before.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="during" disabled={photosByType.during.length === 0}>
+                        During ({photosByType.during.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="after" disabled={photosByType.after.length === 0}>
+                        After ({photosByType.after.length})
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="before" className="mt-4">
+                      {renderPhotoGrid(photosByType.before, "Before")}
+                    </TabsContent>
+                    <TabsContent value="during" className="mt-4">
+                      {renderPhotoGrid(photosByType.during, "During")}
+                    </TabsContent>
+                    <TabsContent value="after" className="mt-4">
+                      {renderPhotoGrid(photosByType.after, "After")}
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              )}
+
+              {workOrderPhotos.length === 0 && (
+                <Card className="bg-muted/50">
+                  <CardContent className="py-6 text-center">
+                    <Camera className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">No photos uploaded yet</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo Lightbox */}
+      <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
+        <DialogContent className="max-w-4xl p-0 bg-black/90">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2 z-10 text-white hover:bg-white/20"
+            onClick={() => setSelectedPhoto(null)}
+          >
+            <X className="h-6 w-6" />
+          </Button>
+          {selectedPhoto && (
+            <img
+              src={selectedPhoto}
+              alt="Work order photo"
+              className="w-full h-auto max-h-[90vh] object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

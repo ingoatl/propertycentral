@@ -147,7 +147,7 @@ Reply CONFIRM to accept or DECLINE to pass.`;
             <h2 style="color: #1f2937;">New Work Order Assigned</h2>
             
             <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-              <p style="margin: 0 0 8px 0;"><strong>Property:</strong> ${propertyName}</p>
+              <p style="margin: 0 0 8px 0;"><strong>Property:</strong> ${propertyAddress}</p>
               <p style="margin: 0 0 8px 0;"><strong>Issue:</strong> ${workOrder.title}</p>
               <p style="margin: 0 0 8px 0;"><strong>Category:</strong> ${workOrder.category}</p>
               <p style="margin: 0 0 8px 0;"><strong>Urgency:</strong> ${workOrder.urgency}</p>
