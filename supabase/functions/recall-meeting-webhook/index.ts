@@ -181,7 +181,7 @@ serve(async (req) => {
             const recipientEmail = data.participants?.[0]?.email || null;
 
             try {
-              await fetch(`${supabaseUrl}/functions/v1/analyze-call-transcript`, {
+              const analysisResponse = await fetch(`${supabaseUrl}/functions/v1/analyze-call-transcript`, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
@@ -201,6 +201,27 @@ serve(async (req) => {
                   platform: recording.platform,
                 }),
               });
+
+              // Create pending_call_recap for video meetings
+              if (recipientEmail) {
+                const recapTitle = `Video Meeting Recap: ${recording.meeting_title || "Untitled Meeting"}`;
+                const recapBody = `Meeting with ${recipientName}\nDuration: ${Math.round((data.duration_seconds || 0) / 60)} minutes\n\nTranscript Summary:\n${transcriptText.slice(0, 500)}...`;
+
+                await supabase
+                  .from("pending_call_recaps")
+                  .insert({
+                    communication_id: commRecord?.id,
+                    recipient_email: recipientEmail,
+                    recipient_name: recipientName,
+                    subject: recapTitle,
+                    body: recapBody,
+                    status: "pending",
+                    owner_id: matchedOwnerId,
+                    lead_id: matchedLeadId,
+                  });
+
+                console.log(`Created pending_call_recap for video meeting ${data.bot_id}`);
+              }
 
               // Mark as analyzed
               await supabase
