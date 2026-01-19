@@ -68,41 +68,70 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
     },
   });
 
-  // Fetch communications with this vendor (by phone number) - including calls with recordings/transcripts
+  // Fetch communications with this vendor (by phone number or vendor_id in metadata)
   const { data: vendorComms = [] } = useQuery({
-    queryKey: ["vendor-communications", vendor.phone],
+    queryKey: ["vendor-communications", vendor.id, vendor.phone],
     queryFn: async () => {
-      if (!vendor.phone) return [];
-      
       // Normalize the vendor phone for matching
-      const normalizePhone = (p: string) => p.replace(/\D/g, "").slice(-10);
-      const vendorPhoneNormalized = normalizePhone(vendor.phone);
+      const normalizePhone = (p: string) => p?.replace(/\D/g, "").slice(-10) || "";
+      const vendorPhoneNormalized = vendor.phone ? normalizePhone(vendor.phone) : "";
       
-      // Query lead_communications for messages matching vendor's phone
-      // This includes calls, voicemails, sms with metadata
+      // Query lead_communications - fetch all and filter in JS since metadata queries are complex
       const { data, error } = await supabase
         .from("lead_communications")
         .select("id, communication_type, direction, body, subject, created_at, status, metadata")
-        .or(`metadata->>unmatched_phone.ilike.%${vendorPhoneNormalized}%,metadata->>contact_phone.ilike.%${vendorPhoneNormalized}%,metadata->>to_number.ilike.%${vendorPhoneNormalized}%,metadata->>from_number.ilike.%${vendorPhoneNormalized}%`)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(200);
       
       if (error) {
         console.error("Error fetching vendor comms:", error);
         return [];
       }
       
+      // Filter messages that match vendor by:
+      // 1. metadata.vendor_id matches vendor.id
+      // 2. metadata.ghl_data.contactPhone contains vendor phone
+      // 3. metadata.to_number or from_number contains vendor phone
+      const matchingMessages = (data || []).filter((m: any) => {
+        const meta = m.metadata;
+        if (!meta) return false;
+        
+        // Check vendor_id
+        if (meta.vendor_id === vendor.id) return true;
+        
+        // Check phone matches in various locations
+        if (vendorPhoneNormalized) {
+          const ghlPhone = meta.ghl_data?.contactPhone || "";
+          const toNum = meta.to_number || "";
+          const fromNum = meta.from_number || "";
+          const unmatchedPhone = meta.unmatched_phone || "";
+          const contactPhone = meta.contact_phone || "";
+          
+          if (normalizePhone(ghlPhone).includes(vendorPhoneNormalized)) return true;
+          if (normalizePhone(toNum).includes(vendorPhoneNormalized)) return true;
+          if (normalizePhone(fromNum).includes(vendorPhoneNormalized)) return true;
+          if (normalizePhone(unmatchedPhone).includes(vendorPhoneNormalized)) return true;
+          if (normalizePhone(contactPhone).includes(vendorPhoneNormalized)) return true;
+        }
+        
+        return false;
+      });
+      
       // Also check user_phone_messages for direct SMS
-      const { data: directSms } = await supabase
-        .from("user_phone_messages")
-        .select("*")
-        .or(`from_number.ilike.%${vendorPhoneNormalized}%,to_number.ilike.%${vendorPhoneNormalized}%`)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      let directSms: any[] = [];
+      if (vendorPhoneNormalized) {
+        const { data: smsData } = await supabase
+          .from("user_phone_messages")
+          .select("*")
+          .or(`from_number.ilike.%${vendorPhoneNormalized}%,to_number.ilike.%${vendorPhoneNormalized}%`)
+          .order("created_at", { ascending: false })
+          .limit(50);
+        directSms = smsData || [];
+      }
       
       // Combine and format messages with full metadata
       const allMessages = [
-        ...(data || []).map((m: any) => ({
+        ...matchingMessages.map((m: any) => ({
           id: m.id,
           type: m.communication_type,
           direction: m.direction,
@@ -116,7 +145,7 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
           duration: m.metadata?.duration || m.metadata?.duration_seconds,
           call_status: m.metadata?.call_status,
         })),
-        ...(directSms || []).map((m: any) => ({
+        ...directSms.map((m: any) => ({
           id: m.id,
           type: "sms",
           direction: m.direction,
@@ -131,12 +160,17 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
         })),
       ];
       
-      // Sort by date and dedupe
+      // Sort by date, dedupe by id, and take top 50
+      const seen = new Set<string>();
       return allMessages
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .filter(m => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        })
         .slice(0, 50);
     },
-    enabled: !!vendor.phone,
   });
 
   const updateVendor = useMutation({
