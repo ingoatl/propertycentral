@@ -193,26 +193,26 @@ export function ExpandableMessageInput({
     </div>
   );
 
-  // Mobile: Use Drawer (bottom sheet) for expanded view - FULL SCREEN
+  // Mobile: Use Drawer (bottom sheet) for expanded view - FULL SCREEN with upscale effect
   const MobileExpandedView = (
     <Drawer open={isExpanded} onOpenChange={setIsExpanded}>
-      <DrawerContent className="h-[95vh] flex flex-col">
-        <DrawerHeader className="border-b px-4 py-4">
-          <DrawerTitle className="text-xl font-semibold">
+      <DrawerContent className="h-[100dvh] flex flex-col data-[state=open]:animate-drawer-scale-in">
+        <DrawerHeader className="border-b px-5 py-5 bg-gradient-to-b from-background to-background/95">
+          <DrawerTitle className="text-xl font-semibold tracking-tight">
             {contactName ? `Message to ${contactName}` : "Compose Message"}
           </DrawerTitle>
         </DrawerHeader>
         
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden bg-background">
           {ExpandedContent}
         </div>
         
-        <DrawerFooter className="border-t pt-4 pb-6 safe-area-bottom">
-          <div className="flex gap-3">
+        <DrawerFooter className="border-t pt-5 pb-8 safe-area-bottom bg-gradient-to-t from-muted/50 to-background">
+          <div className="flex gap-4">
             <Button 
               variant="outline" 
               onClick={handleCancel} 
-              className="flex-1 h-14 text-lg rounded-xl active:scale-[0.98] transition-transform"
+              className="flex-1 h-14 text-lg rounded-2xl active:scale-[0.97] transition-all duration-200 shadow-sm"
             >
               <X className="h-5 w-5 mr-2" />
               Cancel
@@ -221,7 +221,7 @@ export function ExpandableMessageInput({
               <Button 
                 onClick={handleSend} 
                 disabled={!localValue.trim()} 
-                className="flex-1 h-14 text-lg rounded-xl bg-gradient-to-br from-primary to-primary/80 active:scale-[0.98] transition-transform"
+                className="flex-1 h-14 text-lg rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/25 active:scale-[0.97] transition-all duration-200"
               >
                 <Send className="h-5 w-5 mr-2" />
                 Send
@@ -229,7 +229,7 @@ export function ExpandableMessageInput({
             ) : (
               <Button 
                 onClick={handleSaveAndClose} 
-                className="flex-1 h-14 text-lg rounded-xl active:scale-[0.98] transition-transform"
+                className="flex-1 h-14 text-lg rounded-2xl shadow-lg active:scale-[0.97] transition-all duration-200"
               >
                 <Check className="h-5 w-5 mr-2" />
                 Done
@@ -241,12 +241,12 @@ export function ExpandableMessageInput({
     </Drawer>
   );
 
-  // Desktop: Use Dialog for expanded view - WIDER modal
+  // Desktop: Use Dialog for expanded view - WIDER modal with upscale effect
   const DesktopExpandedView = (
     <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
-      <DialogContent className="max-w-3xl w-[90vw] max-h-[85vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle className="text-lg font-semibold">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col p-0 gap-0 rounded-3xl shadow-2xl shadow-black/10 data-[state=open]:animate-scale-in-premium">
+        <DialogHeader className="px-8 py-6 border-b bg-gradient-to-b from-muted/30 to-background">
+          <DialogTitle className="text-xl font-semibold tracking-tight">
             Review Message
             {contactName && (
               <span className="text-muted-foreground font-normal ml-2">
@@ -260,8 +260,8 @@ export function ExpandableMessageInput({
           {ExpandedContent}
         </div>
         
-        <DialogFooter className="px-6 py-4 border-t gap-3 sm:gap-3">
-          <Button variant="outline" onClick={handleCancel} className="h-12 text-base">
+        <DialogFooter className="px-8 py-5 border-t gap-4 sm:gap-4 bg-gradient-to-t from-muted/30 to-background">
+          <Button variant="outline" onClick={handleCancel} className="h-13 px-6 text-base rounded-xl">
             <X className="h-5 w-5 mr-2" />
             Cancel
           </Button>
@@ -269,13 +269,13 @@ export function ExpandableMessageInput({
             <Button 
               onClick={handleSend} 
               disabled={!localValue.trim()}
-              className="h-12 text-base bg-gradient-to-br from-primary to-primary/80"
+              className="h-13 px-8 text-base rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/20"
             >
               <Send className="h-5 w-5 mr-2" />
               Send Message
             </Button>
           ) : (
-            <Button onClick={handleSaveAndClose} className="h-12 text-base">
+            <Button onClick={handleSaveAndClose} className="h-13 px-6 text-base rounded-xl">
               <Check className="h-5 w-5 mr-2" />
               Done
             </Button>
