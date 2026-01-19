@@ -500,3 +500,6 @@ verify_jwt = true
 
 [functions.fetch-slack-channels]
 verify_jwt = true
+
+[functions.google-review-nudge-cron]
+verify_jwt = false
