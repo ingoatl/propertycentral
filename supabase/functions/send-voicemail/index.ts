@@ -153,8 +153,18 @@ serve(async (req) => {
       throw new Error("GHL credentials not configured");
     }
 
-    // Craft a memorable, warm SMS - psychological anchoring with company name
-    const smsBody = `🎙️ Hi! ${senderName || "Your property manager"} from PeachHaus just left you a quick voice message.\n\nTap to listen:\n${playerUrl}`;
+    // Craft SMS with transcript preview for credibility
+    // Include first ~100 chars of transcript so recipient knows it's legitimate
+    const transcriptPreview = messageText 
+      ? (messageText.length > 100 
+          ? messageText.substring(0, 100).trim() + "..." 
+          : messageText)
+      : null;
+    
+    const smsBody = transcriptPreview
+      ? `🎙️ Voice message from ${senderName || "PeachHaus"}:\n\n"${transcriptPreview}"\n\n▶️ Listen to full message:\n${playerUrl}`
+      : `🎙️ Hi! ${senderName || "Your property manager"} from PeachHaus just left you a quick voice message.\n\nTap to listen:\n${playerUrl}`;
+    
     const fromNumber = "+14048005932";
 
     console.log(`Sending voicemail SMS via GHL to ${formattedPhone} from ${fromNumber}`);

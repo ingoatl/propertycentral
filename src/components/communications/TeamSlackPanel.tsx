@@ -112,29 +112,53 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Fetch available channels directly from Slack API via edge function
+  // Fetch available channels - try API first, fallback to database
   const { data: channels = [], isLoading: channelsLoading, error: channelsError } = useQuery({
     queryKey: ['slack-channels-live'],
     queryFn: async () => {
       console.log('[Slack Channels] Fetching channels from Slack API...');
       
-      const { data, error } = await supabase.functions.invoke('fetch-slack-channels');
-      
-      if (error) {
-        console.error('[Slack Channels] Edge function error:', error);
-        throw error;
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-slack-channels');
+        
+        if (error) {
+          console.error('[Slack Channels] Edge function error:', error);
+          throw error;
+        }
+        
+        if (!data?.success) {
+          console.error('[Slack Channels] API error:', data?.error);
+          throw new Error(data?.error || 'Failed to fetch channels');
+        }
+        
+        console.log('[Slack Channels] Loaded:', data.channels?.length || 0, 'channels from Slack');
+        return data.channels as SlackChannel[];
+      } catch (apiError) {
+        // Fallback to database if API fails
+        console.log('[Slack Channels] API failed, falling back to database...');
+        const { data: dbData, error: dbError } = await supabase
+          .from('slack_channel_config')
+          .select('id, channel_name, display_name, description')
+          .eq('is_active', true)
+          .order('display_name');
+        
+        if (dbError) {
+          console.error('[Slack Channels] DB fallback failed:', dbError);
+          throw dbError;
+        }
+        
+        // Map database format to API format
+        return (dbData || []).map(ch => ({
+          id: ch.id,
+          name: ch.channel_name,
+          display_name: ch.display_name,
+          description: ch.description,
+        })) as SlackChannel[];
       }
-      
-      if (!data?.success) {
-        console.error('[Slack Channels] API error:', data?.error);
-        throw new Error(data?.error || 'Failed to fetch channels');
-      }
-      
-      console.log('[Slack Channels] Loaded:', data.channels?.length || 0, 'channels from Slack');
-      return data.channels as SlackChannel[];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - cache to avoid hitting Slack API too often
+    staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    retry: 1, // Only retry once
   });
 
   // Fetch recent messages - memoized query key
