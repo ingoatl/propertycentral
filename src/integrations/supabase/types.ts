@@ -9874,6 +9874,47 @@ export type Database = {
         }
         Relationships: []
       }
+      work_order_photos: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          id: string
+          photo_type: string | null
+          photo_url: string
+          uploaded_by: string
+          uploaded_by_type: string | null
+          work_order_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          photo_type?: string | null
+          photo_url: string
+          uploaded_by: string
+          uploaded_by_type?: string | null
+          work_order_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          photo_type?: string | null
+          photo_url?: string
+          uploaded_by?: string
+          uploaded_by_type?: string | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_photos_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_order_timeline: {
         Row: {
           action: string
@@ -9995,6 +10036,8 @@ export type Database = {
           urgency: Database["public"]["Enums"]["work_order_urgency"] | null
           vendor_accepted: boolean | null
           vendor_accepted_at: string | null
+          vendor_access_token: string | null
+          vendor_access_token_expires_at: string | null
           vendor_declined_reason: string | null
           vendor_notes: string | null
           verification_notes: string | null
@@ -10061,6 +10104,8 @@ export type Database = {
           urgency?: Database["public"]["Enums"]["work_order_urgency"] | null
           vendor_accepted?: boolean | null
           vendor_accepted_at?: string | null
+          vendor_access_token?: string | null
+          vendor_access_token_expires_at?: string | null
           vendor_declined_reason?: string | null
           vendor_notes?: string | null
           verification_notes?: string | null
@@ -10127,6 +10172,8 @@ export type Database = {
           urgency?: Database["public"]["Enums"]["work_order_urgency"] | null
           vendor_accepted?: boolean | null
           vendor_accepted_at?: string | null
+          vendor_access_token?: string | null
+          vendor_access_token_expires_at?: string | null
           vendor_declined_reason?: string | null
           vendor_notes?: string | null
           verification_notes?: string | null

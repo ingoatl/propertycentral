@@ -60,19 +60,41 @@ serve(async (req) => {
       email: false,
     };
 
-    const propertyName = workOrder.property?.name || workOrder.property?.address || "Property";
+    const propertyAddress = workOrder.property?.address || workOrder.property?.name || "Property";
     const urgencyLabel = workOrder.urgency === "emergency" ? "🚨 EMERGENCY" : 
                          workOrder.urgency === "high" ? "⚠️ HIGH PRIORITY" : "";
+
+    // Generate vendor access token
+    const vendorToken = crypto.randomUUID().replace(/-/g, '').substring(0, 24);
+    const portalUrl = `https://propertycentral.lovable.app/vendor-job/${vendorToken}`;
+
+    // Update work order with access token
+    await supabase
+      .from("work_orders")
+      .update({ 
+        vendor_access_token: vendorToken,
+        vendor_access_token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+      })
+      .eq("id", workOrderId);
 
     // Send SMS if vendor has phone and SMS is requested
     if (notifyMethods?.includes("sms") && vendor.phone) {
       const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
       const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
-      // USE THE DEDICATED VENDOR/MAINTENANCE PHONE NUMBER
       const TWILIO_VENDOR_PHONE = Deno.env.get("TWILIO_VENDOR_PHONE_NUMBER") || Deno.env.get("TWILIO_PHONE_NUMBER");
 
       if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_VENDOR_PHONE) {
-        const smsMessage = `${urgencyLabel ? urgencyLabel + "\n" : ""}New Work Order Assigned\n\nProperty: ${propertyName}\nIssue: ${workOrder.title}\nCategory: ${workOrder.category}\n\nDescription: ${workOrder.description?.substring(0, 100)}${workOrder.description?.length > 100 ? "..." : ""}\n\nReply CONFIRM to accept or DECLINE to pass.`;
+        const smsMessage = `${urgencyLabel ? urgencyLabel + "\n\n" : ""}🔧 New Job Assigned
+
+📍 ${propertyAddress}
+Issue: ${workOrder.title}
+
+${workOrder.description?.substring(0, 80)}${workOrder.description?.length > 80 ? "..." : ""}
+
+▶️ View & Upload Photos:
+${portalUrl}
+
+Reply CONFIRM to accept or DECLINE to pass.`;
 
         try {
           const twilioResponse = await fetch(
@@ -94,10 +116,9 @@ serve(async (req) => {
           const twilioData = await twilioResponse.json();
           
           if (twilioResponse.ok) {
-            console.log(`SMS sent to vendor ${vendor.name} from ${TWILIO_VENDOR_PHONE}: ${twilioData.sid}`);
+            console.log(`SMS sent to vendor ${vendor.name} with job portal link: ${twilioData.sid}`);
             results.sms = true;
 
-            // Log the SMS
             await supabase.from("sms_log").insert({
               phone_number: vendor.phone,
               message_type: "work_order_assignment",
@@ -111,8 +132,6 @@ serve(async (req) => {
         } catch (smsError) {
           console.error("SMS error:", smsError);
         }
-      } else {
-        console.log("Twilio credentials not configured, skipping SMS");
       }
     }
 
