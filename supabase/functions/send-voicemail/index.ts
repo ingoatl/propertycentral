@@ -6,6 +6,51 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Function to transcribe audio using OpenAI Whisper
+async function transcribeAudio(audioBytes: Uint8Array, mimeType: string): Promise<string | null> {
+  const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openaiApiKey) {
+    console.log("OpenAI API key not configured, skipping transcription");
+    return null;
+  }
+
+  try {
+    // Determine the file extension
+    let extension = "mp3";
+    if (mimeType.includes("webm")) extension = "webm";
+    else if (mimeType.includes("mp4") || mimeType.includes("m4a")) extension = "m4a";
+    else if (mimeType.includes("wav")) extension = "wav";
+    else if (mimeType.includes("ogg")) extension = "ogg";
+
+    const formData = new FormData();
+    const audioBlob = new Blob([new Uint8Array(audioBytes)], { type: mimeType });
+    formData.append("file", audioBlob, `audio.${extension}`);
+    formData.append("model", "whisper-1");
+    formData.append("language", "en");
+
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openaiApiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Whisper transcription error:", response.status, errorText);
+      return null;
+    }
+
+    const result = await response.json();
+    console.log("Transcription result:", result.text?.substring(0, 100));
+    return result.text || null;
+  } catch (error) {
+    console.error("Transcription failed:", error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -55,6 +100,22 @@ serve(async (req) => {
     let normalizedMimeType = audioMimeType || "audio/mpeg";
     if (normalizedMimeType.includes(";")) {
       normalizedMimeType = normalizedMimeType.split(";")[0].trim();
+    }
+
+    // Determine actual message text - transcribe if it's a recording without text
+    let finalMessageText = messageText;
+    
+    // If it's a recording (not AI-generated) and no real transcript, transcribe it
+    if (audioSource === "recording" || !messageText || messageText === "(Voice recording)") {
+      console.log("Transcribing recorded audio...");
+      const transcript = await transcribeAudio(audioBytes, normalizedMimeType);
+      if (transcript) {
+        finalMessageText = transcript;
+        console.log("Transcription complete:", transcript.substring(0, 100));
+      } else {
+        // Keep original message if transcription fails
+        finalMessageText = messageText || "(Voice recording)";
+      }
     }
 
     // Determine file extension and upload content type
@@ -107,7 +168,7 @@ serve(async (req) => {
 
     const audioUrl = urlData.publicUrl;
 
-    // Create voicemail record
+    // Create voicemail record with actual transcript
     const { data: voicemail, error: voicemailError } = await supabase
       .from("voicemail_messages")
       .insert({
@@ -117,7 +178,7 @@ serve(async (req) => {
         recipient_name: recipientName || null,
         sender_user_id: senderUserId,
         sender_name: senderName || null,
-        message_text: messageText || "",
+        message_text: finalMessageText,
         audio_url: audioUrl,
         audio_source: audioSource || "ai_generated",
         voice_id: voiceId || "nPczCjzI2devNBz1zQrb",
@@ -155,10 +216,13 @@ serve(async (req) => {
 
     // Craft SMS with transcript preview for credibility
     // Include first ~100 chars of transcript so recipient knows it's legitimate
-    const transcriptPreview = messageText 
-      ? (messageText.length > 100 
-          ? messageText.substring(0, 100).trim() + "..." 
-          : messageText)
+    // Use the finalMessageText which has the actual transcript
+    const hasRealTranscript = finalMessageText && finalMessageText !== "(Voice recording)" && finalMessageText.trim().length > 0;
+    
+    const transcriptPreview = hasRealTranscript
+      ? (finalMessageText.length > 100 
+          ? finalMessageText.substring(0, 100).trim() + "..." 
+          : finalMessageText)
       : null;
     
     const smsBody = transcriptPreview
@@ -285,7 +349,7 @@ serve(async (req) => {
         lead_id: leadId,
         communication_type: "voicemail",
         direction: "outbound",
-        body: messageText || "(Voice message)",
+        body: finalMessageText || "(Voice recording)",
         status: "sent",
         ghl_contact_id: contactId,
         ghl_conversation_id: sendData.conversationId,
@@ -296,6 +360,7 @@ serve(async (req) => {
           provider: "gohighlevel",
           ghl_message_id: messageId,
           from_number: fromNumber,
+          transcript: finalMessageText,
         },
       });
     }
@@ -306,7 +371,7 @@ serve(async (req) => {
         owner_id: ownerId,
         communication_type: "voicemail",
         direction: "outbound",
-        body: messageText || "(Voice message)",
+        body: finalMessageText || "(Voice recording)",
         status: "sent",
         ghl_contact_id: contactId,
         ghl_conversation_id: sendData.conversationId,
@@ -317,6 +382,7 @@ serve(async (req) => {
           provider: "gohighlevel",
           ghl_message_id: messageId,
           from_number: fromNumber,
+          transcript: finalMessageText,
         },
       });
     }
