@@ -65,131 +65,70 @@ export function InteractiveDocumentPreview({
       return;
     }
     
-    // Create positioned fields from detected fields
-    // SCALE positions based on actual page count vs stored page numbers
     console.log('[InteractiveDocumentPreview] Processing fields:', data.detectedFields.length, 'actualPages:', numPages);
     
-    // FILTER: Only include fields that have values OR are signature fields
-    // This matches the template analysis behavior - only show filled fields
+    // Filter to show fields with values OR signature/guest fields
     const fieldsToShow = data.detectedFields.filter(field => {
       const value = data.fieldValues[field.api_id];
       const hasValue = value !== undefined && value !== null && value.toString().trim() !== "";
-      const isSignature = (field.type as string) === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
-      // Show fields with values or signature fields
-      return hasValue || isSignature;
+      const isSignature = field.type === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
+      const isGuestField = field.filled_by === "guest" || field.filled_by === "tenant";
+      return hasValue || isSignature || isGuestField;
     });
     
-    console.log('[InteractiveDocumentPreview] Fields with values to show:', fieldsToShow.length, 'of', data.detectedFields.length);
+    console.log('[InteractiveDocumentPreview] Fields to show:', fieldsToShow.length, 'of', data.detectedFields.length);
     
-    // Determine the max page number from stored fields to calculate scale factor
-    const maxStoredPage = Math.max(1, ...fieldsToShow.map(f => f.page || 1));
-    const scaleFactor = maxStoredPage > numPages ? numPages / maxStoredPage : 1;
-    console.log('[InteractiveDocumentPreview] Scale factor:', scaleFactor, 'maxStoredPage:', maxStoredPage);
-    
-    // Group fields by category for fallback positioning
-    const categoryPageMap: Record<string, number> = {
-      property: 1,
-      financial: 1,
-      dates: 1,
-      occupancy: Math.min(2, numPages),
-      contact: Math.min(2, numPages),
-      identification: Math.min(2, numPages),
-      vehicle: Math.min(3, numPages),
-      emergency: Math.min(3, numPages),
-      acknowledgment: Math.max(numPages - 1, 1),
-      signature: numPages, // Signatures on LAST page
-      other: 1,
-    };
-    
-    // Track fields per page for Y positioning (fallback)
-    const fieldsPerPage: Record<number, number> = {};
-    
-    const positioned = fieldsToShow.map((field, index) => {
+    // Map fields to positions - trust the coordinates from field extraction
+    const positioned = fieldsToShow.map((field) => {
       const value = data.fieldValues[field.api_id];
+      const isSignature = field.type === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
       
-      // Check if field has position data from field_mappings
-      const hasPosition = field.x !== undefined && field.y !== undefined && field.page !== undefined;
-      const isSignature = (field.type as string) === "signature" || (field.type as string) === "initials" || field.api_id.includes("signature");
+      // Use field's stored position data directly - these are already percentages from documentFieldExtractor
+      const hasValidPosition = 
+        typeof field.x === 'number' && 
+        typeof field.y === 'number' && 
+        typeof field.page === 'number' &&
+        field.x >= 0 && field.x <= 100 &&
+        field.y >= 0 && field.y <= 100;
       
-      if (hasPosition && field.page !== undefined) {
-        // SCALE the stored page number to actual document pages
-        let actualPage: number;
+      if (hasValidPosition) {
+        // Clamp page to valid range
+        const validPage = Math.max(1, Math.min(field.page!, numPages));
         
-        if (isSignature) {
-          // Signatures ALWAYS go on the last page
-          actualPage = numPages;
-        } else {
-          // Scale other fields proportionally
-          actualPage = Math.max(1, Math.min(numPages, Math.ceil(field.page * scaleFactor)));
-        }
+        // For signature fields, ensure they're on the last page if the stored page exceeds doc length
+        const finalPage = isSignature && field.page! > numPages ? numPages : validPage;
         
-        // IMPORTANT: Adjust stored Y position to avoid overlapping document header
-        // Stored positions from AI analysis may place fields too high
-        // Add a minimum Y offset of 25% to skip headers/titles on first page
-        let adjustedY = field.y!;
-        if (actualPage === 1 && adjustedY < 25) {
-          // Push fields below the typical document header area
-          adjustedY = 25 + (adjustedY * 0.5); // Compress and offset
-        }
+        console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: using stored position (${field.x?.toFixed(1)}%, ${field.y?.toFixed(1)}%) on page ${finalPage}`);
         
-        console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: stored page=${field.page} -> actual page=${actualPage}, y=${field.y} -> ${adjustedY}`);
         return {
           ...field,
           x: field.x!,
-          y: adjustedY,
-          width: field.width || 40,
-          height: field.height || 2.5,
-          page: actualPage,
+          y: field.y!,
+          width: field.width || (isSignature ? 30 : 35),
+          height: field.height || (isSignature ? 5 : 2.5),
+          page: finalPage,
           value,
         };
       }
       
-      // Fallback: distribute across pages based on field category/type
-      const isDateField = field.type === "date" && (field.api_id.includes("sign") || field.api_id.includes("tenant") || field.api_id.includes("host"));
-      const category = field.category || "other";
+      // Fallback only for fields without position data (shouldn't happen with new extractor)
+      console.warn(`[InteractiveDocumentPreview] Field ${field.api_id} missing position data, using fallback`);
       
-      // Determine page based on category and actual numPages
-      let estimatedPage = 1;
-      if (isSignature || isDateField) {
-        // Signatures and related dates go on the LAST page
-        estimatedPage = numPages;
-      } else if (categoryPageMap[category]) {
-        estimatedPage = categoryPageMap[category];
-      } else {
-        // Distribute other fields based on index across available pages
-        estimatedPage = Math.min(Math.floor(index / 8) + 1, numPages);
+      // Simple fallback - place on appropriate page based on category
+      let fallbackPage = 1;
+      if (isSignature || field.category === 'signature') {
+        fallbackPage = numPages; // Signatures on last page
+      } else if (field.category === 'identification' || field.category === 'vehicle' || field.category === 'emergency') {
+        fallbackPage = Math.min(2, numPages);
       }
-      
-      // Track and calculate Y position based on fields already on this page
-      if (!fieldsPerPage[estimatedPage]) {
-        fieldsPerPage[estimatedPage] = 0;
-      }
-      const fieldIndexOnPage = fieldsPerPage[estimatedPage];
-      fieldsPerPage[estimatedPage]++;
-      
-      // Grid positioning within page - 2 columns
-      const row = Math.floor(fieldIndexOnPage / 2);
-      const col = fieldIndexOnPage % 2;
-      
-      // Start fields lower on the page to avoid document headers
-      // For first page, start at 30% to skip title/header
-      const pageYOffset = estimatedPage === 1 ? 30 : 15;
-      
-      // Special handling for signature fields - place them at bottom
-      let yPos = pageYOffset + (row * 8);
-      if (isSignature) {
-        yPos = 65 + (fieldIndexOnPage * 10); // Start at 65% from top
-      }
-      
-      console.log(`[InteractiveDocumentPreview] Field ${field.api_id}: fallback page=${estimatedPage}, y=${yPos}, category=${category}`);
       
       return {
         ...field,
-        x: 5 + (col * 48),
-        y: Math.min(yPos, 88), // Don't go off page
-        width: 42,
+        x: 10,
+        y: 30,
+        width: isSignature ? 30 : 35,
         height: isSignature ? 5 : 3,
-        page: estimatedPage,
+        page: fallbackPage,
         value,
       };
     });
