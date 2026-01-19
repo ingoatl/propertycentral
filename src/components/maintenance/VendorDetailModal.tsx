@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -33,6 +33,9 @@ import DeleteVendorDialog from "./DeleteVendorDialog";
 import BillComSyncButton from "./BillComSyncButton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CallDialog } from "@/components/communications/CallDialog";
+import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
+import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDialog";
+import { MeetingsDialog } from "@/components/communications/MeetingsDialog";
 
 interface VendorDetailModalProps {
   vendor: Vendor & {
@@ -50,7 +53,12 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
   const [formData, setFormData] = useState(vendor);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCallDialog, setShowCallDialog] = useState(false);
+  const [showSmsDialog, setShowSmsDialog] = useState(false);
+  const [showVoicemailDialog, setShowVoicemailDialog] = useState(false);
+  const [showMeetingsDialog, setShowMeetingsDialog] = useState(false);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const { isAdmin } = useAdminCheck();
+  const queryClient = useQueryClient();
 
   // Fetch work orders for this vendor
   const { data: workOrders = [] } = useQuery({
@@ -65,6 +73,45 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
       
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch unassigned work orders
+  const { data: unassignedWorkOrders = [] } = useQuery({
+    queryKey: ["unassigned-work-orders"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("work_orders")
+        .select("*, property:properties(name, address)")
+        .is("assigned_vendor_id", null)
+        .not("status", "in", '("completed","cancelled")')
+        .order("created_at", { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Mutation to assign work order to this vendor
+  const assignWorkOrderMutation = useMutation({
+    mutationFn: async (workOrderId: string) => {
+      const { error } = await supabase
+        .from("work_orders")
+        .update({ assigned_vendor_id: vendor.id })
+        .eq("id", workOrderId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Work order assigned successfully");
+      setSelectedWorkOrderId(null);
+      queryClient.invalidateQueries({ queryKey: ["vendor-work-orders", vendor.id] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-work-orders"] });
+      onUpdate();
+    },
+    onError: (error) => {
+      toast.error("Failed to assign work order: " + (error as Error).message);
     },
   });
 
@@ -292,57 +339,66 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
             </TabsList>
 
             <TabsContent value="details" className="space-y-6 mt-4">
-              {/* Quick Action Buttons */}
-              <div className="flex flex-wrap gap-2 pb-2">
-                {vendor.phone && (
-                  <>
+              {/* Quick Action Buttons - Improved Design */}
+              <div className="p-4 bg-muted/30 rounded-xl">
+                <div className="flex gap-2 justify-center">
+                  {/* Call Button - Primary */}
+                  {vendor.phone && (
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
+                      className="flex flex-col items-center justify-center gap-1 h-16 w-16 rounded-2xl bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/25"
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowCallDialog(true);
                       }}
                     >
-                      <PhoneCall className="h-4 w-4 text-green-600" />
-                      Call
+                      <PhoneCall className="h-5 w-5" />
+                      <span className="text-xs font-medium">Call</span>
                     </Button>
+                  )}
+                  
+                  {/* Text Button */}
+                  {vendor.phone && (
                     <Button
-                      size="sm"
                       variant="outline"
-                      className="gap-1.5"
+                      className="flex flex-col items-center justify-center gap-1 h-16 w-16 rounded-2xl"
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.location.href = `sms:${vendor.phone}`;
+                        setShowSmsDialog(true);
                       }}
                     >
-                      <MessageSquare className="h-4 w-4 text-blue-600" />
-                      SMS
+                      <MessageSquare className="h-5 w-5" />
+                      <span className="text-xs font-medium">Text</span>
                     </Button>
-                    <SendVoicemailButton
-                      recipientPhone={vendor.phone}
-                      recipientName={vendor.name}
+                  )}
+                  
+                  {/* Voice Button */}
+                  {vendor.phone && (
+                    <Button
                       variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                    />
-                  </>
-                )}
-                {vendor.email && (
+                      className="flex flex-col items-center justify-center gap-1 h-16 w-16 rounded-2xl"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowVoicemailDialog(true);
+                      }}
+                    >
+                      <Mic className="h-5 w-5" />
+                      <span className="text-xs font-medium">Voice</span>
+                    </Button>
+                  )}
+                  
+                  {/* Video/Meeting Button */}
                   <Button
-                    size="sm"
                     variant="outline"
-                    className="gap-1.5"
+                    className="flex flex-col items-center justify-center gap-1 h-16 w-16 rounded-2xl"
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.location.href = `mailto:${vendor.email}`;
+                      setShowMeetingsDialog(true);
                     }}
                   >
-                    <Mail className="h-4 w-4 text-purple-600" />
-                    Email
+                    <Video className="h-5 w-5" />
+                    <span className="text-xs font-medium">Video</span>
                   </Button>
-                )}
+                </div>
               </div>
 
               {/* Contact & Stats */}
@@ -604,11 +660,51 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
               )}
             </TabsContent>
 
-            <TabsContent value="jobs" className="mt-4">
+            <TabsContent value="jobs" className="mt-4 space-y-4">
+              {/* Assign Unassigned Work Orders */}
+              {unassignedWorkOrders.length > 0 && (
+                <div className="p-4 border border-dashed rounded-lg bg-muted/30">
+                  <h4 className="font-medium mb-2 flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Assign Work Order
+                  </h4>
+                  <div className="flex gap-2 items-center">
+                    <Select
+                      value={selectedWorkOrderId || ""}
+                      onValueChange={setSelectedWorkOrderId}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a work order to assign" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unassignedWorkOrders.map((wo: any) => (
+                          <SelectItem key={wo.id} value={wo.id}>
+                            <div className="flex flex-col">
+                              <span>{wo.title}</span>
+                              <span className="text-xs text-muted-foreground">{wo.property?.address || "No address"}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={() => selectedWorkOrderId && assignWorkOrderMutation.mutate(selectedWorkOrderId)}
+                      disabled={!selectedWorkOrderId || assignWorkOrderMutation.isPending}
+                    >
+                      {assignWorkOrderMutation.isPending ? "Assigning..." : "Assign"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               {workOrders.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Wrench className="h-8 w-8 mx-auto mb-2" />
                   <p>No work orders assigned yet</p>
+                  {unassignedWorkOrders.length === 0 && (
+                    <p className="text-sm">All work orders are currently assigned</p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -851,13 +947,38 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
       />
 
       {vendor.phone && (
-        <CallDialog
-          open={showCallDialog}
-          onOpenChange={setShowCallDialog}
-          contactPhone={vendor.phone}
-          contactName={vendor.name}
-        />
+        <>
+          <CallDialog
+            open={showCallDialog}
+            onOpenChange={setShowCallDialog}
+            contactPhone={vendor.phone}
+            contactName={vendor.name}
+          />
+          
+          <SendSMSDialog
+            open={showSmsDialog}
+            onOpenChange={setShowSmsDialog}
+            contactPhone={vendor.phone}
+            contactName={vendor.name}
+            contactType="vendor"
+            contactId={vendor.id}
+          />
+          
+          <SendVoicemailDialog
+            open={showVoicemailDialog}
+            onOpenChange={setShowVoicemailDialog}
+            recipientPhone={vendor.phone}
+            recipientName={vendor.name}
+          />
+        </>
       )}
+      
+      <MeetingsDialog
+        open={showMeetingsDialog}
+        onOpenChange={setShowMeetingsDialog}
+        contactName={vendor.name}
+        contactEmail={vendor.email}
+      />
     </>
   );
 };

@@ -341,42 +341,41 @@ const Vendors = () => {
                     )}
                   </div>
 
-                  {/* Quick Action Buttons */}
+                  {/* Quick Action Buttons - Improved Design */}
                   <div className="flex gap-1.5 pt-2 border-t justify-between">
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1">
                       {vendor.phone && (
                         <>
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
+                            className="h-10 w-10 p-0 rounded-xl bg-green-500 hover:bg-green-600 text-white shadow-sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               setCallDialogVendor(vendor);
                             }}
                             title="Call via Twilio"
                           >
-                            <PhoneCall className="h-4 w-4 text-green-600" />
+                            <PhoneCall className="h-4 w-4" />
                           </Button>
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
+                            variant="outline"
+                            className="h-10 w-10 p-0 rounded-xl"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSmsDialogVendor(vendor);
                             }}
                             title="Send SMS via GHL"
                           >
-                            <MessageSquare className="h-4 w-4 text-blue-600" />
+                            <MessageSquare className="h-4 w-4" />
                           </Button>
                           <div onClick={(e) => e.stopPropagation()}>
                             <SendVoicemailButton
                               recipientPhone={vendor.phone}
                               recipientName={vendor.name}
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 p-0"
+                              variant="outline"
+                              size="sm"
+                              className="h-10 w-10 p-0 rounded-xl"
                             />
                           </div>
                         </>
@@ -384,15 +383,15 @@ const Vendors = () => {
                       {vendor.email && (
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
+                          variant="outline"
+                          className="h-10 w-10 p-0 rounded-xl"
                           onClick={(e) => {
                             e.stopPropagation();
                             window.location.href = `mailto:${vendor.email}`;
                           }}
                           title="Email"
                         >
-                          <Mail className="h-4 w-4 text-purple-600" />
+                          <Mail className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
@@ -400,7 +399,7 @@ const Vendors = () => {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="h-10 w-10 p-0 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDeleteVendor(vendor);
