@@ -7,20 +7,80 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Field category definitions with user-friendly labels
+// Field category labels
 const CATEGORY_LABELS: Record<string, string> = {
   property: "Property Details",
   financial: "Financial Terms",
   dates: "Lease Dates",
-  occupancy: "Occupancy & Policies",
-  contact: "Contact Information",
+  landlord: "Landlord Info",
+  tenant: "Tenant Info",
+  occupancy: "Occupancy",
   identification: "Identification",
-  vehicle: "Vehicle Information",
+  vehicle: "Vehicle Info",
   emergency: "Emergency Contact",
-  acknowledgment: "Acknowledgments",
+  employment: "Employment",
+  pets: "Pet Info",
   signature: "Signatures",
+  acknowledgment: "Acknowledgments",
+  package: "Service Package",
   other: "Other Fields",
 };
+
+// Semantic field patterns for AI-assisted labeling
+const FIELD_SEMANTICS = [
+  // Signatures
+  { patterns: ["tenant.*signature", "lessee.*signature", "renter.*signature"], api_id: "tenant_signature", label: "Tenant Signature", type: "signature", filled_by: "tenant", category: "signature" },
+  { patterns: ["guest.*signature"], api_id: "guest_signature", label: "Guest Signature", type: "signature", filled_by: "guest", category: "signature" },
+  { patterns: ["landlord.*signature", "lessor.*signature", "owner.*signature"], api_id: "landlord_signature", label: "Landlord Signature", type: "signature", filled_by: "admin", category: "signature" },
+  { patterns: ["host.*signature", "manager.*signature", "agent.*signature"], api_id: "host_signature", label: "Host Signature", type: "signature", filled_by: "admin", category: "signature" },
+  
+  // Property
+  { patterns: ["property.*address", "rental.*address", "premises"], api_id: "property_address", label: "Property Address", type: "text", filled_by: "admin", category: "property" },
+  { patterns: ["unit.*number", "apt.*number", "apartment"], api_id: "unit_number", label: "Unit Number", type: "text", filled_by: "admin", category: "property" },
+  { patterns: ["^city$", "property.*city"], api_id: "city", label: "City", type: "text", filled_by: "admin", category: "property" },
+  { patterns: ["^state$", "property.*state"], api_id: "state", label: "State", type: "text", filled_by: "admin", category: "property" },
+  { patterns: ["^zip", "postal.*code"], api_id: "zip_code", label: "ZIP Code", type: "text", filled_by: "admin", category: "property" },
+  
+  // Financial
+  { patterns: ["monthly.*rent", "rent.*amount", "base.*rent"], api_id: "monthly_rent", label: "Monthly Rent", type: "text", filled_by: "admin", category: "financial" },
+  { patterns: ["security.*deposit", "damage.*deposit"], api_id: "security_deposit", label: "Security Deposit", type: "text", filled_by: "admin", category: "financial" },
+  { patterns: ["late.*fee", "late.*charge"], api_id: "late_fee", label: "Late Fee", type: "text", filled_by: "admin", category: "financial" },
+  { patterns: ["pet.*deposit"], api_id: "pet_deposit", label: "Pet Deposit", type: "text", filled_by: "admin", category: "financial" },
+  
+  // Dates
+  { patterns: ["lease.*start", "start.*date", "commencement"], api_id: "lease_start_date", label: "Lease Start Date", type: "date", filled_by: "admin", category: "dates" },
+  { patterns: ["lease.*end", "end.*date", "expiration"], api_id: "lease_end_date", label: "Lease End Date", type: "date", filled_by: "admin", category: "dates" },
+  { patterns: ["move.*in.*date", "occupancy.*date"], api_id: "move_in_date", label: "Move-In Date", type: "date", filled_by: "admin", category: "dates" },
+  { patterns: ["effective.*date"], api_id: "effective_date", label: "Effective Date", type: "date", filled_by: "admin", category: "dates" },
+  
+  // Tenant info (admin pre-fills)
+  { patterns: ["tenant.*name", "lessee.*name", "renter.*name"], api_id: "tenant_name", label: "Tenant Name", type: "text", filled_by: "admin", category: "tenant" },
+  { patterns: ["guest.*name"], api_id: "guest_name", label: "Guest Name", type: "text", filled_by: "admin", category: "tenant" },
+  { patterns: ["tenant.*email"], api_id: "tenant_email", label: "Tenant Email", type: "email", filled_by: "admin", category: "tenant" },
+  { patterns: ["tenant.*phone"], api_id: "tenant_phone", label: "Tenant Phone", type: "phone", filled_by: "admin", category: "tenant" },
+  
+  // Landlord info
+  { patterns: ["landlord.*name", "lessor.*name", "owner.*name"], api_id: "landlord_name", label: "Landlord Name", type: "text", filled_by: "admin", category: "landlord" },
+  { patterns: ["landlord.*address", "lessor.*address"], api_id: "landlord_address", label: "Landlord Address", type: "text", filled_by: "admin", category: "landlord" },
+  { patterns: ["landlord.*phone"], api_id: "landlord_phone", label: "Landlord Phone", type: "phone", filled_by: "admin", category: "landlord" },
+  { patterns: ["landlord.*email"], api_id: "landlord_email", label: "Landlord Email", type: "email", filled_by: "admin", category: "landlord" },
+];
+
+interface DetectedField {
+  api_id: string;
+  label: string;
+  type: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  filled_by: "admin" | "guest" | "tenant";
+  category: string;
+  required: boolean;
+  description?: string;
+  original_name?: string;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -37,9 +97,19 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { templateId, forceReanalyze, fileUrl, detectTypeOnly } = await req.json();
+    const { 
+      templateId, 
+      forceReanalyze, 
+      fileUrl, 
+      detectTypeOnly,
+      // New: Accept pre-extracted fields from client-side PDF.js
+      extractedFields,
+      textContent,
+      totalPages: clientTotalPages,
+      hasAcroForm: clientHasAcroForm
+    } = await req.json();
 
-    console.log("Analyzing document - templateId:", templateId, "fileUrl:", fileUrl, "detectTypeOnly:", detectTypeOnly);
+    console.log("Analyzing document - templateId:", templateId, "hasExtractedFields:", !!extractedFields);
 
     let documentUrl = fileUrl;
     let template = null;
@@ -59,9 +129,10 @@ serve(async (req) => {
       template = templateData;
       documentUrl = template.file_path;
 
-      // Check if we already have cached field mappings (unless force re-analyze)
-      if (!forceReanalyze && !detectTypeOnly && template.field_mappings && Array.isArray(template.field_mappings) && template.field_mappings.length > 0) {
-        console.log("Using cached field mappings");
+      // Check for cached field mappings (unless force re-analyze)
+      if (!forceReanalyze && !detectTypeOnly && template.field_mappings && 
+          Array.isArray(template.field_mappings) && template.field_mappings.length > 0) {
+        console.log("Using cached field mappings:", template.field_mappings.length, "fields");
         return new Response(
           JSON.stringify({
             success: true,
@@ -74,11 +145,43 @@ serve(async (req) => {
       }
     }
 
+    // If we have pre-extracted fields from client-side PDF.js, use them directly
+    // This is the preferred path - client extracts real coordinates, we just enhance semantics
+    if (extractedFields && Array.isArray(extractedFields) && extractedFields.length > 0) {
+      console.log("Using pre-extracted fields from client:", extractedFields.length);
+      
+      // Enhance fields with AI if needed for better semantic labeling
+      const enhancedFields = await enhanceFieldsWithAI(extractedFields, textContent, LOVABLE_API_KEY);
+      
+      // Save to template
+      if (template && !detectTypeOnly) {
+        await supabase
+          .from("document_templates")
+          .update({ 
+            field_mappings: enhancedFields,
+            contract_type: detectDocumentType(textContent || ""),
+          })
+          .eq("id", templateId);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          fields: enhancedFields,
+          detected_contract_type: detectDocumentType(textContent || ""),
+          totalPages: clientTotalPages,
+          hasAcroForm: clientHasAcroForm,
+          cached: false,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fallback: Download and analyze document server-side
     if (!documentUrl) {
       throw new Error("No document URL provided");
     }
 
-    // Download the document file
     const fileUrlFull = documentUrl.startsWith("http")
       ? documentUrl
       : `${SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${documentUrl}`;
@@ -90,11 +193,10 @@ serve(async (req) => {
       throw new Error(`Failed to fetch document: ${fileResponse.status}`);
     }
 
-    // Get file content - for DOCX we'll extract text
+    // Extract text content
     const fileBuffer = await fileResponse.arrayBuffer();
     let documentText = "";
 
-    // Check if it's a DOCX file
     if (documentUrl.toLowerCase().endsWith(".docx")) {
       try {
         const { default: JSZip } = await import("https://esm.sh/jszip@3.10.1");
@@ -117,433 +219,44 @@ serve(async (req) => {
       documentText = new TextDecoder().decode(fileBuffer);
     }
 
-    console.log("Extracted document text length:", documentText.length);
-    console.log("Document preview:", documentText.substring(0, 500));
+    console.log("Document text length:", documentText.length);
 
-    // Use AI to analyze the document with IMPROVED prompts
-    const aiPrompt = detectTypeOnly 
-      ? `Analyze this document and determine its type and suggest a name.
+    // Detect document type
+    const detectedType = detectDocumentType(documentText);
 
-Document content:
-${documentText.substring(0, 10000)}
-
-Determine the document type from these options:
-- "co_hosting" - Co-hosting agreement where owner stays involved in management
-- "full_service" - Full-service property management agreement where owner hands off completely
-- "rental_agreement" - Guest/tenant rental or lease agreement
-- "addendum" - Supplement or addendum to another document
-- "pet_policy" - Pet policy agreement
-- "early_termination" - Early termination agreement
-- "other" - Any other type of document
-
-Also suggest a concise name for this template.
-
-Return ONLY a JSON object like:
-{
-  "detected_contract_type": "rental_agreement",
-  "suggested_name": "Standard Lease Agreement"
-}
-
-Return ONLY the JSON, no other text.`
-      : `You are a legal document analyst. Analyze this rental/lease agreement and extract ALL fillable fields.
-
-DOCUMENT CONTENT:
-${documentText.substring(0, 20000)}
-
-CRITICAL RULES FOR FIELD ASSIGNMENT:
-
-1. **ADMIN fills BEFORE sending** (filled_by: "admin"):
-   - Property address, unit number, city, county, state, zip
-   - Landlord/management company name, address, phone, email
-   - Monthly rent amount, security deposit, all fees (late fees, cleaning, etc.)
-   - Lease start date, end date, move-in date
-   - Rent due date, grace period, late fee policies
-   - Utilities included/excluded, parking spaces
-   - Number of bedrooms, bathrooms
-   - Any property-specific terms or rules
-   - Pet policies, pet deposits, pet rent
-   - All financial terms and amounts
-   - Landlord/Host signature and date (if document has host signature)
-
-2. **GUEST fills WHEN SIGNING** (filled_by: "guest"):
-   - Tenant/Guest name (their legal name)
-   - Tenant email, phone, current address
-   - Social Security Number (SSN), Driver's License
-   - Date of Birth
-   - Vehicle information (make, model, plate number)
-   - Emergency contact name, phone, relationship
-   - Number of occupants
-   - **SIGNATURES** - Guest signature, initials
-   - **DATES next to signatures** - Date tenant signs
-
-3. **SIGNATURE FIELDS** - Mark these as type: "signature", category: "signature":
-   - Look for "Tenant Signature", "Guest Signature", "Lessee Signature"
-   - Look for "Landlord Signature", "Host Signature", "Lessor Signature", "Agent Signature"
-   - Look for initials lines on each page
-
-For each field, provide:
-- api_id: snake_case identifier (e.g., "monthly_rent", "tenant_signature")
-- label: User-friendly label (e.g., "Monthly Rent Amount", "Tenant Signature")
-- type: One of "text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"
-- filled_by: "admin" or "guest" based on rules above
-- category: One of "property", "financial", "dates", "occupancy", "contact", "identification", "vehicle", "emergency", "acknowledgment", "signature", "other"
-- required: true/false (signatures are always required, text fields usually required)
-- description: Brief help text explaining what to enter
-
-Also determine the contract type:
-- "co_hosting" - Co-hosting agreement
-- "full_service" - Full-service property management
-- "rental_agreement" - Rental/lease agreement
-- "addendum" - Addendum
-- "pet_policy" - Pet policy
-- "early_termination" - Early termination
-- "other" - Other
-
-Return ONLY valid JSON in this format:
-{
-  "detected_contract_type": "rental_agreement",
-  "suggested_name": "Standard Lease Agreement",
-  "fields": [
-    {
-      "api_id": "property_address",
-      "label": "Property Address",
-      "type": "text",
-      "filled_by": "admin",
-      "category": "property",
-      "required": true,
-      "description": "Full street address of the rental property"
-    },
-    {
-      "api_id": "monthly_rent",
-      "label": "Monthly Rent",
-      "type": "number",
-      "filled_by": "admin",
-      "category": "financial",
-      "required": true,
-      "description": "Monthly rent amount in dollars"
-    },
-    {
-      "api_id": "tenant_name",
-      "label": "Tenant Full Name",
-      "type": "text",
-      "filled_by": "guest",
-      "category": "contact",
-      "required": true,
-      "description": "Legal name of the tenant"
-    },
-    {
-      "api_id": "tenant_signature",
-      "label": "Tenant Signature",
-      "type": "signature",
-      "filled_by": "guest",
-      "category": "signature",
-      "required": true,
-      "description": "Tenant signs here to agree to lease terms"
-    },
-    {
-      "api_id": "host_signature",
-      "label": "Host/Landlord Signature",
-      "type": "signature",
-      "filled_by": "admin",
-      "category": "signature",
-      "required": true,
-      "description": "Host/landlord signs after tenant"
-    }
-  ]
-}`;
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert legal document analyst. You analyze rental agreements, leases, and property management contracts to identify all fillable fields.
-
-KEY PRINCIPLES:
-1. Admin fills ALL property details, financial terms, and lease terms BEFORE sending to tenant
-2. Guest/Tenant ONLY fills their personal info (name, contact, ID) and SIGNS
-3. Signature fields are CRITICAL - identify all signature and initial lines
-4. Use clear, user-friendly labels that explain what to enter
-5. Return ONLY valid JSON - no markdown, no explanations`,
-          },
-          { role: "user", content: aiPrompt },
-        ],
-        temperature: 0.1,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI API error:", errorText);
-      throw new Error(`AI API error: ${aiResponse.status}`);
-    }
-
-    let aiData;
-    try {
-      aiData = await aiResponse.json();
-    } catch (jsonError) {
-      console.error("Error parsing AI response JSON:", jsonError);
+    if (detectTypeOnly) {
       return new Response(
         JSON.stringify({
           success: true,
-          detected_contract_type: "other",
-          suggested_name: "Document Template",
-          fields: [],
-          cached: false,
+          detected_contract_type: detectedType,
+          suggested_name: getSuggestedName(detectedType),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const aiContent = aiData.choices?.[0]?.message?.content || "{}";
-    
-    console.log("AI response:", aiContent.substring(0, 500));
-
-    // Parse the AI response
-    let parsedResult: {
-      detected_contract_type?: string;
-      suggested_name?: string;
-      fields?: Array<{
-        api_id: string;
-        label: string;
-        type: string;
-        filled_by: string;
-        category: string;
-        required?: boolean;
-        description?: string;
-      }>;
-    } = {};
-
-    try {
-      let jsonStr = aiContent;
-      if (jsonStr.includes("```json")) {
-        jsonStr = jsonStr.split("```json")[1].split("```")[0];
-      } else if (jsonStr.includes("```")) {
-        jsonStr = jsonStr.split("```")[1].split("```")[0];
-      }
-      parsedResult = JSON.parse(jsonStr.trim());
-    } catch (parseError) {
-      console.error("Error parsing AI response:", parseError);
-      parsedResult = {
-        detected_contract_type: "other",
-        suggested_name: "Document Template",
-        fields: [],
-      };
-    }
-
-    const detectedType = parsedResult.detected_contract_type || "other";
-    const suggestedName = parsedResult.suggested_name || "Document Template";
-    const rawFields = parsedResult.fields || [];
-
-    // Try to determine actual page count from PDF if possible
-    // For now, estimate based on document text length
-    const estimatedPages = Math.max(4, Math.ceil(documentText.length / 3000));
-    console.log(`Estimated document pages: ${estimatedPages} (based on ${documentText.length} chars)`);
-
-    // Post-process fields to ensure proper structure and assignments
-    // Use SMARTER page distribution based on document structure
-    const fields: Array<{
-      api_id: string;
-      label: string;
-      type: string;
-      filled_by: string;
-      category: string;
-      required: boolean;
-      description: string;
-      page: number;
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    }> = [];
-    
-    // Track fields per category for Y positioning
-    const categoryFieldCounts: Record<string, number> = {};
-    
-    for (let index = 0; index < rawFields.length; index++) {
-      const f = rawFields[index];
-      
-      // Ensure proper type
-      const validTypes = ["text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"];
-      const fieldType = validTypes.includes(f.type) ? f.type : "text";
-      
-      // Force signature fields to signature category
-      const category = fieldType === "signature" ? "signature" : (f.category || "other");
-      
-      // Track how many fields in this category
-      if (!categoryFieldCounts[category]) categoryFieldCounts[category] = 0;
-      const indexInCategory = categoryFieldCounts[category]++;
-      
-      // Ensure required is boolean
-      const required = f.required !== false;
-      
-      // IMPROVED PAGE DISTRIBUTION based on document sections
-      // Signatures always go on the LAST page
-      // Other fields spread across first 75% of document
-      let assignedPage = 1;
-      let baseY = 10;
-      
-      if (fieldType === "signature" || category === "signature") {
-        // Signatures on last page
-        assignedPage = estimatedPages;
-        // Stack signatures vertically
-        baseY = 50 + (indexInCategory * 12);
-      } else {
-        // Distribute non-signature fields across pages based on category priority
-        const categoryPageOffset: Record<string, number> = {
-          property: 0,
-          financial: 0,
-          dates: 0.1,
-          occupancy: 0.2,
-          contact: 0.3,
-          identification: 0.4,
-          vehicle: 0.5,
-          emergency: 0.6,
-          acknowledgment: 0.7,
-          other: 0.3,
-        };
-        
-        // Spread across 75% of document pages (leave last 25% for signatures)
-        const offset = categoryPageOffset[category] || 0;
-        const pagesForContent = Math.max(1, Math.floor(estimatedPages * 0.75));
-        assignedPage = Math.max(1, Math.min(pagesForContent, Math.floor(1 + offset * pagesForContent)));
-        
-        // Within page, stack fields vertically with 2-column layout
-        const row = Math.floor(indexInCategory / 2);
-        baseY = 10 + (row * 8);
-      }
-      
-      // Column positioning (2 columns)
-      const col = indexInCategory % 2;
-      const xPos = fieldType === "signature" ? 10 : (5 + col * 48);
-      const fieldWidth = fieldType === "signature" ? 35 : 42;
-      const fieldHeight = fieldType === "signature" ? 6 : 4;
-      
-      fields.push({
-        api_id: f.api_id || `field_${index}`,
-        label: f.label || f.api_id,
-        type: fieldType,
-        filled_by: f.filled_by === "guest" ? "guest" : "admin",
-        category,
-        required,
-        description: f.description || "",
-        page: assignedPage,
-        x: xPos,
-        y: Math.min(baseY, 90), // Don't go off page
-        width: fieldWidth,
-        height: fieldHeight,
-      });
-    }
-
-    // Ensure we have essential signature fields
-    if (!detectTypeOnly && fields.length > 0) {
-      const hasGuestSignature = fields.some(f => 
-        f.type === "signature" && 
-        (f.filled_by === "guest" || f.api_id.includes("tenant") || f.api_id.includes("guest"))
-      );
-      const hasHostSignature = fields.some(f =>
-        f.type === "signature" && 
-        (f.filled_by === "admin" || f.api_id.includes("host") || f.api_id.includes("landlord") || f.api_id.includes("agent"))
-      );
-      
-      // Signature page is typically the last page - use page 4 as default (will adjust based on actual doc)
-      const signaturePage = 4;
-      
-      if (!hasGuestSignature) {
-        fields.push({
-          api_id: "tenant_signature",
-          label: "Tenant Signature",
-          type: "signature",
-          filled_by: "guest",
-          category: "signature",
-          required: true,
-          description: "Tenant signs here to agree to lease terms",
-          page: signaturePage,
-          x: 10,
-          y: 70,
-          width: 35,
-          height: 6,
-        });
-        fields.push({
-          api_id: "tenant_date_signed",
-          label: "Date Signed (Tenant)",
-          type: "date",
-          filled_by: "guest",
-          category: "signature",
-          required: true,
-          description: "Date tenant signs the agreement",
-          page: signaturePage,
-          x: 55,
-          y: 70,
-          width: 25,
-          height: 4,
-        });
-      }
-      
-      if (!hasHostSignature) {
-        fields.push({
-          api_id: "host_signature",
-          label: "Host/Landlord Signature",
-          type: "signature",
-          filled_by: "admin",
-          category: "signature",
-          required: true,
-          description: "Host/landlord signs to execute the agreement",
-          page: signaturePage,
-          x: 10,
-          y: 85,
-          width: 35,
-          height: 6,
-        });
-        fields.push({
-          api_id: "host_date_signed",
-          label: "Date Signed (Host)",
-          type: "date",
-          filled_by: "admin",
-          category: "signature",
-          required: true,
-          description: "Date host signs the agreement",
-          page: signaturePage,
-          x: 55,
-          y: 85,
-          width: 25,
-          height: 4,
-        });
-      }
-    }
+    // Use AI to extract fields from document text
+    const fields = await extractFieldsWithAI(documentText, detectedType, LOVABLE_API_KEY);
 
     // Update template if we have one
-    if (template && !detectTypeOnly) {
-      const { error: updateError } = await supabase
+    if (template) {
+      await supabase
         .from("document_templates")
         .update({ 
           field_mappings: fields,
           contract_type: detectedType,
         })
         .eq("id", templateId);
-
-      if (updateError) {
-        console.error("Error updating template:", updateError);
-      }
     }
 
-    console.log("Detected type:", detectedType, "Fields:", fields.length);
-    console.log("Admin fields:", fields.filter(f => f.filled_by === "admin").length);
-    console.log("Guest fields:", fields.filter(f => f.filled_by === "guest").length);
-    console.log("Signature fields:", fields.filter(f => f.type === "signature").length);
+    console.log(`Extracted ${fields.length} fields, type: ${detectedType}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         detected_contract_type: detectedType,
-        suggested_name: suggestedName,
-        fields: detectTypeOnly ? undefined : fields,
+        suggested_name: getSuggestedName(detectedType),
+        fields,
         cached: false,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -560,3 +273,292 @@ KEY PRINCIPLES:
     );
   }
 });
+
+/**
+ * Detect document type from content
+ */
+function detectDocumentType(text: string): string {
+  const lower = text.toLowerCase();
+  
+  const patterns: Record<string, string[]> = {
+    rental_agreement: ["residential lease", "lease agreement", "rental agreement", "tenant", "landlord", "monthly rent", "security deposit"],
+    management_agreement: ["management agreement", "property management", "management fee", "owner agrees"],
+    co_hosting: ["co-host", "cohost", "vacation rental management", "airbnb management"],
+    innkeeper_agreement: ["innkeeper", "transient occupancy", "hotel", "lodging", "guest registration"],
+    pet_policy: ["pet policy", "pet agreement", "pet deposit", "pet weight"],
+    early_termination: ["early termination", "terminate agreement", "cancellation"],
+    addendum: ["addendum", "amendment", "supplement to"],
+  };
+
+  let bestMatch = "other";
+  let bestScore = 0;
+
+  for (const [type, keywords] of Object.entries(patterns)) {
+    const score = keywords.filter(kw => lower.includes(kw)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = type;
+    }
+  }
+
+  return bestScore >= 2 ? bestMatch : "other";
+}
+
+/**
+ * Get suggested name for document type
+ */
+function getSuggestedName(type: string): string {
+  const names: Record<string, string> = {
+    rental_agreement: "Residential Lease Agreement",
+    management_agreement: "Property Management Agreement",
+    co_hosting: "Co-Hosting Agreement",
+    innkeeper_agreement: "Innkeeper Agreement",
+    pet_policy: "Pet Policy Agreement",
+    early_termination: "Early Termination Agreement",
+    addendum: "Lease Addendum",
+    other: "Document Template",
+  };
+  return names[type] || "Document Template";
+}
+
+/**
+ * Enhance pre-extracted fields with better semantic labeling using AI
+ */
+async function enhanceFieldsWithAI(
+  fields: DetectedField[], 
+  textContent: string | undefined,
+  apiKey: string
+): Promise<DetectedField[]> {
+  // For now, just apply local pattern matching to improve labels
+  // This avoids unnecessary AI calls when client-side extraction is good
+  return fields.map(field => {
+    const enhanced = findBetterSemantics(field);
+    return { ...field, ...enhanced };
+  });
+}
+
+/**
+ * Find better semantic info for a field
+ */
+function findBetterSemantics(field: DetectedField): Partial<DetectedField> {
+  const fieldName = (field.original_name || field.api_id || "").toLowerCase();
+  const label = (field.label || "").toLowerCase();
+  const combined = `${fieldName} ${label}`;
+
+  for (const semantic of FIELD_SEMANTICS) {
+    for (const pattern of semantic.patterns) {
+      const regex = new RegExp(pattern, "i");
+      if (regex.test(combined)) {
+        return {
+          api_id: semantic.api_id,
+          label: semantic.label,
+          type: semantic.type as DetectedField["type"],
+          filled_by: semantic.filled_by as DetectedField["filled_by"],
+          category: semantic.category,
+        };
+      }
+    }
+  }
+
+  return {};
+}
+
+/**
+ * Extract fields using AI (fallback when no client-side extraction)
+ */
+async function extractFieldsWithAI(
+  documentText: string, 
+  documentType: string,
+  apiKey: string
+): Promise<DetectedField[]> {
+  const prompt = `Analyze this ${documentType} document and extract all fillable fields.
+
+DOCUMENT CONTENT:
+${documentText.substring(0, 15000)}
+
+FIELD ASSIGNMENT RULES:
+1. ADMIN fills BEFORE sending: property address, landlord info, rent amounts, dates, fees, lease terms
+2. TENANT/GUEST fills WHEN SIGNING: signatures, initials, signature dates, SSN, driver's license, DOB
+3. All other tenant info (name, email, phone) is pre-filled by ADMIN from guest data
+
+For each field return:
+- api_id: snake_case identifier
+- label: User-friendly label
+- type: text/number/date/email/phone/textarea/checkbox/signature
+- filled_by: admin/guest/tenant
+- category: property/financial/dates/landlord/tenant/signature/other
+- required: true/false
+- page: estimated page number (1-based)
+- x: horizontal position 0-100%
+- y: vertical position 0-100%
+- width: field width %
+- height: field height %
+
+Return ONLY valid JSON with a "fields" array.`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: "You are a document analysis expert. Return only valid JSON." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status}`);
+    }
+
+    const aiData = await response.json();
+    const content = aiData.choices?.[0]?.message?.content || "{}";
+    
+    // Parse JSON
+    let jsonStr = content;
+    if (jsonStr.includes("```json")) {
+      jsonStr = jsonStr.split("```json")[1].split("```")[0];
+    } else if (jsonStr.includes("```")) {
+      jsonStr = jsonStr.split("```")[1].split("```")[0];
+    }
+    
+    const parsed = JSON.parse(jsonStr.trim());
+    const rawFields = parsed.fields || [];
+
+    // Validate and sanitize fields
+    const fields: DetectedField[] = rawFields.map((f: any, index: number) => ({
+      api_id: String(f.api_id || `field_${index}`).replace(/[^a-z0-9_]/gi, "_").toLowerCase(),
+      label: String(f.label || f.api_id || "Field"),
+      type: ["text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"].includes(f.type) ? f.type : "text",
+      page: Math.max(1, Math.min(20, Number(f.page) || 1)),
+      x: Math.max(0, Math.min(95, Number(f.x) || 10)),
+      y: Math.max(0, Math.min(95, Number(f.y) || 10 + index * 5)),
+      width: Math.max(5, Math.min(80, Number(f.width) || 40)),
+      height: Math.max(2, Math.min(15, Number(f.height) || 3)),
+      filled_by: ["admin", "guest", "tenant"].includes(f.filled_by) ? f.filled_by : "admin",
+      category: f.category || "other",
+      required: f.required !== false,
+      description: f.description || "",
+    }));
+
+    // Ensure essential signature fields exist
+    ensureSignatureFields(fields, documentType);
+
+    return fields;
+  } catch (error) {
+    console.error("AI extraction error:", error);
+    // Return minimal default fields
+    return getDefaultFields(documentType);
+  }
+}
+
+/**
+ * Ensure essential signature fields exist
+ */
+function ensureSignatureFields(fields: DetectedField[], documentType: string): void {
+  const apiIds = new Set(fields.map(f => f.api_id));
+  
+  // Guest/tenant signature
+  if (!apiIds.has("tenant_signature") && !apiIds.has("guest_signature") && !apiIds.has("owner_signature")) {
+    const isLease = documentType === "rental_agreement";
+    fields.push({
+      api_id: isLease ? "tenant_signature" : "guest_signature",
+      label: isLease ? "Tenant Signature" : "Guest Signature",
+      type: "signature",
+      page: 4,
+      x: 10,
+      y: 70,
+      width: 35,
+      height: 6,
+      filled_by: isLease ? "tenant" : "guest",
+      category: "signature",
+      required: true,
+    });
+  }
+
+  // Host/landlord signature
+  if (!apiIds.has("landlord_signature") && !apiIds.has("host_signature")) {
+    const isLease = documentType === "rental_agreement";
+    fields.push({
+      api_id: isLease ? "landlord_signature" : "host_signature",
+      label: isLease ? "Landlord Signature" : "Host Signature",
+      type: "signature",
+      page: 4,
+      x: 10,
+      y: 85,
+      width: 35,
+      height: 6,
+      filled_by: "admin",
+      category: "signature",
+      required: true,
+    });
+  }
+}
+
+/**
+ * Get default fields for a document type
+ */
+function getDefaultFields(documentType: string): DetectedField[] {
+  const isLease = documentType === "rental_agreement";
+  
+  return [
+    {
+      api_id: "property_address",
+      label: "Property Address",
+      type: "text",
+      page: 1,
+      x: 10,
+      y: 20,
+      width: 60,
+      height: 3,
+      filled_by: "admin",
+      category: "property",
+      required: true,
+    },
+    {
+      api_id: isLease ? "tenant_name" : "guest_name",
+      label: isLease ? "Tenant Name" : "Guest Name",
+      type: "text",
+      page: 1,
+      x: 10,
+      y: 30,
+      width: 40,
+      height: 3,
+      filled_by: "admin",
+      category: "tenant",
+      required: true,
+    },
+    {
+      api_id: isLease ? "tenant_signature" : "guest_signature",
+      label: isLease ? "Tenant Signature" : "Guest Signature",
+      type: "signature",
+      page: 4,
+      x: 10,
+      y: 70,
+      width: 35,
+      height: 6,
+      filled_by: isLease ? "tenant" : "guest",
+      category: "signature",
+      required: true,
+    },
+    {
+      api_id: isLease ? "landlord_signature" : "host_signature",
+      label: isLease ? "Landlord Signature" : "Host Signature",
+      type: "signature",
+      page: 4,
+      x: 10,
+      y: 85,
+      width: 35,
+      height: 6,
+      filled_by: "admin",
+      category: "signature",
+      required: true,
+    },
+  ];
+}

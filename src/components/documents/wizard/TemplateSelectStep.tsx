@@ -8,6 +8,7 @@ import { FileText, Check, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { WizardData, DetectedField } from "../DocumentCreateWizard";
 import { getFieldAssignment } from "@/utils/fieldAssignment";
+import { extractDocumentFields } from "@/utils/documentFieldExtractor";
 
 interface Template {
   id: string;
@@ -42,12 +43,10 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
 
       if (error) throw error;
       
-      // Parse field_mappings from JSON - cast through unknown for safety
-      // IMPORTANT: field_mappings contains position data (x, y, page, width, height) that must be preserved
+      // Parse field_mappings - preserve ALL position data
       const parsedTemplates = (templatesData || []).map(t => {
         let parsedMappings: DetectedField[] | null = null;
         if (Array.isArray(t.field_mappings)) {
-          // Explicitly map to ensure all properties including positions are preserved
           parsedMappings = (t.field_mappings as any[]).map(f => ({
             api_id: f.api_id,
             label: f.label,
@@ -56,7 +55,6 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
             category: f.category,
             description: f.description,
             required: f.required,
-            // Preserve position data from field_mappings
             x: f.x,
             y: f.y,
             width: f.width,
@@ -70,45 +68,102 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
         };
       });
       
-      console.log('[TemplateSelectStep] Loaded templates with field positions:', parsedTemplates.map(t => ({
-        name: t.name,
-        fieldCount: t.field_mappings?.length,
-        sampleField: t.field_mappings?.[0]
-      })));
-      
+      console.log('[TemplateSelectStep] Loaded templates:', parsedTemplates.length);
       setTemplates(parsedTemplates);
     } catch (error) {
       console.error("Error loading templates:", error);
+      toast.error("Failed to load templates");
     } finally {
       setLoading(false);
     }
   };
 
-  const analyzeTemplateFields = async (templateId: string, forceReanalyze: boolean = false): Promise<DetectedField[]> => {
+  /**
+   * Analyze template using client-side PDF.js extraction
+   * This is the primary method - extracts REAL coordinates from PDF
+   */
+  const analyzeTemplateClient = async (template: Template): Promise<DetectedField[]> => {
+    const filePath = template.file_path;
+    const isPdf = filePath.toLowerCase().endsWith('.pdf');
+    
+    if (!isPdf) {
+      // For non-PDF files, fall back to server-side analysis
+      return analyzeTemplateServer(template.id, true);
+    }
+
+    // Get the full URL for the PDF
+    const { data: urlData } = supabase.storage
+      .from('onboarding-documents')
+      .getPublicUrl(filePath);
+    
+    const pdfUrl = urlData?.publicUrl;
+    if (!pdfUrl) {
+      throw new Error("Could not get document URL");
+    }
+
+    console.log('[TemplateSelectStep] Extracting fields client-side from:', pdfUrl);
+
     try {
-      setAnalyzingTemplateId(templateId);
+      // Use the unified document field extractor
+      const result = await extractDocumentFields(pdfUrl);
       
-      const { data: response, error } = await supabase.functions.invoke("analyze-document-fields", {
-        body: { templateId, forceReanalyze },
+      console.log('[TemplateSelectStep] Client extraction result:', {
+        fields: result.fields.length,
+        hasAcroForm: result.hasAcroForm,
+        documentType: result.documentType,
+        totalPages: result.totalPages,
       });
 
-      if (error) throw error;
-      
-      if (response?.success && response?.fields) {
-        return response.fields;
+      if (result.fields.length > 0) {
+        // Send to server to save and optionally enhance
+        const { data: response, error } = await supabase.functions.invoke("analyze-document-fields", {
+          body: { 
+            templateId: template.id,
+            extractedFields: result.fields,
+            textContent: result.textLines.map(l => l.text).join(' '),
+            totalPages: result.totalPages,
+            hasAcroForm: result.hasAcroForm,
+          },
+        });
+
+        if (error) {
+          console.error("Server enhancement error:", error);
+          // Still use client-extracted fields
+          return result.fields as DetectedField[];
+        }
+
+        return response?.fields || result.fields;
       }
-      
-      throw new Error(response?.error || "Failed to analyze document");
-    } catch (error) {
-      console.error("Error analyzing template:", error);
-      toast.error("Failed to analyze document fields");
-      return [];
-    } finally {
-      setAnalyzingTemplateId(null);
+
+      // If no fields found client-side, fall back to server
+      return analyzeTemplateServer(template.id, true);
+    } catch (clientError) {
+      console.error("Client-side extraction failed:", clientError);
+      // Fall back to server-side analysis
+      return analyzeTemplateServer(template.id, true);
     }
   };
 
+  /**
+   * Server-side analysis (fallback for non-PDF or when client fails)
+   */
+  const analyzeTemplateServer = async (templateId: string, forceReanalyze: boolean = false): Promise<DetectedField[]> => {
+    const { data: response, error } = await supabase.functions.invoke("analyze-document-fields", {
+      body: { templateId, forceReanalyze },
+    });
+
+    if (error) throw error;
+    
+    if (response?.success && response?.fields) {
+      return response.fields;
+    }
+    
+    throw new Error(response?.error || "Failed to analyze document");
+  };
+
   const selectTemplate = async (template: Template) => {
+    setAnalyzingTemplateId(template.id);
+
     // Set basic template info immediately
     updateData({
       templateId: template.id,
@@ -116,97 +171,93 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
       documentName: template.name,
     });
 
-    // Fetch document content for editing
-    toast.info("Loading document content...");
     try {
-      const { data: response, error } = await supabase.functions.invoke("extract-document-text", {
+      // Fetch document content for editing
+      const { data: textResponse, error: textError } = await supabase.functions.invoke("extract-document-text", {
         body: { templateId: template.id },
       });
       
-      if (error) throw error;
-      
-      if (response?.success && response?.content) {
-        updateData({
-          documentContent: response.content,
-        });
-        toast.success("Document content loaded");
+      if (!textError && textResponse?.success && textResponse?.content) {
+        updateData({ documentContent: textResponse.content });
+      }
+
+      // Check if we have cached field mappings with positions
+      if (template.field_mappings && template.field_mappings.length > 0) {
+        console.log('[TemplateSelectStep] Using cached field mappings:', template.field_mappings.length);
+        const processedFields = applyDefaultAssignments(template.field_mappings);
+        updateData({ detectedFields: processedFields });
+        toast.success(`Loaded ${processedFields.length} fields from template`);
       } else {
-        console.error("Failed to load document content:", response?.error);
-        toast.error("Could not load document text");
+        // Analyze the document to detect fields
+        toast.info("Analyzing document to detect fields...");
+        const fields = await analyzeTemplateClient(template);
+        
+        if (fields.length > 0) {
+          const processedFields = applyDefaultAssignments(fields);
+          updateData({ detectedFields: processedFields });
+          toast.success(`Detected ${fields.length} fields in document`);
+          
+          // Update local template cache
+          setTemplates(prev => 
+            prev.map(t => t.id === template.id ? { ...t, field_mappings: fields } : t)
+          );
+        } else {
+          toast.warning("No fillable fields detected in document");
+        }
       }
     } catch (error) {
-      console.error("Error loading document content:", error);
-      toast.error("Failed to load document content");
-    }
-
-    // Check if we already have cached field mappings
-    if (template.field_mappings && template.field_mappings.length > 0) {
-      // Apply default assignments: dates and address fields should be admin by default
-      const processedFields = applyDefaultAssignments(template.field_mappings);
-      updateData({
-        detectedFields: processedFields,
-      });
-    } else {
-      // Analyze the document to detect fields
-      toast.info("Analyzing document to detect fields...");
-      const fields = await analyzeTemplateFields(template.id);
-      
-      if (fields.length > 0) {
-        // Apply default assignments
-        const processedFields = applyDefaultAssignments(fields);
-        updateData({
-          detectedFields: processedFields,
-        });
-        toast.success(`Detected ${fields.length} fields in document`);
-        
-        // Update local template cache
-        setTemplates(prev => 
-          prev.map(t => t.id === template.id ? { ...t, field_mappings: fields } : t)
-        );
-      }
+      console.error("Error analyzing template:", error);
+      toast.error("Failed to analyze document");
+    } finally {
+      setAnalyzingTemplateId(null);
     }
   };
 
-  // Apply smart defaults using the field assignment utility
-  // IMPORTANT: Preserve position data (x, y, page, width, height) from field_mappings
+  // Apply smart defaults - preserve position data
   const applyDefaultAssignments = (fields: DetectedField[]): DetectedField[] => {
     return fields.map(field => {
-      // Use the centralized field assignment logic
       const assignedTo = getFieldAssignment(field.api_id, field.label, field.category);
-      // Spread the entire field object to preserve ALL data including position (x, y, page, width, height)
-      const processed = { ...field, filled_by: assignedTo };
-      console.log(`[TemplateSelectStep] Field ${field.api_id}: page=${processed.page}, x=${processed.x}, y=${processed.y}`);
-      return processed;
+      return { ...field, filled_by: assignedTo };
     });
   };
 
   const handleReanalyze = async (e: React.MouseEvent, template: Template) => {
     e.stopPropagation();
-    toast.info("Re-analyzing document with enhanced signature detection...");
+    setAnalyzingTemplateId(template.id);
+    toast.info("Re-analyzing document...");
     
-    // Clear cached fields in database first
-    await supabase
-      .from("document_templates")
-      .update({ field_mappings: null })
-      .eq("id", template.id);
-    
-    const fields = await analyzeTemplateFields(template.id, true);
-    
-    if (fields.length > 0) {
-      // Update wizard data if this template is selected
-      if (data.templateId === template.id) {
-        updateData({
-          detectedFields: fields,
-        });
+    try {
+      // Clear cached fields in database
+      await supabase
+        .from("document_templates")
+        .update({ field_mappings: null })
+        .eq("id", template.id);
+      
+      // Re-analyze using client-side extraction
+      const fields = await analyzeTemplateClient(template);
+      
+      if (fields.length > 0) {
+        // Update wizard data if this template is selected
+        if (data.templateId === template.id) {
+          const processedFields = applyDefaultAssignments(fields);
+          updateData({ detectedFields: processedFields });
+        }
+        
+        // Update local template cache
+        setTemplates(prev => 
+          prev.map(t => t.id === template.id ? { ...t, field_mappings: fields } : t)
+        );
+        
+        const signatureFields = fields.filter(f => f.category === "signature" || f.type === "signature").length;
+        toast.success(`Detected ${fields.length} fields (${signatureFields} signatures)`);
+      } else {
+        toast.warning("No fields detected");
       }
-      
-      // Update local template cache
-      setTemplates(prev => 
-        prev.map(t => t.id === template.id ? { ...t, field_mappings: fields } : t)
-      );
-      
-      const signatureFields = fields.filter(f => f.category === "signature").length;
-      toast.success(`Re-detected ${fields.length} fields (${signatureFields} signature fields)`);
+    } catch (error) {
+      console.error("Re-analysis error:", error);
+      toast.error("Failed to re-analyze document");
+    } finally {
+      setAnalyzingTemplateId(null);
     }
   };
 
@@ -240,7 +291,7 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
       <div>
         <Label className="text-lg font-medium">Select a Document Template</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Choose the template for your document. Fields including signatures will be automatically detected.
+          Choose the template for your document. Fields and signatures will be automatically detected.
         </p>
       </div>
 
@@ -249,7 +300,7 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
           const isSelected = data.templateId === template.id;
           const isAnalyzing = analyzingTemplateId === template.id;
           const hasFields = template.field_mappings && template.field_mappings.length > 0;
-          const signatureCount = template.field_mappings?.filter(f => f.category === "signature").length || 0;
+          const signatureCount = template.field_mappings?.filter(f => f.category === "signature" || f.type === "signature").length || 0;
           
           return (
             <Card
@@ -289,7 +340,6 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
                   </div>
                 </div>
                 
-                {/* Re-analyze button */}
                 {hasFields && (
                   <div className="mt-3 pt-3 border-t flex justify-end">
                     <Button
