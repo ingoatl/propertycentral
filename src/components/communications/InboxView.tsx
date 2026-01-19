@@ -2838,39 +2838,39 @@ export function InboxView() {
                         )}
                       </div>
                       
-                      {/* Content */}
-                      <div className="flex-1 min-w-0 py-0.5">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
-                            <PriorityBadge 
-                              priority={comm.priority} 
-                              status={comm.conversation_status}
-                              compact
-                            />
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <div className="opacity-100 md:opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity flex">
-                              <ConversationQuickActions
-                                status={(comm.conversation_status === "awaiting" ? "open" : comm.conversation_status) as "open" | "snoozed" | "done" | "archived"}
-                                onMarkDone={() => handleMarkDone(comm)}
-                                onSnooze={(hours) => handleSnooze(comm, hours)}
-                                onReopen={() => handleReopen(comm)}
-                                isUpdating={updateConversationStatus.isPending}
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 py-0.5">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="font-semibold text-base truncate">{comm.contact_name}</span>
+                              <PriorityBadge 
+                                priority={comm.priority} 
+                                status={comm.conversation_status}
                                 compact
                               />
                             </div>
-                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                              {format(new Date(comm.created_at), "h:mm a")}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <div className="opacity-100 md:opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity flex">
+                                <ConversationQuickActions
+                                  status={(comm.conversation_status === "awaiting" ? "open" : comm.conversation_status) as "open" | "snoozed" | "done" | "archived"}
+                                  onMarkDone={() => handleMarkDone(comm)}
+                                  onSnooze={(hours) => handleSnooze(comm, hours)}
+                                  onReopen={() => handleReopen(comm)}
+                                  isUpdating={updateConversationStatus.isPending}
+                                  compact
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                {format(new Date(comm.created_at), "h:mm a")}
+                              </span>
+                            </div>
                           </div>
+                          
+                          {/* Message preview */}
+                          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                            {getMessagePreview(comm)}
+                          </p>
                         </div>
-                        
-                        {/* Message preview */}
-                        <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
-                          {getMessagePreview(comm)}
-                        </p>
-                      </div>
                     </div>
                     );
                   })}
@@ -3241,8 +3241,88 @@ export function InboxView() {
               </div>
             </div>
 
+            {/* Message Input moved to TOP */}
+            {!selectedMessage.is_draft && (
+              <div className="p-3 md:p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                {/* Smart toolbar - AI and tools above input on mobile */}
+                <div className="flex items-center gap-2 px-1 pb-2.5 overflow-x-auto scrollbar-hide md:hidden">
+                  <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type as "lead" | "owner"} />
+                  <VoiceDictationButton 
+                    onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
+                    messageType={selectedChannel === "email" ? "email" : "sms"} 
+                    contactName={selectedMessage.contact_name}
+                  />
+                  <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                  <div className="w-px h-6 bg-border mx-1" />
+                  <Button 
+                    variant={selectedChannel === "sms" ? "default" : "ghost"} 
+                    size="sm" 
+                    className="h-9 px-3 rounded-full text-sm font-medium" 
+                    onClick={() => setSelectedChannel("sms")} 
+                    disabled={!selectedMessage.contact_phone}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-1.5" />SMS
+                  </Button>
+                  <Button 
+                    variant={selectedChannel === "email" ? "default" : "ghost"} 
+                    size="sm" 
+                    className="h-9 px-3 rounded-full text-sm font-medium" 
+                    onClick={() => setSelectedChannel("email")} 
+                    disabled={!selectedMessage.contact_email}
+                  >
+                    <Mail className="h-4 w-4 mr-1.5" />Email
+                  </Button>
+                </div>
+                
+                {/* iMessage-style composer */}
+                <div className="flex items-end gap-2.5 max-w-3xl mx-auto">
+                  {/* Desktop channel selector */}
+                  <div className="hidden md:flex items-center gap-1.5 mr-1">
+                    <Button variant={selectedChannel === "sms" ? "default" : "ghost"} size="sm" className="h-9 px-2.5" onClick={() => setSelectedChannel("sms")} disabled={!selectedMessage.contact_phone}><MessageSquare className="h-4 w-4" /></Button>
+                    <Button variant={selectedChannel === "email" ? "default" : "ghost"} size="sm" className="h-9 px-2.5" onClick={() => setSelectedChannel("email")} disabled={!selectedMessage.contact_email}><Mail className="h-4 w-4" /></Button>
+                  </div>
+                  
+                  {/* Input container */}
+                  <div className="flex-1 flex items-end gap-2 bg-muted/50 rounded-3xl px-4 py-2.5 min-h-[48px]">
+                    {/* Desktop tools */}
+                    <div className="hidden md:flex items-center gap-1.5">
+                      <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type as "lead" | "owner"} />
+                      <VoiceDictationButton 
+                        onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
+                        messageType={selectedChannel === "email" ? "email" : "sms"} 
+                        contactName={selectedMessage.contact_name}
+                      />
+                    </div>
+                    
+                    <Input 
+                      placeholder="Type a message..." 
+                      value={newMessage} 
+                      onChange={(e) => setNewMessage(e.target.value)} 
+                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()} 
+                      className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-auto min-h-[36px] text-base md:text-lg py-0" 
+                    />
+                    
+                    {/* Desktop emoji picker */}
+                    <div className="hidden md:block">
+                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                    </div>
+                  </div>
+                  
+                  {/* Send button - larger */}
+                  <Button 
+                    size="icon" 
+                    className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 flex-shrink-0" 
+                    onClick={handleSendMessage} 
+                    disabled={!newMessage.trim() || sendSmsMutation.isPending}
+                  >
+                    {sendSmsMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin text-primary-foreground" /> : <Send className="h-5 w-5 text-primary-foreground" />}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <ScrollArea className="flex-1 overflow-x-hidden">
-              <div className="px-2 py-2 sm:px-3 md:px-4 md:py-4 max-w-3xl mx-auto w-full overflow-hidden">
+              <div className="px-3 py-3 sm:px-4 md:px-5 md:py-5 max-w-3xl mx-auto w-full overflow-hidden">
                 {selectedMessage.is_draft && isEditingDraft && editedDraft ? (
                   <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
                     <div><label className="text-sm font-medium">To Email</label><Input value={editedDraft.to_email} onChange={(e) => setEditedDraft({ ...editedDraft, to_email: e.target.value })} className="mt-1" /></div>
@@ -3382,8 +3462,8 @@ export function InboxView() {
                           return (
                             <div key={msg.id}>
                               {showDateSeparator && (
-                                <div className="flex items-center justify-center py-3">
-                                  <span className="text-[11px] font-medium text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+                                <div className="flex items-center justify-center py-4">
+                                  <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-4 py-1.5 rounded-full">
                                     {formatDateLabel(new Date(msg.created_at))}
                                   </span>
                                 </div>
@@ -3400,14 +3480,14 @@ export function InboxView() {
                                   </div>
                                 )}
                               <div className="max-w-[calc(100%-1rem)] sm:max-w-[80%] min-w-0">
-                                  <div className={`rounded-2xl px-3 py-2 sm:px-3.5 overflow-hidden ${
+                                  <div className={`rounded-2xl px-4 py-3 sm:px-5 overflow-hidden ${
                                     isOutbound 
                                       ? "bg-primary text-primary-foreground" 
                                       : "bg-muted"
                                   }`}>
                                     {/* Call Recording Player - styled like screenshot */}
                                     {msg.type === "call" && msg.call_recording_url && (
-                                      <div className="mb-2 -mx-3.5 -mt-2 px-0 pt-0">
+                                      <div className="mb-2 -mx-5 -mt-3 px-0 pt-0">
                                         <CallRecordingPlayer
                                           recordingUrl={msg.call_recording_url}
                                           duration={msg.call_duration}
@@ -3418,28 +3498,28 @@ export function InboxView() {
                                     )}
                                     {/* Simple call indicator when no recording */}
                                     {msg.type === "call" && !msg.call_recording_url && (
-                                      <div className={`flex items-center gap-1.5 text-[11px] mb-1.5 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
-                                        <Phone className="h-3 w-3" />
+                                      <div className={`flex items-center gap-2 text-sm mb-2 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
+                                        <Phone className="h-3.5 w-3.5" />
                                         <span>{isOutbound ? "Outgoing call" : "Incoming call"}</span>
                                         {msg.call_duration && <span>· {Math.floor(msg.call_duration / 60)}m {msg.call_duration % 60}s</span>}
                                       </div>
                                     )}
                                     {msg.type === "email" && (
-                                      <div className={`flex items-center gap-1 text-xs font-medium mb-1 ${isOutbound ? "opacity-90" : "text-muted-foreground"}`}>
-                                        <Mail className="h-3 w-3" />
+                                      <div className={`flex items-center gap-1.5 text-sm font-medium mb-1.5 ${isOutbound ? "opacity-90" : "text-muted-foreground"}`}>
+                                        <Mail className="h-3.5 w-3.5" />
                                         {msg.subject ? msg.subject : (isOutbound ? "Email sent" : "Email received")}
                                       </div>
                                     )}
                                     {msg.type === "sms" && (
-                                      <div className={`flex items-center gap-1.5 text-[11px] mb-1 ${isOutbound ? "opacity-70" : "text-muted-foreground"}`}>
+                                      <div className={`flex items-center gap-2 text-sm mb-1.5 ${isOutbound ? "opacity-70" : "text-muted-foreground"}`}>
                                         {isVoiceAITranscript(msg.body) ? (
                                           <>
-                                            <Bot className="h-3 w-3 text-violet-500" />
+                                            <Bot className="h-3.5 w-3.5 text-violet-500" />
                                             <span className="text-violet-600 font-medium">Voice AI Transcript</span>
                                           </>
                                         ) : (
                                           <>
-                                            <MessageSquare className="h-3 w-3" />
+                                            <MessageSquare className="h-3.5 w-3.5" />
                                             <span>{isOutbound ? "SMS sent" : "SMS received"}</span>
                                           </>
                                         )}
@@ -3489,9 +3569,9 @@ export function InboxView() {
                                         ))}
                                       </div>
                                     )}
-                                    <p className="text-sm whitespace-pre-wrap leading-relaxed break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.body}</p>
+                                    <p className="text-base whitespace-pre-wrap leading-relaxed break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.body}</p>
                                   </div>
-                                  <div className={`flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 px-1 ${isOutbound ? "justify-end" : ""}`}>
+                                  <div className={`flex items-center gap-2 text-xs text-muted-foreground mt-1 px-1.5 ${isOutbound ? "justify-end" : ""}`}>
                                     {isOutbound && currentUserProfile?.first_name && (
                                       <span className="font-medium">{currentUserProfile.first_name}</span>
                                     )}
@@ -3509,11 +3589,11 @@ export function InboxView() {
                       /* Single message fallback */
                       <div className={`flex ${selectedMessage.direction === "outbound" ? "justify-end" : "justify-start"} w-full`}>
                         <div className="max-w-[calc(100%-1rem)] sm:max-w-[85%] min-w-0">
-                          <div className={`rounded-2xl px-4 py-3 overflow-hidden ${selectedMessage.direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                            {selectedMessage.subject && <p className={`text-base font-medium mb-1 ${selectedMessage.direction === "outbound" ? "opacity-90" : ""}`}>{selectedMessage.subject}</p>}
+                          <div className={`rounded-2xl px-5 py-3.5 overflow-hidden ${selectedMessage.direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                            {selectedMessage.subject && <p className={`text-base font-semibold mb-1.5 ${selectedMessage.direction === "outbound" ? "opacity-90" : ""}`}>{selectedMessage.subject}</p>}
                             <p className="text-base whitespace-pre-wrap leading-relaxed break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedMessage.body}</p>
                           </div>
-                          <div className={`text-xs text-muted-foreground mt-1 px-1 ${selectedMessage.direction === "outbound" ? "text-right" : ""}`}>
+                          <div className={`text-xs text-muted-foreground mt-1.5 px-1.5 ${selectedMessage.direction === "outbound" ? "text-right" : ""}`}>
                             {format(new Date(selectedMessage.created_at), "h:mm a")}
                           </div>
                         </div>
@@ -3565,85 +3645,6 @@ export function InboxView() {
                 )}
               </div>
             </ScrollArea>
-
-            {!selectedMessage.is_draft && (
-              <div className="p-2 md:p-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 safe-area-bottom">
-                {/* Smart toolbar - AI and tools above input on mobile */}
-                <div className="flex items-center gap-1.5 px-1 pb-2 overflow-x-auto scrollbar-hide md:hidden">
-                  <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type as "lead" | "owner"} />
-                  <VoiceDictationButton 
-                    onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
-                    messageType={selectedChannel === "email" ? "email" : "sms"} 
-                    contactName={selectedMessage.contact_name}
-                  />
-                  <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                  <div className="w-px h-6 bg-border mx-1" />
-                  <Button 
-                    variant={selectedChannel === "sms" ? "default" : "ghost"} 
-                    size="sm" 
-                    className="h-8 px-2.5 rounded-full text-xs" 
-                    onClick={() => setSelectedChannel("sms")} 
-                    disabled={!selectedMessage.contact_phone}
-                  >
-                    <MessageSquare className="h-3.5 w-3.5 mr-1" />SMS
-                  </Button>
-                  <Button 
-                    variant={selectedChannel === "email" ? "default" : "ghost"} 
-                    size="sm" 
-                    className="h-8 px-2.5 rounded-full text-xs" 
-                    onClick={() => setSelectedChannel("email")} 
-                    disabled={!selectedMessage.contact_email}
-                  >
-                    <Mail className="h-3.5 w-3.5 mr-1" />Email
-                  </Button>
-                </div>
-                
-                {/* iMessage-style composer */}
-                <div className="flex items-end gap-2 max-w-3xl mx-auto">
-                  {/* Desktop channel selector */}
-                  <div className="hidden md:flex items-center gap-1 mr-1">
-                    <Button variant={selectedChannel === "sms" ? "default" : "ghost"} size="sm" className="h-8 px-2" onClick={() => setSelectedChannel("sms")} disabled={!selectedMessage.contact_phone}><MessageSquare className="h-3.5 w-3.5" /></Button>
-                    <Button variant={selectedChannel === "email" ? "default" : "ghost"} size="sm" className="h-8 px-2" onClick={() => setSelectedChannel("email")} disabled={!selectedMessage.contact_email}><Mail className="h-3.5 w-3.5" /></Button>
-                  </div>
-                  
-                  {/* Input container */}
-                  <div className="flex-1 flex items-end gap-2 bg-muted/50 rounded-3xl px-3 py-2 min-h-[44px]">
-                    {/* Desktop tools */}
-                    <div className="hidden md:flex items-center gap-1">
-                      <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type as "lead" | "owner"} />
-                      <VoiceDictationButton 
-                        onResult={(text) => setNewMessage(prev => prev ? `${prev} ${text}` : text)} 
-                        messageType={selectedChannel === "email" ? "email" : "sms"} 
-                        contactName={selectedMessage.contact_name}
-                      />
-                    </div>
-                    
-                    <Input 
-                      placeholder="Message..." 
-                      value={newMessage} 
-                      onChange={(e) => setNewMessage(e.target.value)} 
-                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()} 
-                      className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-auto min-h-[32px] text-[17px] py-0" 
-                    />
-                    
-                    {/* Desktop emoji picker */}
-                    <div className="hidden md:block">
-                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                    </div>
-                  </div>
-                  
-                  {/* Send button - larger on mobile */}
-                  <Button 
-                    size="icon" 
-                    className="h-11 w-11 md:h-10 md:w-10 rounded-full bg-primary hover:bg-primary/90 flex-shrink-0" 
-                    onClick={handleSendMessage} 
-                    disabled={!newMessage.trim() || sendSmsMutation.isPending}
-                  >
-                    {sendSmsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-primary-foreground" /> : <Send className="h-4 w-4 text-primary-foreground" />}
-                  </Button>
-                </div>
-              </div>
-            )}
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
