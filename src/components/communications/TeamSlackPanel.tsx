@@ -24,9 +24,11 @@ interface TeamSlackPanelProps {
 
 interface SlackChannel {
   id: string;
-  channel_name: string;
+  name: string;
   display_name: string;
   description: string | null;
+  is_member?: boolean;
+  num_members?: number;
 }
 
 interface SlackMessage {
@@ -110,26 +112,28 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Fetch available channels - with staleTime to prevent unnecessary refetches
-  // NOTE: Removed allowed_roles filtering to show all active channels to all users
+  // Fetch available channels directly from Slack API via edge function
   const { data: channels = [], isLoading: channelsLoading, error: channelsError } = useQuery({
-    queryKey: ['slack-channels'],
+    queryKey: ['slack-channels-live'],
     queryFn: async () => {
-      console.log('[Slack Channels] Fetching all active channels...');
-      const { data, error } = await supabase
-        .from('slack_channel_config')
-        .select('id, channel_name, display_name, description')
-        .eq('is_active', true)
-        .order('display_name');
+      console.log('[Slack Channels] Fetching channels from Slack API...');
+      
+      const { data, error } = await supabase.functions.invoke('fetch-slack-channels');
       
       if (error) {
-        console.error('[Slack Channels] Failed to load:', error);
+        console.error('[Slack Channels] Edge function error:', error);
         throw error;
       }
-      console.log('[Slack Channels] Loaded:', data?.length || 0, 'channels:', data?.map(c => c.channel_name).join(', '));
-      return data as SlackChannel[];
+      
+      if (!data?.success) {
+        console.error('[Slack Channels] API error:', data?.error);
+        throw new Error(data?.error || 'Failed to fetch channels');
+      }
+      
+      console.log('[Slack Channels] Loaded:', data.channels?.length || 0, 'channels from Slack');
+      return data.channels as SlackChannel[];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes - cache to avoid hitting Slack API too often
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
@@ -169,8 +173,14 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
+      // Find the actual channel ID if sending to a channel
+      const selectedChannelData = messageMode === 'channel' 
+        ? channels.find(ch => ch.name === selectedChannel || ch.id === selectedChannel)
+        : null;
+
       const payload = {
         channel: messageMode === 'channel' ? selectedChannel : undefined,
+        channelId: selectedChannelData?.id, // Send the actual Slack channel ID
         directMessage: messageMode === 'dm',
         recipientUserId: messageMode === 'dm' ? selectedMember : undefined,
         message,
@@ -292,8 +302,8 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
                 </SelectTrigger>
                 <SelectContent>
                   {channels.map((ch) => (
-                    <SelectItem key={ch.id} value={ch.channel_name} className="text-xs">
-                      #{ch.channel_name}
+                    <SelectItem key={ch.id} value={ch.name} className="text-xs">
+                      #{ch.name}
                     </SelectItem>
                   ))}
                   {channels.length === 0 && !channelsLoading && (
@@ -416,9 +426,9 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
               </SelectTrigger>
               <SelectContent>
                 {channels.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.channel_name}>
+                  <SelectItem key={ch.id} value={ch.name}>
                     <div className="flex flex-col">
-                      <span>#{ch.channel_name}</span>
+                      <span>#{ch.name}</span>
                       {ch.description && (
                         <span className="text-xs text-muted-foreground">{ch.description}</span>
                       )}
@@ -426,7 +436,7 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
                   </SelectItem>
                 ))}
                 {channels.length === 0 && !channelsLoading && (
-                  <div className="p-2 text-sm text-muted-foreground">No channels configured</div>
+                  <div className="p-2 text-sm text-muted-foreground">No channels found in Slack</div>
                 )}
               </SelectContent>
             </Select>
