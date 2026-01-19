@@ -478,15 +478,19 @@ Always provide at least: caller_name (if mentioned), interest_level, sentiment, 
         .maybeSingle();
       
       if (existingComm) {
+        // Update existing record with transcript and recording URL
         await supabase
           .from('lead_communications')
           .update({
             body: transcriptText || 'Call completed - no transcription available',
             status: 'transcribed',
+            call_recording_url: recordingUrl, // Store recording URL
+            call_duration: callDuration || null,
           })
           .eq('id', existingComm.id);
+        console.log('Updated existing communication with transcript and recording URL');
       } else {
-        // Create new communication record
+        // Create new communication record with recording URL
         await supabase
           .from('lead_communications')
           .insert({
@@ -497,7 +501,10 @@ Always provide at least: caller_name (if mentioned), interest_level, sentiment, 
             external_id: callSid,
             status: 'transcribed',
             sent_at: new Date().toISOString(),
+            call_recording_url: recordingUrl, // Store recording URL
+            call_duration: callDuration || null,
           });
+        console.log('Created new communication with transcript and recording URL');
       }
 
       // Add timeline entry with transcription

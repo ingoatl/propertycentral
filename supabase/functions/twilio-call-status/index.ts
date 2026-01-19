@@ -48,21 +48,48 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Update the communication record with the call status
+    // Update the communication record with the call status and duration
     if (callSid && callStatus) {
+      const updateData: Record<string, unknown> = {
+        status: callStatus,
+        delivery_status: callStatus,
+        delivery_updated_at: new Date().toISOString(),
+      };
+      
+      // Add call duration if available
+      if (callDuration) {
+        updateData.call_duration = parseInt(callDuration);
+      }
+      
       const { error: updateError } = await supabase
         .from('lead_communications')
-        .update({
-          status: callStatus,
-          delivery_status: callStatus,
-          delivery_updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('external_id', callSid);
 
       if (updateError) {
         console.error('Error updating communication:', updateError);
       } else {
-        console.log('Updated communication status to:', callStatus);
+        console.log('Updated communication status to:', callStatus, 'duration:', callDuration);
+      }
+    }
+    
+    // Store recording URL immediately when recording is completed (before transcription)
+    if (recordingStatus === 'completed' && recordingUrl && callSid) {
+      console.log('Storing recording URL for call:', callSid);
+      const recordingWithFormat = `${recordingUrl}.mp3`;
+      
+      const { error: recordingError } = await supabase
+        .from('lead_communications')
+        .update({
+          call_recording_url: recordingWithFormat,
+          call_duration: recordingDuration ? parseInt(recordingDuration) : null,
+        })
+        .eq('external_id', callSid);
+        
+      if (recordingError) {
+        console.error('Error storing recording URL:', recordingError);
+      } else {
+        console.log('Recording URL stored successfully:', recordingWithFormat);
       }
     }
 

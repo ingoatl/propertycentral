@@ -119,14 +119,22 @@ export function TwilioCallDialog({
   const initializeDevice = async () => {
     try {
       console.log('Getting Twilio token...');
+      
+      // Get current user ID to pass for phone assignment lookup
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+      
       const { data, error } = await supabase.functions.invoke('twilio-token', {
-        body: { identity: `peachhaus-${Date.now()}` }
+        body: { identity: userId || `peachhaus-${Date.now()}`, userId }
       });
 
       if (error) throw error;
       if (!data?.token) throw new Error('No token received');
 
       console.log('Token received, initializing device...');
+      if (data.assignedPhone) {
+        console.log('User assigned phone:', data.assignedPhone);
+      }
       
       const device = new Device(data.token, {
         logLevel: 1,
@@ -238,7 +246,7 @@ export function TwilioCallDialog({
 
       callRef.current = call;
 
-      call.on('accept', () => {
+      call.on('accept', async () => {
         console.log('Call accepted');
         setIsOnCall(true);
         setIsConnecting(false);
@@ -247,6 +255,36 @@ export function TwilioCallDialog({
           setCallDuration(prev => prev + 1);
         }, 1000);
         toast.success('Call connected');
+        
+        // Create communication record at call start so recording/transcript can be linked
+        const callSid = call.parameters?.CallSid;
+        if (callSid && (metadata?.leadId || metadata?.ownerId)) {
+          try {
+            console.log('Creating call communication record with CallSid:', callSid);
+            const { error: insertError } = await supabase
+              .from('lead_communications')
+              .insert({
+                lead_id: metadata?.leadId || null,
+                owner_id: metadata?.ownerId || null,
+                communication_type: 'call',
+                direction: 'outbound',
+                body: 'Call in progress...',
+                external_id: callSid,
+                status: 'in-progress',
+                sent_at: new Date().toISOString(),
+                contact_name: contactName,
+                contact_phone: formattedPhone,
+              });
+            
+            if (insertError) {
+              console.error('Error creating call record:', insertError);
+            } else {
+              console.log('Call communication record created successfully');
+            }
+          } catch (err) {
+            console.error('Error creating call record:', err);
+          }
+        }
       });
 
       call.on('disconnect', async () => {
