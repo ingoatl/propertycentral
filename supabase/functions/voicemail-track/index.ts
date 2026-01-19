@@ -71,6 +71,21 @@ serve(async (req) => {
         updateData.reply_clicked = true;
         break;
 
+      case "voice_reply_started":
+        // Track when user starts recording a voice reply
+        console.log("Voice reply recording started for token:", token);
+        break;
+
+      case "voice_reply_completed":
+        // This is handled by voicemail-reply function
+        console.log("Voice reply completed for token:", token);
+        break;
+
+      case "voice_reply_cancelled":
+        // Track when user cancels voice reply
+        console.log("Voice reply cancelled for token:", token);
+        break;
+
       default:
         console.log("Unknown event type:", event);
     }

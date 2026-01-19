@@ -9645,7 +9645,10 @@ export type Database = {
           played_at: string | null
           recipient_name: string | null
           recipient_phone: string
+          reply_audio_url: string | null
           reply_clicked: boolean | null
+          reply_duration_seconds: number | null
+          reply_recorded_at: string | null
           sender_name: string | null
           sender_user_id: string | null
           sms_message_sid: string | null
@@ -9671,7 +9674,10 @@ export type Database = {
           played_at?: string | null
           recipient_name?: string | null
           recipient_phone: string
+          reply_audio_url?: string | null
           reply_clicked?: boolean | null
+          reply_duration_seconds?: number | null
+          reply_recorded_at?: string | null
           sender_name?: string | null
           sender_user_id?: string | null
           sms_message_sid?: string | null
@@ -9697,7 +9703,10 @@ export type Database = {
           played_at?: string | null
           recipient_name?: string | null
           recipient_phone?: string
+          reply_audio_url?: string | null
           reply_clicked?: boolean | null
+          reply_duration_seconds?: number | null
+          reply_recorded_at?: string | null
           sender_name?: string | null
           sender_user_id?: string | null
           sms_message_sid?: string | null

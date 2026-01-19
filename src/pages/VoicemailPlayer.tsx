@@ -8,14 +8,14 @@ import {
   Play, 
   Pause, 
   Phone, 
-  MessageSquare, 
-  Volume2, 
   Loader2,
-  Home,
-  AlertCircle
+  AlertCircle,
+  Mic,
+  Check
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import VoiceReplyRecorder from "@/components/voicemail/VoiceReplyRecorder";
 
 export default function VoicemailPlayer() {
   const { token } = useParams<{ token: string }>();
@@ -25,10 +25,12 @@ export default function VoicemailPlayer() {
   const [duration, setDuration] = useState(0);
   const [hasTrackedOpen, setHasTrackedOpen] = useState(false);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [showReplyRecorder, setShowReplyRecorder] = useState(false);
+  const [replySent, setReplySent] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Fetch voicemail data
-  const { data: voicemail, isLoading, error } = useQuery({
+  const { data: voicemail, isLoading, error, refetch } = useQuery({
     queryKey: ["voicemail", token],
     queryFn: async () => {
       if (!token) throw new Error("No token provided");
@@ -53,7 +55,14 @@ export default function VoicemailPlayer() {
     }
   }, [voicemail, hasTrackedOpen]);
 
-  const trackEvent = async (event: "open" | "play" | "callback" | "reply", extraData?: Record<string, any>) => {
+  // Check if reply was already sent
+  useEffect(() => {
+    if (voicemail?.reply_audio_url) {
+      setReplySent(true);
+    }
+  }, [voicemail]);
+
+  const trackEvent = async (event: string, extraData?: Record<string, any>) => {
     if (!token) return;
     
     try {
@@ -101,7 +110,6 @@ export default function VoicemailPlayer() {
     setPlaybackProgress(0);
     setCurrentTime(0);
     
-    // Track listen duration
     if (duration > 0) {
       trackEvent("play", { duration: Math.round(duration) });
     }
@@ -118,14 +126,23 @@ export default function VoicemailPlayer() {
 
   const handleCallback = () => {
     trackEvent("callback");
-    // Open phone dialer with Peachhaus number
     window.location.href = "tel:+14048005932";
   };
 
-  const handleReply = () => {
-    trackEvent("reply");
-    // Open SMS composer
-    window.location.href = "sms:+14048005932";
+  const handleReplyClick = () => {
+    trackEvent("voice_reply_started");
+    setShowReplyRecorder(true);
+  };
+
+  const handleReplySent = () => {
+    setReplySent(true);
+    setShowReplyRecorder(false);
+    refetch();
+  };
+
+  const handleReplyCancel = () => {
+    trackEvent("voice_reply_cancelled");
+    setShowReplyRecorder(false);
   };
 
   const formatTime = (seconds: number) => {
@@ -136,19 +153,31 @@ export default function VoicemailPlayer() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <img 
+            src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
+            alt="PeachHaus" 
+            className="h-12 mx-auto mb-6"
+          />
+          <Loader2 className="h-8 w-8 animate-spin text-amber-600 mx-auto" />
+        </div>
       </div>
     );
   }
 
   if (error || !voicemail) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
-        <Card className="max-w-sm w-full p-6 text-center">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-lg font-semibold mb-2">Message Not Found</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
+        <Card className="max-w-sm w-full p-8 text-center shadow-xl border-0">
+          <img 
+            src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
+            alt="PeachHaus" 
+            className="h-10 mx-auto mb-6"
+          />
+          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h1 className="text-xl font-semibold mb-2 text-gray-900">Message Not Found</h1>
+          <p className="text-sm text-gray-500">
             This voice message may have expired or doesn't exist.
           </p>
         </Card>
@@ -157,45 +186,58 @@ export default function VoicemailPlayer() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex flex-col items-center justify-center p-4">
-      <Card className="max-w-sm w-full overflow-hidden shadow-xl">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex flex-col items-center justify-center p-4">
+      <Card className="max-w-md w-full overflow-hidden shadow-2xl border-0 rounded-3xl">
         {/* Header with branding */}
-        <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-6 text-white text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Home className="h-6 w-6" />
-            <span className="text-xl font-bold">Peachhaus</span>
+        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 p-8 text-white text-center relative overflow-hidden">
+          {/* Decorative circles */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+          
+          <div className="relative z-10">
+            <img 
+              src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
+              alt="PeachHaus" 
+              className="h-12 mx-auto mb-3"
+            />
+            <p className="text-amber-100 text-sm font-medium">Property Management</p>
           </div>
-          <p className="text-orange-100 text-sm">Property Management</p>
         </div>
 
         {/* Message Info */}
-        <div className="p-6">
-          <div className="text-center mb-6">
-            <p className="text-sm text-muted-foreground mb-1">Voice Message from</p>
-            <h2 className="text-xl font-semibold">{voicemail.sender_name || "Peachhaus Team"}</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+        <div className="p-6 sm:p-8">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+            </div>
+            <p className="text-sm text-gray-500 mb-1">Voice Message from</p>
+            <h2 className="text-2xl font-bold text-gray-900">{voicemail.sender_name || "PeachHaus Team"}</h2>
+            <p className="text-sm text-gray-400 mt-2">
               {format(new Date(voicemail.created_at), "MMMM d, yyyy 'at' h:mm a")}
             </p>
           </div>
 
           {/* Audio Player */}
-          <div className="bg-muted rounded-xl p-4 mb-6">
+          <div className="bg-gradient-to-br from-gray-50 to-amber-50/50 rounded-2xl p-5 mb-6">
             {/* Waveform-style progress bar */}
             <div 
-              className="h-12 mb-4 bg-muted-foreground/10 rounded-lg overflow-hidden cursor-pointer relative"
+              className="h-16 mb-5 bg-white rounded-xl overflow-hidden cursor-pointer relative shadow-inner"
               onClick={handleSeek}
             >
-              {/* Fake waveform visualization */}
-              <div className="absolute inset-0 flex items-center justify-center gap-0.5 px-2">
-                {Array.from({ length: 40 }).map((_, i) => {
-                  const height = 20 + Math.sin(i * 0.5) * 15 + Math.random() * 10;
-                  const isPlayed = (i / 40) * 100 <= playbackProgress;
+              <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-3">
+                {Array.from({ length: 50 }).map((_, i) => {
+                  const height = 25 + Math.sin(i * 0.4) * 20 + Math.sin(i * 0.8) * 10;
+                  const isPlayed = (i / 50) * 100 <= playbackProgress;
                   return (
                     <div
                       key={i}
                       className={cn(
-                        "w-1 rounded-full transition-colors",
-                        isPlayed ? "bg-orange-500" : "bg-muted-foreground/30"
+                        "w-1 rounded-full transition-all duration-150",
+                        isPlayed 
+                          ? "bg-gradient-to-t from-amber-500 to-orange-400" 
+                          : "bg-gray-200"
                       )}
                       style={{ height: `${height}%` }}
                     />
@@ -206,58 +248,82 @@ export default function VoicemailPlayer() {
 
             {/* Time and Play Button */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground font-mono">
+              <span className="text-sm text-gray-500 font-mono w-12">
                 {formatTime(currentTime)}
               </span>
               
               <Button
                 size="lg"
-                className="rounded-full h-16 w-16 bg-orange-500 hover:bg-orange-600"
+                className="rounded-full h-20 w-20 bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30 transition-all hover:scale-105"
                 onClick={handlePlay}
               >
                 {isPlaying ? (
-                  <Pause className="h-7 w-7" />
+                  <Pause className="h-8 w-8" />
                 ) : (
-                  <Play className="h-7 w-7 ml-1" />
+                  <Play className="h-8 w-8 ml-1" />
                 )}
               </Button>
               
-              <span className="text-sm text-muted-foreground font-mono">
+              <span className="text-sm text-gray-500 font-mono w-12 text-right">
                 {formatTime(duration)}
               </span>
             </div>
           </div>
 
-          {/* Call to Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              size="lg"
-              className="gap-2"
-              onClick={handleCallback}
-            >
-              <Phone className="h-4 w-4" />
-              Call Back
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="gap-2"
-              onClick={handleReply}
-            >
-              <MessageSquare className="h-4 w-4" />
-              Reply
-            </Button>
-          </div>
+          {/* Reply Section */}
+          {showReplyRecorder ? (
+            <VoiceReplyRecorder 
+              token={token!}
+              voicemailId={voicemail.id}
+              onReplySent={handleReplySent}
+              onCancel={handleReplyCancel}
+            />
+          ) : (
+            <>
+              {/* Call to Action Buttons */}
+              <div className="space-y-3">
+                {replySent ? (
+                  <div className="flex items-center justify-center gap-2 py-4 px-6 bg-green-50 rounded-xl border border-green-100">
+                    <Check className="h-5 w-5 text-green-600" />
+                    <span className="text-green-700 font-medium">Reply Sent Successfully</span>
+                  </div>
+                ) : (
+                  <Button
+                    size="lg"
+                    className="w-full gap-3 h-14 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
+                    onClick={handleReplyClick}
+                  >
+                    <Mic className="h-5 w-5" />
+                    Reply with Voice Message
+                  </Button>
+                )}
+                
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full gap-3 h-14 rounded-xl border-2 hover:bg-amber-50"
+                  onClick={handleCallback}
+                >
+                  <Phone className="h-5 w-5" />
+                  Call Us Back
+                </Button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="bg-muted/50 p-4 text-center">
-          <p className="text-xs text-muted-foreground">
-            Questions? Call us at (404) 800-5932
+        <div className="bg-gray-50 p-5 text-center border-t">
+          <p className="text-xs text-gray-500">
+            Questions? Call us at <a href="tel:+14048005932" className="text-amber-600 font-medium hover:underline">(404) 800-5932</a>
           </p>
         </div>
       </Card>
+
+      {/* Powered by badge */}
+      <p className="mt-6 text-xs text-gray-400">
+        Powered by PeachHaus
+      </p>
 
       {/* Hidden audio element */}
       <audio

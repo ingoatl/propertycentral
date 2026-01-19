@@ -1,0 +1,165 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { token, voicemailId, audioBase64, duration, mimeType } = await req.json();
+
+    if (!token || !voicemailId || !audioBase64) {
+      throw new Error("Missing required fields: token, voicemailId, audioBase64");
+    }
+
+    console.log("Processing voicemail reply for token:", token);
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify the voicemail exists and matches the token
+    const { data: voicemail, error: fetchError } = await supabase
+      .from("voicemail_messages")
+      .select("*, leads(id, name, email, phone)")
+      .eq("id", voicemailId)
+      .eq("token", token)
+      .single();
+
+    if (fetchError || !voicemail) {
+      console.error("Voicemail not found or token mismatch:", fetchError);
+      throw new Error("Voicemail not found or invalid token");
+    }
+
+    // Check if already replied
+    if (voicemail.reply_audio_url) {
+      throw new Error("A reply has already been sent for this voicemail");
+    }
+
+    // Decode base64 audio
+    const audioBytes = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
+    
+    // Determine file extension from mime type
+    const extension = mimeType?.includes("webm") ? "webm" : "mp4";
+    const fileName = `voicemail-replies/${voicemailId}-reply-${Date.now()}.${extension}`;
+
+    // Upload to storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("message-attachments")
+      .upload(fileName, audioBytes, {
+        contentType: mimeType || "audio/webm",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      throw new Error("Failed to upload reply audio");
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("message-attachments")
+      .getPublicUrl(fileName);
+
+    const replyAudioUrl = urlData.publicUrl;
+    console.log("Reply audio uploaded:", replyAudioUrl);
+
+    // Update voicemail record with reply info
+    const { error: updateError } = await supabase
+      .from("voicemail_messages")
+      .update({
+        reply_audio_url: replyAudioUrl,
+        reply_recorded_at: new Date().toISOString(),
+        reply_duration_seconds: duration || 0,
+        status: "replied",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", voicemailId);
+
+    if (updateError) {
+      console.error("Update error:", updateError);
+      throw new Error("Failed to update voicemail record");
+    }
+
+    // Create a lead communication entry to track the reply
+    const { error: commError } = await supabase
+      .from("lead_communications")
+      .insert({
+        lead_id: voicemail.lead_id,
+        owner_id: voicemail.owner_id,
+        type: "voicemail_reply",
+        direction: "inbound",
+        subject: `Voice reply from ${voicemail.recipient_name || "Owner"}`,
+        content: `Voice message reply received (${duration}s)`,
+        metadata: {
+          voicemail_id: voicemailId,
+          reply_audio_url: replyAudioUrl,
+          reply_duration: duration,
+          original_sender: voicemail.sender_name,
+        },
+      });
+
+    if (commError) {
+      console.error("Failed to create communication record:", commError);
+      // Don't throw - this is a secondary operation
+    }
+
+    // Send Slack notification if configured
+    const slackToken = Deno.env.get("SLACK_BOT_TOKEN");
+    if (slackToken) {
+      try {
+        const recipientName = voicemail.recipient_name || "An owner";
+        const propertyAddress = voicemail.property_address || "Unknown property";
+        
+        const slackMessage = {
+          channel: "#owner-communications", // Update channel as needed
+          text: `🎙️ *Voice Reply Received*\n\n*From:* ${recipientName}\n*Property:* ${propertyAddress}\n*Duration:* ${duration}s\n\n<${replyAudioUrl}|Listen to Reply>`,
+        };
+
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${slackToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(slackMessage),
+        });
+        console.log("Slack notification sent");
+      } catch (slackErr) {
+        console.error("Failed to send Slack notification:", slackErr);
+        // Don't throw - Slack is optional
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        replyAudioUrl,
+        message: "Reply sent successfully",
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    console.error("Voicemail reply error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+});
