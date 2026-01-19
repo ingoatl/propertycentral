@@ -932,7 +932,7 @@ export function InboxView() {
         let commsQuery = supabase
           .from("lead_communications")
           .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, assigned_user_id, received_on_number, ghl_contact_id, leads(id, name, phone, email)`)
-          .in("communication_type", ["sms", "email"])
+          .in("communication_type", ["sms", "email", "voicemail"])
           .order("created_at", { ascending: false })
           .limit(100);
         
