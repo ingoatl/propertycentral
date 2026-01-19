@@ -7,11 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Delete, Loader2, PhoneOff, PhoneCall, User, Home } from "lucide-react";
+import { Delete, Loader2, PhoneOff, PhoneCall, User, Home, Circle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 import { formatPhoneForDisplay, cleanPhoneNumber } from "@/lib/phoneUtils";
+import { Badge } from "@/components/ui/badge";
 
 interface CallDialogProps {
   open: boolean;
@@ -113,6 +114,17 @@ export function CallDialog({
               </div>
             </div>
           </div>
+
+          {/* Recording indicator when on call */}
+          {isOnCall && (
+            <div className="flex items-center justify-center gap-2 py-2">
+              <Circle className="h-3 w-3 fill-red-500 text-red-500 animate-pulse" />
+              <span className="text-sm font-medium text-red-600">Recording</span>
+              <Badge variant="secondary" className="text-xs">
+                Auto-transcribed
+              </Badge>
+            </div>
+          )}
           
           {/* Phone input */}
           <div className="relative">
@@ -198,6 +210,11 @@ export function CallDialog({
               </Button>
             )}
           </div>
+
+          {/* Recording info */}
+          <p className="text-xs text-center text-muted-foreground">
+            All calls are automatically recorded and transcribed via Twilio
+          </p>
         </div>
       </DialogContent>
     </Dialog>
