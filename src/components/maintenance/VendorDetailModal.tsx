@@ -544,6 +544,7 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
                     vendorId={vendor.id}
                     vendorName={vendor.name}
                     vendorEmail={vendor.email}
+                    vendorPhone={vendor.phone}
                     billcomVendorId={vendor.billcom_vendor_id}
                     billcomSyncedAt={vendor.billcom_synced_at}
                     billcomInviteSentAt={vendor.billcom_invite_sent_at}
