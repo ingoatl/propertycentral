@@ -135,45 +135,110 @@ serve(async (req) => {
     // Build the player URL
     const playerUrl = `https://propertycentral.lovable.app/vm/${voicemail.token}`;
 
-    // Format phone number for Twilio
+    // Format phone number for GHL (E.164)
     let formattedPhone = recipientPhone.replace(/\D/g, "");
     if (formattedPhone.length === 10) {
       formattedPhone = "+1" + formattedPhone;
+    } else if (formattedPhone.length === 11 && formattedPhone.startsWith("1")) {
+      formattedPhone = "+" + formattedPhone;
     } else if (!formattedPhone.startsWith("+")) {
       formattedPhone = "+" + formattedPhone;
     }
 
-    // Send SMS via Twilio
-    const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const twilioPhoneNumber = Deno.env.get("TWILIO_PHONE_NUMBER");
+    // Send SMS via GoHighLevel (404-800-5932 number)
+    const ghlApiKey = Deno.env.get("GHL_API_KEY");
+    const ghlLocationId = Deno.env.get("GHL_LOCATION_ID");
 
-    if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
-      throw new Error("Twilio credentials not configured");
+    if (!ghlApiKey || !ghlLocationId) {
+      throw new Error("GHL credentials not configured");
     }
 
     const smsBody = `🎙️ ${senderName || "Peachhaus"} left you a voice message.\n\nTap to listen:\n${playerUrl}\n\nReply to this text or call (404) 800-5932`;
+    const fromNumber = "+14048005932";
 
-    const twilioResponse = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
+    console.log(`Sending voicemail SMS via GHL to ${formattedPhone} from ${fromNumber}`);
+
+    // Step 1: Find or create contact in GHL
+    const searchResponse = await fetch(
+      `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${ghlLocationId}&phone=${encodeURIComponent(formattedPhone)}`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${ghlApiKey}`,
+          "Version": "2021-07-28",
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    let contactId = null;
+    if (searchResponse.ok) {
+      const searchData = await searchResponse.json();
+      if (searchData.contact?.id) {
+        contactId = searchData.contact.id;
+        console.log(`Found existing GHL contact: ${contactId}`);
+      }
+    }
+
+    // If no contact found, create one
+    if (!contactId) {
+      const createContactResponse = await fetch(
+        `https://services.leadconnectorhq.com/contacts/`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${ghlApiKey}`,
+            "Version": "2021-07-28",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            locationId: ghlLocationId,
+            phone: formattedPhone,
+            name: recipientName || "Contact",
+            source: "PropertyCentral Voicemail",
+          }),
+        }
+      );
+
+      if (createContactResponse.ok) {
+        const createData = await createContactResponse.json();
+        contactId = createData.contact?.id;
+        console.log(`Created new GHL contact: ${contactId}`);
+      } else {
+        const errorText = await createContactResponse.text();
+        console.error("Error creating GHL contact:", errorText);
+        throw new Error(`Failed to create GHL contact: ${createContactResponse.status}`);
+      }
+    }
+
+    if (!contactId) {
+      throw new Error("Failed to find or create GHL contact");
+    }
+
+    // Step 2: Send SMS message via GHL
+    const sendResponse = await fetch(
+      `https://services.leadconnectorhq.com/conversations/messages`,
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
+          "Authorization": `Bearer ${ghlApiKey}`,
+          "Version": "2021-04-15",
+          "Content-Type": "application/json",
         },
-        body: new URLSearchParams({
-          To: formattedPhone,
-          From: twilioPhoneNumber,
-          Body: smsBody,
+        body: JSON.stringify({
+          type: "SMS",
+          contactId: contactId,
+          message: smsBody,
+          fromNumber: fromNumber,
         }),
       }
     );
 
-    const twilioData = await twilioResponse.json();
+    const sendResponseText = await sendResponse.text();
+    console.log(`GHL send response: ${sendResponse.status} - ${sendResponseText}`);
 
-    if (!twilioResponse.ok) {
-      console.error("Twilio error:", twilioData);
+    if (!sendResponse.ok) {
+      console.error("GHL SMS send error:", sendResponseText);
       
       // Update voicemail status to failed
       await supabase
@@ -181,15 +246,24 @@ serve(async (req) => {
         .update({ status: "failed" })
         .eq("id", voicemail.id);
 
-      throw new Error(twilioData.message || "Failed to send SMS");
+      throw new Error(`Failed to send SMS via GHL: ${sendResponse.status}`);
     }
+
+    let sendData;
+    try {
+      sendData = JSON.parse(sendResponseText);
+    } catch (e) {
+      sendData = { messageId: "unknown" };
+    }
+
+    const messageId = sendData.messageId || sendData.conversationId || "sent";
 
     // Update voicemail with SMS info
     await supabase
       .from("voicemail_messages")
       .update({
         sms_sent_at: new Date().toISOString(),
-        sms_message_sid: twilioData.sid,
+        sms_message_sid: messageId,
         status: "sent",
       })
       .eq("id", voicemail.id);
@@ -202,11 +276,15 @@ serve(async (req) => {
         direction: "outbound",
         body: messageText || "(Voice message)",
         status: "sent",
+        ghl_contact_id: contactId,
+        ghl_conversation_id: sendData.conversationId,
         metadata: {
           voicemail_id: voicemail.id,
           audio_url: audioUrl,
           player_url: playerUrl,
-          sms_sid: twilioData.sid,
+          provider: "gohighlevel",
+          ghl_message_id: messageId,
+          from_number: fromNumber,
         },
       });
     }
@@ -219,11 +297,15 @@ serve(async (req) => {
         direction: "outbound",
         body: messageText || "(Voice message)",
         status: "sent",
+        ghl_contact_id: contactId,
+        ghl_conversation_id: sendData.conversationId,
         metadata: {
           voicemail_id: voicemail.id,
           audio_url: audioUrl,
           player_url: playerUrl,
-          sms_sid: twilioData.sid,
+          provider: "gohighlevel",
+          ghl_message_id: messageId,
+          from_number: fromNumber,
         },
       });
     }
@@ -234,7 +316,7 @@ serve(async (req) => {
         voicemailId: voicemail.id,
         token: voicemail.token,
         playerUrl,
-        smsSid: twilioData.sid,
+        messageId: messageId,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
