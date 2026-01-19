@@ -88,8 +88,8 @@ serve(async (req) => {
     let nudgesSent = 0;
     const results: { requestId: string; success: boolean; error?: string }[] = [];
 
-    // Helper to send SMS via GHL
-    const sendNudgeSms = async (phone: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> => {
+    // Helper to send SMS via GHL - creates contact if not found
+    const sendNudgeSms = async (phone: string, message: string, guestName?: string): Promise<{ success: boolean; messageId?: string; error?: string }> => {
       try {
         const formattedPhone = formatPhoneE164(phone);
         
@@ -111,8 +111,40 @@ serve(async (req) => {
           ghlContactId = searchData.contact?.id;
         }
 
+        // If contact not found, create one (same as batch sender does)
         if (!ghlContactId) {
-          return { success: false, error: "Contact not found in GHL" };
+          console.log(`Contact not found for ${formattedPhone}, creating new GHL contact...`);
+          const createResponse = await fetch(
+            `https://services.leadconnectorhq.com/contacts/`,
+            {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${ghlApiKey}`,
+                "Version": "2021-07-28",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                locationId: ghlLocationId,
+                phone: formattedPhone,
+                name: guestName || "Guest",
+                source: "GoogleReviews",
+              }),
+            }
+          );
+
+          if (createResponse.ok) {
+            const createData = await createResponse.json();
+            ghlContactId = createData.contact?.id;
+            console.log(`Created new GHL contact: ${ghlContactId}`);
+          } else {
+            const errorText = await createResponse.text();
+            console.error(`Failed to create GHL contact: ${errorText}`);
+            return { success: false, error: `Failed to create contact: ${errorText}` };
+          }
+        }
+
+        if (!ghlContactId) {
+          return { success: false, error: "Failed to find or create GHL contact" };
         }
 
         // Send SMS
@@ -148,11 +180,14 @@ serve(async (req) => {
 
     for (const request of needsNudge || []) {
       try {
+        // Get guest name from ownerrez_reviews if available
+        const guestName = request.ownerrez_reviews?.guest_name || "there";
+        
         const nudgeMessage = request.nudge_count === 0
           ? `Just checking in real quick — no pressure at all. Happy to send the Google link + your review text if you'd like. Just reply and I'll send it over.`
           : `Just a friendly bump in case life got busy — if you're still open to it, here's the Google link again: ${googleReviewUrl}. We appreciate you!`;
 
-        const result = await sendNudgeSms(request.guest_phone, nudgeMessage);
+        const result = await sendNudgeSms(request.guest_phone, nudgeMessage, guestName);
 
         // Log the SMS
         await supabase.from("sms_log").insert({
