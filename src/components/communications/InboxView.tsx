@@ -2424,9 +2424,9 @@ export function InboxView() {
           </div>
         )}
 
-        {/* Filters row - compact with dropdown for filters */}
+        {/* Filters row - compact with dropdown for filters - NO WRAP on desktop */}
         <div className="px-2 sm:px-3 py-2 border-b">
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap md:flex-nowrap overflow-x-auto">
             {/* Notification bell */}
             <TeamNotificationBell />
             
