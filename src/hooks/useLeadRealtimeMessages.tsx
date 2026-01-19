@@ -16,8 +16,9 @@ export function useLeadRealtimeMessages() {
       queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
       queryClient.invalidateQueries({ queryKey: ["conversation-thread"] });
+      queryClient.invalidateQueries({ queryKey: ["communications"] }); // InboxView uses this
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-    }, 150); // Reduced debounce for faster updates
+    }, 100); // Fast 100ms debounce for near-realtime updates
   }, [queryClient]);
 
   useEffect(() => {

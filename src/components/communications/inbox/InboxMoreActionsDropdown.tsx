@@ -1,4 +1,4 @@
-import { MoreVertical, Save, UserPlus, FileText, Printer, Archive, Calendar, Bell, ExternalLink } from "lucide-react";
+import { MoreVertical, Save, UserPlus, FileText, Printer, Archive, Calendar, Bell, ExternalLink, Sparkles, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,8 +18,11 @@ interface InboxMoreActionsDropdownProps {
   onAddToCalendar?: () => void;
   onSetReminder?: () => void;
   onPrint?: () => void;
+  onSummarize?: () => void;
+  isSummarizing?: boolean;
   showSaveMessage?: boolean;
   showCreateLead?: boolean;
+  showSummarize?: boolean;
   disabled?: boolean;
 }
 
@@ -30,8 +33,11 @@ export function InboxMoreActionsDropdown({
   onAddToCalendar,
   onSetReminder,
   onPrint,
+  onSummarize,
+  isSummarizing = false,
   showSaveMessage = true,
   showCreateLead = true,
+  showSummarize = true,
   disabled = false,
 }: InboxMoreActionsDropdownProps) {
   const handleOpenIncomeReport = () => {
@@ -70,6 +76,18 @@ export function InboxMoreActionsDropdown({
         )}
         
         <DropdownMenuSeparator />
+        
+        {/* Summarize */}
+        {showSummarize && onSummarize && (
+          <DropdownMenuItem onClick={onSummarize} disabled={isSummarizing} className="gap-2">
+            {isSummarizing ? (
+              <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+            ) : (
+              <Sparkles className="h-4 w-4 text-primary" />
+            )}
+            <span>{isSummarizing ? "Summarizing..." : "Summarize"}</span>
+          </DropdownMenuItem>
+        )}
         
         {/* Income Report */}
         <DropdownMenuItem onClick={handleOpenIncomeReport} className="gap-2">
