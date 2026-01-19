@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Maximize2, Minimize2, Send, X, Check } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Maximize2, Send, X, Check, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -50,7 +50,7 @@ export function ExpandableMessageInput({
   contactId,
   contactType = "lead",
   minRows = 2,
-  maxRows = 6,
+  maxRows = 8,
   showCharacterCount = true,
   showSegmentCount = true,
   disabled = false,
@@ -60,6 +60,7 @@ export function ExpandableMessageInput({
 }: ExpandableMessageInputProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [localValue, setLocalValue] = useState(value);
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = useIsMobile();
 
@@ -71,23 +72,24 @@ export function ExpandableMessageInput({
   // Character and segment counting for SMS
   const characterCount = localValue.length;
   const segmentCount = Math.ceil(characterCount / 160) || 1;
+  const isLongMessage = characterCount > 200 || localValue.split('\n').length > 3;
 
-  // Auto-resize textarea based on content
-  const adjustHeight = () => {
+  // Auto-resize textarea with smooth animation
+  const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
-      const lineHeight = 24; // Approximate line height
-      const minHeight = minRows * lineHeight;
+      const lineHeight = 26; // Larger line height for readability
+      const minHeight = Math.max(minRows * lineHeight, 56); // Minimum 56px (touch-friendly)
       const maxHeight = maxRows * lineHeight;
       const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
       textarea.style.height = `${newHeight}px`;
     }
-  };
+  }, [minRows, maxRows]);
 
   useEffect(() => {
     adjustHeight();
-  }, [localValue, minRows, maxRows]);
+  }, [localValue, adjustHeight]);
 
   const handleChange = (newValue: string) => {
     setLocalValue(newValue);
@@ -116,6 +118,40 @@ export function ExpandableMessageInput({
     }
   };
 
+  // Action buttons component
+  const ActionButtons = ({ expanded = false }: { expanded?: boolean }) => (
+    <div className="flex items-center gap-2">
+      {showVoiceDictation && (
+        <VoiceDictationButton
+          onResult={(text) => {
+            const newValue = localValue ? `${localValue}\n${text}` : text;
+            setLocalValue(newValue);
+            if (!expanded) onChange(newValue);
+          }}
+          messageType={messageType}
+          contactName={contactName}
+          className={cn(
+            "transition-all duration-200 active:scale-95",
+            expanded ? "h-12 w-12 md:h-11 md:w-11" : "h-11 w-11 md:h-10 md:w-10"
+          )}
+        />
+      )}
+      {showAIAssistant && contactId && (
+        <AIWritingAssistant
+          currentMessage={localValue}
+          onMessageGenerated={(msg) => {
+            setLocalValue(msg);
+            if (!expanded) onChange(msg);
+          }}
+          contactName={contactName}
+          messageType={messageType}
+          contactId={contactId}
+          contactType={contactType}
+        />
+      )}
+    </div>
+  );
+
   // Expanded content - shared between Dialog and Drawer
   const ExpandedContent = (
     <div className="flex flex-col h-full">
@@ -123,18 +159,40 @@ export function ExpandableMessageInput({
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 min-h-[200px] md:min-h-[250px] text-base leading-relaxed resize-none border-0 focus-visible:ring-0 p-4"
+        className={cn(
+          "flex-1 min-h-[220px] md:min-h-[280px] resize-none border-0 focus-visible:ring-0",
+          "text-[17px] md:text-base leading-relaxed p-4 md:p-5"
+        )}
         autoFocus
       />
       
+      {/* Action bar in expanded view */}
+      <div className="border-t bg-muted/30 px-4 py-3">
+        <ActionButtons expanded />
+      </div>
+      
       {/* Footer info */}
       {(showCharacterCount || showSegmentCount) && messageType === "sms" && (
-        <div className="flex justify-between text-xs text-muted-foreground px-4 py-2 border-t bg-muted/30">
-          {showCharacterCount && <span>{characterCount} characters</span>}
-          {showSegmentCount && (
-            <span>
-              {segmentCount} SMS segment{segmentCount > 1 ? "s" : ""}
-            </span>
+        <div className="flex justify-between items-center px-4 py-3 border-t bg-muted/20">
+          <div className="flex items-center gap-3">
+            {showCharacterCount && (
+              <span className="text-base md:text-sm text-muted-foreground">
+                {characterCount} characters
+              </span>
+            )}
+            {showSegmentCount && (
+              <span className={cn(
+                "text-base md:text-sm font-medium px-2 py-0.5 rounded-full",
+                segmentCount > 1 
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" 
+                  : "bg-muted text-muted-foreground"
+              )}>
+                {segmentCount} segment{segmentCount > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          {segmentCount > 3 && (
+            <span className="text-sm text-amber-500">Long message</span>
           )}
         </div>
       )}
@@ -144,29 +202,10 @@ export function ExpandableMessageInput({
   // Mobile: Use Drawer (bottom sheet) for expanded view
   const MobileExpandedView = (
     <Drawer open={isExpanded} onOpenChange={setIsExpanded}>
-      <DrawerContent className="max-h-[90vh]">
-        <DrawerHeader className="border-b">
-          <DrawerTitle className="flex items-center justify-between">
-            <span>Review Message</span>
-            <div className="flex gap-2">
-              {showVoiceDictation && (
-                <VoiceDictationButton
-                  onResult={(text) => setLocalValue(prev => prev ? `${prev}\n${text}` : text)}
-                  messageType={messageType}
-                  contactName={contactName}
-                />
-              )}
-              {showAIAssistant && contactId && (
-                <AIWritingAssistant
-                  currentMessage={localValue}
-                  onMessageGenerated={setLocalValue}
-                  contactName={contactName}
-                  messageType={messageType}
-                  contactId={contactId}
-                  contactType={contactType}
-                />
-              )}
-            </div>
+      <DrawerContent className="max-h-[92vh] flex flex-col">
+        <DrawerHeader className="border-b px-4 py-3">
+          <DrawerTitle className="text-lg font-semibold">
+            Review Message
           </DrawerTitle>
         </DrawerHeader>
         
@@ -174,31 +213,31 @@ export function ExpandableMessageInput({
           {ExpandedContent}
         </div>
         
-        <DrawerFooter className="border-t pt-4 safe-area-bottom">
+        <DrawerFooter className="border-t pt-4 pb-6 safe-area-bottom">
           <div className="flex gap-3">
             <Button 
               variant="outline" 
               onClick={handleCancel} 
-              className="flex-1 h-12"
+              className="flex-1 h-14 text-base rounded-xl active:scale-[0.98] transition-transform"
             >
-              <X className="h-4 w-4 mr-2" />
+              <X className="h-5 w-5 mr-2" />
               Cancel
             </Button>
             {onSend ? (
               <Button 
                 onClick={handleSend} 
                 disabled={!localValue.trim()} 
-                className="flex-1 h-12 bg-gradient-to-br from-violet-500 to-violet-600"
+                className="flex-1 h-14 text-base rounded-xl bg-gradient-to-br from-primary to-primary/80 active:scale-[0.98] transition-transform"
               >
-                <Send className="h-4 w-4 mr-2" />
+                <Send className="h-5 w-5 mr-2" />
                 Send
               </Button>
             ) : (
               <Button 
                 onClick={handleSaveAndClose} 
-                className="flex-1 h-12"
+                className="flex-1 h-14 text-base rounded-xl active:scale-[0.98] transition-transform"
               >
-                <Check className="h-4 w-4 mr-2" />
+                <Check className="h-5 w-5 mr-2" />
                 Done
               </Button>
             )}
@@ -211,38 +250,24 @@ export function ExpandableMessageInput({
   // Desktop: Use Dialog for expanded view
   const DesktopExpandedView = (
     <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Review Message</span>
-            <div className="flex gap-2">
-              {showVoiceDictation && (
-                <VoiceDictationButton
-                  onResult={(text) => setLocalValue(prev => prev ? `${prev}\n${text}` : text)}
-                  messageType={messageType}
-                  contactName={contactName}
-                />
-              )}
-              {showAIAssistant && contactId && (
-                <AIWritingAssistant
-                  currentMessage={localValue}
-                  onMessageGenerated={setLocalValue}
-                  contactName={contactName}
-                  messageType={messageType}
-                  contactId={contactId}
-                  contactType={contactType}
-                />
-              )}
-            </div>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 py-4 border-b">
+          <DialogTitle className="text-lg font-semibold">
+            Review Message
+            {contactName && (
+              <span className="text-muted-foreground font-normal ml-2">
+                to {contactName}
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 overflow-hidden border rounded-lg">
+        <div className="flex-1 overflow-hidden">
           {ExpandedContent}
         </div>
         
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" onClick={handleCancel}>
+        <DialogFooter className="px-6 py-4 border-t gap-3 sm:gap-3">
+          <Button variant="outline" onClick={handleCancel} className="h-11">
             <X className="h-4 w-4 mr-2" />
             Cancel
           </Button>
@@ -250,13 +275,13 @@ export function ExpandableMessageInput({
             <Button 
               onClick={handleSend} 
               disabled={!localValue.trim()}
-              className="bg-gradient-to-br from-violet-500 to-violet-600"
+              className="h-11 bg-gradient-to-br from-primary to-primary/80"
             >
               <Send className="h-4 w-4 mr-2" />
-              Send
+              Send Message
             </Button>
           ) : (
-            <Button onClick={handleSaveAndClose}>
+            <Button onClick={handleSaveAndClose} className="h-11">
               <Check className="h-4 w-4 mr-2" />
               Done
             </Button>
@@ -268,64 +293,85 @@ export function ExpandableMessageInput({
 
   return (
     <>
-      {/* Compact input view */}
+      {/* Compact input view with enhanced styling */}
       <div className={cn("relative", className)}>
-        <Textarea
-          ref={textareaRef}
-          value={localValue}
-          onChange={(e) => handleChange(e.target.value)}
-          onFocus={isMobile ? handleExpand : undefined}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={cn(
-            "pr-20 resize-none transition-all text-base md:text-sm",
-            isMobile && "cursor-pointer"
-          )}
-          rows={minRows}
-        />
-        
-        {/* Action buttons overlay */}
-        <div className="absolute right-2 top-2 flex gap-1">
-          {showVoiceDictation && !isMobile && (
-            <VoiceDictationButton
-              onResult={(text) => handleChange(localValue ? `${localValue}\n${text}` : text)}
-              messageType={messageType}
-              contactName={contactName}
-            />
-          )}
-          {showAIAssistant && contactId && !isMobile && (
-            <AIWritingAssistant
-              currentMessage={localValue}
-              onMessageGenerated={handleChange}
-              contactName={contactName}
-              messageType={messageType}
-              contactId={contactId}
-              contactType={contactType}
-            />
-          )}
+        <div className={cn(
+          "relative rounded-2xl border-2 transition-all duration-200",
+          isFocused ? "ring-2 ring-primary/20 border-primary/50" : "border-input",
+          "bg-background"
+        )}>
+          <Textarea
+            ref={textareaRef}
+            value={localValue}
+            onChange={(e) => handleChange(e.target.value)}
+            onFocus={() => {
+              setIsFocused(true);
+              if (isMobile && isLongMessage) handleExpand();
+            }}
+            onBlur={() => setIsFocused(false)}
+            placeholder={placeholder}
+            disabled={disabled}
+            className={cn(
+              "min-h-[56px] resize-none border-0 focus-visible:ring-0 rounded-2xl",
+              "text-[17px] leading-relaxed py-4 px-4 pr-14",
+              "placeholder:text-muted-foreground/60",
+              isMobile && isLongMessage && "cursor-pointer"
+            )}
+            rows={minRows}
+          />
+          
+          {/* Expand button */}
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={handleExpand}
-            className="h-8 w-8 rounded-full hover:bg-muted"
+            className="absolute right-2 top-2 h-10 w-10 rounded-full hover:bg-muted transition-all duration-200 active:scale-95"
             title="Expand to review"
           >
-            <Maximize2 className="h-4 w-4 text-muted-foreground" />
+            <Maximize2 className="h-5 w-5 text-muted-foreground" />
           </Button>
         </div>
         
-        {/* Character/segment count */}
-        {(showCharacterCount || showSegmentCount) && messageType === "sms" && (
-          <div className="flex justify-between text-xs text-muted-foreground px-1 mt-1">
-            {showCharacterCount && <span>{characterCount} characters</span>}
-            {showSegmentCount && (
-              <span>
-                {segmentCount} SMS segment{segmentCount > 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Action bar and segment count below input */}
+        <div className="flex items-center justify-between mt-2 px-1">
+          {!isMobile && <ActionButtons />}
+          {isMobile && (
+            <div className="flex items-center gap-2">
+              <ActionButtons />
+            </div>
+          )}
+          
+          {/* Character/segment count */}
+          {(showCharacterCount || showSegmentCount) && messageType === "sms" && characterCount > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              {showCharacterCount && (
+                <span className="text-muted-foreground">{characterCount}</span>
+              )}
+              {showSegmentCount && (
+                <span className={cn(
+                  "font-medium px-2 py-0.5 rounded-full text-xs",
+                  segmentCount > 1 
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" 
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  {segmentCount} SMS
+                </span>
+              )}
+              {isLongMessage && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExpand}
+                  className="h-7 px-2 text-xs text-primary"
+                >
+                  <Type className="h-3 w-3 mr-1" />
+                  Review
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Expanded view - platform specific */}

@@ -3,6 +3,7 @@ import { format, parseISO, isToday, isYesterday } from "date-fns";
 import { Phone, Mail, MessageSquare, Play, Paperclip, FileIcon, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface ThreadMessage {
   id: string;
@@ -80,7 +81,7 @@ export function UnifiedConversationThread({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="px-3 py-2 md:px-4 md:py-4 max-w-3xl mx-auto space-y-1">
+      <div className="px-4 py-4 md:px-5 md:py-5 max-w-3xl mx-auto space-y-1.5">
         {messages.map((msg, idx) => {
           const isOutbound = msg.direction === "outbound";
           const msgDate = parseISO(msg.created_at);
@@ -89,36 +90,43 @@ export function UnifiedConversationThread({
             format(msgDate, "yyyy-MM-dd") !==
               format(parseISO(messages[idx - 1].created_at), "yyyy-MM-dd");
 
+          // Check if this message should be grouped with previous
+          const prevMsg = idx > 0 ? messages[idx - 1] : null;
+          const isGrouped = prevMsg && 
+            prevMsg.direction === msg.direction && 
+            format(msgDate, "yyyy-MM-dd HH:mm") === format(parseISO(prevMsg.created_at), "yyyy-MM-dd HH:mm");
+
           return (
             <div key={msg.id}>
               {/* Date separator */}
               {showDateSeparator && (
-                <div className="flex items-center justify-center py-3">
-                  <span className="text-[11px] text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-xs text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-full font-medium">
                     {formatDateHeader(msgDate)}
                   </span>
                 </div>
               )}
 
-              {/* Message bubble */}
-              <div className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}>
-                <div className="max-w-[85%]">
+              {/* Message bubble - enhanced with larger padding and rounded corners */}
+              <div className={`flex ${isOutbound ? "justify-end" : "justify-start"} ${isGrouped ? "mt-0.5" : "mt-2"}`}>
+                <div className="max-w-[85%] md:max-w-[75%]">
                   <div
-                    className={`rounded-2xl px-3.5 py-2 ${
+                    className={cn(
+                      "rounded-3xl px-4 py-3 transition-all duration-200",
                       isOutbound
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
-                    }`}
+                    )}
                   >
                     {/* Call indicator */}
                     {msg.type === "call" && (
                       <div
-                        className={`flex items-center gap-1.5 text-[11px] mb-1.5 ${
-                          isOutbound ? "opacity-80" : "text-muted-foreground"
+                        className={`flex items-center gap-2 text-xs mb-2 ${
+                          isOutbound ? "opacity-85" : "text-muted-foreground"
                         }`}
                       >
-                        <Phone className="h-3 w-3" />
-                        <span>{isOutbound ? "Outgoing call" : "Incoming call"}</span>
+                        <Phone className="h-3.5 w-3.5" />
+                        <span className="font-medium">{isOutbound ? "Outgoing call" : "Incoming call"}</span>
                         {msg.call_duration && (
                           <span>· {formatDuration(msg.call_duration)}</span>
                         )}
@@ -126,13 +134,13 @@ export function UnifiedConversationThread({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-5 px-1.5 ml-1"
+                            className="h-6 px-2 ml-1"
                             onClick={(e) => {
                               e.stopPropagation();
                               window.open(msg.call_recording_url, "_blank");
                             }}
                           >
-                            <Play className="h-3 w-3" />
+                            <Play className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </div>
@@ -141,11 +149,11 @@ export function UnifiedConversationThread({
                     {/* Email indicator */}
                     {msg.type === "email" && msg.subject && (
                       <div
-                        className={`flex items-center gap-1 text-xs font-medium mb-1 ${
+                        className={`flex items-center gap-1.5 text-sm font-medium mb-1.5 ${
                           isOutbound ? "opacity-90" : ""
                         }`}
                       >
-                        <Mail className="h-3 w-3" />
+                        <Mail className="h-3.5 w-3.5" />
                         {msg.subject}
                       </div>
                     )}
@@ -153,7 +161,7 @@ export function UnifiedConversationThread({
                     {/* MMS/SMS Images */}
                     {msg.media_urls && msg.media_urls.length > 0 && (
                       <div
-                        className={`mb-2 grid gap-1.5 ${
+                        className={`mb-2.5 grid gap-2 ${
                           msg.media_urls.length === 1
                             ? "grid-cols-1"
                             : "grid-cols-2"
@@ -162,9 +170,9 @@ export function UnifiedConversationThread({
                         {msg.media_urls.map((url, imgIdx) => (
                           <div
                             key={imgIdx}
-                            className={`relative overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity ${
+                            className={`relative overflow-hidden rounded-xl cursor-pointer hover:opacity-90 transition-opacity ${
                               msg.media_urls!.length === 1
-                                ? "aspect-auto max-h-64"
+                                ? "aspect-auto max-h-72"
                                 : "aspect-square"
                             }`}
                             onClick={() => onImageClick(url)}
@@ -186,7 +194,7 @@ export function UnifiedConversationThread({
 
                     {/* Email Attachments */}
                     {msg.type === "email" && msg.attachments && msg.attachments.length > 0 && (
-                      <div className="mb-2 space-y-1">
+                      <div className="mb-2.5 space-y-1.5">
                         {msg.attachments.map((att, attIdx) => {
                           const isImage = att.type?.startsWith("image/") || 
                             /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
@@ -195,7 +203,7 @@ export function UnifiedConversationThread({
                             return (
                               <div
                                 key={attIdx}
-                                className="relative overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity max-h-64"
+                                className="relative overflow-hidden rounded-xl cursor-pointer hover:opacity-90 transition-opacity max-h-72"
                                 onClick={() => onImageClick(att.url)}
                               >
                                 <img
@@ -214,29 +222,29 @@ export function UnifiedConversationThread({
                               href={att.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs hover:opacity-80 transition-opacity ${
+                              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm hover:opacity-80 transition-opacity ${
                                 isOutbound 
                                   ? "bg-primary-foreground/10" 
                                   : "bg-background"
                               }`}
                             >
-                              <Paperclip className="h-3 w-3 shrink-0" />
-                              <span className="truncate max-w-[180px]">{att.name}</span>
+                              <Paperclip className="h-4 w-4 shrink-0" />
+                              <span className="truncate max-w-[200px]">{att.name}</span>
                             </a>
                           );
                         })}
                       </div>
                     )}
 
-                    {/* Message body */}
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                    {/* Message body - enhanced font size */}
+                    <p className="text-base md:text-[15px] whitespace-pre-wrap leading-relaxed">
                       {msg.body}
                     </p>
                   </div>
 
-                  {/* Timestamp */}
+                  {/* Timestamp - enhanced */}
                   <div
-                    className={`text-[10px] text-muted-foreground mt-0.5 px-1 ${
+                    className={`text-xs text-muted-foreground mt-1 px-2 ${
                       isOutbound ? "text-right" : ""
                     }`}
                   >

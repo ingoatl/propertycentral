@@ -218,24 +218,24 @@ export function VoiceDictationButton({
 
   const isListening = scribe.isConnected;
 
-  // Trigger button - shared between desktop and mobile
+  // Trigger button - shared between desktop and mobile - ENHANCED SIZE
   const TriggerButton = (
     <Button
       type="button"
       variant={isListening ? "destructive" : "ghost"}
       size="icon"
       className={cn(
-        "h-9 w-9 rounded-full transition-all flex-shrink-0",
-        isListening && "animate-pulse bg-red-500 hover:bg-red-600",
+        "h-11 w-11 md:h-10 md:w-10 rounded-full transition-all duration-200 flex-shrink-0 active:scale-95",
+        isListening && "animate-pulse bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30",
         !isListening && "hover:bg-primary/10",
         className
       )}
       title="Voice dictation - Click to speak"
     >
       {isListening ? (
-        <MicOff className="h-4 w-4" />
+        <MicOff className="h-5 w-5" />
       ) : (
-        <Mic className="h-4 w-4" />
+        <Mic className="h-5 w-5" />
       )}
     </Button>
   );
