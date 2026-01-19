@@ -503,3 +503,6 @@ verify_jwt = true
 
 [functions.google-review-nudge-cron]
 verify_jwt = false
+
+[functions.send-vendor-pause-request]
+verify_jwt = true
