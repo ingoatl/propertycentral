@@ -31,6 +31,7 @@ interface SendVoicemailDialogProps {
   recipientName: string;
   leadId?: string;
   ownerId?: string;
+  vendorId?: string;
   propertyAddress?: string;
   onSuccess?: () => void;
 }
@@ -42,6 +43,7 @@ export function SendVoicemailDialog({
   recipientName,
   leadId,
   ownerId,
+  vendorId,
   propertyAddress,
   onSuccess,
 }: SendVoicemailDialogProps) {
@@ -60,8 +62,8 @@ export function SendVoicemailDialog({
   const [videoStoragePath, setVideoStoragePath] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState<number>(0);
   
-  // Show video option only for owners
-  const showVideoOption = !!ownerId;
+  // Show video option for all contacts (not just owners)
+  const showVideoOption = true;
 
   // Get current user's name
   const { data: currentUser } = useQuery({
@@ -147,6 +149,7 @@ export function SendVoicemailDialog({
           recipientName,
           leadId,
           ownerId,
+          vendorId,
           senderName,
           messageText,
           audioBase64: hasAudio ? audioBase64 : null,

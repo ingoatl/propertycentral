@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall, Inbox, Play, Volume2, Building2 } from "lucide-react";
+import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall, Inbox, Play, Volume2, Building2, Video, ChevronDown, ChevronUp } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { VendorServicesTab } from "./VendorServicesTab";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
@@ -478,71 +478,127 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
                   <p className="text-sm">Start a conversation with {vendor.name}</p>
                 </div>
               ) : (
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-3 pr-4">
-                    {vendorComms.map((msg: any) => (
-                      <div 
-                        key={msg.id} 
-                        className={`p-3 rounded-lg ${
-                          msg.direction === "outbound" 
-                            ? "bg-primary/10 ml-8" 
-                            : "bg-muted mr-8"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          {msg.type === "sms" ? (
-                            <MessageSquare className="h-3.5 w-3.5 text-blue-500" />
-                          ) : msg.type === "voicemail" ? (
-                            <Mic className="h-3.5 w-3.5 text-amber-500" />
-                          ) : msg.type === "call" ? (
-                            <PhoneCall className="h-3.5 w-3.5 text-green-500" />
-                          ) : (
-                            <Mail className="h-3.5 w-3.5 text-purple-500" />
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {msg.direction === "outbound" ? "You" : vendor.name} · {format(new Date(msg.created_at), "MMM d, h:mm a")}
-                          </span>
-                          {msg.duration && (
-                            <Badge variant="outline" className="text-[10px] h-4">
-                              {Math.floor(msg.duration / 60)}:{String(msg.duration % 60).padStart(2, '0')}
-                            </Badge>
-                          )}
-                        </div>
-                        
-                        {/* Message body */}
-                        <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
-                        
-                        {/* Call transcript */}
-                        {msg.transcript && (
-                          <div className="mt-2 p-2 bg-background/50 rounded text-xs border">
-                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
-                              <FileText className="h-3 w-3" />
-                              <span className="font-medium">Transcript</span>
+                <ScrollArea className="h-[450px]">
+                  <div className="space-y-4 pr-4">
+                    {vendorComms.map((msg: any) => {
+                      const isOutbound = msg.direction === "outbound";
+                      const hasRecording = msg.recording_url || msg.metadata?.audio_url;
+                      const hasVideo = msg.metadata?.video_url;
+                      const transcript = msg.transcript || msg.metadata?.transcript || msg.metadata?.transcription;
+                      const duration = msg.duration || msg.metadata?.duration || msg.metadata?.duration_seconds;
+                      
+                      // Get message type icon and color
+                      const getTypeConfig = () => {
+                        switch (msg.type) {
+                          case "sms":
+                            return { icon: MessageSquare, color: "text-blue-500", bg: "bg-blue-500/10" };
+                          case "voicemail":
+                            return { icon: hasVideo ? Video : Mic, color: hasVideo ? "text-purple-500" : "text-amber-500", bg: hasVideo ? "bg-purple-500/10" : "bg-amber-500/10" };
+                          case "call":
+                            return { icon: PhoneCall, color: "text-green-500", bg: "bg-green-500/10" };
+                          default:
+                            return { icon: Mail, color: "text-purple-500", bg: "bg-purple-500/10" };
+                        }
+                      };
+                      
+                      const typeConfig = getTypeConfig();
+                      const TypeIcon = typeConfig.icon;
+                      
+                      return (
+                        <div 
+                          key={msg.id} 
+                          className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}
+                        >
+                          <div 
+                            className={`max-w-[85%] rounded-2xl shadow-sm ${
+                              isOutbound 
+                                ? "bg-primary text-primary-foreground rounded-br-sm" 
+                                : "bg-muted rounded-bl-sm"
+                            }`}
+                          >
+                            {/* Header */}
+                            <div className={`px-4 pt-3 pb-1 flex items-center gap-2 ${isOutbound ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                              <div className={`p-1.5 rounded-full ${isOutbound ? "bg-primary-foreground/20" : typeConfig.bg}`}>
+                                <TypeIcon className={`h-3.5 w-3.5 ${isOutbound ? "text-primary-foreground" : typeConfig.color}`} />
+                              </div>
+                              <span className="text-xs font-medium">
+                                {isOutbound ? "You" : vendor.name}
+                              </span>
+                              <span className="text-xs opacity-70">
+                                {format(new Date(msg.created_at), "MMM d, h:mm a")}
+                              </span>
+                              {duration && (
+                                <Badge variant={isOutbound ? "secondary" : "outline"} className="text-[10px] h-4 ml-auto">
+                                  {Math.floor(duration / 60)}:{String(Math.round(duration % 60)).padStart(2, '0')}
+                                </Badge>
+                              )}
                             </div>
-                            <p className="text-foreground leading-relaxed">{msg.transcript}</p>
+                            
+                            {/* Message body */}
+                            <div className="px-4 pb-2">
+                              <p className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${isOutbound ? "" : "text-foreground"}`}>
+                                {msg.body}
+                              </p>
+                            </div>
+                            
+                            {/* Video player */}
+                            {hasVideo && (
+                              <div className="px-4 pb-3">
+                                <div className="rounded-lg overflow-hidden bg-black/5">
+                                  <video 
+                                    controls 
+                                    className="w-full max-h-48 rounded-lg"
+                                    src={msg.metadata?.video_url}
+                                    preload="metadata"
+                                    poster="/placeholder.svg"
+                                  >
+                                    Your browser doesn't support video
+                                  </video>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Audio recording */}
+                            {hasRecording && !hasVideo && (
+                              <div className="px-4 pb-3">
+                                <div className={`rounded-lg p-2 ${isOutbound ? "bg-primary-foreground/10" : "bg-background/60"}`}>
+                                  <audio 
+                                    controls 
+                                    className="w-full h-8" 
+                                    src={hasRecording}
+                                    preload="none"
+                                  >
+                                    <a href={hasRecording} target="_blank" rel="noopener noreferrer">
+                                      <Button size="sm" variant="ghost" className="gap-1.5 h-6 text-xs">
+                                        <Volume2 className="h-3 w-3" />
+                                        Listen to recording
+                                      </Button>
+                                    </a>
+                                  </audio>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Transcript - collapsible for long ones */}
+                            {transcript && transcript !== "(Voice recording)" && transcript !== "(Video message)" && (
+                              <div className="px-4 pb-3">
+                                <details className="group">
+                                  <summary className={`flex items-center gap-1.5 text-xs cursor-pointer list-none ${isOutbound ? "text-primary-foreground/70 hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                                    <FileText className="h-3.5 w-3.5" />
+                                    <span className="font-medium">Transcript</span>
+                                    <ChevronDown className="h-3 w-3 group-open:hidden ml-auto" />
+                                    <ChevronUp className="h-3 w-3 hidden group-open:block ml-auto" />
+                                  </summary>
+                                  <div className={`mt-2 p-3 rounded-lg text-xs leading-relaxed ${isOutbound ? "bg-primary-foreground/10 text-primary-foreground/90" : "bg-background/60 text-foreground"}`}>
+                                    {transcript}
+                                  </div>
+                                </details>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        
-                        {/* Recording playback */}
-                        {msg.recording_url && (
-                          <div className="mt-2">
-                            <audio 
-                              controls 
-                              className="w-full h-8" 
-                              src={msg.recording_url}
-                              preload="none"
-                            >
-                              <a href={msg.recording_url} target="_blank" rel="noopener noreferrer">
-                                <Button size="sm" variant="ghost" className="gap-1.5 h-6 text-xs">
-                                  <Volume2 className="h-3 w-3" />
-                                  Listen to recording
-                                </Button>
-                              </a>
-                            </audio>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               )}
