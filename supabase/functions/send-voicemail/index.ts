@@ -225,9 +225,12 @@ serve(async (req) => {
           : finalMessageText)
       : null;
     
+    // Format sender display - always include "from PeachHaus Property Management"
+    const senderDisplay = senderName || "Your property manager";
+    
     const smsBody = transcriptPreview
-      ? `🎙️ Voice message from ${senderName || "PeachHaus"}:\n\n"${transcriptPreview}"\n\n▶️ Listen to full message:\n${playerUrl}`
-      : `🎙️ Hi! ${senderName || "Your property manager"} from PeachHaus just left you a quick voice message.\n\nTap to listen:\n${playerUrl}`;
+      ? `🎙️ ${senderDisplay} from PeachHaus Property Management just left you a voice message:\n\n"${transcriptPreview}"\n\n▶️ Listen to full message:\n${playerUrl}`
+      : `🎙️ ${senderDisplay} from PeachHaus Property Management just left you a voice message.\n\nTap to listen:\n${playerUrl}`;
     
     const fromNumber = "+14048005932";
 
