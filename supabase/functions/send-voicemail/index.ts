@@ -51,11 +51,18 @@ serve(async (req) => {
     // Convert base64 to Uint8Array
     const audioBytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
 
+    // Normalize mime type (remove codecs parameter which can cause issues)
+    let normalizedMimeType = audioMimeType || "audio/mpeg";
+    if (normalizedMimeType.includes(";")) {
+      normalizedMimeType = normalizedMimeType.split(";")[0].trim();
+    }
+
     // Determine file extension from mime type
     let extension = "mp3";
-    if (audioMimeType?.includes("webm")) extension = "webm";
-    else if (audioMimeType?.includes("mp4")) extension = "mp4";
-    else if (audioMimeType?.includes("wav")) extension = "wav";
+    if (normalizedMimeType.includes("webm")) extension = "webm";
+    else if (normalizedMimeType.includes("mp4")) extension = "mp4";
+    else if (normalizedMimeType.includes("wav")) extension = "wav";
+    else if (normalizedMimeType.includes("ogg")) extension = "ogg";
 
     // Generate unique filename
     const timestamp = Date.now();
@@ -66,7 +73,7 @@ serve(async (req) => {
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("message-attachments")
       .upload(storagePath, audioBytes, {
-        contentType: audioMimeType || "audio/mpeg",
+        contentType: normalizedMimeType,
         upsert: false,
       });
 
