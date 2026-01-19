@@ -11,7 +11,8 @@ import {
   Loader2,
   AlertCircle,
   Mic,
-  Check
+  Check,
+  Video
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ export default function VoicemailPlayer() {
   const [showReplyRecorder, setShowReplyRecorder] = useState(false);
   const [replySent, setReplySent] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Fetch voicemail data
   const { data: voicemail, isLoading, error, refetch } = useQuery({
@@ -75,13 +77,15 @@ export default function VoicemailPlayer() {
   };
 
   const handlePlay = () => {
-    if (!audioRef.current) return;
+    const isVideo = voicemail?.media_type === "video";
+    const mediaRef = isVideo ? videoRef.current : audioRef.current;
+    if (!mediaRef) return;
     
     if (isPlaying) {
-      audioRef.current.pause();
+      mediaRef.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play();
+      mediaRef.play();
       setIsPlaying(true);
       
       if (!hasTrackedPlay) {
@@ -92,16 +96,20 @@ export default function VoicemailPlayer() {
   };
 
   const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      const progress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+    const isVideo = voicemail?.media_type === "video";
+    const mediaRef = isVideo ? videoRef.current : audioRef.current;
+    if (mediaRef) {
+      const progress = (mediaRef.currentTime / mediaRef.duration) * 100;
       setPlaybackProgress(progress);
-      setCurrentTime(audioRef.current.currentTime);
+      setCurrentTime(mediaRef.currentTime);
     }
   };
 
   const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
+    const isVideo = voicemail?.media_type === "video";
+    const mediaRef = isVideo ? videoRef.current : audioRef.current;
+    if (mediaRef) {
+      setDuration(mediaRef.duration);
     }
   };
 
@@ -116,12 +124,14 @@ export default function VoicemailPlayer() {
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current) return;
+    const isVideo = voicemail?.media_type === "video";
+    const mediaRef = isVideo ? videoRef.current : audioRef.current;
+    if (!mediaRef) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
-    audioRef.current.currentTime = percentage * audioRef.current.duration;
+    mediaRef.currentTime = percentage * mediaRef.duration;
   };
 
   const handleCallback = () => {
@@ -209,18 +219,24 @@ export default function VoicemailPlayer() {
           <div className="p-6 sm:p-8">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 rounded-full mb-4">
-                <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
+                {voicemail.media_type === "video" ? (
+                  <Video className="w-8 h-8 text-amber-600" />
+                ) : (
+                  <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                )}
               </div>
-              <p className="text-sm text-gray-500 mb-1">Voice Message from</p>
+              <p className="text-sm text-gray-500 mb-1">
+                {voicemail.media_type === "video" ? "Video Message from" : "Voice Message from"}
+              </p>
               <h2 className="text-2xl font-bold text-gray-900">{voicemail.sender_name || "PeachHaus Team"}</h2>
               <p className="text-sm text-gray-400 mt-2">
                 {format(new Date(voicemail.created_at), "MMMM d, yyyy 'at' h:mm a")}
               </p>
               
               {/* Show transcript if available */}
-              {voicemail.message_text && (
+              {voicemail.message_text && voicemail.message_text !== "(Video message)" && voicemail.message_text !== "(Voice recording)" && (
                 <div className="mt-4 text-left bg-gray-50 rounded-xl p-4">
                   <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -233,56 +249,92 @@ export default function VoicemailPlayer() {
               )}
             </div>
 
-          {/* Audio Player */}
-          <div className="bg-gradient-to-br from-gray-50 to-amber-50/50 rounded-2xl p-5 mb-6">
-            {/* Waveform-style progress bar */}
-            <div 
-              className="h-16 mb-5 bg-white rounded-xl overflow-hidden cursor-pointer relative shadow-inner"
-              onClick={handleSeek}
-            >
-              <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-3">
-                {Array.from({ length: 50 }).map((_, i) => {
-                  const height = 25 + Math.sin(i * 0.4) * 20 + Math.sin(i * 0.8) * 10;
-                  const isPlayed = (i / 50) * 100 <= playbackProgress;
-                  return (
-                    <div
-                      key={i}
-                      className={cn(
-                        "w-1 rounded-full transition-all duration-150",
-                        isPlayed 
-                          ? "bg-gradient-to-t from-amber-500 to-orange-400" 
-                          : "bg-gray-200"
-                      )}
-                      style={{ height: `${height}%` }}
-                    />
-                  );
-                })}
+          {/* Media Player - Video or Audio */}
+          {voicemail.media_type === "video" && voicemail.video_url ? (
+            // VIDEO PLAYER
+            <div className="bg-gradient-to-br from-gray-50 to-amber-50/50 rounded-2xl p-5 mb-6">
+              <div className="relative rounded-xl overflow-hidden bg-black aspect-video mb-4">
+                <video
+                  ref={videoRef}
+                  src={voicemail.video_url}
+                  className="w-full h-full object-contain"
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onEnded={handleEnded}
+                  playsInline
+                  onClick={handlePlay}
+                />
+                {/* Play overlay when paused */}
+                {!isPlaying && (
+                  <button
+                    onClick={handlePlay}
+                    className="absolute inset-0 flex items-center justify-center bg-black/30"
+                  >
+                    <div className="h-16 w-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                      <Play className="h-8 w-8 text-amber-600 ml-1" />
+                    </div>
+                  </button>
+                )}
+              </div>
+              
+              {/* Time display */}
+              <div className="flex items-center justify-between text-sm text-gray-500">
+                <span className="font-mono">{formatTime(currentTime)}</span>
+                <span className="font-mono">{formatTime(duration)}</span>
               </div>
             </div>
-
-            {/* Time and Play Button */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500 font-mono w-12">
-                {formatTime(currentTime)}
-              </span>
-              
-              <Button
-                size="lg"
-                className="rounded-full h-20 w-20 bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30 transition-all hover:scale-105"
-                onClick={handlePlay}
+          ) : (
+            // AUDIO PLAYER (existing waveform style)
+            <div className="bg-gradient-to-br from-gray-50 to-amber-50/50 rounded-2xl p-5 mb-6">
+              {/* Waveform-style progress bar */}
+              <div 
+                className="h-16 mb-5 bg-white rounded-xl overflow-hidden cursor-pointer relative shadow-inner"
+                onClick={handleSeek}
               >
-                {isPlaying ? (
-                  <Pause className="h-8 w-8" />
-                ) : (
-                  <Play className="h-8 w-8 ml-1" />
-                )}
-              </Button>
-              
-              <span className="text-sm text-gray-500 font-mono w-12 text-right">
-                {formatTime(duration)}
-              </span>
+                <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-3">
+                  {Array.from({ length: 50 }).map((_, i) => {
+                    const height = 25 + Math.sin(i * 0.4) * 20 + Math.sin(i * 0.8) * 10;
+                    const isPlayed = (i / 50) * 100 <= playbackProgress;
+                    return (
+                      <div
+                        key={i}
+                        className={cn(
+                          "w-1 rounded-full transition-all duration-150",
+                          isPlayed 
+                            ? "bg-gradient-to-t from-amber-500 to-orange-400" 
+                            : "bg-gray-200"
+                        )}
+                        style={{ height: `${height}%` }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Time and Play Button */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 font-mono w-12">
+                  {formatTime(currentTime)}
+                </span>
+                
+                <Button
+                  size="lg"
+                  className="rounded-full h-20 w-20 bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30 transition-all hover:scale-105"
+                  onClick={handlePlay}
+                >
+                  {isPlaying ? (
+                    <Pause className="h-8 w-8" />
+                  ) : (
+                    <Play className="h-8 w-8 ml-1" />
+                  )}
+                </Button>
+                
+                <span className="text-sm text-gray-500 font-mono w-12 text-right">
+                  {formatTime(duration)}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Reply Section */}
           {showReplyRecorder ? (
@@ -339,15 +391,17 @@ export default function VoicemailPlayer() {
         Powered by PeachHaus
       </p>
 
-      {/* Hidden audio element */}
-      <audio
-        ref={audioRef}
-        src={voicemail.audio_url}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onEnded={handleEnded}
-        preload="metadata"
-      />
+      {/* Hidden audio element (only for audio messages) */}
+      {voicemail.media_type !== "video" && (
+        <audio
+          ref={audioRef}
+          src={voicemail.audio_url}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onEnded={handleEnded}
+          preload="metadata"
+        />
+      )}
     </div>
   );
 }
