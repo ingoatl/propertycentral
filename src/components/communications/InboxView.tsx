@@ -3088,7 +3088,7 @@ export function InboxView() {
                   {selectedMessage.contact_phone || selectedMessage.contact_email || ""}
                 </span>
               </div>
-              {/* Mobile quick actions */}
+            {/* Mobile quick actions */}
               <ConversationQuickActions
                 status={selectedMessage.conversation_status}
                 onMarkDone={() => handleMarkDone(selectedMessage)}
@@ -3097,6 +3097,17 @@ export function InboxView() {
                 isUpdating={updateConversationStatus.isPending}
                 compact
               />
+              {/* Call button for mobile */}
+              {selectedMessage.contact_phone && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-10 w-10 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => setShowCallDialog(true)}
+                >
+                  <PhoneCall className="h-5 w-5" />
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-10 w-10">
