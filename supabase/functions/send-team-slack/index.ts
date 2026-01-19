@@ -113,8 +113,8 @@ async function sendSlackMessage(channel: string, text: string): Promise<{ ok: bo
   }
 }
 
-// Send a direct message to a user (using user ID as channel)
-// This works with chat:write scope - no need for im:write
+// Send a direct message to a user using conversations.open first
+// This requires im:write scope to open DM channels
 async function sendSlackDM(userId: string, text: string): Promise<{ ok: boolean; ts?: string; error?: string }> {
   if (!SLACK_BOT_TOKEN) {
     console.error('[Slack] SLACK_BOT_TOKEN is not configured');
@@ -125,8 +125,41 @@ async function sendSlackDM(userId: string, text: string): Promise<{ ok: boolean;
   console.log(`[Slack] DM message preview: ${text.substring(0, 100)}...`);
 
   try {
-    // Send directly to user ID - Slack will create/use the DM channel automatically
-    // This works with chat:write scope
+    // Step 1: Open a DM channel with the user using conversations.open
+    // This requires im:write scope
+    console.log('[Slack] Opening DM conversation with conversations.open...');
+    const openResponse = await fetch('https://slack.com/api/conversations.open', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        users: userId, // Single user ID
+      }),
+    });
+
+    const openResult = await openResponse.json();
+    console.log('[Slack] conversations.open response:', JSON.stringify(openResult).substring(0, 500));
+
+    if (!openResult.ok) {
+      console.error('[Slack] conversations.open error:', openResult.error);
+      // Provide helpful error message for scope issues
+      if (openResult.error === 'missing_scope') {
+        return { ok: false, error: 'Bot needs im:write scope. Please add this scope in Slack app settings.' };
+      }
+      return { ok: false, error: openResult.error || 'Failed to open DM channel' };
+    }
+
+    const dmChannelId = openResult.channel?.id;
+    if (!dmChannelId) {
+      console.error('[Slack] No channel ID returned from conversations.open');
+      return { ok: false, error: 'No DM channel ID returned' };
+    }
+
+    console.log(`[Slack] DM channel opened: ${dmChannelId}`);
+
+    // Step 2: Send message to the DM channel
     const response = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: {
@@ -134,7 +167,7 @@ async function sendSlackDM(userId: string, text: string): Promise<{ ok: boolean;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        channel: userId, // User ID works as channel for DMs
+        channel: dmChannelId, // Use the DM channel ID from conversations.open
         text: text,
         unfurl_links: false,
         unfurl_media: false,
@@ -151,7 +184,7 @@ async function sendSlackDM(userId: string, text: string): Promise<{ ok: boolean;
       return { ok: false, error: result.error || 'Unknown Slack error' };
     }
 
-    console.log(`[Slack] DM sent successfully, ts: ${result.ts}`);
+    console.log(`[Slack] DM sent successfully to channel ${dmChannelId}, ts: ${result.ts}`);
     return { ok: true, ts: result.ts };
   } catch (error) {
     console.error('[Slack] DM fetch error:', error);

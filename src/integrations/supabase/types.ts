@@ -9649,6 +9649,7 @@ export type Database = {
           reply_clicked: boolean | null
           reply_duration_seconds: number | null
           reply_recorded_at: string | null
+          reply_transcript: string | null
           sender_name: string | null
           sender_user_id: string | null
           sms_message_sid: string | null
@@ -9678,6 +9679,7 @@ export type Database = {
           reply_clicked?: boolean | null
           reply_duration_seconds?: number | null
           reply_recorded_at?: string | null
+          reply_transcript?: string | null
           sender_name?: string | null
           sender_user_id?: string | null
           sms_message_sid?: string | null
@@ -9707,6 +9709,7 @@ export type Database = {
           reply_clicked?: boolean | null
           reply_duration_seconds?: number | null
           reply_recorded_at?: string | null
+          reply_transcript?: string | null
           sender_name?: string | null
           sender_user_id?: string | null
           sms_message_sid?: string | null
