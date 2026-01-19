@@ -398,6 +398,12 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
       setIsEditingEmail(false);
       setEditedPhone(lead.phone || "");
       setIsEditingPhone(false);
+      // Set default message type based on available contact info
+      if (lead.phone) {
+        setMessageType("sms");
+      } else if (lead.email) {
+        setMessageType("email");
+      }
     }
   }, [lead?.id, lead?.name, lead?.email, lead?.phone]);
 
@@ -954,44 +960,70 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               </div>
               
               {/* Message input - always visible at bottom */}
-              <div className="flex gap-2 pt-3 mt-3 border-t flex-shrink-0 items-start">
-                <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
-                  <SelectTrigger className="w-24 flex-shrink-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sms">SMS</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="flex-1">
-                  <ExpandableMessageInput
-                    value={newMessage}
-                    onChange={setNewMessage}
-                    onSend={() => sendMessage.mutate()}
-                    placeholder={`Type your ${messageType} message...`}
-                    messageType={messageType}
-                    contactName={lead.name}
-                    contactId={lead.id}
-                    contactType="lead"
-                    minRows={2}
-                    maxRows={4}
-                    showCharacterCount={messageType === "sms"}
-                    showSegmentCount={messageType === "sms"}
-                    showVoiceDictation={true}
-                    showAIAssistant={true}
-                    disabled={sendMessage.isPending}
-                  />
+              {lead.phone || lead.email ? (
+                <div className="flex gap-2 pt-3 mt-3 border-t flex-shrink-0 items-start">
+                  <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
+                    <SelectTrigger className="w-24 flex-shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lead.phone && <SelectItem value="sms">SMS</SelectItem>}
+                      {lead.email && <SelectItem value="email">Email</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex-1">
+                    <ExpandableMessageInput
+                      value={newMessage}
+                      onChange={setNewMessage}
+                      onSend={() => sendMessage.mutate()}
+                      placeholder={`Type your ${messageType} message...`}
+                      messageType={messageType}
+                      contactName={lead.name}
+                      contactId={lead.id}
+                      contactType="lead"
+                      minRows={2}
+                      maxRows={4}
+                      showCharacterCount={messageType === "sms"}
+                      showSegmentCount={messageType === "sms"}
+                      showVoiceDictation={true}
+                      showAIAssistant={true}
+                      disabled={sendMessage.isPending}
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => sendMessage.mutate()}
+                    disabled={sendMessage.isPending || !newMessage.trim()}
+                    className="self-start mt-1 flex-shrink-0"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send
+                  </Button>
                 </div>
-                <Button 
-                  onClick={() => sendMessage.mutate()}
-                  disabled={sendMessage.isPending || !newMessage.trim()}
-                  className="self-start mt-1 flex-shrink-0"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Send
-                </Button>
-              </div>
+              ) : (
+                <div className="pt-3 mt-3 border-t text-center">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    No phone or email on file. Add contact info to send messages.
+                  </p>
+                  <div className="flex justify-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setIsEditingPhone(true)}
+                    >
+                      <Phone className="h-4 w-4 mr-2" />
+                      Add Phone
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setIsEditingEmail(true)}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Add Email
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -1015,79 +1047,246 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         </ScrollArea>
       </DialogContent>
 
-      {/* Full Conversation Drawer */}
-      <Drawer open={showFullConversation} onOpenChange={setShowFullConversation}>
-        <DrawerContent className="max-h-[95vh] flex flex-col">
-          <DrawerHeader className="border-b px-4 py-3 flex-shrink-0">
-            <DrawerTitle className="flex items-center gap-3">
-              <MessageCircle className="h-5 w-5 text-primary" />
-              <div>
-                <span className="text-lg font-semibold">Conversation with {lead.name}</span>
-                <p className="text-sm text-muted-foreground font-normal">
-                  {communications?.length || 0} messages • {lead.phone || lead.email}
-                </p>
-              </div>
-            </DrawerTitle>
-          </DrawerHeader>
-          
-          {/* Conversation Thread */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <UnifiedConversationThread
-              messages={threadMessages}
-              contactName={lead.name}
-              onImageClick={(url) => window.open(url, '_blank')}
-            />
-          </div>
-          
-          {/* Message Input */}
-          <div className="border-t p-4 flex-shrink-0 safe-area-bottom">
-            <div className="flex gap-3 items-start">
-              <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
-                <SelectTrigger className="w-24 flex-shrink-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sms">SMS</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="flex-1">
-                <ExpandableMessageInput
-                  value={newMessage}
-                  onChange={setNewMessage}
-                  onSend={() => {
-                    sendMessage.mutate();
-                    queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] });
-                  }}
-                  placeholder={`Type your ${messageType} message...`}
-                  messageType={messageType}
+      {/* Full Conversation Drawer/Dialog */}
+      {isMobile ? (
+        <Drawer open={showFullConversation} onOpenChange={setShowFullConversation}>
+          <DrawerContent className="max-h-[95vh] flex flex-col">
+            <DrawerHeader className="border-b px-4 py-3 flex-shrink-0">
+              <DrawerTitle className="flex items-center gap-3">
+                <MessageCircle className="h-5 w-5 text-primary" />
+                <div>
+                  <span className="text-lg font-semibold">Conversation with {lead.name}</span>
+                  <p className="text-sm text-muted-foreground font-normal">
+                    {communications?.length || 0} messages
+                    {lead.phone && ` • ${lead.phone}`}
+                    {lead.email && !lead.phone && ` • ${lead.email}`}
+                  </p>
+                </div>
+              </DrawerTitle>
+            </DrawerHeader>
+            
+            {/* Conversation Thread */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {threadMessages.length > 0 ? (
+                <UnifiedConversationThread
+                  messages={threadMessages}
                   contactName={lead.name}
-                  contactId={lead.id}
-                  contactType="lead"
-                  minRows={2}
-                  maxRows={4}
-                  showCharacterCount={messageType === "sms"}
-                  showSegmentCount={messageType === "sms"}
-                  showVoiceDictation={true}
-                  showAIAssistant={true}
-                  disabled={sendMessage.isPending}
+                  onImageClick={(url) => window.open(url, '_blank')}
                 />
-              </div>
-              <Button 
-                onClick={() => {
-                  sendMessage.mutate();
-                  queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] });
-                }}
-                disabled={sendMessage.isPending || !newMessage.trim()}
-                className="self-start mt-1 flex-shrink-0 h-11"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Send
-              </Button>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
+                  <MessageCircle className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-base font-medium">No messages yet</p>
+                  <p className="text-sm">
+                    {!lead.phone && !lead.email 
+                      ? "Add phone or email to start a conversation"
+                      : "Start the conversation below"
+                    }
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
-        </DrawerContent>
-      </Drawer>
+            
+            {/* Message Input */}
+            <div className="border-t p-4 flex-shrink-0 safe-area-bottom">
+              {lead.phone || lead.email ? (
+                <div className="flex gap-3 items-start">
+                  <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
+                    <SelectTrigger className="w-24 flex-shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lead.phone && <SelectItem value="sms">SMS</SelectItem>}
+                      {lead.email && <SelectItem value="email">Email</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex-1">
+                    <ExpandableMessageInput
+                      value={newMessage}
+                      onChange={setNewMessage}
+                      onSend={() => {
+                        sendMessage.mutate();
+                        queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] });
+                      }}
+                      placeholder={`Type your ${messageType} message...`}
+                      messageType={messageType}
+                      contactName={lead.name}
+                      contactId={lead.id}
+                      contactType="lead"
+                      minRows={2}
+                      maxRows={4}
+                      showCharacterCount={messageType === "sms"}
+                      showSegmentCount={messageType === "sms"}
+                      showVoiceDictation={true}
+                      showAIAssistant={true}
+                      disabled={sendMessage.isPending}
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      sendMessage.mutate();
+                      queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] });
+                    }}
+                    disabled={sendMessage.isPending || !newMessage.trim()}
+                    className="self-start mt-1 flex-shrink-0 h-11"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    No phone or email on file. Add contact info to send messages.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setShowFullConversation(false);
+                      setIsEditingPhone(true);
+                    }}
+                  >
+                    <Phone className="h-4 w-4 mr-2" />
+                    Add Phone
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="ml-2"
+                    onClick={() => {
+                      setShowFullConversation(false);
+                      setIsEditingEmail(true);
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Add Email
+                  </Button>
+                </div>
+              )}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showFullConversation} onOpenChange={setShowFullConversation}>
+          <DialogContent className="max-w-2xl w-[90vw] max-h-[85vh] flex flex-col p-0">
+            <DialogHeader className="border-b px-6 py-4 flex-shrink-0">
+              <DialogTitle className="flex items-center gap-3">
+                <MessageCircle className="h-5 w-5 text-primary" />
+                <div>
+                  <span className="text-lg font-semibold">Conversation with {lead.name}</span>
+                  <p className="text-sm text-muted-foreground font-normal">
+                    {communications?.length || 0} messages
+                    {lead.phone && ` • ${lead.phone}`}
+                    {lead.email && !lead.phone && ` • ${lead.email}`}
+                  </p>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            
+            {/* Conversation Thread */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {threadMessages.length > 0 ? (
+                <UnifiedConversationThread
+                  messages={threadMessages}
+                  contactName={lead.name}
+                  onImageClick={(url) => window.open(url, '_blank')}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground py-12">
+                  <MessageCircle className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-base font-medium">No messages yet</p>
+                  <p className="text-sm">
+                    {!lead.phone && !lead.email 
+                      ? "Add phone or email to start a conversation"
+                      : "Start the conversation below"
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Message Input */}
+            <div className="border-t p-4 flex-shrink-0">
+              {lead.phone || lead.email ? (
+                <div className="flex gap-3 items-start">
+                  <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
+                    <SelectTrigger className="w-24 flex-shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lead.phone && <SelectItem value="sms">SMS</SelectItem>}
+                      {lead.email && <SelectItem value="email">Email</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex-1">
+                    <ExpandableMessageInput
+                      value={newMessage}
+                      onChange={setNewMessage}
+                      onSend={() => {
+                        sendMessage.mutate();
+                        queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] });
+                      }}
+                      placeholder={`Type your ${messageType} message...`}
+                      messageType={messageType}
+                      contactName={lead.name}
+                      contactId={lead.id}
+                      contactType="lead"
+                      minRows={2}
+                      maxRows={4}
+                      showCharacterCount={messageType === "sms"}
+                      showSegmentCount={messageType === "sms"}
+                      showVoiceDictation={true}
+                      showAIAssistant={true}
+                      disabled={sendMessage.isPending}
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      sendMessage.mutate();
+                      queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] });
+                    }}
+                    disabled={sendMessage.isPending || !newMessage.trim()}
+                    className="self-start mt-1 flex-shrink-0"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    No phone or email on file. Add contact info to send messages.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setShowFullConversation(false);
+                      setIsEditingPhone(true);
+                    }}
+                  >
+                    <Phone className="h-4 w-4 mr-2" />
+                    Add Phone
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="ml-2"
+                    onClick={() => {
+                      setShowFullConversation(false);
+                      setIsEditingEmail(true);
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Add Email
+                  </Button>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 };
