@@ -108,7 +108,55 @@ serve(async (req) => {
     if (mediaType === "video") {
       // VIDEO MESSAGE: Video was already uploaded by the client
       console.log("Processing video message with URL:", videoUrl);
-      finalMessageText = messageText || "(Video message)";
+      
+      // Transcribe video using Whisper (it supports video files)
+      const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+      if (openaiApiKey && (!messageText || messageText === "(Video message)")) {
+        try {
+          console.log("Fetching video for transcription:", videoUrl);
+          const videoResponse = await fetch(videoUrl);
+          if (videoResponse.ok) {
+            const videoBytes = new Uint8Array(await videoResponse.arrayBuffer());
+            console.log(`Video fetched, size: ${videoBytes.length} bytes`);
+            
+            const formData = new FormData();
+            const videoBlob = new Blob([videoBytes], { type: "video/mp4" });
+            formData.append("file", videoBlob, "video.mp4");
+            formData.append("model", "whisper-1");
+            formData.append("language", "en");
+            
+            const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${openaiApiKey}`,
+              },
+              body: formData,
+            });
+            
+            if (whisperResponse.ok) {
+              const result = await whisperResponse.json();
+              if (result.text && result.text.trim().length > 0) {
+                finalMessageText = result.text;
+                console.log("Video transcription complete:", finalMessageText.substring(0, 100));
+              } else {
+                finalMessageText = "(Video message)";
+              }
+            } else {
+              const errorText = await whisperResponse.text();
+              console.error("Whisper video transcription error:", whisperResponse.status, errorText);
+              finalMessageText = "(Video message)";
+            }
+          } else {
+            console.error("Failed to fetch video for transcription:", videoResponse.status);
+            finalMessageText = "(Video message)";
+          }
+        } catch (error) {
+          console.error("Video transcription failed:", error);
+          finalMessageText = "(Video message)";
+        }
+      } else {
+        finalMessageText = messageText || "(Video message)";
+      }
       // audioUrl stays empty for video
     } else {
       // AUDIO MESSAGE: Need to process and upload audio

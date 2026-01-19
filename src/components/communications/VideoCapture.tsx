@@ -124,10 +124,9 @@ export function VideoCapture({
     setUploadError(null);
 
     try {
-      // Generate unique filename
+      // Generate unique filename - ALWAYS use .mp4 extension for compatibility
       const timestamp = Date.now();
-      const extension = videoFile.name.split(".").pop() || "mp4";
-      const filename = `video_${timestamp}.${extension}`;
+      const filename = `video_${timestamp}.mp4`;
       const storagePath = `videos/${filename}`;
 
       // Simulate progress for better UX (actual upload doesn't give progress)
@@ -145,12 +144,8 @@ export function VideoCapture({
       const arrayBuffer = await videoFile.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
 
-      // Determine proper content type (fallback for QuickTime)
-      let contentType = videoFile.type;
-      if (!contentType || contentType === "video/quicktime") {
-        // Convert QuickTime to mp4 content type for better compatibility
-        contentType = "video/mp4";
-      }
+      // ALWAYS use video/mp4 content type for maximum compatibility
+      const contentType = "video/mp4";
 
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
