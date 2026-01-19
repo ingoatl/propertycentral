@@ -51,6 +51,7 @@ import { LeadConversationThread } from "./LeadConversationThread";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DirectCallButton from "./DirectCallButton";
+import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { SendStripeAuthButton } from "./SendStripeAuthButton";
 import { ExpandableMessageInput } from "@/components/communications/ExpandableMessageInput";
 import { UnifiedConversationThread } from "@/components/communications/UnifiedConversationThread";
@@ -545,6 +546,13 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               <MessageSquare className="h-4 w-4 mr-2" />
               Text
             </Button>
+          )}
+          {lead.phone && (
+            <SendVoicemailButton
+              recipientPhone={lead.phone}
+              recipientName={lead.name}
+              leadId={lead.id}
+            />
           )}
           
           {/* Full Conversation Button */}

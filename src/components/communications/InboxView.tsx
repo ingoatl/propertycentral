@@ -93,6 +93,7 @@ import { ArchivedMessagesList } from "./saved/ArchivedMessagesList";
 import { InboxFolderSelector, type InboxFolder } from "./inbox/InboxFolderSelector";
 import { SaveCommunicationButton } from "./saved/SaveCommunicationButton";
 import { InboxMoreActionsDropdown } from "./inbox/InboxMoreActionsDropdown";
+import { SendVoicemailButton } from "./SendVoicemailButton";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -3232,6 +3233,17 @@ export function InboxView() {
                 {/* Call button */}
                 {selectedMessage.contact_phone && !isVoiceAITranscript(selectedMessage.body) && (
                   <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => setShowCallDialog(true)} title="Call"><PhoneCall className="h-4 w-4" /></Button>
+                )}
+                {selectedMessage.contact_phone && (
+                  <SendVoicemailButton
+                    recipientPhone={selectedMessage.contact_phone}
+                    recipientName={selectedMessage.contact_name}
+                    leadId={selectedMessage.contact_type === "lead" ? selectedMessage.contact_id : undefined}
+                    ownerId={selectedMessage.contact_type === "owner" ? selectedMessage.contact_id : undefined}
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                  />
                 )}
                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowNotes(true)} title="Notes"><FileText className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowContactInfo(true)} title="Contact Info"><Info className="h-4 w-4" /></Button>

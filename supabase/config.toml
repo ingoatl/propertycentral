@@ -488,3 +488,12 @@ verify_jwt = true
 
 [functions.process-scheduled-emails]
 verify_jwt = false
+
+[functions.send-voicemail]
+verify_jwt = true
+
+[functions.voicemail-track]
+verify_jwt = false
+
+[functions.elevenlabs-tts]
+verify_jwt = true

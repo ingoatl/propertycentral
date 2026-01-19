@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/responsive-modal";
 import { Owner360Panel } from "./Owner360Panel";
 import { ConversationSummary } from "./ConversationSummary";
+import { SendVoicemailButton } from "./SendVoicemailButton";
 
 interface OwnerCommunicationDetailProps {
   ownerId: string;
@@ -228,8 +229,8 @@ export function OwnerCommunicationDetail({
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="flex items-center gap-3 mt-4">
+          {/* Stats and Voice Message Button */}
+          <div className="flex items-center gap-3 mt-4 flex-wrap">
             <Badge variant="secondary" className="gap-1">
               <MessageSquare className="h-3 w-3" />
               {smsCount} SMS
@@ -242,6 +243,15 @@ export function OwnerCommunicationDetail({
               <Mail className="h-3 w-3" />
               {emailCount} Emails
             </Badge>
+            {ownerPhone && (
+              <SendVoicemailButton
+                recipientPhone={ownerPhone}
+                recipientName={ownerName}
+                ownerId={ownerId}
+                variant="outline"
+                size="sm"
+              />
+            )}
           </div>
 
           {/* Properties */}
