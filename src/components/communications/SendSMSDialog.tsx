@@ -19,7 +19,7 @@ interface SendSMSDialogProps {
   onOpenChange: (open: boolean) => void;
   contactName: string;
   contactPhone: string;
-  contactType: "lead" | "owner";
+  contactType: "lead" | "owner" | "vendor";
   contactId: string;
 }
 
@@ -81,6 +81,7 @@ export function SendSMSDialog({
         body: {
           leadId: contactType === "lead" ? contactId : undefined,
           ownerId: contactType === "owner" ? contactId : undefined,
+          vendorId: contactType === "vendor" ? contactId : undefined,
           phone: contactPhone,
           message: message,
           fromNumber: "+14048005932",
@@ -97,6 +98,7 @@ export function SendSMSDialog({
       queryClient.invalidateQueries({ queryKey: ["owner-communications"] });
       queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["vendor-communications"] });
       onOpenChange(false);
     },
     onError: (error: any) => {

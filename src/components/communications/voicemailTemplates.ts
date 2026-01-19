@@ -57,6 +57,7 @@ export const VOICEMAIL_TEMPLATES: VoicemailTemplate[] = [
 ];
 
 export const VOICE_OPTIONS = [
+  { id: "HXPJDxQ2YWg0wT4IBlof", name: "Ingo", description: "Default company voice" },
   { id: "nPczCjzI2devNBz1zQrb", name: "Brian", description: "Professional male voice" },
   { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", description: "Warm female voice" },
   { id: "JBFqnCBsd6RMkjVDRZzb", name: "George", description: "Confident male voice" },

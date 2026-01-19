@@ -12,7 +12,9 @@ import {
   AlertCircle,
   Mic,
   Check,
-  Video
+  Video,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -28,8 +30,10 @@ export default function VoicemailPlayer() {
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [showReplyRecorder, setShowReplyRecorder] = useState(false);
   const [replySent, setReplySent] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Fetch voicemail data
   const { data: voicemail, isLoading, error, refetch } = useQuery({
@@ -133,6 +137,50 @@ export default function VoicemailPlayer() {
     const percentage = x / rect.width;
     mediaRef.currentTime = percentage * mediaRef.duration;
   };
+
+  const handleFullscreen = async () => {
+    const container = videoContainerRef.current;
+    const video = videoRef.current;
+    
+    if (!container || !video) return;
+    
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      } else {
+        // Try video element first for better mobile support
+        if (video.requestFullscreen) {
+          await video.requestFullscreen();
+          setIsFullscreen(true);
+        } else if ((video as any).webkitEnterFullscreen) {
+          // iOS Safari
+          (video as any).webkitEnterFullscreen();
+          setIsFullscreen(true);
+        } else if (container.requestFullscreen) {
+          await container.requestFullscreen();
+          setIsFullscreen(true);
+        }
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
+    }
+  };
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
 
   const handleCallback = () => {
     trackEvent("callback");
@@ -251,17 +299,22 @@ export default function VoicemailPlayer() {
 
           {/* Media Player - Video or Audio */}
           {voicemail.media_type === "video" && voicemail.video_url ? (
-            // VIDEO PLAYER
+            // VIDEO PLAYER - Responsive with fullscreen support
             <div className="bg-gradient-to-br from-gray-50 to-amber-50/50 rounded-2xl p-5 mb-6">
-              <div className="relative rounded-xl overflow-hidden bg-black aspect-video mb-4">
+              <div 
+                ref={videoContainerRef}
+                className="relative rounded-xl overflow-hidden bg-black mb-4"
+                style={{ maxHeight: "70vh" }}
+              >
                 <video
                   ref={videoRef}
                   src={voicemail.video_url}
-                  className="w-full h-full object-contain"
+                  className="w-full h-auto max-h-[60vh] object-contain mx-auto"
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
                   onEnded={handleEnded}
                   playsInline
+                  webkit-playsinline="true"
                   onClick={handlePlay}
                 />
                 {/* Play overlay when paused */}
@@ -275,6 +328,18 @@ export default function VoicemailPlayer() {
                     </div>
                   </button>
                 )}
+                {/* Fullscreen button */}
+                <button
+                  onClick={handleFullscreen}
+                  className="absolute bottom-3 right-3 p-2.5 bg-black/60 hover:bg-black/80 rounded-lg transition-colors"
+                  title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-5 w-5 text-white" />
+                  ) : (
+                    <Maximize2 className="h-5 w-5 text-white" />
+                  )}
+                </button>
               </div>
               
               {/* Time display */}

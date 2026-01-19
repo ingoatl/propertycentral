@@ -50,7 +50,7 @@ export function SendVoicemailDialog({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [messageText, setMessageText] = useState<string>("");
-  const [voiceId, setVoiceId] = useState<string>("nPczCjzI2devNBz1zQrb");
+  const [voiceId, setVoiceId] = useState<string>("HXPJDxQ2YWg0wT4IBlof");
   const [audioSource, setAudioSource] = useState<"recording" | "ai_generated">("ai_generated");
   const [isSending, setIsSending] = useState(false);
   

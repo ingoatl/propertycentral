@@ -34,7 +34,7 @@ serve(async (req) => {
       throw new Error("GHL_API_KEY and GHL_LOCATION_ID are required");
     }
 
-    const { leadId, ownerId, phone, to, message, fromNumber, mediaUrls } = await req.json();
+    const { leadId, ownerId, vendorId, phone, to, message, fromNumber, mediaUrls } = await req.json();
 
     // Accept either 'phone' or 'to' parameter for the recipient
     const recipientPhone = phone || to;
@@ -82,7 +82,7 @@ serve(async (req) => {
 
     // If no contact found, create one
     if (!contactId) {
-      // Get lead or owner data for creating the contact
+      // Get lead, owner, or vendor data for creating the contact
       let contactData = null;
       
       if (leadId) {
@@ -97,6 +97,13 @@ serve(async (req) => {
           .from("property_owners")
           .select("name, email, phone")
           .eq("id", ownerId)
+          .single();
+        contactData = data;
+      } else if (vendorId) {
+        const { data } = await supabase
+          .from("vendors")
+          .select("name, email, phone")
+          .eq("id", vendorId)
           .single();
         contactData = data;
       }
@@ -269,7 +276,60 @@ serve(async (req) => {
       console.log(`Marked inbound communications as read for owner ${ownerId}`);
     }
 
-    // For unmatched contacts (no leadId or ownerId), log to lead_communications with metadata
+    // Record communication for vendors - store in lead_communications with vendor metadata
+    // This allows messages to show in both the vendor tab AND the user's inbox
+    if (vendorId) {
+      await supabase.from("lead_communications").insert({
+        communication_type: "sms",
+        direction: "outbound",
+        body: message,
+        status: "sent",
+        external_id: sendData.messageId || sendData.conversationId,
+        ghl_conversation_id: sendData.conversationId,
+        assigned_user_id: userId, // Track who sent this message (for inbox view)
+        metadata: {
+          provider: "gohighlevel",
+          ghl_contact_id: contactId,
+          ghl_conversation_id: sendData.conversationId,
+          from_number: formattedFromNumber,
+          to_number: formattedPhone,
+          vendor_id: vendorId,
+          vendor_phone: formattedPhone,
+          contact_type: "vendor",
+          sent_by_user_id: userId,
+        },
+      });
+
+      // Mark all unread inbound communications for this vendor as read
+      const { data: vendorComms } = await supabase
+        .from("lead_communications")
+        .select("id, metadata")
+        .eq("direction", "inbound")
+        .eq("is_read", false)
+        .is("lead_id", null)
+        .is("owner_id", null);
+
+      if (vendorComms) {
+        const matchingIds: string[] = [];
+        for (const comm of vendorComms) {
+          const meta = comm.metadata as any;
+          const commVendorId = meta?.vendor_id;
+          const commVendorPhone = meta?.vendor_phone || meta?.ghl_data?.contactPhone;
+          if (commVendorId === vendorId || (commVendorPhone && formatPhoneE164(commVendorPhone) === formattedPhone)) {
+            matchingIds.push(comm.id);
+          }
+        }
+        if (matchingIds.length > 0) {
+          await supabase
+            .from("lead_communications")
+            .update({ is_read: true })
+            .in("id", matchingIds);
+          console.log(`Marked ${matchingIds.length} vendor communications as read for vendor ${vendorId}`);
+        }
+      }
+      
+      console.log(`Recorded vendor SMS for vendor ${vendorId}`);
+    }
     // so they appear in the conversation thread
     if (!leadId && !ownerId) {
       // Insert outbound message into lead_communications with phone in metadata
