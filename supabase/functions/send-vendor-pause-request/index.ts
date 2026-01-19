@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -59,7 +58,6 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const resend = new Resend(resendApiKey);
 
     const payload: PauseRequestPayload = await req.json();
     console.log("Payload received:", payload);
@@ -299,15 +297,29 @@ const handler = async (req: Request): Promise<Response> => {
 </html>
     `;
 
-    // Send email
+    // Send email using Resend API directly
     console.log(`Sending pause request email to ${vendor.email}`);
-    const emailResult = await resend.emails.send({
-      from: "PeachHaus Property Management <statements@peachhausgroup.com>",
-      to: [vendor.email],
-      cc: ["info@peachhausgroup.com"],
-      subject: `Service Modification Request - ${propertyAddress} - Ref: ${referenceNumber}`,
-      html: emailHtml,
+    const emailResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "PeachHaus Property Management <statements@peachhausgroup.com>",
+        to: [vendor.email],
+        cc: ["info@peachhausgroup.com"],
+        subject: `Service Modification Request - ${propertyAddress} - Ref: ${referenceNumber}`,
+        html: emailHtml,
+      }),
     });
+
+    const emailResult = await emailResponse.json();
+    
+    if (!emailResponse.ok) {
+      console.error("Resend API error:", emailResult);
+      throw new Error(`Failed to send email: ${emailResult.message || 'Unknown error'}`);
+    }
 
     console.log("Email sent successfully:", emailResult);
 
