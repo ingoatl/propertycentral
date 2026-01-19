@@ -29,6 +29,7 @@ import {
   MapPin,
   AlertCircle,
   CheckCircle2,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -44,6 +45,7 @@ import { EnhancedEventsTimeline } from "./components/EnhancedEventsTimeline";
 import { StatementViewer } from "./components/StatementViewer";
 import { OwnerOnboardingTimeline } from "./components/OwnerOnboardingTimeline";
 import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfButton";
+import { OwnerMessagesTab } from "./components/OwnerMessagesTab";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
@@ -894,6 +896,10 @@ export default function OwnerDashboard() {
             <TabsTrigger value="property" className="gap-2">
               <Home className="h-4 w-4" />
               <span className="hidden sm:inline">Property</span>
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="gap-2">
+              <MessageCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Messages</span>
             </TabsTrigger>
           </TabsList>
 

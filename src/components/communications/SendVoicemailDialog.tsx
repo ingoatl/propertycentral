@@ -16,11 +16,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Sparkles, Send, Loader2, User, Phone } from "lucide-react";
+import { Mic, Sparkles, Send, Loader2, User, Phone, Video } from "lucide-react";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { VoiceRecorder } from "./VoiceRecorder";
 import { AIVoiceGenerator } from "./AIVoiceGenerator";
+import { VideoCapture } from "./VideoCapture";
 import { cn } from "@/lib/utils";
 
 interface SendVoicemailDialogProps {
@@ -45,13 +46,22 @@ export function SendVoicemailDialog({
   onSuccess,
 }: SendVoicemailDialogProps) {
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState<"record" | "ai">("ai");
+  const [activeTab, setActiveTab] = useState<"record" | "ai" | "video">("ai");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [messageText, setMessageText] = useState<string>("");
   const [voiceId, setVoiceId] = useState<string>("nPczCjzI2devNBz1zQrb");
   const [audioSource, setAudioSource] = useState<"recording" | "ai_generated">("ai_generated");
   const [isSending, setIsSending] = useState(false);
+  
+  // Video state
+  const [mediaType, setMediaType] = useState<"audio" | "video">("audio");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoStoragePath, setVideoStoragePath] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number>(0);
+  
+  // Show video option only for owners
+  const showVideoOption = !!ownerId;
 
   // Get current user's name
   const { data: currentUser } = useQuery({
@@ -77,6 +87,7 @@ export function SendVoicemailDialog({
     setAudioDuration(duration);
     setAudioSource("recording");
     setMessageText("(Voice recording)");
+    setMediaType("audio");
   };
 
   const handleAIAudioGenerated = (blob: Blob, text: string, voice: string) => {
@@ -84,11 +95,24 @@ export function SendVoicemailDialog({
     setMessageText(text);
     setVoiceId(voice);
     setAudioSource("ai_generated");
+    setMediaType("audio");
+  };
+
+  const handleVideoReady = (url: string, duration: number, storagePath: string) => {
+    setVideoUrl(url);
+    setVideoDuration(duration);
+    setVideoStoragePath(storagePath);
+    setMediaType("video");
+    setMessageText("(Video message)");
   };
 
   const handleSend = async () => {
-    if (!audioBlob) {
-      toast.error("Please record or generate audio first");
+    // Check if we have content to send
+    const hasAudio = !!audioBlob;
+    const hasVideo = mediaType === "video" && !!videoUrl;
+    
+    if (!hasAudio && !hasVideo) {
+      toast.error("Please record or generate a message first");
       return;
     }
 
@@ -100,17 +124,21 @@ export function SendVoicemailDialog({
     setIsSending(true);
 
     try {
-      // Convert blob to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(",")[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-      });
-      reader.readAsDataURL(audioBlob);
-      const audioBase64 = await base64Promise;
+      let audioBase64 = null;
+      
+      // Only convert audio to base64 if we're sending audio
+      if (hasAudio && audioBlob) {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => {
+            const base64 = (reader.result as string).split(",")[1];
+            resolve(base64);
+          };
+          reader.onerror = reject;
+        });
+        reader.readAsDataURL(audioBlob);
+        audioBase64 = await base64Promise;
+      }
 
       // Call the send-voicemail edge function
       const { data, error } = await supabase.functions.invoke("send-voicemail", {
@@ -121,18 +149,22 @@ export function SendVoicemailDialog({
           ownerId,
           senderName,
           messageText,
-          audioBase64,
-          audioMimeType: audioBlob.type,
+          audioBase64: hasAudio ? audioBase64 : null,
+          audioMimeType: hasAudio && audioBlob ? audioBlob.type : null,
           audioSource,
           voiceId,
-          durationSeconds: audioDuration,
+          durationSeconds: hasVideo ? videoDuration : audioDuration,
+          // Video-specific fields
+          mediaType,
+          videoUrl: hasVideo ? videoUrl : null,
+          videoStoragePath: hasVideo ? videoStoragePath : null,
         },
       });
 
       if (error) throw error;
 
       if (data?.success) {
-        toast.success("Voice message sent!");
+        toast.success(hasVideo ? "Video message sent!" : "Voice message sent!");
         onOpenChange(false);
         onSuccess?.();
         
@@ -140,12 +172,16 @@ export function SendVoicemailDialog({
         setAudioBlob(null);
         setMessageText("");
         setAudioDuration(0);
+        setVideoUrl(null);
+        setVideoStoragePath(null);
+        setVideoDuration(0);
+        setMediaType("audio");
       } else {
-        throw new Error(data?.error || "Failed to send voicemail");
+        throw new Error(data?.error || "Failed to send message");
       }
     } catch (error: any) {
-      console.error("Error sending voicemail:", error);
-      toast.error(error.message || "Failed to send voice message");
+      console.error("Error sending message:", error);
+      toast.error(error.message || "Failed to send message");
     } finally {
       setIsSending(false);
     }
@@ -157,8 +193,16 @@ export function SendVoicemailDialog({
       setAudioBlob(null);
       setMessageText("");
       setAudioDuration(0);
+      setVideoUrl(null);
+      setVideoStoragePath(null);
+      setVideoDuration(0);
+      setMediaType("audio");
+      setActiveTab("ai");
     }
   }, [open]);
+
+  // Determine if we're ready to send
+  const isReadyToSend = (mediaType === "audio" && !!audioBlob) || (mediaType === "video" && !!videoUrl);
 
   const content = (
     <div className="flex flex-col gap-4">
@@ -174,16 +218,16 @@ export function SendVoicemailDialog({
             {recipientPhone}
           </p>
         </div>
-        {audioBlob && (
+        {isReadyToSend && (
           <Badge variant="secondary" className="shrink-0">
-            Audio ready
+            {mediaType === "video" ? "Video ready" : "Audio ready"}
           </Badge>
         )}
       </div>
 
-      {/* Tabs for Record vs AI */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "record" | "ai")}>
-        <TabsList className="grid w-full grid-cols-2">
+      {/* Tabs for Record vs AI vs Video (if owner) */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "record" | "ai" | "video")}>
+        <TabsList className={cn("grid w-full", showVideoOption ? "grid-cols-3" : "grid-cols-2")}>
           <TabsTrigger value="record" className="gap-2">
             <Mic className="h-4 w-4" />
             Record
@@ -192,6 +236,12 @@ export function SendVoicemailDialog({
             <Sparkles className="h-4 w-4" />
             AI Voice
           </TabsTrigger>
+          {showVideoOption && (
+            <TabsTrigger value="video" className="gap-2">
+              <Video className="h-4 w-4" />
+              Video
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="record" className="mt-4">
@@ -209,12 +259,21 @@ export function SendVoicemailDialog({
             onAudioGenerated={handleAIAudioGenerated}
           />
         </TabsContent>
+
+        {showVideoOption && (
+          <TabsContent value="video" className="mt-4">
+            <VideoCapture
+              onVideoReady={handleVideoReady}
+              maxDuration={120}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Send Button */}
       <Button
         onClick={handleSend}
-        disabled={!audioBlob || isSending}
+        disabled={!isReadyToSend || isSending}
         size="lg"
         className="w-full gap-2 mt-2"
       >
@@ -226,13 +285,13 @@ export function SendVoicemailDialog({
         ) : (
           <>
             <Send className="h-4 w-4" />
-            Send Voice Message
+            {mediaType === "video" ? "Send Video Message" : "Send Voice Message"}
           </>
         )}
       </Button>
 
       <p className="text-xs text-muted-foreground text-center">
-        {recipientName} will receive an SMS with a link to listen to your message
+        {recipientName} will receive an SMS with a link to {mediaType === "video" ? "watch" : "listen to"} your message
       </p>
     </div>
   );
@@ -243,8 +302,8 @@ export function SendVoicemailDialog({
         <DrawerContent className="max-h-[90vh]">
           <DrawerHeader className="border-b pb-4">
             <DrawerTitle className="flex items-center gap-2">
-              <Mic className="h-5 w-5" />
-              Send Voice Message
+              {mediaType === "video" ? <Video className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              Send {showVideoOption ? "Media" : "Voice"} Message
             </DrawerTitle>
           </DrawerHeader>
           <div className="p-4 overflow-y-auto">
@@ -260,8 +319,8 @@ export function SendVoicemailDialog({
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Mic className="h-5 w-5" />
-            Send Voice Message
+            {mediaType === "video" ? <Video className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            Send {showVideoOption ? "Media" : "Voice"} Message
           </DialogTitle>
         </DialogHeader>
         {content}

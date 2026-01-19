@@ -9724,6 +9724,7 @@ export type Database = {
           duration_seconds: number | null
           id: string
           lead_id: string | null
+          media_type: string | null
           message_text: string
           opened_at: string | null
           owner_id: string | null
@@ -9741,9 +9742,11 @@ export type Database = {
           sms_message_sid: string | null
           sms_sent_at: string | null
           status: string | null
+          thumbnail_url: string | null
           token: string
           total_listen_time: number | null
           updated_at: string | null
+          video_url: string | null
           voice_id: string | null
         }
         Insert: {
@@ -9754,6 +9757,7 @@ export type Database = {
           duration_seconds?: number | null
           id?: string
           lead_id?: string | null
+          media_type?: string | null
           message_text: string
           opened_at?: string | null
           owner_id?: string | null
@@ -9771,9 +9775,11 @@ export type Database = {
           sms_message_sid?: string | null
           sms_sent_at?: string | null
           status?: string | null
+          thumbnail_url?: string | null
           token?: string
           total_listen_time?: number | null
           updated_at?: string | null
+          video_url?: string | null
           voice_id?: string | null
         }
         Update: {
@@ -9784,6 +9790,7 @@ export type Database = {
           duration_seconds?: number | null
           id?: string
           lead_id?: string | null
+          media_type?: string | null
           message_text?: string
           opened_at?: string | null
           owner_id?: string | null
@@ -9801,9 +9808,11 @@ export type Database = {
           sms_message_sid?: string | null
           sms_sent_at?: string | null
           status?: string | null
+          thumbnail_url?: string | null
           token?: string
           total_listen_time?: number | null
           updated_at?: string | null
+          video_url?: string | null
           voice_id?: string | null
         }
         Relationships: [
