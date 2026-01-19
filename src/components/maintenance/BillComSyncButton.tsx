@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Send, CheckCircle } from "lucide-react";
+import { Loader2, RefreshCw, Send, CheckCircle, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 
 interface BillComSyncButtonProps {
   vendorId: string;
   vendorName: string;
   vendorEmail?: string;
+  vendorPhone?: string;
   billcomVendorId?: string | null;
   billcomSyncedAt?: string | null;
   billcomInviteSentAt?: string | null;
@@ -20,6 +21,7 @@ const BillComSyncButton = ({
   vendorId,
   vendorName,
   vendorEmail,
+  vendorPhone,
   billcomVendorId,
   billcomSyncedAt,
   billcomInviteSentAt,
@@ -27,6 +29,7 @@ const BillComSyncButton = ({
 }: BillComSyncButtonProps) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
+  const [isSmsInviting, setIsSmsInviting] = useState(false);
 
   const syncToBillCom = async () => {
     if (!vendorEmail) {
@@ -49,6 +52,7 @@ const BillComSyncButton = ({
         toast.error(data.error || "Failed to sync vendor");
       }
     } catch (error: any) {
+      console.error("Sync error:", error);
       toast.error("Failed to sync vendor: " + error.message);
     } finally {
       setIsSyncing(false);
@@ -76,9 +80,54 @@ const BillComSyncButton = ({
         toast.error(data.error || "Failed to send invitation");
       }
     } catch (error: any) {
+      console.error("Invite error:", error);
       toast.error("Failed to send invitation: " + error.message);
     } finally {
       setIsInviting(false);
+    }
+  };
+
+  const sendSmsInvite = async () => {
+    if (!vendorPhone) {
+      toast.error("Vendor phone is required to send SMS invitation");
+      return;
+    }
+
+    setIsSmsInviting(true);
+    try {
+      // Send SMS with Bill.com signup link
+      const smsBody = `Hi ${vendorName}! PeachHaus Property Management invites you to join Bill.com for easy invoice submission and fast payments. Sign up here: https://app.bill.com/BDCRegistration\n\nOnce registered, you can submit invoices directly through Bill.com and receive payments quickly. Reply with any questions!`;
+
+      const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
+        body: {
+          toNumber: vendorPhone,
+          message: smsBody,
+          fromNumber: "+14049915076", // Vendor phone number
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success("Bill.com invite SMS sent to vendor");
+        
+        // Update vendor record to track SMS invite
+        await supabase
+          .from("vendors")
+          .update({
+            billcom_invite_sent_at: new Date().toISOString(),
+          })
+          .eq("id", vendorId);
+        
+        onUpdate();
+      } else {
+        toast.error(data.error || "Failed to send SMS");
+      }
+    } catch (error: any) {
+      console.error("SMS invite error:", error);
+      toast.error("Failed to send SMS: " + error.message);
+    } finally {
+      setIsSmsInviting(false);
     }
   };
 
@@ -141,7 +190,7 @@ const BillComSyncButton = ({
               ) : (
                 <Send className="h-4 w-4 mr-2" />
               )}
-              {billcomInviteSentAt ? "Resend Invite" : "Send Invite"}
+              {billcomInviteSentAt ? "Resend Email Invite" : "Email Invite"}
             </Button>
           </>
         ) : (
@@ -170,15 +219,36 @@ const BillComSyncButton = ({
               ) : (
                 <Send className="h-4 w-4 mr-2" />
               )}
-              {billcomInviteSentAt ? "Resend Invite" : "Invite Vendor"}
+              {billcomInviteSentAt ? "Resend Email" : "Email Invite"}
             </Button>
           </>
         )}
+        
+        {/* SMS Invite Option */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={sendSmsInvite}
+          disabled={isSmsInviting || !vendorPhone}
+        >
+          {isSmsInviting ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <MessageSquare className="h-4 w-4 mr-2" />
+          )}
+          SMS Invite
+        </Button>
       </div>
 
-      {!vendorEmail && (
+      {!vendorEmail && !vendorPhone && (
         <p className="text-xs text-amber-600">
-          Add vendor email to enable Bill.com integration
+          Add vendor email or phone to enable Bill.com integration
+        </p>
+      )}
+      
+      {!vendorEmail && vendorPhone && (
+        <p className="text-xs text-muted-foreground">
+          Add email for full Bill.com sync, or use SMS invite
         </p>
       )}
     </div>
