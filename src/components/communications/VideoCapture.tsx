@@ -41,8 +41,23 @@ export function VideoCapture({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith("video/")) {
+    // Validate file type - accept video/* and QuickTime (.mov) files
+    const validVideoTypes = [
+      "video/mp4",
+      "video/webm",
+      "video/ogg",
+      "video/quicktime", // .mov files
+      "video/x-m4v",
+      "video/3gpp",
+      "video/3gpp2",
+    ];
+    
+    const isValidVideo = file.type.startsWith("video/") || 
+                         validVideoTypes.includes(file.type) ||
+                         file.name.toLowerCase().endsWith(".mov") ||
+                         file.name.toLowerCase().endsWith(".mp4");
+    
+    if (!isValidVideo) {
       setUploadError("Please select a video file");
       return;
     }
@@ -130,11 +145,18 @@ export function VideoCapture({
       const arrayBuffer = await videoFile.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
 
+      // Determine proper content type (fallback for QuickTime)
+      let contentType = videoFile.type;
+      if (!contentType || contentType === "video/quicktime") {
+        // Convert QuickTime to mp4 content type for better compatibility
+        contentType = "video/mp4";
+      }
+
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("message-attachments")
         .upload(storagePath, uint8Array, {
-          contentType: videoFile.type,
+          contentType: contentType,
           upsert: false,
         });
 

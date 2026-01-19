@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Phone, MessageSquare, X, Delete, Users, Grid3X3, Mic } from "lucide-react";
+import { Phone, MessageSquare, X, Delete, Users, Grid3X3, Mic, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -269,10 +269,21 @@ export function QuickCommunicationButton() {
                                 size="icon"
                                 className="h-8 w-8"
                                 onClick={() => handleVoicemail(contact)}
-                                title="Voicemail"
+                                title="Voice Message"
                               >
                                 <Mic className="h-4 w-4 text-amber-600" />
                               </Button>
+                              {contact.type === "owner" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleVoicemail(contact)}
+                                  title="Video Message"
+                                >
+                                  <Video className="h-4 w-4 text-purple-600" />
+                                </Button>
+                              )}
                             </>
                           )}
                         </div>
