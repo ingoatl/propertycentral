@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall, Inbox } from "lucide-react";
+import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall, Inbox, Play, Volume2 } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import { format } from "date-fns";
@@ -31,6 +31,7 @@ import { useAdminCheck } from "@/hooks/useAdminCheck";
 import DeleteVendorDialog from "./DeleteVendorDialog";
 import BillComSyncButton from "./BillComSyncButton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { CallDialog } from "@/components/communications/CallDialog";
 
 interface VendorDetailModalProps {
   vendor: Vendor & {
@@ -47,6 +48,7 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(vendor);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCallDialog, setShowCallDialog] = useState(false);
   const { isAdmin } = useAdminCheck();
 
   // Fetch work orders for this vendor
@@ -65,7 +67,7 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
     },
   });
 
-  // Fetch communications with this vendor (by phone number)
+  // Fetch communications with this vendor (by phone number) - including calls with recordings/transcripts
   const { data: vendorComms = [] } = useQuery({
     queryKey: ["vendor-communications", vendor.phone],
     queryFn: async () => {
@@ -76,10 +78,11 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
       const vendorPhoneNormalized = normalizePhone(vendor.phone);
       
       // Query lead_communications for messages matching vendor's phone
+      // This includes calls, voicemails, sms with metadata
       const { data, error } = await supabase
         .from("lead_communications")
         .select("id, communication_type, direction, body, subject, created_at, status, metadata")
-        .or(`metadata->>unmatched_phone.ilike.%${vendorPhoneNormalized}%,metadata->>contact_phone.ilike.%${vendorPhoneNormalized}%`)
+        .or(`metadata->>unmatched_phone.ilike.%${vendorPhoneNormalized}%,metadata->>contact_phone.ilike.%${vendorPhoneNormalized}%,metadata->>to_number.ilike.%${vendorPhoneNormalized}%,metadata->>from_number.ilike.%${vendorPhoneNormalized}%`)
         .order("created_at", { ascending: false })
         .limit(50);
       
@@ -96,7 +99,7 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
         .order("created_at", { ascending: false })
         .limit(50);
       
-      // Combine and format messages
+      // Combine and format messages with full metadata
       const allMessages = [
         ...(data || []).map((m: any) => ({
           id: m.id,
@@ -105,6 +108,12 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
           body: m.body,
           created_at: m.created_at,
           source: "lead_comms",
+          metadata: m.metadata,
+          // Extract recording and transcript if available
+          recording_url: m.metadata?.recording_url || m.metadata?.audio_url,
+          transcript: m.metadata?.transcript || m.metadata?.transcription,
+          duration: m.metadata?.duration || m.metadata?.duration_seconds,
+          call_status: m.metadata?.call_status,
         })),
         ...(directSms || []).map((m: any) => ({
           id: m.id,
@@ -113,6 +122,11 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
           body: m.message_body,
           created_at: m.created_at,
           source: "direct",
+          metadata: null,
+          recording_url: null,
+          transcript: null,
+          duration: null,
+          call_status: null,
         })),
       ];
       
@@ -249,7 +263,7 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
                       className="gap-1.5"
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.location.href = `tel:${vendor.phone}`;
+                        setShowCallDialog(true);
                       }}
                     >
                       <PhoneCall className="h-4 w-4 text-green-600" />
@@ -449,8 +463,45 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
                           <span className="text-xs text-muted-foreground">
                             {msg.direction === "outbound" ? "You" : vendor.name} · {format(new Date(msg.created_at), "MMM d, h:mm a")}
                           </span>
+                          {msg.duration && (
+                            <Badge variant="outline" className="text-[10px] h-4">
+                              {Math.floor(msg.duration / 60)}:{String(msg.duration % 60).padStart(2, '0')}
+                            </Badge>
+                          )}
                         </div>
+                        
+                        {/* Message body */}
                         <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                        
+                        {/* Call transcript */}
+                        {msg.transcript && (
+                          <div className="mt-2 p-2 bg-background/50 rounded text-xs border">
+                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                              <FileText className="h-3 w-3" />
+                              <span className="font-medium">Transcript</span>
+                            </div>
+                            <p className="text-foreground leading-relaxed">{msg.transcript}</p>
+                          </div>
+                        )}
+                        
+                        {/* Recording playback */}
+                        {msg.recording_url && (
+                          <div className="mt-2">
+                            <audio 
+                              controls 
+                              className="w-full h-8" 
+                              src={msg.recording_url}
+                              preload="none"
+                            >
+                              <a href={msg.recording_url} target="_blank" rel="noopener noreferrer">
+                                <Button size="sm" variant="ghost" className="gap-1.5 h-6 text-xs">
+                                  <Volume2 className="h-3 w-3" />
+                                  Listen to recording
+                                </Button>
+                              </a>
+                            </audio>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -694,6 +745,15 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
         onConfirm={() => deleteVendor.mutate()}
         isDeleting={deleteVendor.isPending}
       />
+
+      {vendor.phone && (
+        <CallDialog
+          open={showCallDialog}
+          onOpenChange={setShowCallDialog}
+          contactPhone={vendor.phone}
+          contactName={vendor.name}
+        />
+      )}
     </>
   );
 };
