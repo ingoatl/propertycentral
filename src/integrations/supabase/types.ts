@@ -9629,6 +9629,102 @@ export type Database = {
           },
         ]
       }
+      voicemail_messages: {
+        Row: {
+          audio_source: string
+          audio_url: string
+          callback_clicked: boolean | null
+          created_at: string | null
+          duration_seconds: number | null
+          id: string
+          lead_id: string | null
+          message_text: string
+          opened_at: string | null
+          owner_id: string | null
+          play_count: number | null
+          played_at: string | null
+          recipient_name: string | null
+          recipient_phone: string
+          reply_clicked: boolean | null
+          sender_name: string | null
+          sender_user_id: string | null
+          sms_message_sid: string | null
+          sms_sent_at: string | null
+          status: string | null
+          token: string
+          total_listen_time: number | null
+          updated_at: string | null
+          voice_id: string | null
+        }
+        Insert: {
+          audio_source?: string
+          audio_url: string
+          callback_clicked?: boolean | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          lead_id?: string | null
+          message_text: string
+          opened_at?: string | null
+          owner_id?: string | null
+          play_count?: number | null
+          played_at?: string | null
+          recipient_name?: string | null
+          recipient_phone: string
+          reply_clicked?: boolean | null
+          sender_name?: string | null
+          sender_user_id?: string | null
+          sms_message_sid?: string | null
+          sms_sent_at?: string | null
+          status?: string | null
+          token?: string
+          total_listen_time?: number | null
+          updated_at?: string | null
+          voice_id?: string | null
+        }
+        Update: {
+          audio_source?: string
+          audio_url?: string
+          callback_clicked?: boolean | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          lead_id?: string | null
+          message_text?: string
+          opened_at?: string | null
+          owner_id?: string | null
+          play_count?: number | null
+          played_at?: string | null
+          recipient_name?: string | null
+          recipient_phone?: string
+          reply_clicked?: boolean | null
+          sender_name?: string | null
+          sender_user_id?: string | null
+          sms_message_sid?: string | null
+          sms_sent_at?: string | null
+          status?: string | null
+          token?: string
+          total_listen_time?: number | null
+          updated_at?: string | null
+          voice_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voicemail_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voicemail_messages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       watchdog_logs: {
         Row: {
           check_type: string
