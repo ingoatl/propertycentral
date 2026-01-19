@@ -37,7 +37,9 @@ import {
   Circle,
   Pencil,
   Check,
-  X
+  X,
+  Trash2,
+  MessageCircle
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
 import FollowUpManager from "./FollowUpManager";
@@ -51,6 +53,24 @@ import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DirectCallButton from "./DirectCallButton";
 import { SendStripeAuthButton } from "./SendStripeAuthButton";
 import { ExpandableMessageInput } from "@/components/communications/ExpandableMessageInput";
+import { UnifiedConversationThread } from "@/components/communications/UnifiedConversationThread";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -61,12 +81,15 @@ interface LeadDetailModalProps {
 
 const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModalProps) => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [notes, setNotes] = useState(lead?.notes || "");
   const [newMessage, setNewMessage] = useState("");
   const [messageType, setMessageType] = useState<"sms" | "email">("sms");
   const [showScheduleCall, setShowScheduleCall] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showSMSDialog, setShowSMSDialog] = useState(false);
+  const [showFullConversation, setShowFullConversation] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(lead?.name || "");
   const [isEditingEmail, setIsEditingEmail] = useState(false);
@@ -324,6 +347,48 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
     },
   });
 
+  // Delete lead mutation
+  const deleteLead = useMutation({
+    mutationFn: async () => {
+      if (!lead) return;
+      
+      // Delete related records first (timeline, communications, etc.)
+      await supabase.from("lead_timeline").delete().eq("lead_id", lead.id);
+      await supabase.from("lead_communications").delete().eq("lead_id", lead.id);
+      await supabase.from("follow_up_reminders").delete().eq("lead_id", lead.id);
+      
+      // Delete the lead itself
+      const { error } = await supabase
+        .from("leads")
+        .delete()
+        .eq("id", lead.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Lead deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      onOpenChange(false);
+      onRefresh();
+    },
+    onError: (error) => {
+      toast.error("Failed to delete lead: " + error.message);
+    },
+  });
+
+  // Transform communications for UnifiedConversationThread
+  const threadMessages = (communications || [])
+    .filter(c => c.communication_type !== 'voice_call')
+    .map(c => ({
+      id: c.id,
+      type: c.communication_type as "sms" | "email" | "call",
+      direction: c.direction as "inbound" | "outbound",
+      body: c.body,
+      subject: c.subject,
+      created_at: c.created_at,
+      status: c.status,
+    }))
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
   // Reset edited values when lead changes
   useEffect(() => {
     if (lead) {
@@ -407,15 +472,46 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
                 Lead #{lead.lead_number} • {lead.opportunity_source || 'Unknown Source'}
               </p>
             </div>
-            <Badge className={`${stageConfig.bgColor} ${stageConfig.color} border-0`}>
-              {stageConfig.label}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={`${stageConfig.bgColor} ${stageConfig.color} border-0`}>
+                {stageConfig.label}
+              </Badge>
+              
+              {/* Delete Button */}
+              <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete <strong>{lead.name}</strong>? This will permanently remove the lead and all associated communications, timeline entries, and follow-ups. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteLead.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {deleteLead.isPending ? "Deleting..." : "Delete Lead"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1 overflow-y-auto pr-4">
         {/* Quick Action Buttons */}
-        <div className="flex items-center gap-3 py-4 border-b mb-4">
+        <div className="flex flex-wrap items-center gap-3 py-4 border-b mb-4">
           {lead.phone && (
             <DirectCallButton 
               leadId={lead.id}
@@ -428,7 +524,6 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             <Button 
               variant="outline" 
               size="sm"
-              className="flex-1"
               onClick={() => setShowEmailDialog(true)}
             >
               <Mail className="h-4 w-4 mr-2" />
@@ -439,13 +534,28 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             <Button 
               variant="outline" 
               size="sm"
-              className="flex-1"
               onClick={() => setShowSMSDialog(true)}
             >
               <MessageSquare className="h-4 w-4 mr-2" />
               Text
             </Button>
           )}
+          
+          {/* Full Conversation Button */}
+          <Button 
+            variant="default" 
+            size="sm"
+            onClick={() => setShowFullConversation(true)}
+            className="bg-gradient-to-br from-primary to-primary/80"
+          >
+            <MessageCircle className="h-4 w-4 mr-2" />
+            Full Conversation
+            {communications && communications.length > 0 && (
+              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
+                {communications.length}
+              </Badge>
+            )}
+          </Button>
         </div>
 
         {/* Lead Info */}
@@ -904,6 +1014,80 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         </Tabs>
         </ScrollArea>
       </DialogContent>
+
+      {/* Full Conversation Drawer */}
+      <Drawer open={showFullConversation} onOpenChange={setShowFullConversation}>
+        <DrawerContent className="max-h-[95vh] flex flex-col">
+          <DrawerHeader className="border-b px-4 py-3 flex-shrink-0">
+            <DrawerTitle className="flex items-center gap-3">
+              <MessageCircle className="h-5 w-5 text-primary" />
+              <div>
+                <span className="text-lg font-semibold">Conversation with {lead.name}</span>
+                <p className="text-sm text-muted-foreground font-normal">
+                  {communications?.length || 0} messages • {lead.phone || lead.email}
+                </p>
+              </div>
+            </DrawerTitle>
+          </DrawerHeader>
+          
+          {/* Conversation Thread */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <UnifiedConversationThread
+              messages={threadMessages}
+              contactName={lead.name}
+              onImageClick={(url) => window.open(url, '_blank')}
+            />
+          </div>
+          
+          {/* Message Input */}
+          <div className="border-t p-4 flex-shrink-0 safe-area-bottom">
+            <div className="flex gap-3 items-start">
+              <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
+                <SelectTrigger className="w-24 flex-shrink-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sms">SMS</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex-1">
+                <ExpandableMessageInput
+                  value={newMessage}
+                  onChange={setNewMessage}
+                  onSend={() => {
+                    sendMessage.mutate();
+                    queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] });
+                  }}
+                  placeholder={`Type your ${messageType} message...`}
+                  messageType={messageType}
+                  contactName={lead.name}
+                  contactId={lead.id}
+                  contactType="lead"
+                  minRows={2}
+                  maxRows={4}
+                  showCharacterCount={messageType === "sms"}
+                  showSegmentCount={messageType === "sms"}
+                  showVoiceDictation={true}
+                  showAIAssistant={true}
+                  disabled={sendMessage.isPending}
+                />
+              </div>
+              <Button 
+                onClick={() => {
+                  sendMessage.mutate();
+                  queryClient.invalidateQueries({ queryKey: ["lead-communications", lead.id] });
+                }}
+                disabled={sendMessage.isPending || !newMessage.trim()}
+                className="self-start mt-1 flex-shrink-0 h-11"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
     </Dialog>
   );
 };
