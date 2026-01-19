@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+export type ContactType = 'lead' | 'owner' | 'vendor';
+
 export interface UnifiedAIRequest {
   action: 'compose' | 'reply' | 'improve' | 'shorten' | 'professional' | 'friendly';
   messageType: 'sms' | 'email';
-  contactType: 'lead' | 'owner';
+  contactType: ContactType;
   contactId: string;
   currentMessage?: string;
   incomingMessage?: string;
@@ -106,7 +108,7 @@ export function useUnifiedAI() {
 
   // Convenience methods for common actions
   const composeMessage = (
-    contactType: 'lead' | 'owner',
+    contactType: ContactType,
     contactId: string,
     messageType: 'sms' | 'email',
     instructions?: string,
@@ -127,7 +129,7 @@ export function useUnifiedAI() {
   };
 
   const replyToMessage = (
-    contactType: 'lead' | 'owner',
+    contactType: ContactType,
     contactId: string,
     messageType: 'sms' | 'email',
     incomingMessage: string,
@@ -152,7 +154,7 @@ export function useUnifiedAI() {
   };
 
   const improveMessage = (
-    contactType: 'lead' | 'owner',
+    contactType: ContactType,
     contactId: string,
     messageType: 'sms' | 'email',
     currentMessage: string,
@@ -169,7 +171,7 @@ export function useUnifiedAI() {
   };
 
   const shortenMessage = (
-    contactType: 'lead' | 'owner',
+    contactType: ContactType,
     contactId: string,
     messageType: 'sms' | 'email',
     currentMessage: string,
@@ -186,7 +188,7 @@ export function useUnifiedAI() {
   };
 
   const makeProfessional = (
-    contactType: 'lead' | 'owner',
+    contactType: ContactType,
     contactId: string,
     messageType: 'sms' | 'email',
     currentMessage: string,
@@ -203,7 +205,7 @@ export function useUnifiedAI() {
   };
 
   const makeFriendly = (
-    contactType: 'lead' | 'owner',
+    contactType: ContactType,
     contactId: string,
     messageType: 'sms' | 'email',
     currentMessage: string,
