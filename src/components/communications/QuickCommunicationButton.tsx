@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Phone, MessageSquare, X, Delete, Users, Grid3X3 } from "lucide-react";
+import { Phone, MessageSquare, X, Delete, Users, Grid3X3, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SendSMSDialog } from "./SendSMSDialog";
 import { CallDialog } from "./CallDialog";
+import { SendVoicemailDialog } from "./SendVoicemailDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,6 +40,7 @@ export function QuickCommunicationButton() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [showSMS, setShowSMS] = useState(false);
   const [showCall, setShowCall] = useState(false);
+  const [showVoicemail, setShowVoicemail] = useState(false);
   const [activeTab, setActiveTab] = useState<"search" | "dialpad">("search");
 
   // Fetch leads and owners for contact search
@@ -149,6 +151,32 @@ export function QuickCommunicationButton() {
     setOpen(false);
   };
 
+  const handleVoicemail = (contact: Contact) => {
+    if (!contact.phone) {
+      toast.error("No phone number available");
+      return;
+    }
+    setSelectedContact(contact);
+    setShowVoicemail(true);
+    setOpen(false);
+  };
+
+  const handleDialpadVoicemail = () => {
+    if (phoneNumber.length < 10) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+    setSelectedContact({
+      id: "manual",
+      name: formatPhoneForDisplay(phoneNumber),
+      phone: phoneNumber,
+      email: null,
+      type: "lead",
+    });
+    setShowVoicemail(true);
+    setOpen(false);
+  };
+
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
@@ -223,6 +251,7 @@ export function QuickCommunicationButton() {
                                 size="icon"
                                 className="h-8 w-8"
                                 onClick={() => handleCall(contact)}
+                                title="Call"
                               >
                                 <Phone className="h-4 w-4 text-green-600" />
                               </Button>
@@ -231,8 +260,18 @@ export function QuickCommunicationButton() {
                                 size="icon"
                                 className="h-8 w-8"
                                 onClick={() => handleText(contact)}
+                                title="Text"
                               >
                                 <MessageSquare className="h-4 w-4 text-blue-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleVoicemail(contact)}
+                                title="Voicemail"
+                              >
+                                <Mic className="h-4 w-4 text-amber-600" />
                               </Button>
                             </>
                           )}
@@ -298,6 +337,15 @@ export function QuickCommunicationButton() {
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Text
                 </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleDialpadVoicemail}
+                  disabled={phoneNumber.length < 10}
+                >
+                  <Mic className="h-4 w-4 mr-2" />
+                  VM
+                </Button>
               </div>
             </TabsContent>
           </Tabs>
@@ -324,6 +372,18 @@ export function QuickCommunicationButton() {
           contactPhone={selectedContact.phone || ""}
           contactType={selectedContact.type}
           contactId={selectedContact.id}
+        />
+      )}
+
+      {/* Voicemail Dialog */}
+      {selectedContact && selectedContact.phone && (
+        <SendVoicemailDialog
+          open={showVoicemail}
+          onOpenChange={setShowVoicemail}
+          recipientPhone={selectedContact.phone}
+          recipientName={selectedContact.name}
+          leadId={selectedContact.type === "lead" ? selectedContact.id : undefined}
+          ownerId={selectedContact.type === "owner" ? selectedContact.id : undefined}
         />
       )}
     </>

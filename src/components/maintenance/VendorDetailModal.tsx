@@ -23,13 +23,14 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall } from "lucide-react";
+import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall, Inbox } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import { format } from "date-fns";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import DeleteVendorDialog from "./DeleteVendorDialog";
 import BillComSyncButton from "./BillComSyncButton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface VendorDetailModalProps {
   vendor: Vendor & {
@@ -62,6 +63,65 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
       if (error) throw error;
       return data;
     },
+  });
+
+  // Fetch communications with this vendor (by phone number)
+  const { data: vendorComms = [] } = useQuery({
+    queryKey: ["vendor-communications", vendor.phone],
+    queryFn: async () => {
+      if (!vendor.phone) return [];
+      
+      // Normalize the vendor phone for matching
+      const normalizePhone = (p: string) => p.replace(/\D/g, "").slice(-10);
+      const vendorPhoneNormalized = normalizePhone(vendor.phone);
+      
+      // Query lead_communications for messages matching vendor's phone
+      const { data, error } = await supabase
+        .from("lead_communications")
+        .select("id, communication_type, direction, body, subject, created_at, status, metadata")
+        .or(`metadata->>unmatched_phone.ilike.%${vendorPhoneNormalized}%,metadata->>contact_phone.ilike.%${vendorPhoneNormalized}%`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      
+      if (error) {
+        console.error("Error fetching vendor comms:", error);
+        return [];
+      }
+      
+      // Also check user_phone_messages for direct SMS
+      const { data: directSms } = await supabase
+        .from("user_phone_messages")
+        .select("*")
+        .or(`from_number.ilike.%${vendorPhoneNormalized}%,to_number.ilike.%${vendorPhoneNormalized}%`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      
+      // Combine and format messages
+      const allMessages = [
+        ...(data || []).map((m: any) => ({
+          id: m.id,
+          type: m.communication_type,
+          direction: m.direction,
+          body: m.body,
+          created_at: m.created_at,
+          source: "lead_comms",
+        })),
+        ...(directSms || []).map((m: any) => ({
+          id: m.id,
+          type: "sms",
+          direction: m.direction,
+          body: m.message_body,
+          created_at: m.created_at,
+          source: "direct",
+        })),
+      ];
+      
+      // Sort by date and dedupe
+      return allMessages
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 50);
+    },
+    enabled: !!vendor.phone,
   });
 
   const updateVendor = useMutation({
@@ -170,8 +230,9 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
           </DialogHeader>
 
           <Tabs defaultValue="details" className="mt-4">
-            <TabsList>
+            <TabsList className="flex-wrap">
               <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="comms">Communications ({vendorComms.length})</TabsTrigger>
               <TabsTrigger value="jobs">Work Orders ({workOrders.length})</TabsTrigger>
               <TabsTrigger value="billing">Bill.com</TabsTrigger>
               <TabsTrigger value="edit">Edit</TabsTrigger>
@@ -347,6 +408,53 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
                     {vendor.notes}
                   </p>
                 </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="comms" className="mt-4">
+              {!vendor.phone ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Phone className="h-8 w-8 mx-auto mb-2" />
+                  <p>No phone number on file</p>
+                  <p className="text-sm">Add a phone number to see communications</p>
+                </div>
+              ) : vendorComms.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Inbox className="h-8 w-8 mx-auto mb-2" />
+                  <p>No communications yet</p>
+                  <p className="text-sm">Start a conversation with {vendor.name}</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-3 pr-4">
+                    {vendorComms.map((msg: any) => (
+                      <div 
+                        key={msg.id} 
+                        className={`p-3 rounded-lg ${
+                          msg.direction === "outbound" 
+                            ? "bg-primary/10 ml-8" 
+                            : "bg-muted mr-8"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          {msg.type === "sms" ? (
+                            <MessageSquare className="h-3.5 w-3.5 text-blue-500" />
+                          ) : msg.type === "voicemail" ? (
+                            <Mic className="h-3.5 w-3.5 text-amber-500" />
+                          ) : msg.type === "call" ? (
+                            <PhoneCall className="h-3.5 w-3.5 text-green-500" />
+                          ) : (
+                            <Mail className="h-3.5 w-3.5 text-purple-500" />
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {msg.direction === "outbound" ? "You" : vendor.name} · {format(new Date(msg.created_at), "MMM d, h:mm a")}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               )}
             </TabsContent>
 
