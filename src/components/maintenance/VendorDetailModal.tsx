@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2 } from "lucide-react";
+import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText, Trash2, MessageSquare, Mic, PhoneCall } from "lucide-react";
+import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import { format } from "date-fns";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -177,6 +178,59 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
             </TabsList>
 
             <TabsContent value="details" className="space-y-6 mt-4">
+              {/* Quick Action Buttons */}
+              <div className="flex flex-wrap gap-2 pb-2">
+                {vendor.phone && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.href = `tel:${vendor.phone}`;
+                      }}
+                    >
+                      <PhoneCall className="h-4 w-4 text-green-600" />
+                      Call
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.href = `sms:${vendor.phone}`;
+                      }}
+                    >
+                      <MessageSquare className="h-4 w-4 text-blue-600" />
+                      SMS
+                    </Button>
+                    <SendVoicemailButton
+                      recipientPhone={vendor.phone}
+                      recipientName={vendor.name}
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                    />
+                  </>
+                )}
+                {vendor.email && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `mailto:${vendor.email}`;
+                    }}
+                  >
+                    <Mail className="h-4 w-4 text-purple-600" />
+                    Email
+                  </Button>
+                )}
+              </div>
+
               {/* Contact & Stats */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-4">
