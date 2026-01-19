@@ -393,8 +393,8 @@ export function QuickCommunicationButton() {
           onOpenChange={setShowVoicemail}
           recipientPhone={selectedContact.phone}
           recipientName={selectedContact.name}
-          leadId={selectedContact.type === "lead" ? selectedContact.id : undefined}
-          ownerId={selectedContact.type === "owner" ? selectedContact.id : undefined}
+          leadId={selectedContact.type === "lead" && selectedContact.id !== "manual" ? selectedContact.id : undefined}
+          ownerId={selectedContact.type === "owner" && selectedContact.id !== "manual" ? selectedContact.id : undefined}
         />
       )}
     </>
