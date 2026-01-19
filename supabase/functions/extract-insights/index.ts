@@ -179,8 +179,8 @@ serve(async (req) => {
       senderEmail,
       emailDate,
       gmailMessageId,
-      properties,
-      owners,
+      properties = [],
+      owners = [],
       rawHtml,
     } = await req.json();
 
@@ -280,13 +280,16 @@ serve(async (req) => {
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
-    // Create context for AI
-    const propertyList = properties
+    // Create context for AI - ensure arrays are safe
+    const safeProperties = Array.isArray(properties) ? properties : [];
+    const safeOwners = Array.isArray(owners) ? owners : [];
+    
+    const propertyList = safeProperties
       .map((p: any) => `${p.name} (${p.address})`)
-      .join(', ');
-    const ownerList = owners
+      .join(', ') || 'None provided';
+    const ownerList = safeOwners
       .map((o: any) => `${o.name} (${o.email})`)
-      .join(', ');
+      .join(', ') || 'None provided';
 
     const systemPrompt = `You are an AI assistant analyzing property management emails with advanced sentiment analysis and expense detection capabilities.
 
