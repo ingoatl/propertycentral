@@ -231,13 +231,16 @@ export default function VoiceReplyRecorder({
       
       const audioBase64 = await base64Promise;
       
+      // Get clean MIME type (strip codec info like "; codecs=opus")
+      const cleanMimeType = recordedBlob.type.split(';')[0].trim();
+      
       const { data, error } = await supabase.functions.invoke("voicemail-reply", {
         body: {
           token,
           voicemailId,
           audioBase64,
           duration,
-          mimeType: recordedBlob.type,
+          mimeType: cleanMimeType,
         },
       });
       

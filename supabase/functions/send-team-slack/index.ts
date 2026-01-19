@@ -29,9 +29,18 @@ const TEAM_MEMBERS: Record<string, { slackId: string }> = {
   'ingo': { slackId: 'U08BPU3PQ9H' },
 };
 
-// Channel IDs for reliable posting
+// Channel IDs for reliable posting - add actual Slack channel IDs
+// Find these in Slack by right-clicking channel > View channel details > scroll to bottom
 const CHANNEL_IDS: Record<string, string> = {
   'wins': 'C0A967MUW8K',
+  'team-wins': 'C0A967MUW8K', // Update with actual ID
+  'finance-onboarding': '', // Add actual channel ID
+  'marketing-va': '', // Add actual channel ID
+  'ops-escalation': '', // Add actual channel ID
+  'ops-onboarding': '', // Add actual channel ID  
+  'owner-urgent': '', // Add actual channel ID
+  'sales-pipeline': '', // Add actual channel ID
+  'sales-wins': '', // Add actual channel ID
 };
 
 // Cache for Slack user IDs (email -> slackId)
