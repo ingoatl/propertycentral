@@ -40,6 +40,7 @@ import {
   Keyboard,
   Home,
   Hash,
+  Mic,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { cn } from "@/lib/utils";
@@ -260,6 +261,9 @@ export function InboxView() {
   
   // Inbox folder selector (inbox, archived, spam, drafts, all)
   const [selectedFolder, setSelectedFolder] = useState<InboxFolder>("inbox");
+  
+  // Summarize state
+  const [isSummarizing, setIsSummarizing] = useState(false);
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -3260,6 +3264,31 @@ export function InboxView() {
                   }
                   showCreateLead={selectedMessage.contact_type !== "lead" && selectedMessage.contact_type !== "owner"}
                   showSaveMessage={false}
+                  showSummarize={conversationThread.length >= 5}
+                  isSummarizing={isSummarizing}
+                  onSummarize={async () => {
+                    setIsSummarizing(true);
+                    try {
+                      const { data, error } = await supabase.functions.invoke("summarize-conversation", {
+                        body: {
+                          leadId: selectedMessage.contact_type === "lead" ? selectedMessage.contact_id : undefined,
+                          ownerId: selectedMessage.contact_type === "owner" ? selectedMessage.contact_id : undefined,
+                          contactPhone: selectedMessage.contact_phone,
+                          contactEmail: selectedMessage.contact_email,
+                        },
+                      });
+                      if (error) throw error;
+                      if (data?.error) throw new Error(data.error);
+                      if (data?.summary) {
+                        toast.success("Summary generated", { description: data.summary.substring(0, 100) + "..." });
+                      }
+                    } catch (err: any) {
+                      console.error("Summarize error:", err);
+                      toast.error(err.message || "Failed to generate summary");
+                    } finally {
+                      setIsSummarizing(false);
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -3406,17 +3435,7 @@ export function InboxView() {
                       );
                     })()}
                     
-                    {/* Conversation Summary - shows for threads with 5+ messages */}
-                    {!selectedMessage.is_draft && conversationThread.length >= 5 && (
-                      <ConversationSummary
-                        leadId={selectedMessage.contact_type === "lead" ? selectedMessage.contact_id : undefined}
-                        ownerId={selectedMessage.contact_type === "owner" ? selectedMessage.contact_id : undefined}
-                        contactPhone={selectedMessage.contact_phone}
-                        contactEmail={selectedMessage.contact_email}
-                        messageCount={conversationThread.length}
-                        className="mb-3"
-                      />
-                    )}
+                    {/* Conversation Summary REMOVED - now in 3-dot menu */}
                     
                     {/* AI Reply + Smart Extract buttons - compact horizontal row on mobile */}
                     {!selectedMessage.is_draft && conversationThread.length > 0 && (
@@ -3548,6 +3567,14 @@ export function InboxView() {
                                         )}
                                       </div>
                                     )}
+                                    {msg.type === "voicemail" && (
+                                      <div className={`flex items-center gap-2 text-sm mb-1.5 ${isOutbound ? "opacity-70" : "text-muted-foreground"}`}>
+                                        <Mic className="h-3.5 w-3.5 text-amber-500" />
+                                        <span className={`font-medium ${isOutbound ? "" : "text-amber-600"}`}>
+                                          {isOutbound ? "Voicemail sent" : "Voice Reply"}
+                                        </span>
+                                      </div>
+                                    )}
                                     {/* Voice AI Call Back Action */}
                                     {isVoiceAITranscript(msg.body) && !isOutbound && (
                                       <div className="mb-2">
@@ -3564,32 +3591,57 @@ export function InboxView() {
                                         />
                                       </div>
                                     )}
-                                    {/* MMS Images - OpenPhone style grid with lightbox */}
+                                    {/* Media attachments - handle both images and audio */}
                                     {msg.media_urls && msg.media_urls.length > 0 && (
-                                      <div className={`mb-2 grid gap-1.5 ${
-                                        msg.media_urls.length === 1 ? 'grid-cols-1' : 
-                                        msg.media_urls.length === 2 ? 'grid-cols-2' : 
-                                        'grid-cols-2'
-                                      }`}>
-                                        {msg.media_urls.map((url: string, imgIdx: number) => (
-                                          <div 
-                                            key={imgIdx} 
-                                            className={`relative overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity ${
-                                              msg.media_urls.length === 1 ? 'aspect-auto max-h-64' : 'aspect-square'
-                                            }`}
-                                            onClick={() => {
-                                              setLightboxImage(url);
-                                              setLightboxOpen(true);
-                                            }}
-                                          >
-                                            <img 
-                                              src={url} 
-                                              alt="MMS attachment" 
-                                              className={`w-full h-full ${msg.media_urls.length === 1 ? 'object-contain' : 'object-cover'}`}
-                                              loading="lazy"
-                                            />
-                                          </div>
-                                        ))}
+                                      <div className="mb-2">
+                                        {msg.media_urls.map((url: string, imgIdx: number) => {
+                                          // Check if it's an audio file (voicemail reply)
+                                          const isAudio = url.includes('.webm') || url.includes('.mp3') || url.includes('.mp4') || url.includes('.m4a') || url.includes('.wav');
+                                          
+                                          if (isAudio) {
+                                            return (
+                                              <div key={imgIdx} className="bg-background/30 rounded-lg p-3">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                  <div className="p-1.5 rounded-full bg-primary/20">
+                                                    <Mic className="h-3.5 w-3.5 text-primary" />
+                                                  </div>
+                                                  <span className={`text-sm font-medium ${isOutbound ? 'text-primary-foreground/90' : 'text-foreground/80'}`}>
+                                                    Voice Message
+                                                  </span>
+                                                </div>
+                                                <audio 
+                                                  controls 
+                                                  className="w-full h-10 rounded-lg" 
+                                                  preload="metadata"
+                                                >
+                                                  <source src={url} type={url.includes('.mp3') ? 'audio/mpeg' : 'audio/webm'} />
+                                                  Your browser does not support audio playback.
+                                                </audio>
+                                              </div>
+                                            );
+                                          }
+                                          
+                                          // Image attachment
+                                          return (
+                                            <div 
+                                              key={imgIdx} 
+                                              className={`relative overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity ${
+                                                msg.media_urls.length === 1 ? 'aspect-auto max-h-64' : 'aspect-square'
+                                              }`}
+                                              onClick={() => {
+                                                setLightboxImage(url);
+                                                setLightboxOpen(true);
+                                              }}
+                                            >
+                                              <img 
+                                                src={url} 
+                                                alt="MMS attachment" 
+                                                className={`w-full h-full ${msg.media_urls.length === 1 ? 'object-contain' : 'object-cover'}`}
+                                                loading="lazy"
+                                              />
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     )}
                                     <p className="text-base whitespace-pre-wrap leading-relaxed break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.body}</p>
