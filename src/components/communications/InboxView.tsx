@@ -2603,8 +2603,8 @@ export function InboxView() {
           ) : isError ? (
             <div className="flex flex-col items-center justify-center h-48 text-destructive">
               <AlertCircle className="h-12 w-12 mb-3 opacity-70" />
-              <p className="text-sm font-medium">Failed to load messages</p>
-              <p className="text-xs text-muted-foreground mb-3">{(error as Error)?.message || "Unknown error"}</p>
+              <p className="text-base font-medium">Failed to load messages</p>
+              <p className="text-sm text-muted-foreground mb-3">{(error as Error)?.message || "Unknown error"}</p>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
                 <RotateCcw className="h-4 w-4 mr-2" />Retry
               </Button>
@@ -2614,7 +2614,7 @@ export function InboxView() {
             groupedByContactWithDates.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
                 <MessageSquare className="h-12 w-12 mb-3 opacity-30" />
-                <p className="text-sm">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p>
+                <p className="text-base">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p>
               </div>
             ) : (
               <div>
@@ -2622,7 +2622,7 @@ export function InboxView() {
                   <div key={group.date}>
                     {/* Date separator header */}
                     <div className="sticky top-0 bg-background/95 backdrop-blur px-4 py-2 border-b z-10">
-                      <span className="text-xs font-medium text-muted-foreground">{group.label}</span>
+                      <span className="text-sm font-medium text-muted-foreground">{group.label}</span>
                     </div>
                     {group.communications.map((comm) => {
                       const isDone = comm.conversation_status === "done";
@@ -2680,7 +2680,7 @@ export function InboxView() {
                               ? "bg-gradient-to-br from-blue-500 to-blue-600"
                               : "bg-gradient-to-br from-emerald-500 to-emerald-600"
                           )}>
-                            <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
+                            <span className="text-sm font-semibold text-white">{getInitials(comm.contact_name)}</span>
                           </div>
                           {comm.conversation_status === "done" && (
                             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
@@ -2699,13 +2699,13 @@ export function InboxView() {
                           <div className="flex items-center justify-between gap-2 mb-0.5">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               <span className={cn(
-                                "font-semibold text-sm truncate",
+                                "font-semibold text-base truncate",
                                 isPromotional && "text-muted-foreground font-medium"
                               )}>{comm.contact_name}</span>
                               {/* Email classification badge */}
                               {emailClassification && emailClassification !== "normal" && (
-                                <span className={cn(
-                                  "inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+                              <span className={cn(
+                                  "inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium",
                                   isImportant && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
                                   isPromotional && "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                                 )}>
@@ -2740,7 +2740,7 @@ export function InboxView() {
                                   compact
                                 />
                               </div>
-                              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
                                 {isToday(new Date(comm.created_at))
                                   ? format(new Date(comm.created_at), "h:mm a")
                                   : isYesterday(new Date(comm.created_at))
@@ -2753,7 +2753,7 @@ export function InboxView() {
                           
                           {/* Message preview - 2 lines */}
                           <p className={cn(
-                            "text-[13px] text-muted-foreground line-clamp-2 leading-relaxed",
+                            "text-sm text-muted-foreground line-clamp-2 leading-relaxed",
                             isPromotional && "text-muted-foreground/70"
                           )}>
                             {getMessagePreview(comm)}
@@ -2769,7 +2769,7 @@ export function InboxView() {
           ) : groupedCommunications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
               <MessageSquare className="h-12 w-12 mb-3 opacity-30" />
-              <p className="text-sm">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p>
+              <p className="text-base">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p>
             </div>
           ) : (
             <div>
@@ -2777,7 +2777,7 @@ export function InboxView() {
                 <div key={dateKey}>
                   {/* Inline date label - not sticky, scrolls with content */}
                   <div className="px-4 py-2 bg-muted/30">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                       {formatDateHeader(dateKey)}
                     </span>
                   </div>
@@ -2997,7 +2997,7 @@ export function InboxView() {
                 <div className="bg-background rounded-lg border overflow-hidden">
                   <div className="p-4 border-b bg-muted/30">
                     <h2 className="font-semibold text-lg mb-2 break-words">{selectedGmailEmail.subject}</h2>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                    <div className="flex items-center gap-2 text-base text-muted-foreground flex-wrap">
                       <span>From: <strong>{selectedGmailEmail.fromName}</strong> &lt;{selectedGmailEmail.from}&gt;</span>
                     </div>
                   </div>
@@ -3013,7 +3013,7 @@ export function InboxView() {
       margin: 0; 
       padding: 16px; 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 14px;
+      font-size: 16px;
       line-height: 1.6;
       color: #333;
       overflow-x: auto;
@@ -3032,7 +3032,7 @@ export function InboxView() {
                       title="Email content"
                     />
                   ) : (
-                    <div className="p-4 text-sm whitespace-pre-wrap break-words">
+                    <div className="p-4 text-base whitespace-pre-wrap break-words">
                       {selectedGmailEmail.body}
                     </div>
                   )}
@@ -3083,8 +3083,8 @@ export function InboxView() {
                 <ChevronLeft className="h-5 w-5" />
               </Button>
               <div className="flex-1 min-w-0">
-                <span className="font-medium text-sm truncate block">{selectedMessage.contact_name}</span>
-                <span className="text-xs text-muted-foreground truncate block">
+                <span className="font-semibold text-base truncate block">{selectedMessage.contact_name}</span>
+                <span className="text-sm text-muted-foreground truncate block">
                   {selectedMessage.contact_phone || selectedMessage.contact_email || ""}
                 </span>
               </div>
@@ -3162,12 +3162,12 @@ export function InboxView() {
                 {isVoiceAITranscript(selectedMessage.body) ? (
                   <Bot className="h-5 w-5 text-white" />
                 ) : (
-                  <span className="text-sm font-medium text-white">{getInitials(selectedMessage.contact_name)}</span>
+                  <span className="text-base font-semibold text-white">{getInitials(selectedMessage.contact_name)}</span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-base">{selectedMessage.contact_name}</h3>
+                  <h3 className="font-semibold text-lg">{selectedMessage.contact_name}</h3>
                   {isVoiceAITranscript(selectedMessage.body) && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 text-xs font-medium">
                       <Bot className="h-3 w-3" />
@@ -3175,7 +3175,7 @@ export function InboxView() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground truncate">
+                <p className="text-base text-muted-foreground truncate">
                   {isVoiceAITranscript(selectedMessage.body) 
                     ? `Caller: ${extractCallerPhoneFromTranscript(selectedMessage.body) || "Unknown"}`
                     : (selectedMessage.sender_email || selectedMessage.contact_email || selectedMessage.contact_phone || "No contact info")
@@ -3509,11 +3509,11 @@ export function InboxView() {
                       /* Single message fallback */
                       <div className={`flex ${selectedMessage.direction === "outbound" ? "justify-end" : "justify-start"} w-full`}>
                         <div className="max-w-[calc(100%-1rem)] sm:max-w-[85%] min-w-0">
-                          <div className={`rounded-2xl px-3.5 py-2 overflow-hidden ${selectedMessage.direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                            {selectedMessage.subject && <p className={`text-sm font-medium mb-1 ${selectedMessage.direction === "outbound" ? "opacity-90" : ""}`}>{selectedMessage.subject}</p>}
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedMessage.body}</p>
+                          <div className={`rounded-2xl px-4 py-3 overflow-hidden ${selectedMessage.direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                            {selectedMessage.subject && <p className={`text-base font-medium mb-1 ${selectedMessage.direction === "outbound" ? "opacity-90" : ""}`}>{selectedMessage.subject}</p>}
+                            <p className="text-base whitespace-pre-wrap leading-relaxed break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedMessage.body}</p>
                           </div>
-                          <div className={`text-[10px] text-muted-foreground mt-0.5 px-1 ${selectedMessage.direction === "outbound" ? "text-right" : ""}`}>
+                          <div className={`text-xs text-muted-foreground mt-1 px-1 ${selectedMessage.direction === "outbound" ? "text-right" : ""}`}>
                             {format(new Date(selectedMessage.created_at), "h:mm a")}
                           </div>
                         </div>
@@ -3623,7 +3623,7 @@ export function InboxView() {
                       value={newMessage} 
                       onChange={(e) => setNewMessage(e.target.value)} 
                       onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()} 
-                      className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-auto min-h-[28px] text-base md:text-sm py-0" 
+                      className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-auto min-h-[32px] text-[17px] py-0" 
                     />
                     
                     {/* Desktop emoji picker */}
