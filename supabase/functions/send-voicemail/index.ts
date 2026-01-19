@@ -69,14 +69,22 @@ serve(async (req) => {
       audioSource,
       voiceId,
       durationSeconds,
+      // Video fields
+      mediaType = "audio",
+      videoUrl,
+      videoStoragePath,
     } = await req.json();
 
     if (!recipientPhone) {
       throw new Error("Recipient phone is required");
     }
 
-    if (!audioBase64) {
-      throw new Error("Audio data is required");
+    // For audio, require audio data; for video, require video URL
+    if (mediaType === "audio" && !audioBase64) {
+      throw new Error("Audio data is required for audio messages");
+    }
+    if (mediaType === "video" && !videoUrl) {
+      throw new Error("Video URL is required for video messages");
     }
 
     // Initialize Supabase client
@@ -161,12 +169,19 @@ serve(async (req) => {
       throw new Error("Failed to upload audio: " + uploadError.message);
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from("message-attachments")
-      .getPublicUrl(storagePath);
-
-    const audioUrl = urlData.publicUrl;
+    // For video messages, use the pre-uploaded video URL
+    let audioUrl = "";
+    let finalMessageText = messageText;
+    
+    if (mediaType === "video") {
+      // Video was already uploaded by the client
+      console.log("Processing video message with URL:", videoUrl);
+      audioUrl = ""; // Not used for video
+      finalMessageText = messageText || "(Video message)";
+    } else {
+      // Audio message - upload to storage
+      audioUrl = urlData.publicUrl;
+    }
 
     // Create voicemail record with actual transcript
     const { data: voicemail, error: voicemailError } = await supabase
@@ -179,7 +194,9 @@ serve(async (req) => {
         sender_user_id: senderUserId,
         sender_name: senderName || null,
         message_text: finalMessageText,
-        audio_url: audioUrl,
+        audio_url: mediaType === "audio" ? audioUrl : null,
+        video_url: mediaType === "video" ? videoUrl : null,
+        media_type: mediaType,
         audio_source: audioSource || "ai_generated",
         voice_id: voiceId || "nPczCjzI2devNBz1zQrb",
         duration_seconds: durationSeconds || null,
@@ -215,9 +232,7 @@ serve(async (req) => {
     }
 
     // Craft SMS with transcript preview for credibility
-    // Include first ~100 chars of transcript so recipient knows it's legitimate
-    // Use the finalMessageText which has the actual transcript
-    const hasRealTranscript = finalMessageText && finalMessageText !== "(Voice recording)" && finalMessageText.trim().length > 0;
+    const hasRealTranscript = finalMessageText && finalMessageText !== "(Voice recording)" && finalMessageText !== "(Video message)" && finalMessageText.trim().length > 0;
     
     const transcriptPreview = hasRealTranscript
       ? (finalMessageText.length > 100 
@@ -225,12 +240,18 @@ serve(async (req) => {
           : finalMessageText)
       : null;
     
-    // Format sender display - always include "from PeachHaus Property Management"
+    // Format sender display
     const senderDisplay = senderName || "Your property manager";
     
+    // Different SMS format for video vs audio
+    const isVideo = mediaType === "video";
+    const emoji = isVideo ? "🎬" : "🎙️";
+    const actionVerb = isVideo ? "sent you a video message" : "left you a voice message";
+    const watchOrListen = isVideo ? "Watch now" : "Listen to full message";
+    
     const smsBody = transcriptPreview
-      ? `🎙️ ${senderDisplay} from PeachHaus Property Management just left you a voice message:\n\n"${transcriptPreview}"\n\n▶️ Listen to full message:\n${playerUrl}`
-      : `🎙️ ${senderDisplay} from PeachHaus Property Management just left you a voice message.\n\nTap to listen:\n${playerUrl}`;
+      ? `${emoji} ${senderDisplay} from PeachHaus Property Management just ${actionVerb}:\n\n"${transcriptPreview}"\n\n▶️ ${watchOrListen}:\n${playerUrl}`
+      : `${emoji} ${senderDisplay} from PeachHaus Property Management just ${actionVerb}.\n\nTap to ${isVideo ? "watch" : "listen"}:\n${playerUrl}`;
     
     const fromNumber = "+14048005932";
 
