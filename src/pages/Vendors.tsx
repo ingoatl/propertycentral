@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature, MessageSquare, Mic, PhoneCall } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature, MessageSquare, Mic, PhoneCall, Trash2 } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
@@ -15,6 +15,8 @@ import ServiceSignupDialog from "@/components/maintenance/ServiceSignupDialog";
 import ActiveServicesOverview from "@/components/maintenance/ActiveServicesOverview";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
+import DeleteVendorDialog from "@/components/maintenance/DeleteVendorDialog";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 const Vendors = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,7 +27,10 @@ const Vendors = () => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [callDialogVendor, setCallDialogVendor] = useState<Vendor | null>(null);
   const [smsDialogVendor, setSmsDialogVendor] = useState<Vendor | null>(null);
+  const [deleteVendor, setDeleteVendor] = useState<Vendor | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
+  const { isAdmin } = useAdminCheck();
 
   const extractVendorsFromEmails = async () => {
     setIsExtracting(true);
@@ -86,6 +91,34 @@ const Vendors = () => {
     return specialty.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
+  };
+
+  const handleDeleteVendor = async () => {
+    if (!deleteVendor) return;
+    setIsDeleting(true);
+    try {
+      // Unassign work orders first
+      await supabase
+        .from("work_orders")
+        .update({ assigned_vendor_id: null })
+        .eq("assigned_vendor_id", deleteVendor.id);
+      
+      // Delete the vendor
+      const { error } = await supabase
+        .from("vendors")
+        .delete()
+        .eq("id", deleteVendor.id);
+      
+      if (error) throw error;
+      
+      toast.success("Vendor deleted successfully");
+      setDeleteVendor(null);
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+    } catch (error: any) {
+      toast.error("Failed to delete vendor: " + error.message);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -309,56 +342,72 @@ const Vendors = () => {
                   </div>
 
                   {/* Quick Action Buttons */}
-                  <div className="flex gap-1.5 pt-2 border-t">
-                    {vendor.phone && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCallDialogVendor(vendor);
-                          }}
-                          title="Call via Twilio"
-                        >
-                          <PhoneCall className="h-4 w-4 text-green-600" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSmsDialogVendor(vendor);
-                          }}
-                          title="Send SMS via GHL"
-                        >
-                          <MessageSquare className="h-4 w-4 text-blue-600" />
-                        </Button>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <SendVoicemailButton
-                            recipientPhone={vendor.phone}
-                            recipientName={vendor.name}
+                  <div className="flex gap-1.5 pt-2 border-t justify-between">
+                    <div className="flex gap-1.5">
+                      {vendor.phone && (
+                        <>
+                          <Button
+                            size="sm"
                             variant="ghost"
-                            size="icon"
                             className="h-8 w-8 p-0"
-                          />
-                        </div>
-                      </>
-                    )}
-                    {vendor.email && (
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCallDialogVendor(vendor);
+                            }}
+                            title="Call via Twilio"
+                          >
+                            <PhoneCall className="h-4 w-4 text-green-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSmsDialogVendor(vendor);
+                            }}
+                            title="Send SMS via GHL"
+                          >
+                            <MessageSquare className="h-4 w-4 text-blue-600" />
+                          </Button>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <SendVoicemailButton
+                              recipientPhone={vendor.phone}
+                              recipientName={vendor.name}
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 p-0"
+                            />
+                          </div>
+                        </>
+                      )}
+                      {vendor.email && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `mailto:${vendor.email}`;
+                          }}
+                          title="Email"
+                        >
+                          <Mail className="h-4 w-4 text-purple-600" />
+                        </Button>
+                      )}
+                    </div>
+                    {isAdmin && (
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.location.href = `mailto:${vendor.email}`;
+                          setDeleteVendor(vendor);
                         }}
-                        title="Email"
+                        title="Delete vendor"
                       >
-                        <Mail className="h-4 w-4 text-purple-600" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
                   </div>
@@ -401,6 +450,17 @@ const Vendors = () => {
           onOpenChange={(open) => !open && setCallDialogVendor(null)}
           contactName={callDialogVendor.name}
           contactPhone={callDialogVendor.phone}
+        />
+      )}
+
+      {/* Delete Vendor Dialog */}
+      {deleteVendor && (
+        <DeleteVendorDialog
+          vendorName={deleteVendor.name}
+          open={!!deleteVendor}
+          onOpenChange={(open) => !open && setDeleteVendor(null)}
+          onConfirm={handleDeleteVendor}
+          isDeleting={isDeleting}
         />
       )}
 
