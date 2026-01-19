@@ -166,7 +166,7 @@ const ActiveServicesOverview = () => {
                   >
                     <div className="flex items-center gap-2 truncate">
                       <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
-                      <span className="truncate">{service.property?.name || "Unknown Property"}</span>
+                      <span className="truncate">{service.property?.address || service.property?.name || "Unknown Property"}</span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                       <span className="text-muted-foreground">

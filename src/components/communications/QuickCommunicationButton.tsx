@@ -177,6 +177,22 @@ export function QuickCommunicationButton() {
     setOpen(false);
   };
 
+  const handleDialpadVideo = () => {
+    if (phoneNumber.length < 10) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+    setSelectedContact({
+      id: "manual",
+      name: formatPhoneForDisplay(phoneNumber),
+      phone: phoneNumber,
+      email: null,
+      type: "lead",
+    });
+    setShowVoicemail(true); // Video is a tab inside voicemail dialog
+    setOpen(false);
+  };
+
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
@@ -243,7 +259,7 @@ export function QuickCommunicationButton() {
                             </div>
                           )}
                         </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                           {contact.phone && (
                             <>
                               <Button
@@ -273,17 +289,15 @@ export function QuickCommunicationButton() {
                               >
                                 <Mic className="h-4 w-4 text-amber-600" />
                               </Button>
-                              {contact.type === "owner" && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => handleVoicemail(contact)}
-                                  title="Video Message"
-                                >
-                                  <Video className="h-4 w-4 text-purple-600" />
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleVoicemail(contact)}
+                                title="Video Message"
+                              >
+                                <Video className="h-4 w-4 text-purple-600" />
+                              </Button>
                             </>
                           )}
                         </div>
@@ -329,33 +343,42 @@ export function QuickCommunicationButton() {
                 ))}
               </div>
 
-              {/* Action buttons */}
-              <div className="flex gap-2">
+              {/* Action buttons - 4 buttons grid for mobile */}
+              <div className="grid grid-cols-4 gap-2">
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-col h-auto py-2 bg-green-600 hover:bg-green-700"
                   onClick={handleDialpadCall}
                   disabled={phoneNumber.length < 10}
                 >
-                  <Phone className="h-4 w-4 mr-2" />
-                  Call
+                  <Phone className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Call</span>
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="flex-col h-auto py-2"
                   onClick={handleDialpadSMS}
                   disabled={phoneNumber.length < 10}
                 >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Text
+                  <MessageSquare className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Text</span>
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="flex-col h-auto py-2"
                   onClick={handleDialpadVoicemail}
                   disabled={phoneNumber.length < 10}
                 >
-                  <Mic className="h-4 w-4 mr-2" />
-                  VM
+                  <Mic className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Voice</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-col h-auto py-2"
+                  onClick={handleDialpadVideo}
+                  disabled={phoneNumber.length < 10}
+                >
+                  <Video className="h-4 w-4 mb-1" />
+                  <span className="text-xs">Video</span>
                 </Button>
               </div>
             </TabsContent>
