@@ -153,7 +153,7 @@ serve(async (req) => {
       throw new Error("GHL credentials not configured");
     }
 
-    const smsBody = `🎙️ ${senderName || "Peachhaus"} left you a voice message.\n\nTap to listen:\n${playerUrl}\n\nReply to this text or call (404) 800-5932`;
+    const smsBody = `🎙️ ${senderName || "Someone"} from PeachHaus Group LLC just left you a voice message.\n\nClick below to listen:\n${playerUrl}`;
     const fromNumber = "+14048005932";
 
     console.log(`Sending voicemail SMS via GHL to ${formattedPhone} from ${fromNumber}`);
