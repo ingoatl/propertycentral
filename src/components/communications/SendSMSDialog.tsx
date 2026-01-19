@@ -7,13 +7,12 @@ import {
   ResponsiveModalTitle,
 } from "@/components/ui/responsive-modal";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { VoiceDictationButton } from "./VoiceDictationButton";
+import { ExpandableMessageInput } from "./ExpandableMessageInput";
 
 interface SendSMSDialogProps {
   open: boolean;
@@ -113,8 +112,7 @@ export function SendSMSDialog({
     setMessage(personalizedMessage);
   };
 
-  const characterCount = message.length;
-  const segmentCount = Math.ceil(characterCount / 160) || 1;
+  // Character count is now handled by ExpandableMessageInput
 
   const getInitials = (name: string) => {
     return name
@@ -187,31 +185,22 @@ export function SendSMSDialog({
               ))}
             </div>
 
-            {/* Message input */}
-            <div className="space-y-2">
-              <div className="relative">
-                <Textarea
-                  placeholder="Type your message..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={4}
-                  className="resize-none rounded-xl pr-12 text-base md:text-sm min-h-[120px] md:min-h-[100px]"
-                />
-                <div className="absolute right-2 top-2">
-                  <VoiceDictationButton
-                    onResult={(text) => setMessage(prev => prev ? `${prev}\n${text}` : text)}
-                    messageType="sms"
-                    contactName={contactName}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground px-1">
-                <span>{characterCount} characters</span>
-                <span>
-                  {segmentCount} SMS segment{segmentCount > 1 ? "s" : ""}
-                </span>
-              </div>
-            </div>
+            {/* Message input with expand/review capability */}
+            <ExpandableMessageInput
+              value={message}
+              onChange={setMessage}
+              placeholder="Type your message..."
+              messageType="sms"
+              contactName={contactName}
+              contactId={contactId}
+              contactType={contactType}
+              minRows={3}
+              maxRows={6}
+              showCharacterCount={true}
+              showSegmentCount={true}
+              showVoiceDictation={true}
+              showAIAssistant={true}
+            />
           </div>
 
           {/* Send button - sticky at bottom on mobile */}

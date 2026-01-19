@@ -50,6 +50,7 @@ import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DirectCallButton from "./DirectCallButton";
 import { SendStripeAuthButton } from "./SendStripeAuthButton";
+import { ExpandableMessageInput } from "@/components/communications/ExpandableMessageInput";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -843,9 +844,9 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               </div>
               
               {/* Message input - always visible at bottom */}
-              <div className="flex gap-2 pt-3 mt-3 border-t flex-shrink-0">
+              <div className="flex gap-2 pt-3 mt-3 border-t flex-shrink-0 items-start">
                 <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
-                  <SelectTrigger className="w-24">
+                  <SelectTrigger className="w-24 flex-shrink-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -853,17 +854,29 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
                     <SelectItem value="email">Email</SelectItem>
                   </SelectContent>
                 </Select>
-                <Textarea
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={`Type your ${messageType} message...`}
-                  className="flex-1 min-h-[60px] resize-none"
-                  rows={2}
-                />
+                <div className="flex-1">
+                  <ExpandableMessageInput
+                    value={newMessage}
+                    onChange={setNewMessage}
+                    onSend={() => sendMessage.mutate()}
+                    placeholder={`Type your ${messageType} message...`}
+                    messageType={messageType}
+                    contactName={lead.name}
+                    contactId={lead.id}
+                    contactType="lead"
+                    minRows={2}
+                    maxRows={4}
+                    showCharacterCount={messageType === "sms"}
+                    showSegmentCount={messageType === "sms"}
+                    showVoiceDictation={true}
+                    showAIAssistant={true}
+                    disabled={sendMessage.isPending}
+                  />
+                </div>
                 <Button 
                   onClick={() => sendMessage.mutate()}
                   disabled={sendMessage.isPending || !newMessage.trim()}
-                  className="self-end"
+                  className="self-start mt-1 flex-shrink-0"
                 >
                   <Send className="h-4 w-4 mr-2" />
                   Send
