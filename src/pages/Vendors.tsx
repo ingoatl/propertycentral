@@ -14,9 +14,8 @@ import VendorDetailModal from "@/components/maintenance/VendorDetailModal";
 import ServiceSignupDialog from "@/components/maintenance/ServiceSignupDialog";
 import { CollapsibleActiveServices } from "@/components/maintenance/CollapsibleActiveServices";
 import { VendorKPIBar } from "@/components/maintenance/VendorKPIBar";
-import { WorkOrderPipeline } from "@/components/maintenance/WorkOrderPipeline";
+import { WorkOrderStageCards } from "@/components/maintenance/WorkOrderStageCards";
 import { WorkOrdersTable } from "@/components/maintenance/WorkOrdersTable";
-import { WorkflowDiagram } from "@/components/maintenance/WorkflowDiagram";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DeleteVendorDialog from "@/components/maintenance/DeleteVendorDialog";
@@ -163,11 +162,12 @@ const Vendors = () => {
           monthlyServicesCost={monthlyServicesCost}
         />
 
-        {/* Work Order Pipeline */}
-        <WorkOrderPipeline workOrders={workOrders} />
-
-        {/* Workflow Diagram */}
-        <WorkflowDiagram />
+        {/* Work Order Stage Cards */}
+        <WorkOrderStageCards
+          workOrders={workOrders}
+          onViewDetails={(wo) => setSelectedWorkOrderId(wo.id)}
+          isLoading={workOrdersLoading}
+        />
 
         {/* Work Orders Table */}
         <WorkOrdersTable
