@@ -85,14 +85,13 @@ serve(async (req) => {
       }
     }
 
-    // If no contact found, DO NOT create one - use Twilio as fallback to avoid GHL duplicates
-    // The user explicitly requested to disable contact sync back to GHL
+    // If no contact found, create one in GHL (especially for vendors)
+    // We must always use GHL for sending SMS - no Twilio fallback
     if (!contactId) {
-      console.log(`No GHL contact found for ${formattedPhone} - using Twilio fallback to avoid creating duplicates`);
+      console.log(`No GHL contact found for ${formattedPhone} - creating contact in GHL`);
       
-      // Get contact data from our database for logging
+      // Get contact data from our database for the new contact
       let contactData: { name?: string; email?: string; phone?: string } | null = null;
-      let contactName = "Contact";
       
       if (leadId) {
         const { data } = await supabase
@@ -120,104 +119,45 @@ serve(async (req) => {
         contactName = contactData?.name || "Vendor";
       }
 
-      // FALLBACK: Send SMS directly via Twilio if no GHL contact exists
-      console.log(`Sending SMS via Twilio fallback to ${formattedPhone} (${contactName})`);
+      // Create the contact in GHL
+      const createPayload: Record<string, string> = {
+        locationId: ghlLocationId,
+        phone: formattedPhone,
+        name: contactName,
+      };
       
-      const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-      const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-      
-      if (!twilioAccountSid || !twilioAuthToken) {
-        throw new Error(`No GHL contact found for ${formattedPhone} and Twilio credentials not configured.`);
+      if (contactData?.email) {
+        createPayload.email = contactData.email;
       }
       
-      // Send via Twilio
-      const twilioResponse = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
+      console.log(`Creating GHL contact:`, createPayload);
+      
+      const createResponse = await fetch(
+        `https://services.leadconnectorhq.com/contacts/`,
         {
           method: "POST",
           headers: {
-            "Authorization": `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": `Bearer ${ghlApiKey}`,
+            "Version": "2021-07-28",
+            "Content-Type": "application/json",
           },
-          body: new URLSearchParams({
-            To: formattedPhone,
-            // Twilio fallback MUST use Twilio-owned number (A2P registered)
-            // GHL numbers (+14045741740, +14046090955) are NOT in Twilio account
-            From: "+14049915076",
-            Body: message,
-          }).toString(),
+          body: JSON.stringify(createPayload),
         }
       );
       
-      if (!twilioResponse.ok) {
-        const errorData = await twilioResponse.json().catch(() => ({}));
-        console.error("Twilio error details:", JSON.stringify(errorData));
-        // Provide more specific error message based on Twilio error codes
-        const twilioCode = errorData.code;
-        const twilioMessage = errorData.message || `HTTP ${twilioResponse.status}`;
-        if (twilioCode === 21211) {
-          throw new Error(`Invalid phone number: ${formattedPhone} - ${twilioMessage}`);
-        } else if (twilioCode === 21608 || twilioCode === 21610) {
-          throw new Error(`Phone number unverified or blocked: ${twilioMessage}`);
-        } else if (twilioCode === 21660) {
-          throw new Error(`From number not registered for this region: ${twilioMessage}`);
-        } else {
-          throw new Error(`Twilio SMS failed (${twilioCode}): ${twilioMessage}`);
-        }
+      if (!createResponse.ok) {
+        const createError = await createResponse.text();
+        console.error(`Failed to create GHL contact: ${createResponse.status} - ${createError}`);
+        throw new Error(`Failed to create GHL contact: ${createError}`);
       }
       
-      const twilioData = await twilioResponse.json();
-      console.log(`SMS sent via Twilio fallback. SID: ${twilioData.sid}`);
+      const createData = await createResponse.json();
+      contactId = createData.contact?.id;
+      console.log(`Created new GHL contact: ${contactId}`);
       
-      // Get user ID from auth header
-      const authHeader = req.headers.get('Authorization');
-      let userId: string | null = null;
-      if (authHeader) {
-        const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-        userId = user?.id || null;
+      if (!contactId) {
+        throw new Error("Failed to get contact ID after creation");
       }
-      
-      // Record the communication in our database
-      const commRecord: Record<string, unknown> = {
-        communication_type: "sms",
-        direction: "outbound",
-        body: message,
-        status: "sent",
-        external_id: twilioData.sid,
-        assigned_user_id: userId,
-        metadata: {
-          provider: "twilio_fallback",
-          from_number: formattedFromNumber,
-          to_number: formattedPhone,
-          twilio_sid: twilioData.sid,
-          sent_by_user_id: userId,
-          contact_name: contactName,
-        },
-      };
-      
-      if (leadId) commRecord.lead_id = leadId;
-      if (ownerId) commRecord.owner_id = ownerId;
-      if (vendorId) {
-        commRecord.metadata = {
-          ...commRecord.metadata as Record<string, unknown>,
-          vendor_id: vendorId,
-          vendor_phone: formattedPhone,
-          contact_type: "vendor",
-        };
-      }
-      
-      await supabase.from("lead_communications").insert(commRecord);
-      console.log(`Recorded Twilio fallback SMS in database`);
-      
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          messageId: twilioData.sid,
-          provider: "twilio_fallback",
-          note: "Sent via Twilio (no GHL contact found)",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
     // Step 2: Send SMS message (or MMS if media attached)
