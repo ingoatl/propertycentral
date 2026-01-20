@@ -63,7 +63,7 @@ import { SmartSchedulingCard, detectSchedulingIntent } from "./SmartSchedulingCa
 import { SmartTaskExtractButton } from "./SmartTaskExtractButton";
 import { EmojiPicker } from "./EmojiPicker";
 import { VoiceDictationButton } from "./VoiceDictationButton";
-import { TeamSlackPanel } from "./TeamSlackPanel";
+import { TeamHubPanel } from "../team-hub/TeamHubPanel";
 import { FollowUpSchedulerModal } from "./FollowUpSchedulerModal";
 import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
