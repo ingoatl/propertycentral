@@ -351,65 +351,64 @@ const Vendors = () => {
                     )}
                   </div>
 
-                  {/* Quick Action Buttons - Improved Design */}
-                  <div className="flex gap-1.5 pt-2 border-t justify-between">
-                    <div className="flex gap-1">
-                      {vendor.phone && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="h-10 w-10 p-0 rounded-xl bg-green-500 hover:bg-green-600 text-white shadow-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCallDialogVendor(vendor);
-                            }}
-                            title="Call via Twilio"
-                          >
-                            <PhoneCall className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-10 w-10 p-0 rounded-xl"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSmsDialogVendor(vendor);
-                            }}
-                            title="Send SMS via GHL"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <SendVoicemailButton
-                              recipientPhone={vendor.phone}
-                              recipientName={vendor.name}
-                              variant="outline"
-                              size="sm"
-                              className="h-10 w-10 p-0 rounded-xl"
-                            />
-                          </div>
-                        </>
-                      )}
-                      {vendor.email && (
+                  {/* Quick Action Buttons - Compact Icon Grid */}
+                  <div className="flex gap-2 pt-2 border-t">
+                    {vendor.phone && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="h-9 w-9 p-0 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCallDialogVendor(vendor);
+                          }}
+                          title="Call via Twilio"
+                        >
+                          <PhoneCall className="h-4 w-4" />
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-10 w-10 p-0 rounded-xl"
+                          className="h-9 w-9 p-0 rounded-lg"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.location.href = `mailto:${vendor.email}`;
+                            setSmsDialogVendor(vendor);
                           }}
-                          title="Email"
+                          title="Send SMS"
                         >
-                          <Mail className="h-4 w-4" />
+                          <MessageSquare className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <SendVoicemailButton
+                            recipientPhone={vendor.phone}
+                            recipientName={vendor.name}
+                            variant="outline"
+                            size="sm"
+                            className="h-9 w-9 p-0 rounded-lg"
+                          />
+                        </div>
+                      </>
+                    )}
+                    {vendor.email && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 w-9 p-0 rounded-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.location.href = `mailto:${vendor.email}`;
+                        }}
+                        title="Email"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <div className="flex-1" />
                     {isAdmin && (
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-10 w-10 p-0 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="h-9 w-9 p-0 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDeleteVendor(vendor);
