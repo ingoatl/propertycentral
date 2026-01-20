@@ -46,51 +46,66 @@ export function QuickCommunicationButton() {
   const [showRecordMeeting, setShowRecordMeeting] = useState(false);
   const [activeTab, setActiveTab] = useState<"search" | "dialpad">("search");
 
-  // Fetch leads and owners for contact search
+  // Helper to normalize phone numbers for comparison
+  const cleanPhoneNumber = (phone: string): string => {
+    return phone.replace(/\D/g, '').slice(-10);
+  };
+
+  // Fetch leads and owners for contact search with deduplication
   const { data: contacts = [] } = useQuery({
     queryKey: ["quick-contacts", search],
     queryFn: async () => {
-      const results: Contact[] = [];
-
-      // Search leads
-      const { data: leads } = await supabase
-        .from("leads")
-        .select("id, name, phone, email")
-        .or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
-        .limit(10);
-
-      if (leads) {
-        results.push(
-          ...leads.map((l) => ({
-            id: l.id,
-            name: l.name,
-            phone: l.phone,
-            email: l.email,
-            type: "lead" as const,
-          }))
-        );
-      }
-
-      // Search owners
+      // Fetch owners first (they take priority)
       const { data: owners } = await supabase
         .from("property_owners")
         .select("id, name, phone, email")
         .or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
         .limit(10);
 
-      if (owners) {
-        results.push(
-          ...owners.map((o) => ({
-            id: o.id,
-            name: o.name,
-            phone: o.phone,
-            email: o.email,
-            type: "owner" as const,
-          }))
-        );
-      }
+      const ownerContacts: Contact[] = (owners || []).map((o) => ({
+        id: o.id,
+        name: o.name,
+        phone: o.phone,
+        email: o.email,
+        type: "owner" as const,
+      }));
 
-      return results;
+      // Create a set of owner phone numbers and names for deduplication
+      const ownerPhones = new Set(
+        ownerContacts.map(o => cleanPhoneNumber(o.phone || '')).filter(Boolean)
+      );
+      const ownerNames = new Set(
+        ownerContacts.map(o => o.name.toLowerCase().trim())
+      );
+
+      // Fetch leads, excluding ops_handoff stage
+      const { data: leads } = await supabase
+        .from("leads")
+        .select("id, name, phone, email, stage")
+        .or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
+        .neq('stage', 'ops_handoff')
+        .limit(10);
+
+      // Filter out leads that match owners by phone OR name
+      const leadContacts: Contact[] = (leads || [])
+        .filter(l => {
+          const cleanedPhone = cleanPhoneNumber(l.phone || '');
+          const normalizedName = l.name.toLowerCase().trim();
+          // Exclude if phone matches OR name matches an owner
+          const phoneMatch = cleanedPhone && ownerPhones.has(cleanedPhone);
+          const nameMatch = ownerNames.has(normalizedName);
+          return !phoneMatch && !nameMatch;
+        })
+        .map((l) => ({
+          id: l.id,
+          name: l.name,
+          phone: l.phone,
+          email: l.email,
+          type: "lead" as const,
+        }));
+
+      // Return owners first, then leads
+      return [...ownerContacts, ...leadContacts];
     },
     enabled: search.length >= 2,
   });
@@ -288,91 +303,97 @@ export function QuickCommunicationButton() {
                     {contacts.map((contact) => (
                       <div
                         key={`${contact.type}-${contact.id}`}
-                        className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                        className="p-3 rounded-2xl bg-card border border-border/50 hover:bg-muted/30 transition-all duration-150"
                       >
-                        {/* Contact Info */}
-                        <div className="flex items-center gap-2 mb-3">
+                        {/* Contact Info - Apple style */}
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                            <span className="text-sm font-semibold text-primary">
+                              {contact.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <span className="font-medium text-sm truncate block">{contact.name}</span>
+                            <span className="font-medium text-sm text-foreground block truncate">{contact.name}</span>
                             {contact.phone && (
                               <span className="text-xs text-muted-foreground">
                                 {formatPhoneForDisplay(contact.phone)}
                               </span>
                             )}
                           </div>
-                          <Badge variant={contact.type === "lead" ? "default" : "secondary"} className="text-xs shrink-0">
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                            contact.type === "owner" 
+                              ? "bg-secondary text-secondary-foreground" 
+                              : "bg-primary/10 text-primary"
+                          }`}>
                             {contact.type}
-                          </Badge>
+                          </span>
                         </div>
-                        
                         {/* Communication Buttons - Always visible */}
                         {contact.phone && (
-                          <div className="space-y-2">
-                            {/* Primary 4 buttons - compact sizing */}
-                            <div className="grid grid-cols-4 gap-1">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="flex-col h-9 min-w-0 px-0.5 gap-0.5 bg-primary hover:bg-primary/90 touch-manipulation"
+                          <div className="space-y-2.5">
+                            {/* Apple-style action buttons */}
+                            <div className="grid grid-cols-4 gap-2">
+                              <button
+                                className="flex flex-col items-center justify-center h-14 rounded-xl bg-primary/10 hover:bg-primary/20 active:scale-95 transition-all duration-150 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleCall(contact);
                                 }}
                               >
-                                <Phone className="h-3.5 w-3.5 shrink-0" />
-                                <span className="text-[9px]">Call</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-col h-9 min-w-0 px-0.5 gap-0.5 touch-manipulation"
+                                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center mb-1">
+                                  <Phone className="h-4 w-4 text-primary-foreground" />
+                                </div>
+                                <span className="text-[10px] font-medium text-foreground">Call</span>
+                              </button>
+                              <button
+                                className="flex flex-col items-center justify-center h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleText(contact);
                                 }}
                               >
-                                <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                                <span className="text-[9px]">Text</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-col h-9 min-w-0 px-0.5 gap-0.5 touch-manipulation"
+                                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mb-1">
+                                  <MessageSquare className="h-4 w-4 text-secondary-foreground" />
+                                </div>
+                                <span className="text-[10px] font-medium text-foreground">Text</span>
+                              </button>
+                              <button
+                                className="flex flex-col items-center justify-center h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleVoicemail(contact);
                                 }}
                               >
-                                <Mic className="h-3.5 w-3.5 shrink-0" />
-                                <span className="text-[9px]">Voice</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-col h-9 min-w-0 px-0.5 gap-0.5 touch-manipulation"
+                                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mb-1">
+                                  <Mic className="h-4 w-4 text-secondary-foreground" />
+                                </div>
+                                <span className="text-[10px] font-medium text-foreground">Voice</span>
+                              </button>
+                              <button
+                                className="flex flex-col items-center justify-center h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleVideoMessage(contact);
                                 }}
                               >
-                                <Video className="h-3.5 w-3.5 shrink-0" />
-                                <span className="text-[9px]">Video</span>
-                              </Button>
+                                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mb-1">
+                                  <Video className="h-4 w-4 text-secondary-foreground" />
+                                </div>
+                                <span className="text-[10px] font-medium text-foreground">Video</span>
+                              </button>
                             </div>
                             
-                            {/* Record Meeting button */}
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="w-full gap-2 touch-manipulation"
+                            {/* Record Meeting button - Apple style */}
+                            <button
+                              className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-muted hover:bg-muted/80 active:scale-[0.98] transition-all duration-150 touch-manipulation"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRecordMeeting(contact);
                               }}
                             >
-                              <Camera className="h-4 w-4" />
-                              <span className="text-xs">Record Meeting</span>
-                            </Button>
+                              <Camera className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-xs font-medium text-foreground">Record Meeting</span>
+                            </button>
                           </div>
                         )}
                       </div>
