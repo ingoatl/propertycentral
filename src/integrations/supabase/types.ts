@@ -7739,6 +7739,39 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          auth_key: string
+          created_at: string | null
+          endpoint: string
+          id: string
+          last_used_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth_key: string
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          last_used_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth_key?: string
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          last_used_at?: string | null
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       reconciliation_audit_log: {
         Row: {
           action: string
@@ -8433,8 +8466,193 @@ export type Database = {
           },
         ]
       }
+      team_channel_members: {
+        Row: {
+          channel_id: string
+          id: string
+          joined_at: string | null
+          last_read_at: string | null
+          notifications_muted: boolean | null
+          role: string | null
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          joined_at?: string | null
+          last_read_at?: string | null
+          notifications_muted?: boolean | null
+          role?: string | null
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          joined_at?: string | null
+          last_read_at?: string | null
+          notifications_muted?: boolean | null
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_channel_members_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "team_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_channels: {
+        Row: {
+          channel_type: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          display_name: string
+          id: string
+          is_archived: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          channel_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          is_archived?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          channel_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_archived?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      team_messages: {
+        Row: {
+          channel_id: string
+          content: string
+          created_at: string | null
+          edited_at: string | null
+          file_name: string | null
+          file_url: string | null
+          id: string
+          is_edited: boolean | null
+          is_pinned: boolean | null
+          lead_id: string | null
+          message_type: string | null
+          owner_id: string | null
+          parent_message_id: string | null
+          property_id: string | null
+          reactions: Json | null
+          sender_id: string
+          work_order_id: string | null
+        }
+        Insert: {
+          channel_id: string
+          content: string
+          created_at?: string | null
+          edited_at?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          is_edited?: boolean | null
+          is_pinned?: boolean | null
+          lead_id?: string | null
+          message_type?: string | null
+          owner_id?: string | null
+          parent_message_id?: string | null
+          property_id?: string | null
+          reactions?: Json | null
+          sender_id: string
+          work_order_id?: string | null
+        }
+        Update: {
+          channel_id?: string
+          content?: string
+          created_at?: string | null
+          edited_at?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          is_edited?: boolean | null
+          is_pinned?: boolean | null
+          lead_id?: string | null
+          message_type?: string | null
+          owner_id?: string | null
+          parent_message_id?: string | null
+          property_id?: string | null
+          reactions?: Json | null
+          sender_id?: string
+          work_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "team_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_messages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "team_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_messages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_messages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_messages_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_notifications: {
         Row: {
+          channel_id: string | null
           communication_id: string | null
           created_at: string | null
           created_by: string | null
@@ -8442,11 +8660,13 @@ export type Database = {
           is_read: boolean | null
           link: string | null
           message: string | null
+          message_id: string | null
           title: string
           type: string
           user_id: string
         }
         Insert: {
+          channel_id?: string | null
           communication_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -8454,11 +8674,13 @@ export type Database = {
           is_read?: boolean | null
           link?: string | null
           message?: string | null
+          message_id?: string | null
           title: string
           type?: string
           user_id: string
         }
         Update: {
+          channel_id?: string | null
           communication_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -8466,6 +8688,7 @@ export type Database = {
           is_read?: boolean | null
           link?: string | null
           message?: string | null
+          message_id?: string | null
           title?: string
           type?: string
           user_id?: string
@@ -8476,6 +8699,47 @@ export type Database = {
             columns: ["communication_id"]
             isOneToOne: false
             referencedRelation: "lead_communications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_presence: {
+        Row: {
+          current_channel_id: string | null
+          focus_mode_until: string | null
+          id: string
+          last_seen_at: string | null
+          status: string | null
+          status_emoji: string | null
+          status_text: string | null
+          user_id: string
+        }
+        Insert: {
+          current_channel_id?: string | null
+          focus_mode_until?: string | null
+          id?: string
+          last_seen_at?: string | null
+          status?: string | null
+          status_emoji?: string | null
+          status_text?: string | null
+          user_id: string
+        }
+        Update: {
+          current_channel_id?: string | null
+          focus_mode_until?: string | null
+          id?: string
+          last_seen_at?: string | null
+          status?: string | null
+          status_emoji?: string | null
+          status_text?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_presence_current_channel_id_fkey"
+            columns: ["current_channel_id"]
+            isOneToOne: false
+            referencedRelation: "team_channels"
             referencedColumns: ["id"]
           },
         ]
