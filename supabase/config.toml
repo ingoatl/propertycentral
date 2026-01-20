@@ -506,3 +506,6 @@ verify_jwt = false
 
 [functions.send-vendor-pause-request]
 verify_jwt = true
+
+[functions.send-owner-approval-request]
+verify_jwt = true
