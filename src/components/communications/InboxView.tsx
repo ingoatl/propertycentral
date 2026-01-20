@@ -2267,11 +2267,34 @@ export function InboxView() {
       }
     }
     
-    // Return only the latest message per contact, sorted by priority then date
+    // Return only the latest message per contact, with the best name selected
+    // Select the best name: prefer properly cased names (mixed case) over all-caps or all-lowercase
+    const selectBestName = (messages: CommunicationItem[]): string => {
+      const names = messages.map(m => m.contact_name).filter(n => n && n !== "Unknown" && n !== "Contact");
+      if (names.length === 0) return messages[0]?.contact_name || "Unknown";
+      
+      // Prefer names with mixed case (proper names like "John Smith")
+      const mixedCase = names.find(n => n !== n.toUpperCase() && n !== n.toLowerCase() && n.includes(" "));
+      if (mixedCase) return mixedCase;
+      
+      // Prefer names with space (full name)
+      const withSpace = names.find(n => n.includes(" "));
+      if (withSpace) return withSpace;
+      
+      // Return first non-generic name
+      return names[0];
+    };
+    
     const sorted = Array.from(contactMap.values())
-      .map(messages => messages.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )[0]);
+      .map(messages => {
+        const sortedMsgs = messages.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        const latest = sortedMsgs[0];
+        // Override name with best name from all messages in thread
+        const bestName = selectBestName(sortedMsgs);
+        return { ...latest, contact_name: bestName };
+      });
     
     // Sort: open/awaiting at top (unfaded), then snoozed/done at bottom (faded)
     // Within each group, sort by priority then by date
@@ -2335,11 +2358,27 @@ export function InboxView() {
       contactMap.set(key, existing);
     }
     
-    // Get only the latest message per contact
+    // Helper to select best name (same logic as "All" tab)
+    const selectBestNameLocal = (messages: CommunicationItem[]): string => {
+      const names = messages.map(m => m.contact_name).filter(n => n && n !== "Unknown" && n !== "Contact");
+      if (names.length === 0) return messages[0]?.contact_name || "Unknown";
+      const mixedCase = names.find(n => n !== n.toUpperCase() && n !== n.toLowerCase() && n.includes(" "));
+      if (mixedCase) return mixedCase;
+      const withSpace = names.find(n => n.includes(" "));
+      if (withSpace) return withSpace;
+      return names[0];
+    };
+    
+    // Get only the latest message per contact, with best name selected
     const latestByContact = Array.from(contactMap.values())
-      .map(messages => messages.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )[0])
+      .map(messages => {
+        const sortedMsgs = messages.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        const latest = sortedMsgs[0];
+        const bestName = selectBestNameLocal(sortedMsgs);
+        return { ...latest, contact_name: bestName };
+      })
       .sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
