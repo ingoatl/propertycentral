@@ -102,19 +102,37 @@ serve(async (req) => {
       // The recording URL from Twilio needs .mp3 extension for the audio file
       const recordingWithFormat = `${recordingUrl}.mp3`;
       
-      // Try to get phone numbers from the lead_communications table if not in callback
+      // Get phone numbers - first from callback, then from DB
       let phoneFrom = fromNumber;
       let phoneTo = toNumber;
       
-      if ((!phoneFrom || !phoneTo) && callSid) {
-        // Look up the parent call's communication record which should have the phone
+      // Get the parent call SID if this is a child call
+      const parentCallSid = formData.get('ParentCallSid') as string;
+      const effectiveCallSid = parentCallSid || callSid;
+      
+      console.log('Looking up communication record for CallSid:', effectiveCallSid);
+      
+      // Try to get phone from the lead_communications record or metadata
+      if (!phoneTo && effectiveCallSid) {
         const { data: comm } = await supabase
           .from('lead_communications')
-          .select('lead_id')
-          .eq('external_id', callSid)
+          .select('lead_id, owner_id, metadata')
+          .eq('external_id', effectiveCallSid)
           .maybeSingle();
         
-        if (comm?.lead_id) {
+        console.log('Found communication record:', comm);
+        
+        // Try to get phone from metadata first (set when call was initiated)
+        if (comm?.metadata && typeof comm.metadata === 'object') {
+          const meta = comm.metadata as Record<string, unknown>;
+          if (meta.to_number) {
+            phoneTo = meta.to_number as string;
+            console.log('Got phone from metadata:', phoneTo);
+          }
+        }
+        
+        // If still no phone, try to get from lead
+        if (!phoneTo && comm?.lead_id) {
           const { data: lead } = await supabase
             .from('leads')
             .select('phone')
@@ -126,13 +144,41 @@ serve(async (req) => {
             console.log('Found lead phone from communication record:', phoneTo);
           }
         }
+        
+        // Try from owner if no lead
+        if (!phoneTo && comm?.owner_id) {
+          const { data: owner } = await supabase
+            .from('property_owners')
+            .select('phone')
+            .eq('id', comm.owner_id)
+            .maybeSingle();
+          
+          if (owner?.phone) {
+            phoneTo = owner.phone;
+            console.log('Found owner phone from communication record:', phoneTo);
+          }
+        }
       }
+      
+      // Also update recording URL on parent call SID if different
+      if (parentCallSid && parentCallSid !== callSid) {
+        console.log('Updating parent call with recording:', parentCallSid);
+        await supabase
+          .from('lead_communications')
+          .update({
+            call_recording_url: recordingWithFormat,
+            call_duration: recordingDuration ? parseInt(recordingDuration) : null,
+          })
+          .eq('external_id', parentCallSid);
+      }
+      
+      console.log('Triggering transcription with:', { effectiveCallSid, phoneFrom, phoneTo });
       
       // Trigger transcription
       try {
         const { data, error } = await supabase.functions.invoke('transcribe-call', {
           body: {
-            callSid,
+            callSid: effectiveCallSid,
             recordingUrl: recordingWithFormat,
             fromNumber: phoneFrom,
             toNumber: phoneTo,

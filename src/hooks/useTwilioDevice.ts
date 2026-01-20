@@ -5,15 +5,19 @@ import { toast } from "sonner";
 import { formatPhoneForTwilio, cleanPhoneNumber } from "@/lib/phoneUtils";
 
 interface UseTwilioDeviceOptions {
-  onCallStart?: () => void;
+  onCallStart?: (callSid?: string) => void;
   onCallEnd?: () => void;
   onCallError?: (error: Error) => void;
+  leadId?: string | null;
+  ownerId?: string | null;
+  contactPhone?: string;
 }
 
 export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isOnCall, setIsOnCall] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [currentCallSid, setCurrentCallSid] = useState<string | null>(null);
   
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -94,6 +98,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
     setIsOnCall(false);
     setIsConnecting(false);
     setCallDuration(0);
+    setCurrentCallSid(null);
     options.onCallEnd?.();
   }, [options]);
 
@@ -103,7 +108,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
     }
   }, [isOnCall]);
 
-  const makeCall = useCallback(async (phoneNumber: string): Promise<boolean> => {
+  const makeCall = useCallback(async (phoneNumber: string, leadId?: string | null, ownerId?: string | null): Promise<boolean> => {
     const cleaned = cleanPhoneNumber(phoneNumber);
     if (cleaned.length < 10) {
       toast.error("Please enter a valid phone number");
@@ -131,8 +136,49 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
 
       callRef.current = call;
 
-      call.on('accept', () => {
+      call.on('accept', async () => {
         console.log('Call accepted');
+        
+        // Get the CallSid from Twilio
+        const callSid = call.parameters?.CallSid;
+        console.log('Call SID:', callSid);
+        setCurrentCallSid(callSid);
+        
+        // Create a communication record so we can track this call
+        if (callSid) {
+          try {
+            const effectiveLeadId = leadId ?? options.leadId;
+            const effectiveOwnerId = ownerId ?? options.ownerId;
+            const effectivePhone = phoneNumber || options.contactPhone;
+            
+            console.log('Creating communication record for call:', { callSid, effectiveLeadId, effectiveOwnerId, effectivePhone });
+            
+            const { error: insertError } = await supabase
+              .from('lead_communications')
+              .insert({
+                external_id: callSid,
+                communication_type: 'call',
+                direction: 'outbound',
+                body: `Outbound call to ${effectivePhone}`,
+                status: 'in-progress',
+                lead_id: effectiveLeadId || null,
+                owner_id: effectiveOwnerId || null,
+                metadata: { 
+                  to_number: formattedPhone,
+                  initiated_at: new Date().toISOString()
+                }
+              });
+            
+            if (insertError) {
+              console.error('Error creating call record:', insertError);
+            } else {
+              console.log('Call record created successfully');
+            }
+          } catch (err) {
+            console.error('Failed to create call record:', err);
+          }
+        }
+        
         setIsOnCall(true);
         setIsConnecting(false);
         setCallDuration(0);
@@ -140,7 +186,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
           setCallDuration(prev => prev + 1);
         }, 1000);
         toast.success('Call connected');
-        options.onCallStart?.();
+        options.onCallStart?.(callSid);
       });
 
       call.on('disconnect', () => {
@@ -179,6 +225,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
     isConnecting,
     isOnCall,
     callDuration,
+    currentCallSid,
     makeCall,
     endCall,
     sendDigits,

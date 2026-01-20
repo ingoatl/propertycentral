@@ -19,8 +19,10 @@ interface CallDialogProps {
   onOpenChange: (open: boolean) => void;
   contactName: string;
   contactPhone: string;
-  contactType?: 'lead' | 'owner';
+  contactType?: 'lead' | 'owner' | 'vendor';
   contactAddress?: string | null;
+  leadId?: string | null;
+  ownerId?: string | null;
 }
 
 const dialPad = [
@@ -37,11 +39,17 @@ export function CallDialog({
   contactPhone,
   contactType = 'lead',
   contactAddress,
+  leadId,
+  ownerId,
 }: CallDialogProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const isMobile = useIsMobile();
   
-  const { isConnecting, isOnCall, callDuration, makeCall, endCall, sendDigits, formatDuration } = useTwilioDevice();
+  const { isConnecting, isOnCall, callDuration, makeCall, endCall, sendDigits, formatDuration } = useTwilioDevice({
+    leadId,
+    ownerId,
+    contactPhone,
+  });
 
   // Set phone number when dialog opens
   useEffect(() => {
@@ -62,7 +70,7 @@ export function CallDialog({
   // Using formatPhoneForDisplay from phoneUtils
 
   const handleCall = async () => {
-    await makeCall(phoneNumber);
+    await makeCall(phoneNumber, leadId, ownerId);
   };
 
   const handleOpenChange = (newOpen: boolean) => {
