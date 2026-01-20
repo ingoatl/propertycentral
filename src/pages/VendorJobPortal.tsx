@@ -17,7 +17,8 @@ import {
   MapPin, Clock, CheckCircle, XCircle, 
   Camera, DollarSign, ExternalLink, Phone, Loader2, Send, 
   Building2, Play, X, Lock, Key, Shield, Copy, FileText,
-  ArrowRight, ChevronDown, ChevronUp, AlertCircle, Pause, Mic, Video
+  ArrowRight, ChevronDown, ChevronUp, AlertCircle, Pause, Mic, Video,
+  PawPrint, Car, Wrench, AlertTriangle
 } from "lucide-react";
 
 interface WorkOrderData {
@@ -38,6 +39,13 @@ interface WorkOrderData {
   voice_message_url: string | null;
   voice_message_transcript: string | null;
   video_url: string | null;
+  // Enhanced access fields
+  tenant_contact_name: string | null;
+  tenant_contact_phone: string | null;
+  pets_on_property: string | null;
+  parking_instructions: string | null;
+  utility_shutoff_notes: string | null;
+  safety_notes: string | null;
   property: { id: string; name: string | null; address: string | null; image_path: string | null } | null;
   assigned_vendor: { id: string; name: string; phone: string | null; company_name: string | null; billcom_vendor_id: string | null; billcom_invite_sent_at: string | null } | null;
 }
@@ -82,6 +90,8 @@ const VendorJobPortal = () => {
           created_at, access_instructions, quoted_cost,
           vendor_accepted, completed_at, quote_scope, quote_materials, quote_labor_hours,
           voice_message_url, voice_message_transcript, video_url,
+          tenant_contact_name, tenant_contact_phone, pets_on_property,
+          parking_instructions, utility_shutoff_notes, safety_notes,
           property:properties(id, name, address, image_path),
           assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, phone, company_name, billcom_vendor_id, billcom_invite_sent_at)
         `)
@@ -432,6 +442,12 @@ const VendorJobPortal = () => {
   const hasAccessCodes = maintenanceBook?.lockbox_code || maintenanceBook?.gate_code || maintenanceBook?.alarm_code;
   const accessInstructions = maintenanceBook?.access_instructions || workOrder.access_instructions;
   const isPendingApproval = workOrder.status === "pending_approval" || workOrder.status === "awaiting_approval";
+  
+  // Check for any site access info
+  const hasSiteInfo = hasAccessCodes || accessInstructions || 
+    workOrder.tenant_contact_name || workOrder.tenant_contact_phone ||
+    workOrder.pets_on_property || workOrder.parking_instructions ||
+    workOrder.utility_shutoff_notes || workOrder.safety_notes;
 
   // Step labels
   const steps = [
@@ -631,72 +647,138 @@ const VendorJobPortal = () => {
           </CardContent>
         </Card>
 
-        {/* Access Codes - Collapsible */}
-        {(hasAccessCodes || accessInstructions) && (
-          <Card className="border-neutral-200">
-            <CardHeader 
-              className="p-4 cursor-pointer"
-              onClick={() => setShowAccessCodes(!showAccessCodes)}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Key className="h-4 w-4 text-neutral-500" />Access Codes
-                </CardTitle>
-                {showAccessCodes ? <ChevronUp className="h-4 w-4 text-neutral-400" /> : <ChevronDown className="h-4 w-4 text-neutral-400" />}
-              </div>
+        {/* Site Access & Safety - Always visible, not collapsed */}
+        {hasSiteInfo && (
+          <Card className="border-2 border-foreground">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wide flex items-center gap-2">
+                <Key className="h-4 w-4" />SITE ACCESS & SAFETY
+              </CardTitle>
             </CardHeader>
-            {showAccessCodes && (
-              <CardContent className="pt-0 px-4 pb-4 space-y-2">
-                {maintenanceBook?.lockbox_code && (
-                  <div className="flex items-center justify-between p-3 bg-neutral-50 rounded border border-neutral-100">
-                    <div className="flex items-center gap-3">
-                      <Lock className="h-4 w-4 text-neutral-400" />
-                      <div>
-                        <p className="text-[10px] text-neutral-500 uppercase tracking-wide">Lockbox</p>
-                        <p className="font-mono font-semibold text-neutral-900">{maintenanceBook.lockbox_code}</p>
+            <CardContent className="px-4 pb-4 space-y-3">
+              {/* Entry Codes */}
+              {hasAccessCodes && (
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">Entry</p>
+                  {maintenanceBook?.lockbox_code && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded border">
+                      <div className="flex items-center gap-3">
+                        <Lock className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Lockbox</p>
+                          <p className="font-mono font-semibold text-foreground">{maintenanceBook.lockbox_code}</p>
+                        </div>
                       </div>
+                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.lockbox_code!, "Code")}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.lockbox_code!, "Code")}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                {maintenanceBook?.gate_code && (
-                  <div className="flex items-center justify-between p-3 bg-neutral-50 rounded border border-neutral-100">
-                    <div className="flex items-center gap-3">
-                      <Key className="h-4 w-4 text-neutral-400" />
-                      <div>
-                        <p className="text-[10px] text-neutral-500 uppercase tracking-wide">Gate</p>
-                        <p className="font-mono font-semibold text-neutral-900">{maintenanceBook.gate_code}</p>
+                  )}
+                  {maintenanceBook?.gate_code && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded border">
+                      <div className="flex items-center gap-3">
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Gate</p>
+                          <p className="font-mono font-semibold text-foreground">{maintenanceBook.gate_code}</p>
+                        </div>
                       </div>
+                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.gate_code!, "Code")}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.gate_code!, "Code")}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                {maintenanceBook?.alarm_code && (
-                  <div className="flex items-center justify-between p-3 bg-neutral-50 rounded border border-neutral-100">
-                    <div className="flex items-center gap-3">
-                      <Shield className="h-4 w-4 text-neutral-400" />
-                      <div>
-                        <p className="text-[10px] text-neutral-500 uppercase tracking-wide">Alarm</p>
-                        <p className="font-mono font-semibold text-neutral-900">{maintenanceBook.alarm_code}</p>
+                  )}
+                  {maintenanceBook?.alarm_code && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded border">
+                      <div className="flex items-center gap-3">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Alarm</p>
+                          <p className="font-mono font-semibold text-foreground">{maintenanceBook.alarm_code}</p>
+                        </div>
                       </div>
+                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.alarm_code!, "Code")}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.alarm_code!, "Code")}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Access Instructions */}
+              {accessInstructions && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded">
+                  <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium uppercase tracking-wide mb-1">Entry Instructions</p>
+                  <p className="text-sm text-amber-900 dark:text-amber-200 whitespace-pre-wrap">{accessInstructions}</p>
+                </div>
+              )}
+
+              {/* Tenant Contact */}
+              {(workOrder.tenant_contact_name || workOrder.tenant_contact_phone) && (
+                <div className="p-3 bg-muted rounded border">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <Phone className="h-3 w-3" />On-Site Contact
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      {workOrder.tenant_contact_name && (
+                        <p className="text-sm font-medium text-foreground">{workOrder.tenant_contact_name}</p>
+                      )}
+                      {workOrder.tenant_contact_phone && (
+                        <p className="text-sm text-muted-foreground">{workOrder.tenant_contact_phone}</p>
+                      )}
+                    </div>
+                    {workOrder.tenant_contact_phone && (
+                      <Button variant="outline" size="sm" className="h-10 touch-manipulation" asChild>
+                        <a href={`tel:${workOrder.tenant_contact_phone}`}>
+                          <Phone className="h-4 w-4 mr-1" />Call
+                        </a>
+                      </Button>
+                    )}
                   </div>
-                )}
-                {accessInstructions && (
-                  <div className="p-3 bg-amber-50 border border-amber-100 rounded">
-                    <p className="text-[10px] text-amber-700 font-medium uppercase tracking-wide mb-1">Instructions</p>
-                    <p className="text-sm text-amber-900 whitespace-pre-wrap">{accessInstructions}</p>
-                  </div>
-                )}
-              </CardContent>
-            )}
+                </div>
+              )}
+
+              {/* Pets Warning - Highlighted */}
+              {workOrder.pets_on_property && (
+                <div className="p-3 bg-amber-100 dark:bg-amber-950/50 border-2 border-amber-300 dark:border-amber-700 rounded">
+                  <p className="text-[10px] text-amber-800 dark:text-amber-300 font-bold uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <PawPrint className="h-3 w-3" />⚠️ Pets on Property
+                  </p>
+                  <p className="text-sm text-amber-900 dark:text-amber-200 whitespace-pre-wrap">{workOrder.pets_on_property}</p>
+                </div>
+              )}
+
+              {/* Parking */}
+              {workOrder.parking_instructions && (
+                <div className="p-3 bg-muted rounded border">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <Car className="h-3 w-3" />Parking
+                  </p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{workOrder.parking_instructions}</p>
+                </div>
+              )}
+
+              {/* Utility Shutoffs */}
+              {workOrder.utility_shutoff_notes && (
+                <div className="p-3 bg-muted rounded border">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <Wrench className="h-3 w-3" />Utility Locations
+                  </p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{workOrder.utility_shutoff_notes}</p>
+                </div>
+              )}
+
+              {/* Safety Notes - Red Warning */}
+              {workOrder.safety_notes && (
+                <div className="p-3 bg-destructive/10 border-2 border-destructive/30 rounded">
+                  <p className="text-[10px] text-destructive font-bold uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />⛔ Safety Warning
+                  </p>
+                  <p className="text-sm text-destructive whitespace-pre-wrap">{workOrder.safety_notes}</p>
+                </div>
+              )}
+            </CardContent>
           </Card>
         )}
 

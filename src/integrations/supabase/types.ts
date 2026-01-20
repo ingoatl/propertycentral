@@ -10020,6 +10020,8 @@ export type Database = {
           owner_notified: boolean | null
           owner_notified_at: string | null
           parent_work_order_id: string | null
+          parking_instructions: string | null
+          pets_on_property: string | null
           property_id: string
           quote_labor_hours: number | null
           quote_materials: string | null
@@ -10030,16 +10032,20 @@ export type Database = {
           reported_by_phone: string | null
           reported_by_user_id: string | null
           requires_vendor: boolean | null
+          safety_notes: string | null
           scheduled_date: string | null
           scheduled_time_end: string | null
           scheduled_time_start: string | null
           scheduled_time_window: string | null
           source: string | null
           status: Database["public"]["Enums"]["work_order_status"] | null
+          tenant_contact_name: string | null
+          tenant_contact_phone: string | null
           title: string
           troubleshooting_resolved: boolean | null
           updated_at: string | null
           urgency: Database["public"]["Enums"]["work_order_urgency"] | null
+          utility_shutoff_notes: string | null
           vendor_accepted: boolean | null
           vendor_accepted_at: string | null
           vendor_access_token: string | null
@@ -10097,6 +10103,8 @@ export type Database = {
           owner_notified?: boolean | null
           owner_notified_at?: string | null
           parent_work_order_id?: string | null
+          parking_instructions?: string | null
+          pets_on_property?: string | null
           property_id: string
           quote_labor_hours?: number | null
           quote_materials?: string | null
@@ -10107,16 +10115,20 @@ export type Database = {
           reported_by_phone?: string | null
           reported_by_user_id?: string | null
           requires_vendor?: boolean | null
+          safety_notes?: string | null
           scheduled_date?: string | null
           scheduled_time_end?: string | null
           scheduled_time_start?: string | null
           scheduled_time_window?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["work_order_status"] | null
+          tenant_contact_name?: string | null
+          tenant_contact_phone?: string | null
           title: string
           troubleshooting_resolved?: boolean | null
           updated_at?: string | null
           urgency?: Database["public"]["Enums"]["work_order_urgency"] | null
+          utility_shutoff_notes?: string | null
           vendor_accepted?: boolean | null
           vendor_accepted_at?: string | null
           vendor_access_token?: string | null
@@ -10174,6 +10186,8 @@ export type Database = {
           owner_notified?: boolean | null
           owner_notified_at?: string | null
           parent_work_order_id?: string | null
+          parking_instructions?: string | null
+          pets_on_property?: string | null
           property_id?: string
           quote_labor_hours?: number | null
           quote_materials?: string | null
@@ -10184,16 +10198,20 @@ export type Database = {
           reported_by_phone?: string | null
           reported_by_user_id?: string | null
           requires_vendor?: boolean | null
+          safety_notes?: string | null
           scheduled_date?: string | null
           scheduled_time_end?: string | null
           scheduled_time_start?: string | null
           scheduled_time_window?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["work_order_status"] | null
+          tenant_contact_name?: string | null
+          tenant_contact_phone?: string | null
           title?: string
           troubleshooting_resolved?: boolean | null
           updated_at?: string | null
           urgency?: Database["public"]["Enums"]["work_order_urgency"] | null
+          utility_shutoff_notes?: string | null
           vendor_accepted?: boolean | null
           vendor_accepted_at?: string | null
           vendor_access_token?: string | null
