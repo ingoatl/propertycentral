@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, MessageSquare, PhoneCall, Trash2, ClipboardList } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, MessageSquare, PhoneCall, Trash2, ClipboardList, Mic, Video } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
@@ -19,6 +19,8 @@ import { WorkOrdersTable } from "@/components/maintenance/WorkOrdersTable";
 import { VendorCommunicationsTab } from "@/components/maintenance/VendorCommunicationsTab";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
+import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDialog";
+import { MeetingsDialog } from "@/components/communications/MeetingsDialog";
 import DeleteVendorDialog from "@/components/maintenance/DeleteVendorDialog";
 import { StartWorkOrderDialog } from "@/components/maintenance/StartWorkOrderDialog";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -33,6 +35,8 @@ const Vendors = () => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [callDialogVendor, setCallDialogVendor] = useState<Vendor | null>(null);
   const [smsDialogVendor, setSmsDialogVendor] = useState<Vendor | null>(null);
+  const [voicemailDialogVendor, setVoicemailDialogVendor] = useState<Vendor | null>(null);
+  const [videoDialogVendor, setVideoDialogVendor] = useState<Vendor | null>(null);
   const [deleteVendor, setDeleteVendor] = useState<Vendor | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showStartWorkOrder, setShowStartWorkOrder] = useState(false);
@@ -237,28 +241,31 @@ const Vendors = () => {
                     {vendor.emergency_available && <Badge variant="outline" className="text-xs border-red-200 text-red-600"><AlertTriangle className="h-3 w-3 mr-1" />24/7</Badge>}
                     {vendor.insurance_verified && <Badge variant="outline" className="text-xs border-green-200 text-green-600"><Shield className="h-3 w-3 mr-1" />Insured</Badge>}
                   </div>
-                  <div className="flex items-center gap-2 pt-2 border-t">
+                  <div className="flex items-center gap-1.5 pt-2 border-t">
                     {vendor.phone && (
                       <>
-                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setCallDialogVendor(vendor); }}>
+                        <Button size="icon" variant="default" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setCallDialogVendor(vendor); }} title="Call">
                           <PhoneCall className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setSmsDialogVendor(vendor); }}>
+                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setSmsDialogVendor(vendor); }} title="Text">
                           <MessageSquare className="h-4 w-4" />
                         </Button>
-                        <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
-                          <SendVoicemailButton recipientPhone={vendor.phone} recipientName={vendor.name} variant="outline" size="icon" className="h-8 w-8" />
-                        </div>
+                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setVoicemailDialogVendor(vendor); }} title="Voice">
+                          <Mic className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setVideoDialogVendor(vendor); }} title="Video">
+                          <Video className="h-4 w-4" />
+                        </Button>
                       </>
                     )}
                     {vendor.email && (
-                      <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); window.location.href = `mailto:${vendor.email}`; }}>
+                      <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); window.location.href = `mailto:${vendor.email}`; }} title="Email">
                         <Mail className="h-4 w-4" />
                       </Button>
                     )}
                     <div className="flex-1" />
                     {isAdmin && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setDeleteVendor(vendor); }}>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setDeleteVendor(vendor); }} title="Delete">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
@@ -275,6 +282,22 @@ const Vendors = () => {
       {selectedVendor && <VendorDetailModal open={!!selectedVendor} onOpenChange={(open) => !open && setSelectedVendor(null)} vendor={selectedVendor} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["vendors"] })} />}
       {callDialogVendor && <CallDialog open={!!callDialogVendor} onOpenChange={(open) => !open && setCallDialogVendor(null)} contactName={callDialogVendor.name} contactPhone={callDialogVendor.phone} contactType="vendor" />}
       {smsDialogVendor && <SendSMSDialog open={!!smsDialogVendor} onOpenChange={(open) => !open && setSmsDialogVendor(null)} contactName={smsDialogVendor.name} contactPhone={smsDialogVendor.phone} contactType="vendor" contactId={smsDialogVendor.id} />}
+      {voicemailDialogVendor && voicemailDialogVendor.phone && (
+        <SendVoicemailDialog
+          open={!!voicemailDialogVendor}
+          onOpenChange={(open) => !open && setVoicemailDialogVendor(null)}
+          recipientPhone={voicemailDialogVendor.phone}
+          recipientName={voicemailDialogVendor.name}
+        />
+      )}
+      {videoDialogVendor && (
+        <MeetingsDialog
+          open={!!videoDialogVendor}
+          onOpenChange={(open) => !open && setVideoDialogVendor(null)}
+          contactName={videoDialogVendor.name}
+          contactEmail={videoDialogVendor.email}
+        />
+      )}
       {deleteVendor && <DeleteVendorDialog open={!!deleteVendor} onOpenChange={(open) => !open && setDeleteVendor(null)} vendorName={deleteVendor.name} onConfirm={handleDeleteVendor} isDeleting={isDeleting} />}
       <StartWorkOrderDialog open={showStartWorkOrder} onOpenChange={setShowStartWorkOrder} onSuccess={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />
       {selectedWorkOrderId && <WorkOrderDetailModal workOrderId={selectedWorkOrderId} open={!!selectedWorkOrderId} onOpenChange={(open) => !open && setSelectedWorkOrderId(null)} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />}
