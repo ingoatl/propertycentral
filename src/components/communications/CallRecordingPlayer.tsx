@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Phone, Play, Pause, Square, Volume2, Download, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Phone, Play, Pause, Square, Volume2, Download, FileText, FileDown, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -90,6 +90,19 @@ export function CallRecordingPlayer({
     window.open(recordingUrl, "_blank");
   };
 
+  const handleDownloadTranscript = () => {
+    if (!transcript) return;
+    const blob = new Blob([transcript], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `call-transcript-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className={cn(
       "rounded-lg border",
@@ -173,7 +186,7 @@ export function CallRecordingPlayer({
             x{playbackRate}
           </Button>
 
-          {/* Download */}
+          {/* Download Recording */}
           <Button
             variant="ghost"
             size="icon"
@@ -183,6 +196,19 @@ export function CallRecordingPlayer({
           >
             <Download className="h-3.5 w-3.5" />
           </Button>
+
+          {/* Download Transcript */}
+          {transcript && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={handleDownloadTranscript}
+              title="Download transcript"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
 
         {/* Transcript toggle */}
