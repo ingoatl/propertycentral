@@ -2,11 +2,9 @@ import { memo, useState } from 'react';
 import { Menu, Phone, Bell, Bot, LogOut, MessageSquare, Mail, Video, Search, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import peachIcon from '@/assets/peach-icon.png';
 import { cn } from '@/lib/utils';
 
 interface MobileHeaderBarProps {
@@ -48,10 +46,10 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
       {/* Apple-style clean header */}
       <div className="bg-background/95 backdrop-blur-xl border-b border-border/40">
         <div className="px-4 py-3">
-          {/* Top Row - Logo, Quick Actions */}
+          {/* Top Row - Menu + Quick Actions */}
           <div className="flex items-center justify-between">
-            {/* Left: Menu + Logo */}
-            <div className="flex items-center gap-3">
+            {/* Left: Menu */}
+            <div className="flex items-center gap-2">
               {canAccessNav && (
                 <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
                   <SheetTrigger asChild>
@@ -62,12 +60,9 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
                   <SheetContent side="left" className="w-[300px] p-0 border-r-0">
                     <div className="h-full flex flex-col bg-background">
                       {/* Header */}
-                      <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
-                        <img src={peachIcon} alt="Peach" className="w-11 h-11 rounded-2xl" />
-                        <div>
-                          <span className="font-semibold text-base block">Property Central</span>
-                          <span className="text-xs text-muted-foreground">{user?.email}</span>
-                        </div>
+                      <div className="px-5 py-4 border-b border-border/50">
+                        <span className="font-semibold text-base block">Property Central</span>
+                        <span className="text-xs text-muted-foreground">{user?.email}</span>
                       </div>
                       
                       {/* Navigation */}
@@ -101,19 +96,14 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
                 </Sheet>
               )}
               
-              {/* Peach Logo */}
-              <button 
-                onClick={() => navigate('/')}
-                className="flex items-center active:scale-95 transition-transform touch-manipulation"
-              >
-                <img src={peachIcon} alt="Peach" className="w-10 h-10 rounded-2xl" />
-              </button>
+              {/* Title */}
+              <span className="font-semibold text-base">Property Central</span>
             </div>
 
-            {/* Right: Minimal Action Bar */}
+            {/* Right: Action Buttons */}
             {canAccessNav && (
               <div className="flex items-center gap-2">
-                {/* Team Hub - Direct Access */}
+                {/* Team Hub */}
                 <button
                   onClick={() => navigate('/team-hub')}
                   className="w-10 h-10 flex items-center justify-center rounded-full bg-secondary hover:bg-secondary/80 active:scale-95 transition-all touch-manipulation"
@@ -154,7 +144,7 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
           </div>
         </div>
 
-        {/* Bottom Row - Clean Segmented Tabs */}
+        {/* Bottom Row - Communication Tabs */}
         {canAccessNav && (
           <div className="px-4 pb-3">
             <CommunicationTabs />
@@ -165,23 +155,23 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
   );
 });
 
-// Apple-style minimal tab bar
+// Apple-style minimal tab bar - Fixed routes to use /communications
 function CommunicationTabs() {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname + location.search;
   
   const tabs = [
-    { icon: MessageSquare, label: 'All', path: '/inbox' },
-    { icon: MessageSquare, label: 'SMS', path: '/inbox?filter=sms' },
-    { icon: Phone, label: 'Calls', path: '/inbox?filter=call' },
-    { icon: Mail, label: 'Email', path: '/inbox?filter=email' },
-    { icon: Video, label: 'Video', path: '/inbox?filter=video' },
+    { icon: MessageSquare, label: 'All', path: '/communications' },
+    { icon: MessageSquare, label: 'SMS', path: '/communications?filter=sms' },
+    { icon: Phone, label: 'Calls', path: '/communications?filter=call' },
+    { icon: Mail, label: 'Email', path: '/communications?filter=email' },
+    { icon: Video, label: 'Video', path: '/communications?filter=video' },
   ];
 
   const isActive = (path: string) => {
-    if (path === '/inbox') {
-      return currentPath === '/inbox' || currentPath === '/inbox?';
+    if (path === '/communications') {
+      return currentPath === '/communications' || currentPath === '/communications?';
     }
     return currentPath.includes(path.split('?')[1] || '');
   };
@@ -211,7 +201,7 @@ function CommunicationTabs() {
       
       {/* Search */}
       <button
-        onClick={() => navigate('/inbox?search=true')}
+        onClick={() => navigate('/communications?search=true')}
         className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-all touch-manipulation"
       >
         <Search className="w-4 h-4" />
