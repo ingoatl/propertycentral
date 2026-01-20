@@ -509,7 +509,7 @@ const CreateWorkOrderDialog = ({
                 </div>
               )}
               
-              {/* Video Upload */}
+              {/* Video Upload - Camera Capture on Mobile */}
               {!videoFile ? (
                 <Button
                   type="button"
@@ -519,7 +519,7 @@ const CreateWorkOrderDialog = ({
                   className="flex items-center gap-2"
                 >
                   <Video className="h-4 w-4" />
-                  Upload Video
+                  Record Video
                 </Button>
               ) : (
                 <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
@@ -534,6 +534,7 @@ const CreateWorkOrderDialog = ({
                 ref={videoInputRef}
                 type="file"
                 accept="video/*"
+                capture="environment"
                 onChange={handleVideoSelect}
                 className="hidden"
               />
