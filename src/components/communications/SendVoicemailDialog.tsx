@@ -274,7 +274,7 @@ export function SendVoicemailDialog({
           <TabsContent value="video" className="mt-4">
             <VideoCapture
               onVideoReady={handleVideoReady}
-              maxDuration={120}
+              maxDuration={180}
             />
           </TabsContent>
         )}
