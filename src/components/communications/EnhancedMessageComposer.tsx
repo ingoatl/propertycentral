@@ -67,16 +67,19 @@ export function EnhancedMessageComposer({
   const segmentCount = Math.ceil(characterCount / 160) || 1;
   const isLongMessage = characterCount > 200 || localValue.split('\n').length > 3;
 
+  // Auto-expand when there's content to make it easier to read
+  const shouldAutoExpand = characterCount > 100 || localValue.split('\n').length > 2;
+
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
-      const minHeight = 56;
-      const maxHeight = 336;
+      const minHeight = shouldAutoExpand ? 120 : 56; // Larger when there's content
+      const maxHeight = 400; // Increased max height
       const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
       textarea.style.height = `${newHeight}px`;
     }
-  }, []);
+  }, [shouldAutoExpand]);
 
   useEffect(() => {
     adjustHeight();
@@ -245,8 +248,11 @@ export function EnhancedMessageComposer({
             placeholder={placeholder}
             disabled={disabled}
             autoFocus={autoFocus}
-            className="min-h-[56px] max-h-[336px] resize-none border-0 focus-visible:ring-0 rounded-2xl text-[17px] leading-relaxed py-4 px-4 pr-14 placeholder:text-muted-foreground/60"
-            rows={1}
+            className={cn(
+              "resize-none border-0 focus-visible:ring-0 rounded-2xl text-[17px] leading-relaxed py-4 px-4 pr-14 placeholder:text-muted-foreground/60 transition-all duration-200",
+              shouldAutoExpand ? "min-h-[120px] max-h-[400px]" : "min-h-[56px] max-h-[400px]"
+            )}
+            rows={shouldAutoExpand ? 4 : 1}
           />
           {onSend && localValue.trim() && (
             <div className="absolute right-2 bottom-2">
