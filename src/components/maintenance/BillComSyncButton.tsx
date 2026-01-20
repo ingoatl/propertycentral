@@ -100,9 +100,9 @@ const BillComSyncButton = ({
 
       const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
         body: {
-          toNumber: vendorPhone,
+          phone: vendorPhone,
           message: smsBody,
-          fromNumber: "+14049915076", // Vendor phone number
+          vendorId, // Include vendorId so the function uses the correct vendor number
         },
       });
 
