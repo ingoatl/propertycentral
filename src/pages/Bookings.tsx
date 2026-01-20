@@ -13,11 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, Plus, Trash2, Edit, User, Mail, DollarSign, Home, Star, MessageSquare, Phone } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, Plus, Trash2, Edit, User, Mail, DollarSign, Home, Star, MessageSquare, Phone, Mic, Video } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import GoogleReviewsTab from "@/components/bookings/GoogleReviewsTab";
 import { GuestCommunicationModal } from "@/components/bookings/GuestCommunicationModal";
+import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDialog";
+import { MeetingsDialog } from "@/components/communications/MeetingsDialog";
 // Mid-term booking schema
 const bookingSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
@@ -82,6 +84,8 @@ const Bookings = () => {
   // Communication modal state
   const [communicationOpen, setCommunicationOpen] = useState(false);
   const [communicationMode, setCommunicationMode] = useState<'text' | 'call'>('text');
+  const [voicemailOpen, setVoicemailOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<{
     id: string;
     name: string;
@@ -295,6 +299,32 @@ const Bookings = () => {
     });
     setCommunicationMode('call');
     setCommunicationOpen(true);
+  };
+
+  const handleVoicemailGuest = (booking: MidTermBooking) => {
+    if (!booking.tenant_phone) {
+      toast.error("No phone number available for this guest");
+      return;
+    }
+    setSelectedGuest({
+      id: booking.id,
+      name: booking.tenant_name,
+      phone: booking.tenant_phone,
+      email: booking.tenant_email || undefined,
+      propertyName: getMidTermPropertyName(booking.property_id),
+    });
+    setVoicemailOpen(true);
+  };
+
+  const handleVideoGuest = (booking: MidTermBooking) => {
+    setSelectedGuest({
+      id: booking.id,
+      name: booking.tenant_name,
+      phone: booking.tenant_phone || "",
+      email: booking.tenant_email || undefined,
+      propertyName: getMidTermPropertyName(booking.property_id),
+    });
+    setVideoOpen(true);
   };
 
   // OwnerRez functions
@@ -741,25 +771,43 @@ const Bookings = () => {
                         {booking.tenant_phone && (
                           <>
                             <Button
-                              variant="ghost"
+                              variant="default"
+                              size="icon"
+                              onClick={() => handleCallGuest(booking)}
+                              className="h-8 w-8 bg-primary hover:bg-primary/90"
+                              title="Call guest"
+                            >
+                              <Phone className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
                               size="icon"
                               onClick={() => handleTextGuest(booking)}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              className="h-8 w-8"
                               title="Send text message"
                             >
                               <MessageSquare className="w-4 h-4" />
                             </Button>
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="icon"
-                              onClick={() => handleCallGuest(booking)}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              title="Call guest"
+                              onClick={() => handleVoicemailGuest(booking)}
+                              className="h-8 w-8"
+                              title="Voice message"
                             >
-                              <Phone className="w-4 h-4" />
+                              <Mic className="w-4 h-4" />
                             </Button>
                           </>
                         )}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleVideoGuest(booking)}
+                          className="h-8 w-8"
+                          title="Video meeting"
+                        >
+                          <Video className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="outline"
                           size="icon"
@@ -989,6 +1037,26 @@ const Bookings = () => {
         guest={selectedGuest}
         mode={communicationMode}
       />
+
+      {/* Voicemail Dialog */}
+      {selectedGuest && selectedGuest.phone && (
+        <SendVoicemailDialog
+          open={voicemailOpen}
+          onOpenChange={setVoicemailOpen}
+          recipientPhone={selectedGuest.phone}
+          recipientName={selectedGuest.name}
+        />
+      )}
+
+      {/* Video Meeting Dialog */}
+      {selectedGuest && (
+        <MeetingsDialog
+          open={videoOpen}
+          onOpenChange={setVideoOpen}
+          contactName={selectedGuest.name}
+          contactEmail={selectedGuest.email || null}
+        />
+      )}
     </div>
   );
 };
