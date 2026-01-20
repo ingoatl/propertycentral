@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { navigationConfig, NavDropdown, NavLink } from "@/config/navigation";
 import {
   Collapsible,
@@ -30,7 +30,7 @@ export function MobileNavigation({ isAdmin }: MobileNavigationProps) {
   );
 
   return (
-    <nav className="flex flex-col p-4 gap-1">
+    <nav className="py-2">
       {visibleNavItems.map((navItem) => {
         if (navItem.type === "link") {
           const linkItem = navItem as NavLink;
@@ -42,20 +42,16 @@ export function MobileNavigation({ isAdmin }: MobileNavigationProps) {
               key={linkItem.path}
               to={linkItem.path}
               className={cn(
-                "flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-medium transition-all",
-                "active:scale-[0.98] touch-manipulation",
+                "flex items-center gap-3 mx-3 px-4 py-3 rounded-xl text-[15px] font-medium transition-all",
+                "active:bg-secondary touch-manipulation",
                 isActive 
-                  ? "bg-primary/10 text-primary" 
-                  : "text-foreground hover:bg-muted"
+                  ? "bg-secondary text-foreground" 
+                  : "text-foreground/80 hover:bg-secondary/50"
               )}
             >
-              <div className={cn(
-                "w-9 h-9 rounded-xl flex items-center justify-center",
-                isActive ? "bg-primary text-primary-foreground" : "bg-muted"
-              )}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <span>{linkItem.label}</span>
+              <Icon className="w-5 h-5 text-muted-foreground" />
+              <span className="flex-1">{linkItem.label}</span>
+              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-foreground" />}
             </Link>
           );
         }
@@ -79,59 +75,48 @@ export function MobileNavigation({ isAdmin }: MobileNavigationProps) {
             <CollapsibleTrigger asChild>
               <button
                 className={cn(
-                  "flex items-center justify-between w-full px-4 py-3.5 rounded-2xl text-sm font-medium transition-all",
-                  "active:scale-[0.98] touch-manipulation",
+                  "flex items-center gap-3 w-full mx-3 px-4 py-3 rounded-xl text-[15px] font-medium transition-all",
+                  "active:bg-secondary touch-manipulation",
                   hasActiveChild 
-                    ? "bg-primary/10 text-primary" 
-                    : "text-foreground hover:bg-muted"
+                    ? "bg-secondary/50 text-foreground" 
+                    : "text-foreground/80 hover:bg-secondary/50"
                 )}
+                style={{ width: 'calc(100% - 24px)' }}
               >
-                <span className="flex items-center gap-3">
-                  <div className={cn(
-                    "w-9 h-9 rounded-xl flex items-center justify-center",
-                    hasActiveChild ? "bg-primary text-primary-foreground" : "bg-muted"
-                  )}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  {dropdownItem.label}
-                </span>
-                <ChevronDown
+                <Icon className="w-5 h-5 text-muted-foreground" />
+                <span className="flex-1 text-left">{dropdownItem.label}</span>
+                <ChevronRight
                   className={cn(
-                    "w-4 h-4 transition-transform duration-300",
-                    (isExpanded || hasActiveChild) && "rotate-180"
+                    "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                    (isExpanded || hasActiveChild) && "rotate-90"
                   )}
                 />
               </button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="pl-6 mt-1 space-y-0.5 animate-accordion-down">
-              {visibleItems.map((item) => {
-                const isActive = location.pathname === item.path;
-                const ItemIcon = item.icon;
+            <CollapsibleContent className="overflow-hidden">
+              <div className="ml-6 pl-4 border-l border-border/50 my-1 space-y-0.5">
+                {visibleItems.map((item) => {
+                  const isActive = location.pathname === item.path;
+                  const ItemIcon = item.icon;
 
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all",
-                      "active:scale-[0.98] touch-manipulation",
-                      isActive 
-                        ? "bg-primary/10 text-primary font-medium" 
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    )}
-                  >
-                    <ItemIcon className="w-4 h-4" />
-                    <div className="flex flex-col">
-                      <span>{item.label}</span>
-                      {item.description && (
-                        <span className="text-[11px] text-muted-foreground leading-tight">
-                          {item.description}
-                        </span>
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                        "active:bg-secondary touch-manipulation",
+                        isActive 
+                          ? "text-foreground font-medium" 
+                          : "text-muted-foreground hover:text-foreground"
                       )}
-                    </div>
-                  </Link>
-                );
-              })}
+                    >
+                      <ItemIcon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </CollapsibleContent>
           </Collapsible>
         );

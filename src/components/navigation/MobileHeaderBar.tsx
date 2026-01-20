@@ -1,9 +1,9 @@
 import { memo, useState } from 'react';
-import { Menu, Phone, Bell, Bot, LogOut, Search } from 'lucide-react';
+import { Menu, Phone, Bell, Bot, LogOut, MessageSquare, Mail, Video, Search, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import peachIcon from '@/assets/peach-icon.png';
@@ -45,34 +45,53 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
 
   return (
     <header className="md:hidden sticky top-0 z-50 safe-area-inset">
-      {/* Apple-style glassmorphic header */}
-      <div className="bg-background/70 backdrop-blur-xl border-b border-border/50 shadow-sm">
-        <div className="px-3 py-2">
+      {/* Apple-style clean header */}
+      <div className="bg-background/95 backdrop-blur-xl border-b border-border/40">
+        <div className="px-4 py-3">
           {/* Top Row - Logo, Quick Actions */}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between">
             {/* Left: Menu + Logo */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {canAccessNav && (
                 <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
                   <SheetTrigger asChild>
-                    <button className="p-2.5 rounded-2xl bg-muted/50 hover:bg-muted active:scale-95 transition-all touch-manipulation">
-                      <Menu className="w-5 h-5 text-foreground" />
+                    <button className="w-10 h-10 flex items-center justify-center rounded-full bg-secondary hover:bg-secondary/80 active:scale-95 transition-all touch-manipulation">
+                      <Menu className="w-5 h-5 text-secondary-foreground" />
                     </button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="w-[280px] p-0">
-                    <div className="h-full flex flex-col">
-                      <div className="p-4 border-b flex items-center gap-3">
-                        <img src={peachIcon} alt="Peach" className="w-10 h-10 rounded-xl" />
-                        <span className="font-semibold text-lg">Property Central</span>
+                  <SheetContent side="left" className="w-[300px] p-0 border-r-0">
+                    <div className="h-full flex flex-col bg-background">
+                      {/* Header */}
+                      <div className="px-5 py-4 border-b border-border/50 flex items-center gap-3">
+                        <img src={peachIcon} alt="Peach" className="w-11 h-11 rounded-2xl" />
+                        <div>
+                          <span className="font-semibold text-base block">Property Central</span>
+                          <span className="text-xs text-muted-foreground">{user?.email}</span>
+                        </div>
                       </div>
+                      
+                      {/* Navigation */}
                       <div className="flex-1 overflow-auto" onClick={() => setMenuOpen(false)}>
                         {navigationContent}
                       </div>
+                      
+                      {/* Footer with Team Hub + Sign Out */}
                       {user && (
-                        <div className="p-4 border-t">
-                          <p className="text-sm text-muted-foreground truncate mb-2">{user.email}</p>
-                          <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleLogout}>
-                            <LogOut className="w-4 h-4" />
+                        <div className="p-4 border-t border-border/50 space-y-2">
+                          <Button 
+                            variant="secondary" 
+                            className="w-full justify-start gap-3 h-11"
+                            onClick={() => { navigate('/team-hub'); setMenuOpen(false); }}
+                          >
+                            <Users className="w-5 h-5" />
+                            Team Hub
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            className="w-full justify-start gap-3 h-11 text-muted-foreground"
+                            onClick={handleLogout}
+                          >
+                            <LogOut className="w-5 h-5" />
                             Sign Out
                           </Button>
                         </div>
@@ -85,85 +104,60 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
               {/* Peach Logo */}
               <button 
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2 p-1 rounded-xl active:scale-95 transition-transform touch-manipulation"
+                className="flex items-center active:scale-95 transition-transform touch-manipulation"
               >
-                <img src={peachIcon} alt="Peach" className="w-9 h-9 rounded-xl shadow-md" />
+                <img src={peachIcon} alt="Peach" className="w-10 h-10 rounded-2xl" />
               </button>
             </div>
 
-            {/* Right: Quick Action Pills */}
+            {/* Right: Minimal Action Bar */}
             {canAccessNav && (
-              <div className="flex items-center gap-1.5">
-                {/* Dialer Button - Primary Action */}
+              <div className="flex items-center gap-2">
+                {/* Team Hub - Direct Access */}
+                <button
+                  onClick={() => navigate('/team-hub')}
+                  className="w-10 h-10 flex items-center justify-center rounded-full bg-secondary hover:bg-secondary/80 active:scale-95 transition-all touch-manipulation"
+                >
+                  <Users className="w-5 h-5 text-secondary-foreground" />
+                </button>
+
+                {/* Dialer */}
                 <button
                   onClick={onOpenDialer}
-                  className={cn(
-                    "relative flex items-center justify-center",
-                    "w-11 h-11 rounded-2xl",
-                    "bg-primary text-primary-foreground",
-                    "shadow-lg shadow-primary/25",
-                    "active:scale-95 transition-all touch-manipulation"
-                  )}
+                  className="w-10 h-10 flex items-center justify-center rounded-full bg-foreground text-background active:scale-95 transition-all touch-manipulation"
                 >
                   <Phone className="w-5 h-5" />
                 </button>
 
-                {/* Notification Bell */}
+                {/* Notifications */}
                 <button
                   onClick={onOpenNotifications}
-                  className={cn(
-                    "relative flex items-center justify-center",
-                    "w-11 h-11 rounded-2xl",
-                    "bg-muted/80 hover:bg-muted",
-                    "active:scale-95 transition-all touch-manipulation"
-                  )}
+                  className="relative w-10 h-10 flex items-center justify-center rounded-full bg-secondary hover:bg-secondary/80 active:scale-95 transition-all touch-manipulation"
                 >
-                  <Bell className="w-5 h-5 text-foreground" />
+                  <Bell className="w-5 h-5 text-secondary-foreground" />
                   {unreadCount > 0 && (
-                    <Badge 
-                      variant="destructive" 
-                      className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1.5 text-[10px] font-bold rounded-full"
-                    >
+                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 flex items-center justify-center bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full">
                       {unreadCount > 9 ? '9+' : unreadCount}
-                    </Badge>
+                    </span>
                   )}
                 </button>
 
                 {/* AI Assistant */}
                 <button
                   onClick={onOpenAiChat}
-                  className={cn(
-                    "relative flex items-center justify-center",
-                    "w-11 h-11 rounded-2xl",
-                    "bg-emerald-100 dark:bg-emerald-900/30",
-                    "border border-emerald-200 dark:border-emerald-800",
-                    "active:scale-95 transition-all touch-manipulation"
-                  )}
+                  className="w-10 h-10 flex items-center justify-center rounded-full bg-secondary hover:bg-secondary/80 active:scale-95 transition-all touch-manipulation"
                 >
-                  <Bot className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                </button>
-
-                {/* Logout */}
-                <button
-                  onClick={handleLogout}
-                  className={cn(
-                    "flex items-center justify-center",
-                    "w-11 h-11 rounded-2xl",
-                    "bg-muted/50 hover:bg-muted",
-                    "active:scale-95 transition-all touch-manipulation"
-                  )}
-                >
-                  <LogOut className="w-5 h-5 text-muted-foreground" />
+                  <Bot className="w-5 h-5 text-secondary-foreground" />
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Bottom Row - Segmented Control for Communication Tabs */}
+        {/* Bottom Row - Clean Segmented Tabs */}
         {canAccessNav && (
-          <div className="px-3 pb-3">
-            <CommunicationSegmentedControl />
+          <div className="px-4 pb-3">
+            <CommunicationTabs />
           </div>
         )}
       </div>
@@ -171,46 +165,54 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
   );
 });
 
-// Apple-style Segmented Control for communication types
-function CommunicationSegmentedControl() {
+// Apple-style minimal tab bar
+function CommunicationTabs() {
   const navigate = useNavigate();
-  const segments = [
-    { icon: '💬', label: 'Inbox', path: '/inbox' },
-    { icon: '📱', label: 'SMS', path: '/inbox?filter=sms' },
-    { icon: '📞', label: 'Calls', path: '/inbox?filter=call' },
-    { icon: '✉️', label: 'Email', path: '/inbox?filter=email' },
-    { icon: '🎥', label: 'Video', path: '/inbox?filter=video' },
+  const location = useLocation();
+  const currentPath = location.pathname + location.search;
+  
+  const tabs = [
+    { icon: MessageSquare, label: 'All', path: '/inbox' },
+    { icon: MessageSquare, label: 'SMS', path: '/inbox?filter=sms' },
+    { icon: Phone, label: 'Calls', path: '/inbox?filter=call' },
+    { icon: Mail, label: 'Email', path: '/inbox?filter=email' },
+    { icon: Video, label: 'Video', path: '/inbox?filter=video' },
   ];
 
+  const isActive = (path: string) => {
+    if (path === '/inbox') {
+      return currentPath === '/inbox' || currentPath === '/inbox?';
+    }
+    return currentPath.includes(path.split('?')[1] || '');
+  };
+
   return (
-    <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-2xl">
-      {segments.map((seg, idx) => (
-        <button
-          key={seg.label}
-          onClick={() => navigate(seg.path)}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-1",
-            "py-2.5 px-1.5 rounded-xl",
-            "text-xs font-medium",
-            "active:scale-95 transition-all touch-manipulation",
-            idx === 0 
-              ? "bg-background shadow-sm text-foreground" 
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-          )}
-        >
-          <span className="text-base">{seg.icon}</span>
-        </button>
-      ))}
+    <div className="flex items-center bg-secondary/50 rounded-xl p-1">
+      {tabs.map((tab) => {
+        const Icon = tab.icon;
+        const active = isActive(tab.path);
+        
+        return (
+          <button
+            key={tab.label}
+            onClick={() => navigate(tab.path)}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all touch-manipulation",
+              active 
+                ? "bg-background text-foreground shadow-sm" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Icon className="w-4 h-4" />
+            <span className="hidden xs:inline">{tab.label}</span>
+          </button>
+        );
+      })}
       
       {/* Search */}
       <button
         onClick={() => navigate('/inbox?search=true')}
-        className={cn(
-          "flex items-center justify-center",
-          "w-10 h-10 rounded-xl",
-          "text-muted-foreground hover:text-foreground hover:bg-background/50",
-          "active:scale-95 transition-all touch-manipulation"
-        )}
+        className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-all touch-manipulation"
       >
         <Search className="w-4 h-4" />
       </button>

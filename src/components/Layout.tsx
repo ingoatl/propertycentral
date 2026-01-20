@@ -1,10 +1,11 @@
 import { ReactNode, useState, useEffect } from "react";
-import { LogOut, Bot } from "lucide-react";
+import { LogOut, Bot, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "./ProtectedRoute";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ChatDialog } from "@/components/ai-assistant/ChatDialog";
 import { MainNavigation } from "@/components/navigation/MainNavigation";
 import { MobileNavigation } from "@/components/navigation/MobileNavigation";
@@ -23,6 +24,8 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const { user, loading, pendingApproval } = useAuth() as any;
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasUserRole, setHasUserRole] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
@@ -134,9 +137,29 @@ const Layout = ({ children }: LayoutProps) => {
             {/* Center: Desktop Navigation */}
             {canAccessNav && <MainNavigation isAdmin={isAdmin} />}
 
-            {/* Right side: Quick Actions + AI Assistant + Notification Bell + User info + Logout */}
+            {/* Right side: Quick Actions + Team Hub + Notification Bell + AI + Logout */}
             <div className="flex items-center gap-1 sm:gap-2">
               {canAccessNav && <QuickCommunicationButton />}
+              
+              {/* Team Hub Direct Access */}
+              {canAccessNav && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => navigate('/team-hub')}
+                      className="shrink-0 h-9 gap-2"
+                    >
+                      <Users className="h-4 w-4" />
+                      <span className="hidden lg:inline">Team Hub</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Open Team Hub for internal messaging</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
               
               {/* Team Hub Notification Bell */}
               {canAccessNav && <NotificationBell />}
@@ -149,10 +172,10 @@ const Layout = ({ children }: LayoutProps) => {
                       variant="outline" 
                       size="sm" 
                       onClick={() => setAiChatOpen(true)}
-                      className="shrink-0 h-9 gap-2 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400"
+                      className="shrink-0 h-9 gap-2"
                     >
                       <Bot className="h-4 w-4" />
-                      <span className="hidden sm:inline">AI Assistant</span>
+                      <span className="hidden sm:inline">AI</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -163,17 +186,16 @@ const Layout = ({ children }: LayoutProps) => {
               
               {user && (
                 <>
-                  <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
+                  <span className="text-sm text-muted-foreground hidden xl:inline truncate max-w-[120px]">
                     {user.email}
                   </span>
                   <Button 
-                    variant="outline" 
+                    variant="ghost" 
                     size="sm" 
                     onClick={handleLogout} 
                     className="shrink-0 h-9"
                   >
-                    <LogOut className="h-4 w-4 lg:mr-2" />
-                    <span className="hidden lg:inline">Logout</span>
+                    <LogOut className="h-4 w-4" />
                   </Button>
                 </>
               )}
