@@ -66,6 +66,7 @@ const VendorJobPortal = () => {
   const [showAccessCodes, setShowAccessCodes] = useState(false);
   const [showGetPaidModal, setShowGetPaidModal] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
   const beforeInputRef = useRef<HTMLInputElement>(null);
   const afterInputRef = useRef<HTMLInputElement>(null);
   const voiceAudioRef = useRef<HTMLAudioElement>(null);
@@ -537,19 +538,19 @@ const VendorJobPortal = () => {
               <p className="text-sm text-neutral-600 mt-3 p-3 bg-neutral-50 rounded border border-neutral-100">{workOrder.description}</p>
             )}
             
-            {/* Voice Message Section */}
+            {/* Voice Message Section - Mobile Optimized */}
             {workOrder.voice_message_url && (
-              <div className="mt-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+              <div className="mt-4 p-3 sm:p-4 bg-neutral-50 rounded-lg border border-neutral-200">
                 <div className="flex items-center gap-2 mb-3">
                   <Mic className="h-4 w-4 text-neutral-600" />
                   <span className="text-sm font-medium text-neutral-700">Voice Instructions</span>
                 </div>
                 
-                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-neutral-200">
+                <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-white rounded-lg border border-neutral-200">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white flex-shrink-0"
+                    className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white flex-shrink-0 touch-manipulation"
                     onClick={() => {
                       if (voiceAudioRef.current) {
                         if (isPlayingVoice) {
@@ -562,10 +563,10 @@ const VendorJobPortal = () => {
                       }
                     }}
                   >
-                    {isPlayingVoice ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+                    {isPlayingVoice ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
                   </Button>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-neutral-500">Audio Message from Property Manager</p>
+                    <p className="text-xs text-neutral-500">Audio Message</p>
                     <p className="text-sm text-neutral-700 font-medium">Tap to play</p>
                   </div>
                 </div>
@@ -576,31 +577,44 @@ const VendorJobPortal = () => {
                   className="hidden" 
                 />
                 
-                {/* Voice Transcript */}
+                {/* Collapsible Voice Transcript */}
                 {workOrder.voice_message_transcript && (
-                  <div className="mt-3 p-3 bg-white rounded-lg border border-neutral-200">
-                    <p className="text-xs font-medium text-neutral-500 mb-1 flex items-center gap-1">
-                      <FileText className="h-3 w-3" />Transcript
-                    </p>
-                    <p className="text-sm text-neutral-700 whitespace-pre-wrap">{workOrder.voice_message_transcript}</p>
+                  <div className="mt-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowTranscript(!showTranscript)}
+                      className="w-full justify-between text-neutral-600 hover:text-neutral-900 h-10 touch-manipulation"
+                    >
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-3.5 w-3.5" />
+                        {showTranscript ? "Hide Transcript" : "Show Transcript"}
+                      </span>
+                      {showTranscript ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                    {showTranscript && (
+                      <div className="mt-2 p-3 bg-white rounded-lg border border-neutral-200">
+                        <p className="text-sm text-neutral-700 whitespace-pre-wrap leading-relaxed">{workOrder.voice_message_transcript}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
             
-            {/* Video Section */}
+            {/* Video Section - Mobile Optimized */}
             {workOrder.video_url && (
-              <div className="mt-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+              <div className="mt-4 p-3 sm:p-4 bg-neutral-50 rounded-lg border border-neutral-200">
                 <div className="flex items-center gap-2 mb-3">
                   <Video className="h-4 w-4 text-neutral-600" />
                   <span className="text-sm font-medium text-neutral-700">Video Instructions</span>
                 </div>
                 
-                <div className="relative w-full rounded-lg overflow-hidden border border-neutral-200">
+                <div className="relative w-full rounded-lg overflow-hidden border border-neutral-200 bg-black">
                   <video 
                     src={workOrder.video_url} 
                     controls 
-                    className="w-full max-h-64 object-contain bg-black"
+                    className="w-full max-h-[300px] object-contain"
                     playsInline
                     preload="metadata"
                   />

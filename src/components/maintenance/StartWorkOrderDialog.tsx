@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Wrench, Home, User, Mic, Video, X, Play, Pause, Square } from "lucide-react";
+import { Loader2, Wrench, Home, User, Mic, Video, X, Play, Pause } from "lucide-react";
 import { VoiceRecorder } from "@/components/communications/VoiceRecorder";
+import { VideoRecordingButton } from "@/components/maintenance/VideoRecordingButton";
 
 interface StartWorkOrderDialogProps {
   open: boolean;
@@ -120,18 +121,23 @@ export function StartWorkOrderDialog({
     toast.success("Voice message recorded");
   };
 
-  // Handle video selection
+  // Handle video selection from file input
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 100 * 1024 * 1024) {
-        toast.error("Video must be under 100MB");
-        return;
-      }
-      setVideoFile(file);
-      setVideoUrl(URL.createObjectURL(file));
-      toast.success("Video added");
+      handleVideoFile(file);
     }
+  };
+
+  // Handle video file (from recording or file input)
+  const handleVideoFile = (file: File) => {
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("Video must be under 100MB");
+      return;
+    }
+    setVideoFile(file);
+    setVideoUrl(URL.createObjectURL(file));
+    toast.success("Video added");
   };
 
   // Clear voice message
@@ -315,15 +321,15 @@ export function StartWorkOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Wrench className="h-5 w-5 text-primary" />
             Start Work Order
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-2">
           {/* Property Selection */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5 text-sm">
@@ -331,12 +337,12 @@ export function StartWorkOrderDialog({
               Property *
             </Label>
             <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-              <SelectTrigger className="text-sm">
+              <SelectTrigger className="text-sm h-11 touch-manipulation">
                 <SelectValue placeholder={loadingProperties ? "Loading..." : "Select property"} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[300px]">
                 {properties.map((property) => (
-                  <SelectItem key={property.id} value={property.id} className="text-sm">
+                  <SelectItem key={property.id} value={property.id} className="text-sm py-3 touch-manipulation">
                     {getPropertyLabel(property)}
                   </SelectItem>
                 ))}
@@ -351,12 +357,12 @@ export function StartWorkOrderDialog({
               Assign Vendor *
             </Label>
             <Select value={selectedVendor} onValueChange={setSelectedVendor}>
-              <SelectTrigger className="text-sm">
+              <SelectTrigger className="text-sm h-11 touch-manipulation">
                 <SelectValue placeholder={loadingVendors ? "Loading..." : "Select vendor"} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[300px]">
                 {vendors.map((vendor) => (
-                  <SelectItem key={vendor.id} value={vendor.id} className="text-sm">
+                  <SelectItem key={vendor.id} value={vendor.id} className="text-sm py-3 touch-manipulation">
                     {getVendorLabel(vendor)}
                   </SelectItem>
                 ))}
@@ -371,7 +377,7 @@ export function StartWorkOrderDialog({
               placeholder="e.g., HVAC repair, Plumbing leak fix..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-sm"
+              className="text-sm h-11 touch-manipulation"
             />
           </div>
 
@@ -379,14 +385,14 @@ export function StartWorkOrderDialog({
           <div className="space-y-2">
             <Label className="text-sm">Priority</Label>
             <Select value={priority} onValueChange={(val) => setPriority(val as "low" | "normal" | "high" | "emergency")}>
-              <SelectTrigger className="text-sm">
+              <SelectTrigger className="text-sm h-11 touch-manipulation">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="emergency">Emergency</SelectItem>
+                <SelectItem value="low" className="py-3 touch-manipulation">Low</SelectItem>
+                <SelectItem value="normal" className="py-3 touch-manipulation">Normal</SelectItem>
+                <SelectItem value="high" className="py-3 touch-manipulation">High</SelectItem>
+                <SelectItem value="emergency" className="py-3 touch-manipulation">Emergency</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -412,20 +418,29 @@ export function StartWorkOrderDialog({
                 variant={voiceUrl ? "default" : "outline"}
                 size="sm"
                 onClick={() => voiceUrl ? undefined : setShowVoiceRecorder(true)}
-                className="gap-2"
+                className="gap-2 touch-manipulation"
               >
                 <Mic className="h-4 w-4" />
                 {voiceUrl ? "Voice Added" : "Record Voice"}
               </Button>
+              
+              {/* Video Recording Button */}
+              <VideoRecordingButton
+                onVideoRecorded={handleVideoFile}
+                hasVideo={!!videoUrl}
+                disabled={createWorkOrderMutation.isPending}
+              />
+              
+              {/* Video Upload Button */}
               <Button
                 type="button"
-                variant={videoUrl ? "default" : "outline"}
+                variant="outline"
                 size="sm"
                 onClick={() => videoInputRef.current?.click()}
-                className="gap-2"
+                className="gap-2 touch-manipulation"
               >
                 <Video className="h-4 w-4" />
-                {videoUrl ? "Video Added" : "Record Video"}
+                Upload Video
               </Button>
             </div>
 
