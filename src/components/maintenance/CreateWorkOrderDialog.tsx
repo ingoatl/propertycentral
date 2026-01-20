@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Phone, Mail, Mic, Video, Loader2, X, Play, Pause, FileText } from "lucide-react";
+import { Phone, Mail, Mic, Video, Loader2, X, Play, Pause, FileText, User, AlertTriangle, Key, Car, Shield } from "lucide-react";
 import { WORK_ORDER_CATEGORIES, Vendor } from "@/types/maintenance";
 
 interface CreateWorkOrderDialogProps {
@@ -50,6 +50,14 @@ const CreateWorkOrderDialog = ({
     access_instructions: "",
     estimated_cost: "",
     assigned_vendor_id: "",
+    // Site access fields
+    vendor_access_code: "",
+    tenant_contact_name: "",
+    tenant_contact_phone: "",
+    pets_on_property: "",
+    parking_instructions: "",
+    utility_shutoff_notes: "",
+    safety_notes: "",
   });
   const [notifySms, setNotifySms] = useState(true);
   const [notifyEmail, setNotifyEmail] = useState(true);
@@ -85,6 +93,160 @@ const CreateWorkOrderDialog = ({
       return data;
     },
   });
+
+  // Fetch property access data when property is selected
+  const { data: propertyAccessData } = useQuery({
+    queryKey: ["property-access-data", formData.property_id],
+    queryFn: async () => {
+      if (!formData.property_id) return null;
+      
+      // Fetch from property_maintenance_book
+      const { data: maintenanceBook } = await supabase
+        .from("property_maintenance_book")
+        .select("*")
+        .eq("property_id", formData.property_id)
+        .maybeSingle();
+      
+      // Fetch from owner_onboarding_submissions via property
+      const { data: onboardingData } = await supabase
+        .from("owner_onboarding_submissions")
+        .select("*")
+        .eq("property_id", formData.property_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      return { maintenanceBook, onboardingData };
+    },
+    enabled: !!formData.property_id,
+  });
+
+  // Fetch current occupant from bookings
+  const { data: currentOccupant } = useQuery({
+    queryKey: ["current-occupant", formData.property_id],
+    queryFn: async () => {
+      if (!formData.property_id) return null;
+      
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check mid-term bookings first
+      const { data: midTermBooking } = await supabase
+        .from("mid_term_bookings")
+        .select("guest_name, guest_phone, check_in, check_out")
+        .eq("property_id", formData.property_id)
+        .lte("check_in", today)
+        .gte("check_out", today)
+        .not("status", "eq", "cancelled")
+        .order("check_in", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (midTermBooking) {
+        return {
+          type: "mid_term",
+          name: midTermBooking.guest_name,
+          phone: midTermBooking.guest_phone,
+          email: null,
+          checkIn: midTermBooking.check_in,
+          checkOut: midTermBooking.check_out,
+        };
+      }
+      
+      // Check OwnerRez bookings
+      const { data: ownerrezBooking } = await supabase
+        .from("ownerrez_bookings")
+        .select("guest_name, check_in, check_out")
+        .eq("property_id", formData.property_id)
+        .lte("check_in", today)
+        .gte("check_out", today)
+        .not("booking_status", "eq", "Canceled")
+        .order("check_in", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (ownerrezBooking) {
+        return {
+          type: "short_term",
+          name: ownerrezBooking.guest_name,
+          phone: null,
+          email: null,
+          checkIn: ownerrezBooking.check_in,
+          checkOut: ownerrezBooking.check_out,
+        };
+      }
+      
+      return null;
+    },
+    enabled: !!formData.property_id,
+  });
+
+  // Auto-populate access data when property changes
+  useEffect(() => {
+    if (propertyAccessData) {
+      const { maintenanceBook, onboardingData } = propertyAccessData;
+      
+      // Build access instructions from available codes
+      const accessParts: string[] = [];
+      
+      // Priority: maintenance book > onboarding data
+      const vendorAccessCode = maintenanceBook?.vendor_access_code || onboardingData?.smart_lock_code || onboardingData?.lockbox_code || "";
+      const gateCode = maintenanceBook?.gate_code || onboardingData?.gate_code || "";
+      const alarmCode = maintenanceBook?.alarm_code || onboardingData?.alarm_code || "";
+      const lockboxCode = maintenanceBook?.lockbox_code || onboardingData?.lockbox_code || "";
+      
+      if (gateCode) accessParts.push(`Gate: ${gateCode}`);
+      if (lockboxCode && lockboxCode !== vendorAccessCode) accessParts.push(`Lockbox: ${lockboxCode}`);
+      if (alarmCode) accessParts.push(`Alarm: ${alarmCode}`);
+      
+      const accessInstructions = maintenanceBook?.access_instructions || 
+        (accessParts.length > 0 ? accessParts.join(" | ") : "");
+      
+      // Build pets info
+      let petsInfo = "";
+      if (onboardingData?.pets_allowed) {
+        petsInfo = "Pets allowed";
+        if (onboardingData?.pet_size_restrictions) {
+          petsInfo += ` (${onboardingData.pet_size_restrictions})`;
+        }
+      }
+      
+      // Build utility shutoff notes
+      const utilityParts: string[] = [];
+      if (onboardingData?.water_shutoff_location) utilityParts.push(`Water: ${onboardingData.water_shutoff_location}`);
+      if (onboardingData?.breaker_panel_location) utilityParts.push(`Breaker: ${onboardingData.breaker_panel_location}`);
+      if (onboardingData?.gas_shutoff_location) utilityParts.push(`Gas: ${onboardingData.gas_shutoff_location}`);
+      
+      // Build safety notes
+      const safetyParts: string[] = [];
+      if (onboardingData?.has_security_system && onboardingData?.security_brand) {
+        safetyParts.push(`Security: ${onboardingData.security_brand}`);
+      }
+      if (onboardingData?.fire_extinguisher_locations) {
+        safetyParts.push(`Fire ext: ${onboardingData.fire_extinguisher_locations}`);
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        vendor_access_code: vendorAccessCode,
+        access_instructions: accessInstructions,
+        parking_instructions: onboardingData?.parking_instructions || "",
+        pets_on_property: petsInfo,
+        utility_shutoff_notes: utilityParts.join(" | "),
+        safety_notes: safetyParts.join(" | "),
+      }));
+    }
+  }, [propertyAccessData]);
+
+  // Auto-populate current occupant
+  useEffect(() => {
+    if (currentOccupant) {
+      setFormData(prev => ({
+        ...prev,
+        tenant_contact_name: currentOccupant.name || "",
+        tenant_contact_phone: currentOccupant.phone || "",
+      }));
+    }
+  }, [currentOccupant]);
 
   // Fetch all vendors
   const { data: vendors = [] } = useQuery({
@@ -273,6 +435,14 @@ const CreateWorkOrderDialog = ({
           voice_message_url: voiceMessageUrl,
           voice_message_transcript: voiceTranscript,
           video_url: videoUrl,
+          // Site access fields
+          vendor_access_code: formData.vendor_access_code || null,
+          tenant_contact_name: formData.tenant_contact_name || null,
+          tenant_contact_phone: formData.tenant_contact_phone || null,
+          pets_on_property: formData.pets_on_property || null,
+          parking_instructions: formData.parking_instructions || null,
+          utility_shutoff_notes: formData.utility_shutoff_notes || null,
+          safety_notes: formData.safety_notes || null,
         })
         .select()
         .single();
@@ -354,6 +524,13 @@ const CreateWorkOrderDialog = ({
       access_instructions: "",
       estimated_cost: "",
       assigned_vendor_id: "",
+      vendor_access_code: "",
+      tenant_contact_name: "",
+      tenant_contact_phone: "",
+      pets_on_property: "",
+      parking_instructions: "",
+      utility_shutoff_notes: "",
+      safety_notes: "",
     });
     setNotifySms(true);
     setNotifyEmail(true);
@@ -403,6 +580,26 @@ const CreateWorkOrderDialog = ({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Current Occupant Banner */}
+          {currentOccupant && (
+            <div className="p-3 bg-accent/50 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                <span className="font-medium text-foreground">Current Occupant</span>
+                <Badge variant="secondary" className="text-xs">
+                  {currentOccupant.type === "mid_term" ? "Mid-Term" : "Short-Term"}
+                </Badge>
+              </div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{currentOccupant.name}</span>
+                {currentOccupant.phone && <span className="ml-2">• {currentOccupant.phone}</span>}
+                <span className="ml-2">
+                  ({currentOccupant.checkIn} → {currentOccupant.checkOut})
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Title */}
           <div className="space-y-2">
@@ -556,6 +753,119 @@ const CreateWorkOrderDialog = ({
             )}
           </div>
 
+          {/* Site Access & Safety Section */}
+          <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Key className="h-4 w-4 text-primary" />
+              <Label className="text-base">Site Access & Safety</Label>
+              {propertyAccessData && (
+                <Badge variant="secondary" className="text-xs">Auto-filled from onboarding</Badge>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="vendor_access_code" className="text-sm font-normal flex items-center gap-1">
+                  <Key className="h-3 w-3" />
+                  Vendor Access Code
+                </Label>
+                <Input
+                  id="vendor_access_code"
+                  value={formData.vendor_access_code}
+                  onChange={(e) => setFormData({ ...formData, vendor_access_code: e.target.value })}
+                  placeholder="Smart lock / lockbox code"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="access_instructions" className="text-sm font-normal">Access Instructions</Label>
+                <Input
+                  id="access_instructions"
+                  value={formData.access_instructions}
+                  onChange={(e) => setFormData({ ...formData, access_instructions: e.target.value })}
+                  placeholder="Gate: 1234 | Alarm: 5678"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="tenant_contact_name" className="text-sm font-normal flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  Tenant/Guest Name
+                </Label>
+                <Input
+                  id="tenant_contact_name"
+                  value={formData.tenant_contact_name}
+                  onChange={(e) => setFormData({ ...formData, tenant_contact_name: e.target.value })}
+                  placeholder="Current occupant name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tenant_contact_phone" className="text-sm font-normal flex items-center gap-1">
+                  <Phone className="h-3 w-3" />
+                  Tenant/Guest Phone
+                </Label>
+                <Input
+                  id="tenant_contact_phone"
+                  value={formData.tenant_contact_phone}
+                  onChange={(e) => setFormData({ ...formData, tenant_contact_phone: e.target.value })}
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="parking_instructions" className="text-sm font-normal flex items-center gap-1">
+                  <Car className="h-3 w-3" />
+                  Parking Instructions
+                </Label>
+                <Input
+                  id="parking_instructions"
+                  value={formData.parking_instructions}
+                  onChange={(e) => setFormData({ ...formData, parking_instructions: e.target.value })}
+                  placeholder="Where vendor should park"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pets_on_property" className="text-sm font-normal flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Pets on Property
+                </Label>
+                <Input
+                  id="pets_on_property"
+                  value={formData.pets_on_property}
+                  onChange={(e) => setFormData({ ...formData, pets_on_property: e.target.value })}
+                  placeholder="Dog, cat, etc."
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="utility_shutoff_notes" className="text-sm font-normal flex items-center gap-1">
+                  <Shield className="h-3 w-3" />
+                  Utility Shutoffs
+                </Label>
+                <Input
+                  id="utility_shutoff_notes"
+                  value={formData.utility_shutoff_notes}
+                  onChange={(e) => setFormData({ ...formData, utility_shutoff_notes: e.target.value })}
+                  placeholder="Water, gas, breaker locations"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="safety_notes" className="text-sm font-normal">Safety Notes</Label>
+                <Input
+                  id="safety_notes"
+                  value={formData.safety_notes}
+                  onChange={(e) => setFormData({ ...formData, safety_notes: e.target.value })}
+                  placeholder="Security system, fire extinguisher"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Source */}
           <div className="space-y-2">
             <Label>Source</Label>
@@ -611,27 +921,17 @@ const CreateWorkOrderDialog = ({
             </div>
           </div>
 
-          {/* Additional Fields */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="estimated_cost">Estimated Cost ($)</Label>
-              <Input
-                id="estimated_cost"
-                type="number"
-                value={formData.estimated_cost}
-                onChange={(e) => setFormData({ ...formData, estimated_cost: e.target.value })}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="access_instructions">Access Instructions</Label>
-              <Input
-                id="access_instructions"
-                value={formData.access_instructions}
-                onChange={(e) => setFormData({ ...formData, access_instructions: e.target.value })}
-                placeholder="Lockbox code, gate code, etc."
-              />
-            </div>
+          {/* Estimated Cost */}
+          <div className="space-y-2">
+            <Label htmlFor="estimated_cost">Estimated Cost ($)</Label>
+            <Input
+              id="estimated_cost"
+              type="number"
+              value={formData.estimated_cost}
+              onChange={(e) => setFormData({ ...formData, estimated_cost: e.target.value })}
+              placeholder="0.00"
+              className="max-w-[200px]"
+            />
           </div>
 
           {/* Vendor Assignment (Optional) */}
