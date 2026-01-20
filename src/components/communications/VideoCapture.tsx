@@ -193,11 +193,29 @@ export function VideoCapture({
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       const videoDuration = videoRef.current.duration;
-      setDuration(videoDuration);
-
-      // Check if video exceeds max duration
-      if (videoDuration > maxDuration) {
-        setUploadError(`Video is too long. Maximum duration is ${Math.floor(maxDuration / 60)} minutes.`);
+      
+      // For recorded videos (webm), duration may be Infinity initially
+      // Only validate if we have a valid finite duration
+      if (isFinite(videoDuration) && !isNaN(videoDuration) && videoDuration > 0) {
+        setDuration(videoDuration);
+        
+        // Check if video exceeds max duration
+        if (videoDuration > maxDuration) {
+          setUploadError(`Video is too long. Maximum duration is ${Math.floor(maxDuration / 60)} minutes.`);
+        }
+      } else {
+        // For recorded videos, use the recording time as duration estimate
+        // The recordingTime state tracks how long the user recorded
+        if (recordingTime > 0) {
+          setDuration(recordingTime);
+        } else {
+          // Fallback: try to get duration when video can play through
+          videoRef.current.addEventListener('durationchange', () => {
+            if (videoRef.current && isFinite(videoRef.current.duration)) {
+              setDuration(videoRef.current.duration);
+            }
+          }, { once: true });
+        }
       }
     }
   };
