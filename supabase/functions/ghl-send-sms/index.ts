@@ -141,8 +141,9 @@ serve(async (req) => {
           },
           body: new URLSearchParams({
             To: formattedPhone,
-            // Use vendor number for Twilio fallback (vendors only go through fallback)
-            From: "+14045741740",
+            // Twilio fallback MUST use Twilio-owned number (A2P registered)
+            // GHL numbers (+14045741740, +14046090955) are NOT in Twilio account
+            From: "+14049915076",
             Body: message,
           }).toString(),
         }
