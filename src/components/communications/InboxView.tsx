@@ -132,6 +132,8 @@ interface CommunicationItem {
   is_resolved?: boolean;
   owner_id?: string;
   property_name?: string;
+  // Lead ID for consistent grouping
+  lead_id?: string;
   // New Inbox Zero fields
   priority?: ConversationPriority;
   conversation_status?: ConversationStatusType;
@@ -1150,6 +1152,7 @@ export function InboxView() {
               status: comm.status || undefined,
               media_urls: Array.isArray(comm.media_urls) ? comm.media_urls as string[] : undefined,
               ghl_contact_id: (comm as any).ghl_contact_id || undefined,
+              lead_id: comm.lead_id || undefined,
             };
 
             if (search) {
@@ -2195,10 +2198,13 @@ export function InboxView() {
     
     // Add SMS/Call communications
     for (const comm of filteredComms) {
-      // Create unique key based on: lead_id (most reliable), then phone, then email, then id
-      // For leads, use lead_id as primary key to ensure all comms for same lead are grouped
+      // Create unique key - ALWAYS prioritize lead_id for consistent grouping
+      // This ensures all communications for the same lead are grouped together
       let key: string;
-      if (comm.contact_type === "lead" && comm.contact_id) {
+      if (comm.lead_id) {
+        // Use lead_id as primary grouping key - this is the most reliable
+        key = `lead:${comm.lead_id}`;
+      } else if (comm.contact_type === "lead" && comm.contact_id) {
         key = `lead:${comm.contact_id}`;
       } else if (comm.contact_type === "owner" && comm.owner_id) {
         key = `owner:${comm.owner_id}`;
@@ -2352,12 +2358,15 @@ export function InboxView() {
     
     const filteredComms = enhancedCommunications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
     
-    // First, group by contact - use lead_id/owner_id for reliability, then phone, then email
+    // First, group by contact - ALWAYS prioritize lead_id for consistent grouping
     const contactMap = new Map<string, CommunicationItem[]>();
     for (const comm of filteredComms) {
-      // Create unique key - prioritize lead_id/owner_id for consistent grouping
+      // Create unique key - ALWAYS prioritize lead_id for consistent grouping
       let key: string;
-      if (comm.contact_type === "lead" && comm.contact_id) {
+      if (comm.lead_id) {
+        // Use lead_id as primary grouping key - this is the most reliable
+        key = `lead:${comm.lead_id}`;
+      } else if (comm.contact_type === "lead" && comm.contact_id) {
         key = `lead:${comm.contact_id}`;
       } else if (comm.contact_type === "owner" && comm.owner_id) {
         key = `owner:${comm.owner_id}`;
