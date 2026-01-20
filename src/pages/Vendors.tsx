@@ -72,10 +72,10 @@ const Vendors = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("work_orders")
-        .select("id, title, status, urgency, category, quoted_cost, created_at, property:properties(name, address), assigned_vendor:vendors(name, company_name)")
+        .select("id, title, status, urgency, category, quoted_cost, created_at, property:properties(name, address), assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(name, company_name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
@@ -255,11 +255,11 @@ const Vendors = () => {
       <AddVendorDialog open={showAddDialog} onOpenChange={setShowAddDialog} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ["vendors"] }); setShowAddDialog(false); }} />
       <ServiceSignupDialog open={showServiceSignupDialog} onOpenChange={setShowServiceSignupDialog} />
       {selectedVendor && <VendorDetailModal open={!!selectedVendor} onOpenChange={(open) => !open && setSelectedVendor(null)} vendor={selectedVendor} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["vendors"] })} />}
-      {callDialogVendor && <CallDialog open={!!callDialogVendor} onOpenChange={(open) => !open && setCallDialogVendor(null)} recipientName={callDialogVendor.name} recipientPhone={callDialogVendor.phone} />}
-      {smsDialogVendor && <SendSMSDialog open={!!smsDialogVendor} onOpenChange={(open) => !open && setSmsDialogVendor(null)} recipientName={smsDialogVendor.name} recipientPhone={smsDialogVendor.phone} vendorId={smsDialogVendor.id} />}
-      {deleteVendor && <DeleteVendorDialog open={!!deleteVendor} onOpenChange={(open) => !open && setDeleteVendor(null)} vendor={deleteVendor} onConfirm={handleDeleteVendor} isDeleting={isDeleting} />}
+      {callDialogVendor && <CallDialog open={!!callDialogVendor} onOpenChange={(open) => !open && setCallDialogVendor(null)} contactName={callDialogVendor.name} contactPhone={callDialogVendor.phone} contactType="vendor" />}
+      {smsDialogVendor && <SendSMSDialog open={!!smsDialogVendor} onOpenChange={(open) => !open && setSmsDialogVendor(null)} contactName={smsDialogVendor.name} contactPhone={smsDialogVendor.phone} contactType="vendor" contactId={smsDialogVendor.id} />}
+      {deleteVendor && <DeleteVendorDialog open={!!deleteVendor} onOpenChange={(open) => !open && setDeleteVendor(null)} vendorName={deleteVendor.name} onConfirm={handleDeleteVendor} isDeleting={isDeleting} />}
       <StartWorkOrderDialog open={showStartWorkOrder} onOpenChange={setShowStartWorkOrder} onSuccess={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />
-      {selectedWorkOrder && <WorkOrderDetailModal workOrderId={selectedWorkOrder.id} open={!!selectedWorkOrder} onOpenChange={(open) => !open && setSelectedWorkOrder(null)} />}
+      {selectedWorkOrder && <WorkOrderDetailModal workOrder={selectedWorkOrder as any} open={!!selectedWorkOrder} onOpenChange={(open) => !open && setSelectedWorkOrder(null)} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />}
     </>
   );
 };
