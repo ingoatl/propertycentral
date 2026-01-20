@@ -6709,31 +6709,37 @@ export type Database = {
       profiles: {
         Row: {
           assigned_phone_number: string | null
+          avatar_url: string | null
           created_at: string
           email: string
           first_name: string | null
           id: string
           is_admin: boolean
+          job_title: string | null
           status: Database["public"]["Enums"]["account_status"]
           updated_at: string
         }
         Insert: {
           assigned_phone_number?: string | null
+          avatar_url?: string | null
           created_at?: string
           email: string
           first_name?: string | null
           id: string
           is_admin?: boolean
+          job_title?: string | null
           status?: Database["public"]["Enums"]["account_status"]
           updated_at?: string
         }
         Update: {
           assigned_phone_number?: string | null
+          avatar_url?: string | null
           created_at?: string
           email?: string
           first_name?: string | null
           id?: string
           is_admin?: boolean
+          job_title?: string | null
           status?: Database["public"]["Enums"]["account_status"]
           updated_at?: string
         }
@@ -8578,6 +8584,7 @@ export type Database = {
       }
       team_messages: {
         Row: {
+          attachments: Json | null
           channel_id: string
           content: string
           created_at: string | null
@@ -8588,6 +8595,7 @@ export type Database = {
           is_edited: boolean | null
           is_pinned: boolean | null
           lead_id: string | null
+          mentions: string[] | null
           message_type: string | null
           owner_id: string | null
           parent_message_id: string | null
@@ -8597,6 +8605,7 @@ export type Database = {
           work_order_id: string | null
         }
         Insert: {
+          attachments?: Json | null
           channel_id: string
           content: string
           created_at?: string | null
@@ -8607,6 +8616,7 @@ export type Database = {
           is_edited?: boolean | null
           is_pinned?: boolean | null
           lead_id?: string | null
+          mentions?: string[] | null
           message_type?: string | null
           owner_id?: string | null
           parent_message_id?: string | null
@@ -8616,6 +8626,7 @@ export type Database = {
           work_order_id?: string | null
         }
         Update: {
+          attachments?: Json | null
           channel_id?: string
           content?: string
           created_at?: string | null
@@ -8626,6 +8637,7 @@ export type Database = {
           is_edited?: boolean | null
           is_pinned?: boolean | null
           lead_id?: string | null
+          mentions?: string[] | null
           message_type?: string | null
           owner_id?: string | null
           parent_message_id?: string | null

@@ -11,12 +11,13 @@ import {
   useMarkChannelRead 
 } from '@/hooks/useTeamHub';
 import { ChannelSidebar } from '@/components/team-hub/ChannelSidebar';
-import { MessageThread } from '@/components/team-hub/MessageThread';
-import { MessageComposer } from '@/components/team-hub/MessageComposer';
+import { SlackStyleMessageThread } from '@/components/team-hub/SlackStyleMessageThread';
+import { EnhancedMessageComposer } from '@/components/team-hub/EnhancedMessageComposer';
 import { PresencePanel } from '@/components/team-hub/PresencePanel';
 import { NotificationBell } from '@/components/team-hub/NotificationBell';
 import { NotificationPreferencesPanel } from '@/components/team-hub/NotificationPreferencesPanel';
 import { TeamHubAdmin } from '@/components/team-hub/TeamHubAdmin';
+import { ProfileAvatarUpload } from '@/components/team-hub/ProfileAvatarUpload';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -218,7 +219,13 @@ export default function TeamHub() {
                   <TabsContent value="admin" className="mt-4">
                     <TeamHubAdmin />
                   </TabsContent>
-                  <TabsContent value="status" className="mt-4 space-y-4">
+                  <TabsContent value="status" className="mt-4 space-y-6">
+                    {/* Profile Picture Upload */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium">Your Profile Picture</h4>
+                      <ProfileAvatarUpload size="lg" />
+                    </div>
+                    
                     <div className="space-y-2">
                       <h4 className="font-medium">Set Your Status</h4>
                       <div className="grid grid-cols-3 gap-2">
@@ -248,16 +255,16 @@ export default function TeamHub() {
           </div>
         </div>
 
-        {/* Messages */}
-        <MessageThread
+        {/* Messages - Slack Style */}
+        <SlackStyleMessageThread
           messages={messages}
           currentUserId={user?.id || null}
           isLoading={messagesLoading}
         />
 
-        {/* Composer */}
+        {/* Enhanced Composer with emoji, files, @mentions */}
         {selectedChannelId && (
-          <MessageComposer
+          <EnhancedMessageComposer
             onSend={handleSendMessage}
             isLoading={sendMessage.isPending}
             channelName={selectedChannel?.name}
