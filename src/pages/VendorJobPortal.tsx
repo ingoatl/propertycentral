@@ -730,11 +730,11 @@ const VendorJobPortal = () => {
                 </div>
               )}
 
-              {/* Tenant Contact */}
+              {/* Tenant/Guest Contact */}
               {(workOrder.tenant_contact_name || workOrder.tenant_contact_phone) && (
                 <div className="p-3 bg-muted rounded border">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <Phone className="h-3 w-3" />On-Site Contact
+                    <Phone className="h-3 w-3" />Current Guest/Tenant
                   </p>
                   <div className="flex items-center justify-between">
                     <div>
