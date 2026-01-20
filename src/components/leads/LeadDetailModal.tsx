@@ -55,6 +55,7 @@ import DirectCallButton from "./DirectCallButton";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDialog";
 import { SendStripeAuthButton } from "./SendStripeAuthButton";
+import { SendPaymentLinkButton } from "./SendPaymentLinkButton";
 import { MeetingsDialog } from "@/components/communications/MeetingsDialog";
 import { ExpandableMessageInput } from "@/components/communications/ExpandableMessageInput";
 import { UnifiedConversationThread } from "@/components/communications/UnifiedConversationThread";
@@ -774,6 +775,13 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             name={lead.name}
             propertyAddress={lead.property_address}
             stage={lead.stage}
+          />
+
+          <SendPaymentLinkButton
+            leadId={lead.id}
+            email={lead.email}
+            phone={lead.phone}
+            name={lead.name}
           />
         </div>
 
