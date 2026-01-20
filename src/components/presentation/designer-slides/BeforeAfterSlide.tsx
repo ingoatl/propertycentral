@@ -1,21 +1,13 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Import before/after images - mapped exactly from PDF:
-// Page 2: Whitehurst (img_p1_1=before, img_p1_2=after, etc.)
-// Page 1 attachments: Southvale, Justice, Lakewood pairs
-import whitehurstBefore from "@/assets/designer/whitehurst-b1.jpg";
-import whitehurstAfter from "@/assets/designer/whitehurst-a1.jpg";
-import southvaleBefore from "@/assets/designer/southvale-b.jpg";
-import southvaleAfter from "@/assets/designer/southvale-a.jpg";
-import justiceBefore from "@/assets/designer/justice-b.jpg";
-import justiceAfter from "@/assets/designer/justice-a.jpg";
-import lakewoodBefore from "@/assets/designer/lakewood-b.jpg";
-import lakewoodAfter from "@/assets/designer/lakewood-a.jpg";
-import brushyBefore from "@/assets/designer/brushy-before.jpg";
-import brushyAfter from "@/assets/designer/brushy-after.jpg";
-import tolaniBefore from "@/assets/designer/tolani-before.jpg";
-import tolaniAfter from "@/assets/designer/tolani-after.jpg";
+// Import combined before/after pair images from user uploads
+import whitehurstPair from "@/assets/designer/whitehurst-pair1.png";
+import southvalePair from "@/assets/designer/southvale-pair.png";
+import justicePair from "@/assets/designer/justice-pair.png";
+import lakewoodPair from "@/assets/designer/lakewood-pair.png";
+import brushyPair from "@/assets/designer/brushy-pair.png";
+import tolaniPair from "@/assets/designer/tolani-pair.png";
 
 interface CaseStudy {
   name: string;
@@ -24,8 +16,7 @@ interface CaseStudy {
   year: string;
   airbnbUrl: string;
   airbnbShortUrl?: string;
-  beforeImage: string;
-  afterImage: string;
+  pairImage: string;
   highlights?: string[];
 }
 
@@ -38,8 +29,7 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2025",
     airbnbUrl: "https://airbnb.com/h/designermarietta",
     airbnbShortUrl: "airbnb.com/h/designermarietta",
-    beforeImage: whitehurstBefore,
-    afterImage: whitehurstAfter,
+    pairImage: whitehurstPair,
     highlights: ["Full home transformation", "Premium furnishings", "Designer touches"],
   },
   southvale: {
@@ -47,8 +37,7 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$35K",
     year: "2025",
     airbnbUrl: "https://www.airbnb.com/rooms/1394277589009252467",
-    beforeImage: southvaleBefore,
-    afterImage: southvaleAfter,
+    pairImage: southvalePair,
     highlights: ["Modern aesthetic", "Cohesive design", "Guest-focused amenities"],
   },
   justice: {
@@ -56,8 +45,7 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$25K",
     year: "2025",
     airbnbUrl: "https://www.airbnb.com/rooms/1395677657124996447",
-    beforeImage: justiceBefore,
-    afterImage: justiceAfter,
+    pairImage: justicePair,
     highlights: ["Complete makeover", "Green accent wall", "High-end finishes"],
   },
   lakewood: {
@@ -65,8 +53,7 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$23K",
     year: "2024",
     airbnbUrl: "https://www.airbnb.com/rooms/1399393314185549107",
-    beforeImage: lakewoodBefore,
-    afterImage: lakewoodAfter,
+    pairImage: lakewoodPair,
     highlights: ["Warm tones", "Cozy atmosphere", "Functional layout"],
   },
   brushy: {
@@ -74,8 +61,7 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$23K",
     year: "2024",
     airbnbUrl: "https://www.airbnb.com/rooms/1108098053080240369",
-    beforeImage: brushyBefore,
-    afterImage: brushyAfter,
+    pairImage: brushyPair,
     highlights: ["Natural elements", "Inviting spaces", "Photo-ready rooms"],
   },
   tolani: {
@@ -83,8 +69,7 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$20K",
     year: "2023",
     airbnbUrl: "https://www.airbnb.com/rooms/1066144648492952003",
-    beforeImage: tolaniBefore,
-    afterImage: tolaniAfter,
+    pairImage: tolaniPair,
     highlights: ["Budget-conscious", "High impact", "Thoughtful details"],
   },
 };
@@ -104,7 +89,7 @@ export function BeforeAfterSlide({ propertyKey }: BeforeAfterSlideProps) {
     <SlideLayout overlay="gradient">
       <div className="w-full max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8 lg:mb-10">
+        <div className="text-center mb-6 lg:mb-8">
           <p className="text-amber-400 uppercase tracking-widest text-base lg:text-lg mb-3">Case Study</p>
           <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4">
             {property.name}
@@ -114,31 +99,21 @@ export function BeforeAfterSlide({ propertyKey }: BeforeAfterSlideProps) {
           </h2>
         </div>
 
-        {/* Before/After Comparison - Side by Side */}
-        <div className="grid md:grid-cols-2 gap-6 lg:gap-8 mb-8">
-          {/* Before */}
-          <div className="relative group">
-            <div className="absolute top-4 left-4 z-10 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-full">
-              <span className="text-white font-semibold text-lg">BEFORE</span>
-            </div>
-            <img
-              src={property.beforeImage}
-              alt={`${property.name} Before`}
-              className="w-full h-64 md:h-72 lg:h-80 object-cover rounded-2xl border border-white/10"
-            />
+        {/* Combined Before/After Image with Labels */}
+        <div className="relative mb-8">
+          {/* Before Label - Left Side */}
+          <div className="absolute top-4 left-4 z-10 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-full">
+            <span className="text-white font-semibold text-lg">BEFORE</span>
           </div>
-
-          {/* After */}
-          <div className="relative group">
-            <div className="absolute top-4 left-4 z-10 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 rounded-full">
-              <span className="text-white font-semibold text-lg">AFTER</span>
-            </div>
-            <img
-              src={property.afterImage}
-              alt={`${property.name} After`}
-              className="w-full h-64 md:h-72 lg:h-80 object-cover rounded-2xl border border-amber-400/30"
-            />
+          {/* After Label - Right Side */}
+          <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 rounded-full">
+            <span className="text-white font-semibold text-lg">AFTER</span>
           </div>
+          <img
+            src={property.pairImage}
+            alt={`${property.name} Before and After`}
+            className="w-full h-auto max-h-[50vh] object-contain rounded-2xl border border-white/10"
+          />
         </div>
 
         {/* Info Cards */}
