@@ -1071,23 +1071,58 @@ const VendorJobPortal = () => {
               <Separator className="my-4" />
               
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-background rounded border text-left">
-                  <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-sm text-foreground">Get Paid</p>
-                    <p className="text-xs text-muted-foreground">
-                      Get paid fast by using Bill.com
-                    </p>
-                  </div>
-                </div>
-                <Button 
-                  className="w-full bg-primary hover:bg-primary/90" 
-                  onClick={() => setShowGetPaidModal(true)}
-                >
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Get Paid
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                {workOrder.assigned_vendor?.billcom_vendor_id ? (
+                  <>
+                    {/* Connected vendor - show direct Bill.com access */}
+                    <div className="flex items-center gap-3 p-3 bg-green-50 rounded border border-green-200 text-left">
+                      <Building2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-sm text-green-900">Bill.com Connected</p>
+                        <p className="text-xs text-green-700">
+                          Submit your invoice with ref: WO-{workOrder.id.slice(0, 8).toUpperCase()}
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full bg-neutral-900 hover:bg-neutral-800 text-white" 
+                      asChild
+                    >
+                      <a href="https://app.bill.com" target="_blank" rel="noopener noreferrer">
+                        <Building2 className="h-4 w-4 mr-2" />
+                        Open Bill.com
+                        <ExternalLink className="h-4 w-4 ml-2" />
+                      </a>
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="w-full" 
+                      onClick={() => setShowGetPaidModal(true)}
+                    >
+                      View Invoice Details
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {/* Non-connected vendor - encourage Bill.com enrollment */}
+                    <div className="flex items-center gap-3 p-3 bg-amber-50 rounded border border-amber-200 text-left">
+                      <FileText className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-sm text-amber-900">Get Paid Faster</p>
+                        <p className="text-xs text-amber-700">
+                          Join Bill.com for direct deposit payments
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full bg-primary hover:bg-primary/90" 
+                      onClick={() => setShowGetPaidModal(true)}
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Get Paid
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
