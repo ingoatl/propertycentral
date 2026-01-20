@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen, Eye, FileSpreadsheet, X } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen, Eye, FileSpreadsheet, X, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
+import { MaintenanceBookTab } from "@/components/properties/MaintenanceBookTab";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { ModalSkeleton } from "@/components/ui/modal-skeleton";
@@ -769,14 +770,18 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
             <ModalSkeleton variant="property-details" />
            ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-              <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+              <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
                 <TabsTrigger value="details" className="flex items-center gap-2">
                   <Home className="h-4 w-4" />
                   Details
                 </TabsTrigger>
+                <TabsTrigger value="maintenance" className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4" />
+                  Maintenance
+                </TabsTrigger>
                 <TabsTrigger value="documents" className="flex items-center gap-2">
                   <FolderOpen className="h-4 w-4" />
-                  Documents
+                  Docs
                   {propertyDocuments.length > 0 && (
                     <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
                       {propertyDocuments.length}
@@ -1795,6 +1800,17 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                 )}
                   </div>
                 </ScrollArea>
+              </TabsContent>
+              
+              {/* Maintenance Book Tab */}
+              <TabsContent value="maintenance" className="flex-1 min-h-0 mt-4">
+                {propertyId ? (
+                  <MaintenanceBookTab propertyId={propertyId} />
+                ) : (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    No property selected
+                  </div>
+                )}
               </TabsContent>
               
               <TabsContent value="documents" className="flex-1 min-h-0 mt-4">

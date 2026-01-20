@@ -94,21 +94,14 @@ const CreateWorkOrderDialog = ({
     },
   });
 
-  // Fetch property access data when property is selected
-  const { data: propertyAccessData, isLoading: accessDataLoading } = useQuery({
-    queryKey: ["property-access-data", formData.property_id],
+  // Fetch property access data from onboarding submissions only
+  const { data: onboardingData, isLoading: accessDataLoading } = useQuery({
+    queryKey: ["property-onboarding-access", formData.property_id],
     queryFn: async () => {
       if (!formData.property_id) return null;
       
-      // Fetch from property_maintenance_book
-      const { data: maintenanceBook } = await supabase
-        .from("property_maintenance_book")
-        .select("*")
-        .eq("property_id", formData.property_id)
-        .maybeSingle();
-      
-      // Fetch from owner_onboarding_submissions via property
-      const { data: onboardingData } = await supabase
+      // Fetch from owner_onboarding_submissions via property_id
+      const { data } = await supabase
         .from("owner_onboarding_submissions")
         .select("*")
         .eq("property_id", formData.property_id)
@@ -116,19 +109,18 @@ const CreateWorkOrderDialog = ({
         .limit(1)
         .maybeSingle();
       
-      return { maintenanceBook, onboardingData };
+      return data;
     },
     enabled: !!formData.property_id,
   });
 
-  // Check if we have any access data
-  const hasAccessData = propertyAccessData && (
-    propertyAccessData.maintenanceBook?.vendor_access_code ||
-    propertyAccessData.maintenanceBook?.lockbox_code ||
-    propertyAccessData.maintenanceBook?.gate_code ||
-    propertyAccessData.onboardingData?.smart_lock_code ||
-    propertyAccessData.onboardingData?.lockbox_code ||
-    propertyAccessData.onboardingData?.gate_code
+  // Check if we have any access data from onboarding
+  const hasAccessData = onboardingData && (
+    onboardingData.smart_lock_code ||
+    onboardingData.lockbox_code ||
+    onboardingData.gate_code ||
+    onboardingData.vendor_access_code ||
+    onboardingData.alarm_code
   );
 
   // Fetch current occupant from bookings
@@ -190,21 +182,19 @@ const CreateWorkOrderDialog = ({
     enabled: !!formData.property_id,
   });
 
-  // Auto-populate access data when property changes
+  // Auto-populate access data from onboarding when property changes
   useEffect(() => {
-    if (propertyAccessData) {
-      const { maintenanceBook, onboardingData } = propertyAccessData;
-      
+    if (onboardingData) {
       // Build access instructions from available codes
       const accessParts: string[] = [];
       
-      // Priority: maintenance book > onboarding data
-      const vendorAccessCode = maintenanceBook?.vendor_access_code || onboardingData?.smart_lock_code || onboardingData?.lockbox_code || "";
-      const gateCode = maintenanceBook?.gate_code || onboardingData?.gate_code || "";
-      const alarmCode = maintenanceBook?.alarm_code || onboardingData?.alarm_code || "";
-      const lockboxCode = maintenanceBook?.lockbox_code || onboardingData?.lockbox_code || "";
-      const garageCode = onboardingData?.garage_code || "";
-      const smartLockBrand = onboardingData?.smart_lock_brand || "";
+      // Priority: vendor_access_code > smart_lock_code > lockbox_code
+      const vendorAccessCode = onboardingData.vendor_access_code || onboardingData.smart_lock_code || onboardingData.lockbox_code || "";
+      const gateCode = onboardingData.gate_code || "";
+      const alarmCode = onboardingData.alarm_code || "";
+      const lockboxCode = onboardingData.lockbox_code || "";
+      const garageCode = onboardingData.garage_code || "";
+      const smartLockBrand = onboardingData.smart_lock_brand || "";
       
       // Build comprehensive access instructions
       if (smartLockBrand && vendorAccessCode) {
@@ -217,30 +207,29 @@ const CreateWorkOrderDialog = ({
       if (garageCode) accessParts.push(`🏠 Garage: ${garageCode}`);
       if (alarmCode) accessParts.push(`🚨 Alarm: ${alarmCode}`);
       
-      const accessInstructions = maintenanceBook?.access_instructions || 
-        (accessParts.length > 0 ? accessParts.join(" | ") : "");
+      const accessInstructions = accessParts.length > 0 ? accessParts.join(" | ") : "";
       
       // Build pets info
       let petsInfo = "";
-      if (onboardingData?.pets_allowed) {
+      if (onboardingData.pets_allowed) {
         petsInfo = "Pets allowed";
-        if (onboardingData?.pet_size_restrictions) {
+        if (onboardingData.pet_size_restrictions) {
           petsInfo += ` (${onboardingData.pet_size_restrictions})`;
         }
       }
       
       // Build utility shutoff notes
       const utilityParts: string[] = [];
-      if (onboardingData?.water_shutoff_location) utilityParts.push(`Water: ${onboardingData.water_shutoff_location}`);
-      if (onboardingData?.breaker_panel_location) utilityParts.push(`Breaker: ${onboardingData.breaker_panel_location}`);
-      if (onboardingData?.gas_shutoff_location) utilityParts.push(`Gas: ${onboardingData.gas_shutoff_location}`);
+      if (onboardingData.water_shutoff_location) utilityParts.push(`Water: ${onboardingData.water_shutoff_location}`);
+      if (onboardingData.breaker_panel_location) utilityParts.push(`Breaker: ${onboardingData.breaker_panel_location}`);
+      if (onboardingData.gas_shutoff_location) utilityParts.push(`Gas: ${onboardingData.gas_shutoff_location}`);
       
       // Build safety notes
       const safetyParts: string[] = [];
-      if (onboardingData?.has_security_system && onboardingData?.security_brand) {
+      if (onboardingData.has_security_system && onboardingData.security_brand) {
         safetyParts.push(`Security: ${onboardingData.security_brand}`);
       }
-      if (onboardingData?.fire_extinguisher_locations) {
+      if (onboardingData.fire_extinguisher_locations) {
         safetyParts.push(`Fire ext: ${onboardingData.fire_extinguisher_locations}`);
       }
       
@@ -248,13 +237,13 @@ const CreateWorkOrderDialog = ({
         ...prev,
         vendor_access_code: vendorAccessCode,
         access_instructions: accessInstructions,
-        parking_instructions: onboardingData?.parking_instructions || "",
+        parking_instructions: onboardingData.parking_instructions || "",
         pets_on_property: petsInfo,
         utility_shutoff_notes: utilityParts.join(" | "),
         safety_notes: safetyParts.join(" | "),
       }));
     }
-  }, [propertyAccessData]);
+  }, [onboardingData]);
 
   // Auto-populate current occupant
   useEffect(() => {
@@ -799,11 +788,11 @@ const CreateWorkOrderDialog = ({
             </div>
 
             {/* Smart Lock Info Banner */}
-            {propertyAccessData?.onboardingData?.smart_lock_brand && (
+            {onboardingData?.smart_lock_brand && (
               <div className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg">
                 <Key className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium text-primary">
-                  Smart Lock: {propertyAccessData.onboardingData.smart_lock_brand}
+                  Smart Lock: {onboardingData.smart_lock_brand}
                 </span>
               </div>
             )}
