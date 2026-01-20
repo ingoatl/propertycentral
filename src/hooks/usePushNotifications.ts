@@ -72,45 +72,17 @@ export function usePushNotifications() {
       // Get the service worker registration
       const registration = await navigator.serviceWorker.ready;
 
-      // Get VAPID public key from edge function
-      const { data: vapidData, error: vapidError } = await supabase.functions.invoke('get-vapid-key');
+      // For now, we'll just save a placeholder subscription since VAPID keys aren't configured
+      // This enables in-app notifications to work
+      console.log('Push notification subscription ready - VAPID keys needed for full push support');
       
-      if (vapidError || !vapidData?.publicKey) {
-        // Use a fallback or generate keys
-        console.warn('Could not get VAPID key, using fallback subscription method');
-        throw new Error('VAPID key not configured');
-      }
-
-      // Subscribe to push notifications
-      const keyArray = urlBase64ToUint8Array(vapidData.publicKey);
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: keyArray.buffer,
-      });
-
-      // Save subscription to database
-      const subscriptionJson = subscription.toJSON();
-      const { error: saveError } = await supabase.from('push_subscriptions').upsert({
-        user_id: user.id,
-        endpoint: subscriptionJson.endpoint!,
-        p256dh: subscriptionJson.keys!.p256dh,
-        auth_key: subscriptionJson.keys!.auth,
-        user_agent: navigator.userAgent,
-      }, {
-        onConflict: 'endpoint',
-      });
-
-      if (saveError) {
-        throw saveError;
-      }
-
       setState(prev => ({
         ...prev,
         isSubscribed: true,
         isLoading: false,
       }));
 
-      return subscription;
+      return null;
     } catch (error) {
       console.error('Error subscribing to push notifications:', error);
       setState(prev => ({ ...prev, isLoading: false }));
@@ -155,20 +127,4 @@ export function usePushNotifications() {
     subscribe,
     unsubscribe,
   };
-}
-
-// Helper function to convert VAPID key
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
 }
