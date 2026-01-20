@@ -220,15 +220,27 @@ serve(async (req) => {
     // Build the player URL
     const playerUrl = `https://propertycentral.lovable.app/vm/${voicemail.token}`;
 
-    // Format phone number for GHL (E.164)
+    // Format phone number for GHL (E.164) with validation
     let formattedPhone = recipientPhone.replace(/\D/g, "");
+    
+    // Validate phone number - must be exactly 10 or 11 digits for US
+    if (formattedPhone.length > 11) {
+      console.error(`Invalid phone number - too many digits: ${formattedPhone} (${formattedPhone.length} digits)`);
+      // Truncate to first 10 digits (assuming area code + number)
+      formattedPhone = formattedPhone.substring(0, 10);
+      console.log(`Truncated to: ${formattedPhone}`);
+    }
+    
     if (formattedPhone.length === 10) {
       formattedPhone = "+1" + formattedPhone;
     } else if (formattedPhone.length === 11 && formattedPhone.startsWith("1")) {
       formattedPhone = "+" + formattedPhone;
-    } else if (!formattedPhone.startsWith("+")) {
-      formattedPhone = "+" + formattedPhone;
+    } else {
+      console.error(`Invalid phone number format: ${formattedPhone}`);
+      throw new Error(`Invalid phone number: must be 10 digits, got ${formattedPhone.length}`);
     }
+    
+    console.log(`Validated phone: ${recipientPhone} -> ${formattedPhone}`);
 
     // Send SMS via GoHighLevel (404-800-5932 number)
     const ghlApiKey = Deno.env.get("GHL_API_KEY");
