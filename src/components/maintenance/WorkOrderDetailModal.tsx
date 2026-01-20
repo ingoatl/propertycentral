@@ -313,12 +313,12 @@ const WorkOrderDetailModal = ({
 
   const getSenderBadgeColor = (type: string) => {
     switch (type) {
-      case 'owner': return 'bg-purple-100 text-purple-700';
-      case 'vendor': return 'bg-orange-100 text-orange-700';
-      case 'guest': return 'bg-blue-100 text-blue-700';
-      case 'ai': return 'bg-cyan-100 text-cyan-700';
-      case 'system': return 'bg-gray-100 text-gray-700';
-      default: return 'bg-green-100 text-green-700';
+      case 'owner': return 'bg-muted text-foreground border border-border';
+      case 'vendor': return 'bg-muted text-foreground border border-border';
+      case 'guest': return 'bg-muted text-foreground border border-border';
+      case 'ai': return 'bg-muted text-foreground border border-border';
+      case 'system': return 'bg-muted text-foreground border border-border';
+      default: return 'bg-muted text-foreground border border-border';
     }
   };
 
@@ -336,13 +336,15 @@ const WorkOrderDetailModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background">
+        <DialogHeader className="pb-4 border-b border-border">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{category?.icon}</span>
+              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                <Wrench className="h-5 w-5 text-foreground" />
+              </div>
               <div>
-                <DialogTitle className="text-xl">{workOrder.title}</DialogTitle>
+                <DialogTitle className="text-lg font-semibold text-foreground">{workOrder.title}</DialogTitle>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                   <MapPin className="h-3.5 w-3.5" />
                   {workOrder.property?.name || workOrder.property?.address}
@@ -351,12 +353,12 @@ const WorkOrderDetailModal = ({
             </div>
             <div className="flex gap-2">
               {statusConfig && (
-                <Badge className={`${statusConfig.bgColor} ${statusConfig.color}`}>
+                <Badge variant="outline" className="font-medium">
                   {statusConfig.label}
                 </Badge>
               )}
               {urgencyConfig && (
-                <Badge className={`${urgencyConfig.bgColor} ${urgencyConfig.color}`}>
+                <Badge variant="outline" className="font-medium">
                   {urgencyConfig.label}
                 </Badge>
               )}
@@ -376,20 +378,20 @@ const WorkOrderDetailModal = ({
           <TabsContent value="details" className="space-y-6 mt-4">
             <div className="grid grid-cols-2 gap-6">
               {/* Left Column */}
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
-                  <Label className="text-muted-foreground">Description</Label>
-                  <p className="mt-1">{workOrder.description || 'No description provided'}</p>
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</Label>
+                  <p className="mt-2 text-foreground">{workOrder.description || 'No description provided'}</p>
                 </div>
 
                 <div>
-                  <Label className="text-muted-foreground">Category</Label>
-                  <p className="mt-1">{category?.label || 'Unknown'}</p>
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</Label>
+                  <p className="mt-2 text-foreground">{category?.label || 'Unknown'}</p>
                 </div>
 
                 <div>
-                  <Label className="text-muted-foreground">Source</Label>
-                  <p className="mt-1 capitalize">{workOrder.source?.replace(/_/g, ' ') || 'Unknown'}</p>
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Source</Label>
+                  <p className="mt-2 capitalize text-foreground">{workOrder.source?.replace(/_/g, ' ') || 'Unknown'}</p>
                 </div>
 
                 {workOrder.reported_by && (
@@ -429,29 +431,29 @@ const WorkOrderDetailModal = ({
 
                 {workOrder.assigned_vendor && (
                   <div>
-                    <Label className="text-muted-foreground">Assigned Vendor</Label>
-                    <div className="mt-1 p-3 bg-muted rounded-lg">
-                      <p className="font-medium">{workOrder.assigned_vendor.name}</p>
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assigned Vendor</Label>
+                    <div className="mt-2 p-4 bg-muted/50 rounded-lg border border-border">
+                      <p className="font-semibold text-foreground">{workOrder.assigned_vendor.name}</p>
                       {workOrder.assigned_vendor.company_name && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground mt-0.5">
                           {workOrder.assigned_vendor.company_name}
                         </p>
                       )}
-                      <p className="text-sm mt-1 flex items-center gap-2">
-                        <Phone className="h-3.5 w-3.5" />
+                      <p className="text-sm mt-2 flex items-center gap-2 text-foreground">
+                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                         {workOrder.assigned_vendor.phone}
                       </p>
                       {/* Vendor Response Status */}
-                      <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
+                      <div className="mt-3 pt-3 border-t border-border space-y-2">
                         {workOrder.vendor_accepted === true && (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          <Badge variant="outline" className="text-foreground">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Confirmed
                           </Badge>
                         )}
                         {workOrder.vendor_accepted === false && (
                           <div>
-                            <Badge variant="destructive">Declined</Badge>
+                            <Badge variant="outline" className="text-foreground">Declined</Badge>
                             {workOrder.vendor_declined_reason && (
                               <p className="text-xs text-muted-foreground mt-1">
                                 {workOrder.vendor_declined_reason}
@@ -460,7 +462,7 @@ const WorkOrderDetailModal = ({
                           </div>
                         )}
                         {workOrder.vendor_accepted === null && (
-                          <Badge variant="outline" className="text-amber-700 border-amber-300">
+                          <Badge variant="outline" className="text-muted-foreground">
                             <Clock className="h-3 w-3 mr-1" />
                             Awaiting Response
                           </Badge>
@@ -519,18 +521,18 @@ const WorkOrderDetailModal = ({
 
                 {/* Owner Approval Status */}
                 {workOrder.status === "awaiting_approval" && (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-yellow-700 font-medium">
+                  <div className="p-4 bg-muted border border-border rounded-lg">
+                    <div className="flex items-center gap-2 text-foreground font-medium">
                       <AlertTriangle className="h-4 w-4" />
                       Awaiting Owner Approval
                     </div>
-                    <p className="text-sm text-yellow-600 mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                       Quote of ${workOrder.quoted_cost} requires owner authorization
                     </p>
                   </div>
                 )}
                 {workOrder.owner_approved === true && (
-                  <div className="flex items-center gap-2 text-green-600">
+                  <div className="flex items-center gap-2 text-foreground">
                     <CheckCircle className="h-4 w-4" />
                     <span className="text-sm font-medium">Owner Approved</span>
                     {workOrder.owner_approved_at && (
@@ -541,7 +543,7 @@ const WorkOrderDetailModal = ({
                   </div>
                 )}
                 {workOrder.owner_approved === false && (
-                  <div className="flex items-center gap-2 text-red-600">
+                  <div className="flex items-center gap-2 text-foreground">
                     <AlertTriangle className="h-4 w-4" />
                     <span className="text-sm font-medium">Owner Declined</span>
                   </div>

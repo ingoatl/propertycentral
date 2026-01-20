@@ -237,17 +237,31 @@ const Vendors = () => {
                     {vendor.emergency_available && <Badge variant="outline" className="text-xs border-red-200 text-red-600"><AlertTriangle className="h-3 w-3 mr-1" />24/7</Badge>}
                     {vendor.insurance_verified && <Badge variant="outline" className="text-xs border-green-200 text-green-600"><Shield className="h-3 w-3 mr-1" />Insured</Badge>}
                   </div>
-                  <div className="flex items-center gap-1.5 pt-2 border-t">
+                  <div className="flex items-center gap-2 pt-2 border-t">
                     {vendor.phone && (
                       <>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setCallDialogVendor(vendor); }}><PhoneCall className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setSmsDialogVendor(vendor); }}><MessageSquare className="h-4 w-4" /></Button>
-                        <div onClick={(e) => e.stopPropagation()}><SendVoicemailButton recipientPhone={vendor.phone} recipientName={vendor.name} variant="ghost" size="sm" className="h-8 w-8 p-0" /></div>
+                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setCallDialogVendor(vendor); }}>
+                          <PhoneCall className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setSmsDialogVendor(vendor); }}>
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                        <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+                          <SendVoicemailButton recipientPhone={vendor.phone} recipientName={vendor.name} variant="outline" size="icon" className="h-8 w-8" />
+                        </div>
                       </>
                     )}
-                    {vendor.email && <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); window.location.href = `mailto:${vendor.email}`; }}><Mail className="h-4 w-4" /></Button>}
+                    {vendor.email && (
+                      <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); window.location.href = `mailto:${vendor.email}`; }}>
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                    )}
                     <div className="flex-1" />
-                    {isAdmin && <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteVendor(vendor); }}><Trash2 className="h-4 w-4" /></Button>}
+                    {isAdmin && (
+                      <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setDeleteVendor(vendor); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
