@@ -312,54 +312,46 @@ export default function VoicemailPlayer() {
 
           {/* Media Player - Video or Audio */}
           {voicemail.media_type === "video" && voicemail.video_url ? (
-            // VIDEO PLAYER - Responsive with fullscreen support
+            // VIDEO PLAYER - iOS Safari compatible with native controls
             <div className="bg-gradient-to-br from-gray-50 to-amber-50/50 rounded-2xl p-5 mb-6">
               <div 
                 ref={videoContainerRef}
                 className="relative rounded-xl overflow-hidden bg-black mb-4"
-                style={{ maxHeight: "70vh" }}
               >
+                {/* 
+                  iOS Safari fix: Use native controls for better compatibility.
+                  crossOrigin removed as it can cause CORS issues on iOS.
+                  webkit-playsinline added for older iOS versions.
+                */}
                 <video
                   ref={videoRef}
                   src={voicemail.video_url}
-                  className="w-full h-auto max-h-[60vh] object-contain mx-auto"
+                  className="w-full h-auto max-h-[70vh] object-contain mx-auto"
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
                   onEnded={handleEnded}
-                  onError={(e) => console.error("Video load error:", e)}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onError={(e) => {
+                    const video = e.target as HTMLVideoElement;
+                    console.error("Video error:", {
+                      error: video.error,
+                      networkState: video.networkState,
+                      readyState: video.readyState,
+                      src: video.src
+                    });
+                  }}
                   playsInline
-                  preload="metadata"
-                  crossOrigin="anonymous"
-                  controls={false}
-                  onClick={handlePlay}
+                  webkit-playsinline="true"
+                  preload="auto"
+                  controls
+                  controlsList="nodownload"
+                  style={{ WebkitTransform: 'translateZ(0)' }}
                 />
-                {/* Play overlay when paused */}
-                {!isPlaying && (
-                  <button
-                    onClick={handlePlay}
-                    className="absolute inset-0 flex items-center justify-center bg-black/30"
-                  >
-                    <div className="h-16 w-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                      <Play className="h-8 w-8 text-amber-600 ml-1" />
-                    </div>
-                  </button>
-                )}
-                {/* Fullscreen button */}
-                <button
-                  onClick={handleFullscreen}
-                  className="absolute bottom-3 right-3 p-2.5 bg-black/60 hover:bg-black/80 rounded-lg transition-colors"
-                  title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="h-5 w-5 text-white" />
-                  ) : (
-                    <Maximize2 className="h-5 w-5 text-white" />
-                  )}
-                </button>
               </div>
               
-              {/* Time display */}
-              <div className="flex items-center justify-between text-sm text-gray-500">
+              {/* Time display for context */}
+              <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
                 <span className="font-mono">{formatTime(currentTime)}</span>
                 <span className="font-mono">{formatTime(duration)}</span>
               </div>
