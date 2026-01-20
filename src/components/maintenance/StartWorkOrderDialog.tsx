@@ -102,6 +102,11 @@ export function StartWorkOrderDialog({
       // Generate a work order number
       const woNumber = `WO-${Date.now().toString().slice(-6)}`;
       
+      // Generate vendor access token for the portal
+      const vendorAccessToken = crypto.randomUUID();
+      const tokenExpiresAt = new Date();
+      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30 days expiry
+      
       const insertData = {
         property_id: selectedProperty,
         assigned_vendor_id: selectedVendor,
@@ -110,6 +115,8 @@ export function StartWorkOrderDialog({
         category,
         urgency: priority,
         status: "dispatched" as const, // Set to dispatched since vendor is assigned
+        vendor_access_token: vendorAccessToken,
+        vendor_access_token_expires_at: tokenExpiresAt.toISOString(),
       };
       
       const { data, error } = await supabase
@@ -119,14 +126,17 @@ export function StartWorkOrderDialog({
         .single();
       
       if (error) throw error;
-      return { ...data, woNumber };
+      return { ...data, woNumber, vendorAccessToken };
     },
     onSuccess: async (workOrder) => {
-      // Send SMS to vendor notifying them of the new work order
+      // Send SMS to vendor notifying them of the new work order with portal link
       const vendor = vendors.find(v => v.id === selectedVendor);
       const property = properties.find(p => p.id === selectedProperty);
       const propertyLabel = property ? getPropertyLabel(property) : "Property";
       const urgencyLabel = priority.charAt(0).toUpperCase() + priority.slice(1);
+      
+      // Build portal URL
+      const portalUrl = `https://propertycentral.lovable.app/vendor-job/${workOrder.vendorAccessToken}`;
       
       if (vendor?.phone) {
         try {
@@ -134,7 +144,8 @@ export function StartWorkOrderDialog({
             `Job: ${title}\n` +
             `Location: ${propertyLabel}\n` +
             `Priority: ${urgencyLabel}\n\n` +
-            `Reply CONFIRM to accept, or DECLINE [reason] if unavailable.`;
+            `View full details & respond:\n${portalUrl}\n\n` +
+            `Or quick reply: CONFIRM / DECLINE / QUOTE $xxx`;
           
           const { error: smsError } = await supabase.functions.invoke("ghl-send-sms", {
             body: {
@@ -148,7 +159,7 @@ export function StartWorkOrderDialog({
             console.error("Failed to send vendor notification SMS:", smsError);
             toast.error("Work order created but SMS notification failed");
           } else {
-            console.log("Vendor notification SMS sent successfully");
+            console.log("Vendor notification SMS sent successfully with portal link");
           }
         } catch (smsError) {
           console.error("Failed to send vendor notification SMS:", smsError);
