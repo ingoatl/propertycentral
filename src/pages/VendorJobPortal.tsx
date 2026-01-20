@@ -58,6 +58,13 @@ interface MaintenanceBook {
   vendor_access_code: string | null;
 }
 
+interface OnboardingData {
+  smart_lock_brand: string | null;
+  smart_lock_code: string | null;
+  parking_instructions: string | null;
+  garage_code: string | null;
+}
+
 const VendorJobPortal = () => {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
@@ -142,6 +149,24 @@ const VendorJobPortal = () => {
       
       if (error) throw error;
       return data as MaintenanceBook | null;
+    },
+    enabled: !!workOrder?.property?.id,
+  });
+
+  // Fetch onboarding data for smart lock info
+  const { data: onboardingData } = useQuery({
+    queryKey: ["property-onboarding", workOrder?.property?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("owner_onboarding_submissions")
+        .select("smart_lock_brand, smart_lock_code, parking_instructions, garage_code")
+        .eq("property_id", workOrder!.property!.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data as OnboardingData | null;
     },
     enabled: !!workOrder?.property?.id,
   });
@@ -646,15 +671,26 @@ const VendorJobPortal = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-3">
+              {/* Smart Lock Info Banner */}
+              {onboardingData?.smart_lock_brand && (
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center gap-2">
+                  <Lock className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Entry Method</p>
+                    <p className="text-sm font-semibold text-foreground">Smart Lock: {onboardingData.smart_lock_brand}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Vendor Access Code - PROMINENT */}
               {vendorAccessCode && (
                 <div className="p-4 bg-primary/10 border-2 border-primary rounded-lg">
                   <p className="text-[10px] text-primary font-bold uppercase tracking-wide mb-2 flex items-center gap-1">
-                    🔑 VENDOR ACCESS CODE
+                    🔑 {onboardingData?.smart_lock_brand ? `${onboardingData.smart_lock_brand.toUpperCase()} CODE` : 'VENDOR ACCESS CODE'}
                   </p>
                   <div className="flex items-center justify-between">
                     <p className="font-mono text-2xl font-bold text-primary tracking-wider">{vendorAccessCode}</p>
-                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(vendorAccessCode, "Vendor Access Code")} className="h-10 touch-manipulation">
+                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(vendorAccessCode, "Access Code")} className="h-10 touch-manipulation">
                       <Copy className="h-4 w-4 mr-1" />Copy
                     </Button>
                   </div>

@@ -95,7 +95,7 @@ const CreateWorkOrderDialog = ({
   });
 
   // Fetch property access data when property is selected
-  const { data: propertyAccessData } = useQuery({
+  const { data: propertyAccessData, isLoading: accessDataLoading } = useQuery({
     queryKey: ["property-access-data", formData.property_id],
     queryFn: async () => {
       if (!formData.property_id) return null;
@@ -120,6 +120,16 @@ const CreateWorkOrderDialog = ({
     },
     enabled: !!formData.property_id,
   });
+
+  // Check if we have any access data
+  const hasAccessData = propertyAccessData && (
+    propertyAccessData.maintenanceBook?.vendor_access_code ||
+    propertyAccessData.maintenanceBook?.lockbox_code ||
+    propertyAccessData.maintenanceBook?.gate_code ||
+    propertyAccessData.onboardingData?.smart_lock_code ||
+    propertyAccessData.onboardingData?.lockbox_code ||
+    propertyAccessData.onboardingData?.gate_code
+  );
 
   // Fetch current occupant from bookings
   const { data: currentOccupant } = useQuery({
@@ -193,10 +203,19 @@ const CreateWorkOrderDialog = ({
       const gateCode = maintenanceBook?.gate_code || onboardingData?.gate_code || "";
       const alarmCode = maintenanceBook?.alarm_code || onboardingData?.alarm_code || "";
       const lockboxCode = maintenanceBook?.lockbox_code || onboardingData?.lockbox_code || "";
+      const garageCode = onboardingData?.garage_code || "";
+      const smartLockBrand = onboardingData?.smart_lock_brand || "";
       
-      if (gateCode) accessParts.push(`Gate: ${gateCode}`);
-      if (lockboxCode && lockboxCode !== vendorAccessCode) accessParts.push(`Lockbox: ${lockboxCode}`);
-      if (alarmCode) accessParts.push(`Alarm: ${alarmCode}`);
+      // Build comprehensive access instructions
+      if (smartLockBrand && vendorAccessCode) {
+        accessParts.push(`🔐 Smart Lock (${smartLockBrand}): ${vendorAccessCode}`);
+      } else if (vendorAccessCode) {
+        accessParts.push(`🔑 Access Code: ${vendorAccessCode}`);
+      }
+      if (lockboxCode && lockboxCode !== vendorAccessCode) accessParts.push(`📦 Lockbox: ${lockboxCode}`);
+      if (gateCode) accessParts.push(`🚪 Gate: ${gateCode}`);
+      if (garageCode) accessParts.push(`🏠 Garage: ${garageCode}`);
+      if (alarmCode) accessParts.push(`🚨 Alarm: ${alarmCode}`);
       
       const accessInstructions = maintenanceBook?.access_instructions || 
         (accessParts.length > 0 ? accessParts.join(" | ") : "");
@@ -755,13 +774,39 @@ const CreateWorkOrderDialog = ({
 
           {/* Site Access & Safety Section */}
           <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-            <div className="flex items-center gap-2">
-              <Key className="h-4 w-4 text-primary" />
-              <Label className="text-base">Site Access & Safety</Label>
-              {propertyAccessData && (
-                <Badge variant="secondary" className="text-xs">Auto-filled from onboarding</Badge>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="h-4 w-4 text-primary" />
+                <Label className="text-base">Site Access & Safety</Label>
+              </div>
+              {formData.property_id && (
+                <>
+                  {accessDataLoading ? (
+                    <Badge variant="outline" className="text-xs">
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />Loading...
+                    </Badge>
+                  ) : hasAccessData ? (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-200">
+                      ✓ Auto-filled from property data
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                      ⚠ No access data on file
+                    </Badge>
+                  )}
+                </>
               )}
             </div>
+
+            {/* Smart Lock Info Banner */}
+            {propertyAccessData?.onboardingData?.smart_lock_brand && (
+              <div className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg">
+                <Key className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium text-primary">
+                  Smart Lock: {propertyAccessData.onboardingData.smart_lock_brand}
+                </span>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -774,6 +819,7 @@ const CreateWorkOrderDialog = ({
                   value={formData.vendor_access_code}
                   onChange={(e) => setFormData({ ...formData, vendor_access_code: e.target.value })}
                   placeholder="Smart lock / lockbox code"
+                  className={formData.vendor_access_code ? "border-green-300 bg-green-50/50" : ""}
                 />
               </div>
               <div className="space-y-2">
@@ -783,6 +829,7 @@ const CreateWorkOrderDialog = ({
                   value={formData.access_instructions}
                   onChange={(e) => setFormData({ ...formData, access_instructions: e.target.value })}
                   placeholder="Gate: 1234 | Alarm: 5678"
+                  className={formData.access_instructions ? "border-green-300 bg-green-50/50" : ""}
                 />
               </div>
             </div>
