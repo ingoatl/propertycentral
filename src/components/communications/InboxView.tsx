@@ -343,12 +343,21 @@ export function InboxView() {
       if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success("SMS sent!");
       setNewMessage("");
       // Invalidate both the main list AND the conversation thread for real-time updates
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
       queryClient.invalidateQueries({ queryKey: ["conversation-thread"] });
+      
+      // Mark conversation as "awaiting" (awaiting response from contact) after sending a reply
+      if (selectedMessage) {
+        updateConversationStatus.mutate({
+          contactPhone: selectedMessage.contact_phone,
+          contactEmail: selectedMessage.contact_email,
+          status: "awaiting",
+        });
+      }
       
       // Show follow-up scheduler modal after sending - but only for inbound conversations
       // Check if this is a response to an inbound message
