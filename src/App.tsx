@@ -45,6 +45,8 @@ const OwnerDashboard = lazy(() => import("./pages/owner/OwnerDashboard"));
 const OwnerPortalManagement = lazy(() => import("./pages/OwnerPortalManagement"));
 const SignDocument = lazy(() => import("./pages/SignDocument"));
 const BookInspection = lazy(() => import("./pages/BookInspection"));
+const LeadPaymentSetup = lazy(() => import("./pages/LeadPaymentSetup"));
+const LeadPaymentSuccess = lazy(() => import("./pages/LeadPaymentSuccess"));
 const OnboardingPresentation = lazy(() => import("./pages/OnboardingPresentation"));
 const DesignerPresentation = lazy(() => import("./pages/DesignerPresentation"));
 const RescheduleCall = lazy(() => import("./pages/RescheduleCall"));
@@ -116,6 +118,8 @@ const App = () => (
             <Route path="/owner-payment-success" element={<OwnerPaymentSuccess />} />
             <Route path="/audit/:token" element={<AuditPortal />} />
             <Route path="/owner" element={<OwnerDashboard />} />
+            <Route path="/lead-payment-setup" element={<LeadPaymentSetup />} />
+            <Route path="/lead-payment-success" element={<LeadPaymentSuccess />} />
             <Route path="/sign/:token" element={<Suspense fallback={<SigningLoader />}><SignDocument /></Suspense>} />
             <Route path="/onboarding-presentation" element={<OnboardingPresentation />} />
             <Route path="/designer-presentation" element={<DesignerPresentation />} />
