@@ -509,3 +509,6 @@ verify_jwt = true
 
 [functions.send-owner-approval-request]
 verify_jwt = true
+
+[functions.owner-approval-action]
+verify_jwt = false

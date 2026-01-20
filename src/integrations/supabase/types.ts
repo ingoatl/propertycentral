@@ -10013,6 +10013,7 @@ export type Database = {
           invoice_path: string | null
           owner_approval_reminder_count: number | null
           owner_approval_requested_at: string | null
+          owner_approval_token: string | null
           owner_approved: boolean | null
           owner_approved_at: string | null
           owner_approved_by: string | null
@@ -10048,6 +10049,9 @@ export type Database = {
           verification_notes: string | null
           verified_at: string | null
           verified_by: string | null
+          video_url: string | null
+          voice_message_transcript: string | null
+          voice_message_url: string | null
           warranty_id: string | null
           work_order_number: number
         }
@@ -10086,6 +10090,7 @@ export type Database = {
           invoice_path?: string | null
           owner_approval_reminder_count?: number | null
           owner_approval_requested_at?: string | null
+          owner_approval_token?: string | null
           owner_approved?: boolean | null
           owner_approved_at?: string | null
           owner_approved_by?: string | null
@@ -10121,6 +10126,9 @@ export type Database = {
           verification_notes?: string | null
           verified_at?: string | null
           verified_by?: string | null
+          video_url?: string | null
+          voice_message_transcript?: string | null
+          voice_message_url?: string | null
           warranty_id?: string | null
           work_order_number?: number
         }
@@ -10159,6 +10167,7 @@ export type Database = {
           invoice_path?: string | null
           owner_approval_reminder_count?: number | null
           owner_approval_requested_at?: string | null
+          owner_approval_token?: string | null
           owner_approved?: boolean | null
           owner_approved_at?: string | null
           owner_approved_by?: string | null
@@ -10194,6 +10203,9 @@ export type Database = {
           verification_notes?: string | null
           verified_at?: string | null
           verified_by?: string | null
+          video_url?: string | null
+          voice_message_transcript?: string | null
+          voice_message_url?: string | null
           warranty_id?: string | null
           work_order_number?: number
         }

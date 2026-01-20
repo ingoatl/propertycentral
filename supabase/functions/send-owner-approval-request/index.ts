@@ -26,6 +26,13 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+// Generate a secure random token
+function generateApprovalToken(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -103,13 +110,22 @@ serve(async (req) => {
       }
     }
 
-    // Update work order status and track approval request
+    // Generate a secure approval token
+    const approvalToken = generateApprovalToken();
+    
+    // Build approval URLs
+    const approvalBaseUrl = `${supabaseUrl}/functions/v1/owner-approval-action`;
+    const approveUrl = `${approvalBaseUrl}?workOrderId=${workOrderId}&action=approve&token=${approvalToken}`;
+    const declineUrl = `${approvalBaseUrl}?workOrderId=${workOrderId}&action=decline&token=${approvalToken}`;
+
+    // Update work order status and store approval token
     await supabase
       .from("work_orders")
       .update({
         status: "pending_approval",
         owner_approval_requested_at: new Date().toISOString(),
         owner_approval_reminder_count: (workOrder.owner_approval_reminder_count || 0) + 1,
+        owner_approval_token: approvalToken,
       })
       .eq("id", workOrderId);
 
@@ -370,17 +386,33 @@ Reply APPROVE to proceed or DECLINE to reject.
       </table>
     </div>
 
-    <!-- Action Section -->
+    <!-- Action Buttons -->
     <div style="padding: 0 32px 24px 32px;">
       <div style="font-size: 11px; font-weight: 600; color: #111111; padding: 8px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
         Your Response
       </div>
-      <div style="padding: 16px 0;">
-        <p style="font-size: 13px; color: #444444; margin: 0 0 12px 0;">Please respond to approve or decline this work:</p>
-        <ul style="font-size: 13px; color: #444444; margin: 0; padding-left: 20px;">
-          <li style="margin-bottom: 8px;"><strong>Reply to the SMS</strong> we sent with <strong>APPROVE</strong> or <strong>DECLINE</strong></li>
-          <li>Or <strong>log in to your owner portal</strong> to review details and approve</li>
-        </ul>
+      <div style="padding: 20px 0;">
+        <p style="font-size: 13px; color: #444444; margin: 0 0 20px 0;">Click below to approve or decline this work:</p>
+        
+        <!-- Approval Buttons -->
+        <table style="width: 100%;" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding-right: 8px; width: 50%;">
+              <a href="${approveUrl}" style="display: block; background: #111111; color: #ffffff; text-decoration: none; padding: 16px 24px; text-align: center; font-size: 14px; font-weight: 600; border-radius: 4px;">
+                Approve Quote
+              </a>
+            </td>
+            <td style="padding-left: 8px; width: 50%;">
+              <a href="${declineUrl}" style="display: block; background: #ffffff; color: #111111; text-decoration: none; padding: 16px 24px; text-align: center; font-size: 14px; font-weight: 600; border: 2px solid #111111; border-radius: 4px;">
+                Decline Quote
+              </a>
+            </td>
+          </tr>
+        </table>
+        
+        <p style="font-size: 12px; color: #888888; margin: 16px 0 0 0; text-align: center;">
+          Or reply to our SMS with APPROVE or DECLINE
+        </p>
       </div>
     </div>
 
