@@ -1,13 +1,19 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Import combined before/after pair images from user uploads
-import whitehurstPair from "@/assets/designer/whitehurst-pair1.png";
-import southvalePair from "@/assets/designer/southvale-pair.png";
-import justicePair from "@/assets/designer/justice-pair.png";
-import lakewoodPair from "@/assets/designer/lakewood-pair.png";
-import brushyPair from "@/assets/designer/brushy-pair.png";
-import tolaniPair from "@/assets/designer/tolani-pair.png";
+// Import separate before/after images for side-by-side display
+import whitehurstBefore from "@/assets/designer/whitehurst-before-1.jpg";
+import whitehurstAfter from "@/assets/designer/whitehurst-after-1.jpg";
+import southvaleBefore from "@/assets/designer/southvale-before-1.jpg";
+import southvaleAfter from "@/assets/designer/southvale-after-1.jpg";
+import justiceBefore from "@/assets/designer/justice-before-1.jpg";
+import justiceAfter from "@/assets/designer/justice-after-1.jpg";
+import lakewoodBefore from "@/assets/designer/lakewood-before-1.jpg";
+import lakewoodAfter from "@/assets/designer/lakewood-after-1.jpg";
+import brushyBefore from "@/assets/designer/brushy-before.jpg";
+import brushyAfter from "@/assets/designer/brushy-after.jpg";
+import tolaniBefore from "@/assets/designer/tolani-before.jpg";
+import tolaniAfter from "@/assets/designer/tolani-after.jpg";
 
 interface CaseStudy {
   name: string;
@@ -16,7 +22,8 @@ interface CaseStudy {
   year: string;
   airbnbUrl: string;
   airbnbShortUrl?: string;
-  pairImage: string;
+  beforeImage: string;
+  afterImage: string;
   highlights?: string[];
 }
 
@@ -29,7 +36,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2025",
     airbnbUrl: "https://airbnb.com/h/designermarietta",
     airbnbShortUrl: "airbnb.com/h/designermarietta",
-    pairImage: whitehurstPair,
+    beforeImage: whitehurstBefore,
+    afterImage: whitehurstAfter,
     highlights: ["Full home transformation", "Premium furnishings", "Designer touches"],
   },
   southvale: {
@@ -37,7 +45,8 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$35K",
     year: "2025",
     airbnbUrl: "https://www.airbnb.com/rooms/1394277589009252467",
-    pairImage: southvalePair,
+    beforeImage: southvaleBefore,
+    afterImage: southvaleAfter,
     highlights: ["Modern aesthetic", "Cohesive design", "Guest-focused amenities"],
   },
   justice: {
@@ -45,7 +54,8 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$25K",
     year: "2025",
     airbnbUrl: "https://www.airbnb.com/rooms/1395677657124996447",
-    pairImage: justicePair,
+    beforeImage: justiceBefore,
+    afterImage: justiceAfter,
     highlights: ["Complete makeover", "Green accent wall", "High-end finishes"],
   },
   lakewood: {
@@ -53,7 +63,8 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$23K",
     year: "2024",
     airbnbUrl: "https://www.airbnb.com/rooms/1399393314185549107",
-    pairImage: lakewoodPair,
+    beforeImage: lakewoodBefore,
+    afterImage: lakewoodAfter,
     highlights: ["Warm tones", "Cozy atmosphere", "Functional layout"],
   },
   brushy: {
@@ -61,7 +72,8 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$23K",
     year: "2024",
     airbnbUrl: "https://www.airbnb.com/rooms/1108098053080240369",
-    pairImage: brushyPair,
+    beforeImage: brushyBefore,
+    afterImage: brushyAfter,
     highlights: ["Natural elements", "Inviting spaces", "Photo-ready rooms"],
   },
   tolani: {
@@ -69,7 +81,8 @@ const caseStudies: Record<string, CaseStudy> = {
     budgetRange: "$20K",
     year: "2023",
     airbnbUrl: "https://www.airbnb.com/rooms/1066144648492952003",
-    pairImage: tolaniPair,
+    beforeImage: tolaniBefore,
+    afterImage: tolaniAfter,
     highlights: ["Budget-conscious", "High impact", "Thoughtful details"],
   },
 };
@@ -89,9 +102,9 @@ export function BeforeAfterSlide({ propertyKey }: BeforeAfterSlideProps) {
     <SlideLayout overlay="gradient">
       <div className="w-full max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-6 lg:mb-8">
-          <p className="text-amber-400 uppercase tracking-widest text-base lg:text-lg mb-3">Case Study</p>
-          <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4">
+        <div className="text-center mb-6">
+          <p className="text-amber-400 uppercase tracking-widest text-sm lg:text-base mb-2">Case Study</p>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white">
             {property.name}
             {property.location && (
               <span className="text-white/50 font-normal"> — {property.location}</span>
@@ -99,40 +112,49 @@ export function BeforeAfterSlide({ propertyKey }: BeforeAfterSlideProps) {
           </h2>
         </div>
 
-        {/* Combined Before/After Image with Labels */}
-        <div className="relative mb-8">
-          {/* Before Label - Left Side */}
-          <div className="absolute top-4 left-4 z-10 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-full">
-            <span className="text-white font-semibold text-lg">BEFORE</span>
+        {/* Side-by-Side Before/After Images */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* Before */}
+          <div className="relative">
+            <div className="absolute top-3 left-3 z-10 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full">
+              <span className="text-white font-semibold text-sm">BEFORE</span>
+            </div>
+            <img
+              src={property.beforeImage}
+              alt={`${property.name} Before`}
+              className="w-full h-[40vh] object-cover rounded-xl border border-white/10"
+            />
           </div>
-          {/* After Label - Right Side */}
-          <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 rounded-full">
-            <span className="text-white font-semibold text-lg">AFTER</span>
+          {/* After */}
+          <div className="relative">
+            <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-1.5 rounded-full">
+              <span className="text-white font-semibold text-sm">AFTER</span>
+            </div>
+            <img
+              src={property.afterImage}
+              alt={`${property.name} After`}
+              className="w-full h-[40vh] object-cover rounded-xl border border-white/10"
+            />
           </div>
-          <img
-            src={property.pairImage}
-            alt={`${property.name} Before and After`}
-            className="w-full h-auto max-h-[50vh] object-contain rounded-2xl border border-white/10"
-          />
         </div>
 
         {/* Info Cards */}
-        <div className="grid md:grid-cols-3 gap-4 lg:gap-6">
+        <div className="grid md:grid-cols-3 gap-4">
           {/* Budget */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 lg:p-6 border border-white/10 text-center">
-            <DollarSign className="w-8 h-8 text-amber-400 mx-auto mb-3" />
-            <p className="text-white/50 text-sm uppercase tracking-wide mb-1">Investment Range</p>
-            <p className="text-2xl lg:text-3xl font-bold text-white">{property.budgetRange}</p>
-            <p className="text-white/40 text-sm">({property.year})</p>
+          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-center">
+            <DollarSign className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+            <p className="text-white/50 text-xs uppercase tracking-wide mb-1">Investment</p>
+            <p className="text-xl lg:text-2xl font-bold text-white">{property.budgetRange}</p>
+            <p className="text-white/40 text-xs">({property.year})</p>
           </div>
 
           {/* Highlights */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 lg:p-6 border border-white/10">
-            <p className="text-white/50 text-sm uppercase tracking-wide mb-3 text-center">Transformation Highlights</p>
-            <ul className="space-y-2">
+          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+            <p className="text-white/50 text-xs uppercase tracking-wide mb-2 text-center">Highlights</p>
+            <ul className="space-y-1">
               {property.highlights?.map((highlight, i) => (
-                <li key={i} className="flex items-center gap-2 text-white/80 text-sm lg:text-base">
-                  <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                <li key={i} className="flex items-center gap-2 text-white/80 text-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
                   {highlight}
                 </li>
               ))}
@@ -144,14 +166,13 @@ export function BeforeAfterSlide({ propertyKey }: BeforeAfterSlideProps) {
             href={property.airbnbUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-gradient-to-br from-amber-400/20 to-orange-500/20 backdrop-blur-sm rounded-2xl p-5 lg:p-6 border border-amber-400/30 text-center hover:border-amber-400 transition-all duration-300 group"
+            className="bg-gradient-to-br from-amber-400/20 to-orange-500/20 backdrop-blur-sm rounded-xl p-4 border border-amber-400/30 text-center hover:border-amber-400 transition-all duration-300 group"
           >
-            <ExternalLink className="w-8 h-8 text-amber-400 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-            <p className="text-white/50 text-sm uppercase tracking-wide mb-2">Verify on Airbnb</p>
-            <p className="text-amber-400 font-semibold text-base lg:text-lg">
-              {property.airbnbShortUrl || "View Live Listing"}
+            <ExternalLink className="w-6 h-6 text-amber-400 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+            <p className="text-white/50 text-xs uppercase tracking-wide mb-1">Verify Live</p>
+            <p className="text-amber-400 font-semibold text-sm">
+              {property.airbnbShortUrl || "View Listing"}
             </p>
-            <p className="text-white/40 text-xs mt-2">Click to see the property yourself</p>
           </a>
         </div>
       </div>
