@@ -268,8 +268,6 @@ export function usePhoneLookup() {
       return lookupCache;
     }
 
-    console.log(`[PhoneLookup] Looking up ${phonesToLookup.length} phones:`, phonesToLookup);
-
     // Mark as pending
     setPendingLookups((prev) => {
       const next = new Set(prev);
@@ -283,7 +281,6 @@ export function usePhoneLookup() {
       });
 
       if (error) {
-        console.error("Batch phone lookup error:", error);
         // Mark as failed to avoid retrying immediately
         setFailedLookups((prev) => {
           const next = new Set(prev);
@@ -294,14 +291,12 @@ export function usePhoneLookup() {
       }
 
       const results = data?.results || [];
-      console.log(`[PhoneLookup] Got ${results.length} results`);
       
       const newCache: PhoneLookupCache = { ...lookupCache };
       
       results.forEach((result: PhoneLookupResult) => {
         const normalized = normalizePhone(result.phone);
         newCache[normalized] = result;
-        console.log(`[PhoneLookup] ${normalized} -> ${result.callerName || result.name || "No name found"}`);
       });
 
       setLookupCache(newCache);

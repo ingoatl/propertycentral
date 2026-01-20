@@ -352,17 +352,14 @@ export const TaskItem = ({ task, onUpdate, assignedUserName: preloadedUserName }
           .from("property_owners")
           .update({ email: value.toLowerCase() })
           .eq("id", property.owner_id);
-        console.log("Synced owner email:", value);
       } else if (isPhone) {
         await supabase
           .from("property_owners")
           .update({ phone: value })
           .eq("id", property.owner_id);
-        console.log("Synced owner phone:", value);
       }
     } catch (error) {
-      console.error("Failed to sync owner info:", error);
-      // Don't throw - this is a background sync
+      // Silent fail - this is a background sync
     }
   };
 

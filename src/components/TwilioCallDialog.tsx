@@ -118,8 +118,6 @@ export function TwilioCallDialog({
 
   const initializeDevice = async () => {
     try {
-      console.log('Getting Twilio token...');
-      
       // Get current user ID to pass for phone assignment lookup
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
@@ -130,11 +128,6 @@ export function TwilioCallDialog({
 
       if (error) throw error;
       if (!data?.token) throw new Error('No token received');
-
-      console.log('Token received, initializing device...');
-      if (data.assignedPhone) {
-        console.log('User assigned phone:', data.assignedPhone);
-      }
       
       const device = new Device(data.token, {
         logLevel: 1,
@@ -142,7 +135,6 @@ export function TwilioCallDialog({
       });
 
       device.on('registered', () => {
-        console.log('Device registered successfully');
       });
 
       device.on('error', (err) => {
