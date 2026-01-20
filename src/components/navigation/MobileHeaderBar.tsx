@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { QuickCommunicationButton } from '@/components/communications/QuickCommunicationButton';
 import { NotificationBell } from '@/components/team-hub/NotificationBell';
+import { MobileNavigation } from './MobileNavigation';
 
 interface MobileHeaderBarProps {
   isAdmin: boolean;
@@ -58,9 +59,9 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
                         <span className="text-xs text-muted-foreground">{user?.email}</span>
                       </div>
                       
-                      {/* Navigation - stop propagation to allow submenu clicks */}
+                      {/* Navigation */}
                       <div className="flex-1 overflow-auto">
-                        {navigationContent}
+                        <MobileNavigation isAdmin={isAdmin} onNavigate={() => setMenuOpen(false)} />
                       </div>
                       
                       {/* Footer */}

@@ -41,13 +41,26 @@ export default function VoicemailPlayer() {
     queryFn: async () => {
       if (!token) throw new Error("No token provided");
       
+      console.log("[VoicemailPlayer] Fetching voicemail with token:", token);
+      
       const { data, error } = await supabase
         .from("voicemail_messages")
         .select("*")
         .eq("token", token)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("[VoicemailPlayer] Error fetching voicemail:", error);
+        throw error;
+      }
+      
+      console.log("[VoicemailPlayer] Voicemail data:", { 
+        id: data?.id, 
+        media_type: data?.media_type, 
+        has_video_url: !!data?.video_url,
+        has_audio_url: !!data?.audio_url 
+      });
+      
       return data;
     },
     enabled: !!token,
@@ -313,8 +326,11 @@ export default function VoicemailPlayer() {
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
                   onEnded={handleEnded}
+                  onError={(e) => console.error("Video load error:", e)}
                   playsInline
-                  webkit-playsinline="true"
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                  controls={false}
                   onClick={handlePlay}
                 />
                 {/* Play overlay when paused */}
