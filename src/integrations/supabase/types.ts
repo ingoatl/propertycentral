@@ -10011,6 +10011,8 @@ export type Database = {
           id: string
           inspection_issue_id: string | null
           invoice_path: string | null
+          owner_approval_reminder_count: number | null
+          owner_approval_requested_at: string | null
           owner_approved: boolean | null
           owner_approved_at: string | null
           owner_approved_by: string | null
@@ -10079,6 +10081,8 @@ export type Database = {
           id?: string
           inspection_issue_id?: string | null
           invoice_path?: string | null
+          owner_approval_reminder_count?: number | null
+          owner_approval_requested_at?: string | null
           owner_approved?: boolean | null
           owner_approved_at?: string | null
           owner_approved_by?: string | null
@@ -10147,6 +10151,8 @@ export type Database = {
           id?: string
           inspection_issue_id?: string | null
           invoice_path?: string | null
+          owner_approval_reminder_count?: number | null
+          owner_approval_requested_at?: string | null
           owner_approved?: boolean | null
           owner_approved_at?: string | null
           owner_approved_by?: string | null

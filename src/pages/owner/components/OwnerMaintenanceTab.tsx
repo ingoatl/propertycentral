@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import {
   Wrench,
   Clock,
@@ -20,6 +22,8 @@ import {
   CalendarDays,
   Image,
   X,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 
 interface OwnerMaintenanceTabProps {
@@ -60,18 +64,23 @@ interface WorkOrderPhoto {
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   new: { label: "New", color: "bg-blue-100 text-blue-800", icon: AlertCircle },
   assigned: { label: "Assigned", color: "bg-yellow-100 text-yellow-800", icon: Clock },
+  dispatched: { label: "Dispatched", color: "bg-purple-100 text-purple-800", icon: Clock },
   scheduled: { label: "Scheduled", color: "bg-purple-100 text-purple-800", icon: CalendarDays },
   in_progress: { label: "In Progress", color: "bg-orange-100 text-orange-800", icon: Wrench },
   pending_approval: { label: "Awaiting Approval", color: "bg-amber-100 text-amber-800", icon: Clock },
+  awaiting_approval: { label: "Awaiting Approval", color: "bg-amber-100 text-amber-800", icon: Clock },
   pending_verification: { label: "Pending Verification", color: "bg-indigo-100 text-indigo-800", icon: CheckCircle },
   completed: { label: "Completed", color: "bg-green-100 text-green-800", icon: CheckCircle },
   cancelled: { label: "Cancelled", color: "bg-gray-100 text-gray-800", icon: AlertCircle },
 };
 
 export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTabProps) {
+  const queryClient = useQueryClient();
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"active" | "completed" | "all">("all");
+  const [showDeclineDialog, setShowDeclineDialog] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
 
   // Fetch work orders for this owner's properties
   const { data: workOrders = [], isLoading } = useQuery({
@@ -114,6 +123,29 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
     },
   });
 
+  // Set up realtime subscription for work order updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('owner-work-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'work_orders',
+        },
+        (payload) => {
+          console.log('Work order realtime update:', payload);
+          queryClient.invalidateQueries({ queryKey: ["owner-work-orders", ownerId, propertyId, statusFilter] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [ownerId, propertyId, statusFilter, queryClient]);
+
   // Fetch photos for selected work order
   const { data: workOrderPhotos = [] } = useQuery({
     queryKey: ["work-order-photos-owner", selectedWorkOrder?.id],
@@ -130,6 +162,69 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
     enabled: !!selectedWorkOrder?.id,
   });
 
+  // Approve work order mutation
+  const approveWorkOrder = useMutation({
+    mutationFn: async (workOrderId: string) => {
+      const { error } = await supabase
+        .from("work_orders")
+        .update({ 
+          owner_approved: true, 
+          status: "scheduled" 
+        })
+        .eq("id", workOrderId);
+      if (error) throw error;
+
+      // Add timeline entry
+      await supabase.from("work_order_timeline").insert({
+        work_order_id: workOrderId,
+        action: "Owner approved the work order",
+        performed_by_type: "owner",
+        performed_by_name: "Owner",
+      });
+    },
+    onSuccess: () => {
+      toast.success("Work order approved! Vendor has been notified.");
+      queryClient.invalidateQueries({ queryKey: ["owner-work-orders"] });
+      setSelectedWorkOrder(null);
+    },
+    onError: (error) => {
+      toast.error("Failed to approve: " + error.message);
+    },
+  });
+
+  // Decline work order mutation
+  const declineWorkOrder = useMutation({
+    mutationFn: async ({ workOrderId, reason }: { workOrderId: string; reason: string }) => {
+      const { error } = await supabase
+        .from("work_orders")
+        .update({ 
+          owner_approved: false, 
+          status: "on_hold",
+          owner_declined_reason: reason || "No reason provided"
+        })
+        .eq("id", workOrderId);
+      if (error) throw error;
+
+      // Add timeline entry
+      await supabase.from("work_order_timeline").insert({
+        work_order_id: workOrderId,
+        action: `Owner declined the work order. Reason: ${reason || "Not specified"}`,
+        performed_by_type: "owner",
+        performed_by_name: "Owner",
+      });
+    },
+    onSuccess: () => {
+      toast.success("Work order declined.");
+      queryClient.invalidateQueries({ queryKey: ["owner-work-orders"] });
+      setSelectedWorkOrder(null);
+      setShowDeclineDialog(false);
+      setDeclineReason("");
+    },
+    onError: (error) => {
+      toast.error("Failed to decline: " + error.message);
+    },
+  });
+
   // Group photos by type
   const photosByType = {
     before: workOrderPhotos.filter(p => p.photo_type === "before"),
@@ -140,17 +235,23 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
   // Calculate stats
   const totalCost = workOrders.reduce((sum, wo) => sum + (wo.actual_cost || wo.quoted_cost || 0), 0);
   const completedCount = workOrders.filter(wo => wo.status === "completed").length;
-  const pendingApprovalCount = workOrders.filter(wo => wo.status === "pending_approval").length;
+  const pendingApprovalCount = workOrders.filter(wo => 
+    wo.status === "pending_approval" || wo.status === "awaiting_approval"
+  ).length;
+
+  const isAwaitingApproval = (status: string) => 
+    status === "pending_approval" || status === "awaiting_approval";
 
   const renderWorkOrderCard = (wo: WorkOrder) => {
     const statusConfig = STATUS_CONFIG[wo.status] || STATUS_CONFIG.new;
     const StatusIcon = statusConfig.icon;
+    const needsApproval = isAwaitingApproval(wo.status);
 
     return (
       <Card
         key={wo.id}
-        className="cursor-pointer hover:shadow-md transition-shadow border-l-4"
-        style={{ borderLeftColor: wo.status === "pending_approval" ? "#f59e0b" : "transparent" }}
+        className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${needsApproval ? 'ring-2 ring-amber-400' : ''}`}
+        style={{ borderLeftColor: needsApproval ? "#f59e0b" : "transparent" }}
         onClick={() => setSelectedWorkOrder(wo)}
       >
         <CardContent className="p-4">
@@ -167,8 +268,8 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
                 {wo.urgency === "emergency" && (
                   <Badge variant="destructive">Emergency</Badge>
                 )}
-                {wo.status === "pending_approval" && (
-                  <Badge className="bg-amber-500 text-white">Needs Your Approval</Badge>
+                {needsApproval && (
+                  <Badge className="bg-amber-500 text-white animate-pulse">Action Required</Badge>
                 )}
               </div>
               <h4 className="font-medium text-sm">{wo.title}</h4>
@@ -192,6 +293,31 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
                   </span>
                 )}
               </div>
+              {needsApproval && (
+                <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                  <Button 
+                    size="sm" 
+                    className="bg-green-600 hover:bg-green-700 flex-1"
+                    onClick={() => approveWorkOrder.mutate(wo.id)}
+                    disabled={approveWorkOrder.isPending}
+                  >
+                    <ThumbsUp className="h-3 w-3 mr-1" />
+                    Approve
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="border-red-300 text-red-600 hover:bg-red-50 flex-1"
+                    onClick={() => {
+                      setSelectedWorkOrder(wo);
+                      setShowDeclineDialog(true);
+                    }}
+                  >
+                    <ThumbsDown className="h-3 w-3 mr-1" />
+                    Decline
+                  </Button>
+                </div>
+              )}
             </div>
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </div>
@@ -251,7 +377,7 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
             <div className="text-xs text-muted-foreground">Completed</div>
           </CardContent>
         </Card>
-        <Card className={pendingApprovalCount > 0 ? "ring-2 ring-amber-500" : ""}>
+        <Card className={pendingApprovalCount > 0 ? "ring-2 ring-amber-500 animate-pulse" : ""}>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-amber-600">{pendingApprovalCount}</div>
             <div className="text-xs text-muted-foreground">Awaiting Approval</div>
@@ -271,12 +397,12 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <AlertCircle className="h-5 w-5 text-amber-600" />
-              <div>
+              <div className="flex-1">
                 <p className="font-medium text-amber-800">
                   {pendingApprovalCount} work order{pendingApprovalCount > 1 ? "s" : ""} awaiting your approval
                 </p>
                 <p className="text-sm text-amber-600">
-                  Reply APPROVE or DECLINE via SMS, or click to view details
+                  Click "Approve" or "Decline" below, or reply via SMS
                 </p>
               </div>
             </div>
@@ -313,7 +439,7 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
       )}
 
       {/* Work Order Detail Dialog */}
-      <Dialog open={!!selectedWorkOrder} onOpenChange={() => setSelectedWorkOrder(null)}>
+      <Dialog open={!!selectedWorkOrder && !showDeclineDialog} onOpenChange={() => setSelectedWorkOrder(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -324,6 +450,37 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
           
           {selectedWorkOrder && (
             <div className="space-y-6">
+              {/* Approval Buttons at Top for pending items */}
+              {isAwaitingApproval(selectedWorkOrder.status) && (
+                <Card className="bg-amber-50 border-amber-200">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-amber-800 mb-3 font-medium">
+                      This work order requires your approval to proceed.
+                    </p>
+                    <div className="flex gap-3">
+                      <Button 
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        onClick={() => approveWorkOrder.mutate(selectedWorkOrder.id)}
+                        disabled={approveWorkOrder.isPending}
+                      >
+                        {approveWorkOrder.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <><ThumbsUp className="h-4 w-4 mr-2" />Approve</>
+                        )}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                        onClick={() => setShowDeclineDialog(true)}
+                      >
+                        <ThumbsDown className="h-4 w-4 mr-2" />Decline
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Status & Details */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -410,6 +567,57 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Decline Dialog */}
+      <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Decline Work Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Please provide a reason for declining this work order (optional):
+            </p>
+            <Textarea 
+              value={declineReason} 
+              onChange={(e) => setDeclineReason(e.target.value)}
+              placeholder="e.g., Too expensive, want a second quote, not a priority right now..."
+              rows={3}
+            />
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowDeclineDialog(false);
+                  setDeclineReason("");
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={() => {
+                  if (selectedWorkOrder) {
+                    declineWorkOrder.mutate({ 
+                      workOrderId: selectedWorkOrder.id, 
+                      reason: declineReason 
+                    });
+                  }
+                }}
+                disabled={declineWorkOrder.isPending}
+                className="flex-1"
+              >
+                {declineWorkOrder.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Decline Work Order"
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

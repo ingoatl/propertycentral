@@ -6,6 +6,24 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Vendor phone number for all vendor communications
+const VENDOR_FROM_NUMBER = "+14045741740";
+
+// Format phone number to E.164 format
+function formatPhoneE164(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  if (digits.length > 10) {
+    return `+${digits}`;
+  }
+  return phone;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,6 +41,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const ghlApiKey = Deno.env.get("GHL_API_KEY");
+    const ghlLocationId = Deno.env.get("GHL_LOCATION_ID");
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch work order with property
@@ -64,27 +84,22 @@ serve(async (req) => {
     const urgencyLabel = workOrder.urgency === "emergency" ? "🚨 EMERGENCY" : 
                          workOrder.urgency === "high" ? "⚠️ HIGH PRIORITY" : "";
 
-    // Generate vendor access token
+    // Generate vendor access token - valid for 1 YEAR
     const vendorToken = crypto.randomUUID().replace(/-/g, '').substring(0, 24);
     const portalUrl = `https://propertycentral.lovable.app/vendor-job/${vendorToken}`;
 
-    // Update work order with access token
+    // Update work order with access token - 1 year expiry
     await supabase
       .from("work_orders")
       .update({ 
         vendor_access_token: vendorToken,
-        vendor_access_token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+        vendor_access_token_expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 YEAR
       })
       .eq("id", workOrderId);
 
-    // Send SMS if vendor has phone and SMS is requested
+    // Send SMS via GHL if vendor has phone and SMS is requested
     if (notifyMethods?.includes("sms") && vendor.phone) {
-      const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
-      const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
-      const TWILIO_VENDOR_PHONE = Deno.env.get("TWILIO_VENDOR_PHONE_NUMBER") || Deno.env.get("TWILIO_PHONE_NUMBER");
-
-      if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_VENDOR_PHONE) {
-        const smsMessage = `${urgencyLabel ? urgencyLabel + "\n\n" : ""}🔧 New Job Assigned
+      const smsMessage = `${urgencyLabel ? urgencyLabel + "\n\n" : ""}🔧 New Job Assigned
 
 📍 ${propertyAddress}
 Issue: ${workOrder.title}
@@ -96,42 +111,126 @@ ${portalUrl}
 
 Reply CONFIRM to accept or DECLINE to pass.`;
 
-        try {
-          const twilioResponse = await fetch(
-            `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      if (ghlApiKey && ghlLocationId) {
+        const formattedPhone = formatPhoneE164(vendor.phone);
+        
+        // Find or create GHL contact for this vendor
+        let ghlContactId = null;
+        
+        // Search for existing contact
+        const searchResponse = await fetch(
+          `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${ghlLocationId}&phone=${encodeURIComponent(formattedPhone)}`,
+          {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${ghlApiKey}`,
+              "Version": "2021-07-28",
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          if (searchData.contact?.id) {
+            ghlContactId = searchData.contact.id;
+            console.log(`Found existing GHL contact for vendor: ${ghlContactId}`);
+          }
+        }
+
+        // Create contact if not found
+        if (!ghlContactId) {
+          console.log(`Creating GHL contact for vendor: ${vendor.name}`);
+          const createResponse = await fetch(
+            `https://services.leadconnectorhq.com/contacts/`,
             {
               method: "POST",
               headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                Authorization: `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
+                "Authorization": `Bearer ${ghlApiKey}`,
+                "Version": "2021-07-28",
+                "Content-Type": "application/json",
               },
-              body: new URLSearchParams({
-                From: TWILIO_VENDOR_PHONE,
-                To: vendor.phone,
-                Body: smsMessage,
+              body: JSON.stringify({
+                locationId: ghlLocationId,
+                phone: formattedPhone,
+                name: vendor.name || "Vendor",
+                email: vendor.email || undefined,
               }),
             }
           );
 
-          const twilioData = await twilioResponse.json();
-          
-          if (twilioResponse.ok) {
-            console.log(`SMS sent to vendor ${vendor.name} with job portal link: ${twilioData.sid}`);
-            results.sms = true;
-
-            await supabase.from("sms_log").insert({
-              phone_number: vendor.phone,
-              message_type: "work_order_assignment",
-              message_body: smsMessage,
-              twilio_message_sid: twilioData.sid,
-              status: "sent",
-            });
+          if (createResponse.ok) {
+            const createData = await createResponse.json();
+            ghlContactId = createData.contact?.id;
+            console.log(`Created new GHL contact for vendor: ${ghlContactId}`);
           } else {
-            console.error("Failed to send SMS:", twilioData);
+            console.error("Failed to create GHL contact:", await createResponse.text());
           }
-        } catch (smsError) {
-          console.error("SMS error:", smsError);
         }
+
+        // Send SMS via GHL
+        if (ghlContactId) {
+          try {
+            const sendResponse = await fetch(
+              `https://services.leadconnectorhq.com/conversations/messages`,
+              {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${ghlApiKey}`,
+                  "Version": "2021-04-15",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  type: "SMS",
+                  contactId: ghlContactId,
+                  message: smsMessage,
+                  fromNumber: VENDOR_FROM_NUMBER,
+                }),
+              }
+            );
+
+            if (sendResponse.ok) {
+              const sendData = await sendResponse.json();
+              console.log(`SMS sent to vendor ${vendor.name} via GHL: ${sendData.messageId}`);
+              results.sms = true;
+
+              // Log to lead_communications for inbox visibility
+              await supabase.from("lead_communications").insert({
+                communication_type: "sms",
+                direction: "outbound",
+                body: smsMessage,
+                status: "sent",
+                external_id: sendData.messageId || sendData.conversationId,
+                ghl_conversation_id: sendData.conversationId,
+                metadata: {
+                  provider: "gohighlevel",
+                  ghl_contact_id: ghlContactId,
+                  from_number: VENDOR_FROM_NUMBER,
+                  to_number: formattedPhone,
+                  vendor_id: vendorId,
+                  vendor_phone: formattedPhone,
+                  contact_type: "vendor",
+                  work_order_id: workOrderId,
+                },
+              });
+
+              await supabase.from("sms_log").insert({
+                phone_number: vendor.phone,
+                message_type: "work_order_assignment",
+                message_body: smsMessage,
+                ghl_message_id: sendData.messageId,
+                status: "sent",
+              });
+            } else {
+              const errorText = await sendResponse.text();
+              console.error("Failed to send SMS via GHL:", errorText);
+            }
+          } catch (smsError) {
+            console.error("GHL SMS error:", smsError);
+          }
+        }
+      } else {
+        console.log("GHL credentials not configured, skipping SMS");
       }
     }
 
@@ -160,6 +259,10 @@ Reply CONFIRM to accept or DECLINE to pass.`;
               <h3 style="color: #374151;">Access Instructions</h3>
               <p style="color: #4b5563;">${workOrder.access_instructions}</p>
             ` : ""}
+            
+            <div style="margin: 24px 0; text-align: center;">
+              <a href="${portalUrl}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Job & Upload Photos</a>
+            </div>
             
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
             

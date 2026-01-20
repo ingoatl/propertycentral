@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +75,32 @@ const VendorJobPortal = () => {
     },
     enabled: !!token,
   });
+
+  // Set up realtime subscription for work order updates
+  useEffect(() => {
+    if (!workOrder?.id) return;
+    
+    const channel = supabase
+      .channel(`vendor-job-${workOrder.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'work_orders',
+          filter: `id=eq.${workOrder.id}`,
+        },
+        (payload) => {
+          console.log('Work order realtime update:', payload);
+          queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [workOrder?.id, token, queryClient]);
 
   // Fetch property maintenance book for access codes
   const { data: maintenanceBook } = useQuery({
