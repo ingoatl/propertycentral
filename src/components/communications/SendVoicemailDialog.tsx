@@ -123,6 +123,13 @@ export function SendVoicemailDialog({
       return;
     }
 
+    // Validate phone number - clean and check length
+    const cleanedPhone = recipientPhone.replace(/\D/g, "");
+    if (cleanedPhone.length < 10 || cleanedPhone.length > 11) {
+      toast.error(`Invalid phone number: must be 10 digits (got ${cleanedPhone.length})`);
+      return;
+    }
+
     setIsSending(true);
 
     try {

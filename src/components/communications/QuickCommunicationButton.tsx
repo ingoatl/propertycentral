@@ -178,14 +178,20 @@ export function QuickCommunicationButton() {
   };
 
   const handleDialpadVoicemail = () => {
-    if (phoneNumber.length < 10) {
-      toast.error("Please enter a valid phone number");
+    // Clean and validate phone number
+    const cleanedPhone = phoneNumber.replace(/\D/g, "");
+    if (cleanedPhone.length < 10) {
+      toast.error("Please enter a valid 10-digit phone number");
+      return;
+    }
+    if (cleanedPhone.length > 10) {
+      toast.error(`Phone number too long: ${cleanedPhone.length} digits (max 10)`);
       return;
     }
     setSelectedContact({
       id: "manual",
-      name: formatPhoneForDisplay(phoneNumber),
-      phone: phoneNumber,
+      name: formatPhoneForDisplay(cleanedPhone),
+      phone: cleanedPhone,
       email: null,
       type: "lead",
     });
@@ -194,14 +200,20 @@ export function QuickCommunicationButton() {
   };
 
   const handleDialpadVideoMessage = () => {
-    if (phoneNumber.length < 10) {
-      toast.error("Please enter a valid phone number");
+    // Clean and validate phone number
+    const cleanedPhone = phoneNumber.replace(/\D/g, "");
+    if (cleanedPhone.length < 10) {
+      toast.error("Please enter a valid 10-digit phone number");
+      return;
+    }
+    if (cleanedPhone.length > 10) {
+      toast.error(`Phone number too long: ${cleanedPhone.length} digits (max 10)`);
       return;
     }
     setSelectedContact({
       id: "manual",
-      name: formatPhoneForDisplay(phoneNumber),
-      phone: phoneNumber,
+      name: formatPhoneForDisplay(cleanedPhone),
+      phone: cleanedPhone,
       email: null,
       type: "lead",
     });
