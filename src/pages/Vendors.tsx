@@ -17,6 +17,7 @@ import { VendorKPIBar } from "@/components/maintenance/VendorKPIBar";
 import { WorkOrderStageCards } from "@/components/maintenance/WorkOrderStageCards";
 import { WorkOrdersTable } from "@/components/maintenance/WorkOrdersTable";
 import { VendorCommunicationsTab } from "@/components/maintenance/VendorCommunicationsTab";
+import VendorPaymentDashboard from "@/components/maintenance/VendorPaymentDashboard";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDialog";
@@ -183,6 +184,9 @@ const Vendors = () => {
 
         {/* Vendor Communications Tab */}
         <VendorCommunicationsTab />
+
+        {/* Vendor Payment Dashboard */}
+        <VendorPaymentDashboard />
 
         {/* Collapsible Active Services */}
         <CollapsibleActiveServices />
