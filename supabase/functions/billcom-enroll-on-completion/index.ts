@@ -191,13 +191,12 @@ serve(async (req) => {
         const GHL_LOCATION_ID = Deno.env.get("GHL_LOCATION_ID");
 
         if (GHL_API_KEY && GHL_LOCATION_ID) {
-          // Build the SMS message
+          // Build the SMS message - don't include generic link, Bill.com sends proper invite email
           const smsMessage = `PeachHaus Property Management
 
 ${vendor.name}, you completed a job at ${propertyName}.
 
-To receive payment, please complete your Bill.com setup:
-https://app.bill.com/BDCRegistration
+To receive payment, check your email (${vendor.email}) for a Bill.com invitation from info@peachhausgroup.com.
 
 This allows us to pay you directly via bank deposit within 7-10 business days.
 
