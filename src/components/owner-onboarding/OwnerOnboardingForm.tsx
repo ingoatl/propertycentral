@@ -171,7 +171,6 @@ export function OwnerOnboardingForm() {
       default: return null;
     }
   };
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[hsl(25,100%,98%)] via-[hsl(30,100%,97%)] to-[hsl(20,100%,96%)]">
