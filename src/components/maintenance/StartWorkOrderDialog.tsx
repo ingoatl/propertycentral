@@ -115,18 +115,20 @@ export function StartWorkOrderDialog({
       
       if (vendor?.phone) {
         try {
-          await supabase.functions.invoke("send-ghl-sms", {
+          const { error: smsError } = await supabase.functions.invoke("ghl-send-sms", {
             body: {
-              to: vendor.phone,
-              message: `New work order assigned: "${title}" at ${property?.address || property?.name || "Property"}. Priority: ${priority}. Please confirm you can take this job by replying to this message.`,
-              metadata: {
-                vendor_id: vendor.id,
-                vendor_name: vendor.name,
-                work_order_id: workOrder.id,
-                contact_type: "vendor",
-              },
+              vendorId: vendor.id,
+              phone: vendor.phone,
+              message: `New work order assigned: "${title}" at ${property?.address || property?.name || "Property"}. Priority: ${priority}. Please confirm you can take this job by replying CONFIRM, or reply DECLINE if you cannot.`,
             },
           });
+          
+          if (smsError) {
+            console.error("Failed to send vendor notification SMS:", smsError);
+            toast.error("Work order created but SMS notification failed");
+          } else {
+            console.log("Vendor notification SMS sent successfully");
+          }
         } catch (smsError) {
           console.error("Failed to send vendor notification SMS:", smsError);
         }
