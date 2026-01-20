@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home, Presentation, Brain, BookOpen } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home, Presentation, Brain, BookOpen, MessageSquare } from "lucide-react";
 import { Link } from "react-router-dom";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
@@ -29,6 +29,7 @@ import { GRECAuditDashboard } from "@/components/admin/GRECAuditDashboard";
 import { OwnerPortalAdmin } from "@/components/admin/OwnerPortalAdmin";
 import { ToneProfilesManager } from "@/components/admin/ToneProfilesManager";
 import { CompanyKnowledgeManager } from "@/components/admin/CompanyKnowledgeManager";
+import { TeamHubAdmin } from "@/components/team-hub/TeamHubAdmin";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -391,26 +392,35 @@ const Admin = () => {
   const rejectedUsers = profiles.filter((p) => p.status === "rejected");
 
   return (
-    <div className="space-y-8 pb-20">
-      <div className="mb-8 flex items-start justify-between">
+    <div className="space-y-6 pb-20 px-2 sm:px-0">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary via-primary-light to-accent bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-4xl font-bold mb-2 bg-gradient-to-r from-primary via-primary-light to-accent bg-clip-text text-transparent">
             Admin Panel
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm sm:text-base">
             Manage user accounts, permissions, team roles, and access to the system
           </p>
         </div>
-        <Link to="/onboarding-presentation">
-          <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
-            <Presentation className="h-4 w-4 mr-2" />
-            Owner Presentation
-          </Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/team-hub">
+            <Button variant="outline" size="sm" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Team Hub
+            </Button>
+          </Link>
+          <Link to="/onboarding-presentation">
+            <Button size="sm" className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white gap-2">
+              <Presentation className="h-4 w-4" />
+              <span className="hidden sm:inline">Owner</span> Presentation
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+        <div className="overflow-x-auto -mx-2 px-2">
+          <TabsList className="inline-flex flex-nowrap gap-1 h-auto p-1 min-w-max">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="team-matrix">
             <Users className="w-4 h-4 mr-2" />
@@ -472,121 +482,108 @@ const Admin = () => {
             <Brain className="w-4 h-4 mr-2" />
             AI Tone Profiles
           </TabsTrigger>
-          <TabsTrigger value="knowledge-base">
-            <BookOpen className="w-4 h-4 mr-2" />
-            Company Knowledge
+          <TabsTrigger value="knowledge-base" className="text-xs sm:text-sm">
+            <BookOpen className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Company Knowledge</span>
           </TabsTrigger>
-        </TabsList>
+          </TabsList>
+        </div>
 
-        <TabsContent value="users" className="space-y-8 mt-8">
-          {/* Quick Actions */}
-          <Card className="shadow-card border-border/50">
-            <CardHeader className="bg-gradient-subtle rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5" />
-                Quick Actions
-              </CardTitle>
-              <CardDescription>
-                Bulk operations and system management
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <AssignUnassignedTasksButton />
-            </CardContent>
-          </Card>
+        <TabsContent value="users" className="space-y-6 mt-6">
+          {/* Quick Actions + Team Hub Invites */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="shadow-card border-border/50">
+              <CardHeader className="bg-gradient-subtle rounded-t-lg">
+                <CardTitle className="flex items-center gap-2">
+                  <UserCog className="w-5 h-5" />
+                  Quick Actions
+                </CardTitle>
+                <CardDescription>
+                  Bulk operations and system management
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-4">
+                <div className="p-4 rounded-lg border bg-muted/50">
+                  <h4 className="font-medium mb-2">Assign Unassigned Tasks</h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Automatically assign existing unassigned tasks to team members.
+                  </p>
+                  <AssignUnassignedTasksButton />
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Admin Actions */}
-          <div className="space-y-6">
-        <Card className="shadow-card border-border/50">
-          <CardHeader className="bg-gradient-subtle rounded-t-lg">
-            <CardTitle className="flex items-center gap-2">
-              <UserCog className="w-5 h-5" />
-              Quick Actions
-            </CardTitle>
-            <CardDescription>
-              Bulk operations and system management
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="p-4 rounded-lg border bg-muted/50">
-                <h4 className="font-medium mb-2">Assign Unassigned Tasks</h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Automatically assign existing unassigned tasks to team members based on the current Team Matrix configuration. 
-                  This is useful when you've set up your team roles but have existing projects with unassigned tasks.
-                </p>
-                <AssignUnassignedTasksButton />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-          <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-card border-border/50">
-          <CardHeader className="bg-gradient-subtle rounded-t-lg">
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5" />
-              Create New User
-            </CardTitle>
-            <CardDescription>
-              Add a new user account with email and password
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-email">Email</Label>
-                <Input
-                  id="new-email"
-                  type="email"
-                  placeholder="user@example.com"
-                  value={newUserEmail}
-                  onChange={(e) => setNewUserEmail(e.target.value)}
-                  required
-                  maxLength={255}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-password">Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={newUserPassword}
-                  onChange={(e) => setNewUserPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="auto-approve"
-                  checked={autoApprove}
-                  onChange={(e) => setAutoApprove(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <Label htmlFor="auto-approve" className="cursor-pointer text-sm">
-                  Auto-approve user
-                </Label>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" disabled={creatingUser} className="flex-1">
-                  {creatingUser ? "Creating..." : "Create User"}
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => handleSendWelcomeEmail(newUserEmail, newUserPassword)}
-                  disabled={!newUserEmail || !newUserPassword}
-                >
-                  Send Welcome Email
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            {/* Team Hub Invites */}
+            <TeamHubAdmin />
           </div>
+
+          {/* Create User + Change Password */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="shadow-card border-border/50">
+              <CardHeader className="bg-gradient-subtle rounded-t-lg">
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5" />
+                  Create New User
+                </CardTitle>
+                <CardDescription>
+                  Add a new user account with email and password
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <form onSubmit={handleCreateUser} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-email">Email</Label>
+                    <Input
+                      id="new-email"
+                      type="email"
+                      placeholder="user@example.com"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      required
+                      maxLength={255}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="auto-approve"
+                      checked={autoApprove}
+                      onChange={(e) => setAutoApprove(e.target.checked)}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    <Label htmlFor="auto-approve" className="cursor-pointer text-sm">
+                      Auto-approve user
+                    </Label>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button type="submit" disabled={creatingUser} className="flex-1">
+                      {creatingUser ? "Creating..." : "Create User"}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      onClick={() => handleSendWelcomeEmail(newUserEmail, newUserPassword)}
+                      disabled={!newUserEmail || !newUserPassword}
+                      className="flex-1 sm:flex-none"
+                    >
+                      Send Welcome Email
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
 
         <Card className="shadow-card border-border/50">
           <CardHeader className="bg-gradient-subtle rounded-t-lg">
@@ -639,19 +636,19 @@ const Admin = () => {
               {pendingUsers.map((profile) => (
                 <div
                   key={profile.id}
-                  className="p-4 border border-border/50 rounded-lg flex items-center justify-between gap-4"
+                  className="p-3 sm:p-4 border border-border/50 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
-                  <div>
-                    <p className="font-medium">{profile.email}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{profile.email}</p>
                     <p className="text-sm text-muted-foreground">
                       Requested: {new Date(profile.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <Button
                       size="sm"
                       onClick={() => updateUserStatus(profile.id, "approved")}
-                      className="gap-1"
+                      className="gap-1 flex-1 sm:flex-none"
                     >
                       <CheckCircle className="w-4 h-4" />
                       Approve
@@ -660,7 +657,7 @@ const Admin = () => {
                       size="sm"
                       variant="destructive"
                       onClick={() => updateUserStatus(profile.id, "rejected")}
-                      className="gap-1"
+                      className="gap-1 flex-1 sm:flex-none"
                     >
                       <XCircle className="w-4 h-4" />
                       Reject
@@ -689,9 +686,9 @@ const Admin = () => {
               {approvedUsers.map((profile) => (
                 <div
                   key={profile.id}
-                  className="p-4 border border-border/50 rounded-lg flex items-center justify-between gap-4"
+                  className="p-3 sm:p-4 border border-border/50 rounded-lg flex flex-col gap-3"
                 >
-                  <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium">{profile.email}</p>
                       {profile.is_admin && (
