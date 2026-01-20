@@ -3562,6 +3562,7 @@ export type Database = {
           email: string | null
           follow_up_paused: boolean | null
           ghl_contact_id: string | null
+          has_payment_method: boolean | null
           has_unread_messages: boolean | null
           id: string
           inspection_assigned_to: string | null
@@ -3604,6 +3605,7 @@ export type Database = {
           email?: string | null
           follow_up_paused?: boolean | null
           ghl_contact_id?: string | null
+          has_payment_method?: boolean | null
           has_unread_messages?: boolean | null
           id?: string
           inspection_assigned_to?: string | null
@@ -3646,6 +3648,7 @@ export type Database = {
           email?: string | null
           follow_up_paused?: boolean | null
           ghl_contact_id?: string | null
+          has_payment_method?: boolean | null
           has_unread_messages?: boolean | null
           id?: string
           inspection_assigned_to?: string | null
