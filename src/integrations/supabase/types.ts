@@ -5336,6 +5336,7 @@ export type Database = {
           unique_selling_points: string | null
           updated_at: string
           utilities: Json | null
+          vendor_access_code: string | null
           vrbo_link: string | null
           vrbo_revenue_export_url: string | null
           wastewater_system: string | null
@@ -5441,6 +5442,7 @@ export type Database = {
           unique_selling_points?: string | null
           updated_at?: string
           utilities?: Json | null
+          vendor_access_code?: string | null
           vrbo_link?: string | null
           vrbo_revenue_export_url?: string | null
           wastewater_system?: string | null
@@ -5546,6 +5548,7 @@ export type Database = {
           unique_selling_points?: string | null
           updated_at?: string
           utilities?: Json | null
+          vendor_access_code?: string | null
           vrbo_link?: string | null
           vrbo_revenue_export_url?: string | null
           wastewater_system?: string | null
