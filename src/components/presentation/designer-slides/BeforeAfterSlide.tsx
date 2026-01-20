@@ -1,20 +1,20 @@
 import { SlideLayout } from "../SlideLayout";
-import { ExternalLink, DollarSign, MapPin } from "lucide-react";
+import { ExternalLink, DollarSign } from "lucide-react";
 
 // Import before/after images - using correct paired images from PDF
-import whitehurstBefore from "@/assets/designer/whitehurst-before-new.jpg";
-import whitehurstAfter from "@/assets/designer/whitehurst-after-new.jpg";
-import southvaleBefore from "@/assets/designer/southvale-before-new.jpg";
-import southvaleAfter from "@/assets/designer/southvale-after-new.jpg";
-import justiceBefore from "@/assets/designer/justice-before-new.jpg";
-import justiceAfter from "@/assets/designer/justice-after-new.jpg";
-import lakewoodBefore from "@/assets/designer/lakewood-before-new.jpg";
-import lakewoodAfter from "@/assets/designer/lakewood-after-new.jpg";
+// Page 2 = Whitehurst (4 pairs labeled), Page 1 = other properties (3 pairs as attachments)
+import whitehurstBefore from "@/assets/designer/whitehurst-before-1.jpg";
+import whitehurstAfter from "@/assets/designer/whitehurst-after-1.jpg";
+import southvaleBefore from "@/assets/designer/southvale-before-1.jpg";
+import southvaleAfter from "@/assets/designer/southvale-after-1.jpg";
+import justiceBefore from "@/assets/designer/justice-before-1.jpg";
+import justiceAfter from "@/assets/designer/justice-after-1.jpg";
+import lakewoodBefore from "@/assets/designer/lakewood-before-1.jpg";
+import lakewoodAfter from "@/assets/designer/lakewood-after-1.jpg";
 import brushyBefore from "@/assets/designer/brushy-before.jpg";
 import brushyAfter from "@/assets/designer/brushy-after.jpg";
 import tolaniBefore from "@/assets/designer/tolani-before.jpg";
 import tolaniAfter from "@/assets/designer/tolani-after.jpg";
-
 
 interface CaseStudy {
   name: string;
@@ -56,7 +56,7 @@ const caseStudies: Record<string, CaseStudy> = {
     airbnbUrl: "https://www.airbnb.com/rooms/1395677657124996447",
     beforeImage: justiceBefore,
     afterImage: justiceAfter,
-    highlights: ["Complete makeover", "Neutral palette", "High-end finishes"],
+    highlights: ["Complete makeover", "Green accent wall", "High-end finishes"],
   },
   lakewood: {
     name: "Lakewood",
@@ -112,7 +112,7 @@ export function BeforeAfterSlide({ propertyKey }: BeforeAfterSlideProps) {
           </h2>
         </div>
 
-        {/* Before/After Comparison */}
+        {/* Before/After Comparison - Side by Side */}
         <div className="grid md:grid-cols-2 gap-6 lg:gap-8 mb-8">
           {/* Before */}
           <div className="relative group">
