@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OwnerOnboardingFormData } from '@/types/owner-onboarding';
 import { Home, User, GraduationCap } from 'lucide-react';
+import { GooglePlacesAutocomplete } from '@/components/ui/google-places-autocomplete';
 
 interface StepProps {
   formData: OwnerOnboardingFormData;
@@ -106,15 +107,15 @@ export function OwnerInfoStep({ formData, updateFormData }: StepProps) {
             <Label htmlFor="property_address" className="text-sm font-medium">
               Property Address <span className="text-red-500">*</span>
             </Label>
-            <Input
+            <GooglePlacesAutocomplete
               id="property_address"
               value={formData.property_address}
-              onChange={(e) => updateFormData({ property_address: e.target.value })}
+              onChange={(value) => updateFormData({ property_address: value })}
               placeholder="123 Main Street, Atlanta, GA 30301"
               className="h-14 mt-1"
+              onPlaceSelect={(place) => updateFormData({ property_address: place.formattedAddress })}
             />
           </div>
-
           {/* How did you find us */}
           <div className="pt-4 border-t">
             <Label htmlFor="how_did_you_find_us" className="text-sm font-medium">

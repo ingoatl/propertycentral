@@ -1,7 +1,10 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OwnerOnboardingFormData, UtilityInfo } from '@/types/owner-onboarding';
+import { Flame, AlertTriangle } from 'lucide-react';
 
 interface StepProps {
   formData: OwnerOnboardingFormData;
@@ -70,6 +73,57 @@ export function UtilitiesStep({ formData, updateFormData }: StepProps) {
             </div>
           </div>
         )}
+
+        {/* Gas Stove Question */}
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Flame className="w-5 h-5 text-orange-500" />
+              Kitchen Stove Type
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between py-3 px-4 bg-white rounded-lg">
+              <div>
+                <Label htmlFor="has_gas_stove" className="text-sm font-medium">
+                  Does the kitchen have a gas stove?
+                </Label>
+                <p className="text-xs text-muted-foreground">Gas appliances require safety equipment</p>
+              </div>
+              <Switch
+                id="has_gas_stove"
+                checked={formData.has_gas_stove}
+                onCheckedChange={(checked) => updateFormData({ 
+                  has_gas_stove: checked,
+                  natural_gas_detector_installed: checked ? formData.natural_gas_detector_installed : false
+                })}
+              />
+            </div>
+
+            {formData.has_gas_stove && (
+              <div className="flex items-center justify-between py-3 px-4 bg-white rounded-lg border border-orange-200">
+                <div>
+                  <Label htmlFor="natural_gas_detector_installed" className="text-sm font-medium">
+                    Is a natural gas detector installed?
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Required for guest safety with gas appliances</p>
+                </div>
+                <Switch
+                  id="natural_gas_detector_installed"
+                  checked={formData.natural_gas_detector_installed}
+                  onCheckedChange={(checked) => updateFormData({ natural_gas_detector_installed: checked })}
+                />
+              </div>
+            )}
+
+            {formData.has_gas_stove && !formData.natural_gas_detector_installed && (
+              <div className="flex items-start gap-2 p-3 bg-amber-100 text-amber-800 rounded-lg text-sm">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>A setup task will be created to install a natural gas detector for guest safety.</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="space-y-4 mt-6">
           <h3 className="text-lg font-semibold text-gray-900">Utility Providers</h3>

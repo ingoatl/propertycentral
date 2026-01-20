@@ -63,6 +63,8 @@ export interface OwnerOnboardingFormData {
   septic_last_pumped: string;
   septic_company: string;
   utilities: UtilityInfo[];
+  has_gas_stove: boolean;
+  natural_gas_detector_installed: boolean;
 
   // Step 4: Operations
   primary_cleaner: string;
@@ -235,6 +237,8 @@ export const initialFormData: OwnerOnboardingFormData = {
     { type: 'Internet', provider: '', account_number: '' },
     { type: 'Trash', provider: '', account_number: '' },
   ],
+  has_gas_stove: false,
+  natural_gas_detector_installed: false,
 
   // Step 4
   primary_cleaner: '',
