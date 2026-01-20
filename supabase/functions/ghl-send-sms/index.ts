@@ -45,10 +45,10 @@ serve(async (req) => {
 
     const formattedPhone = formatPhoneE164(recipientPhone);
     
-    // Use the GHL vendor number +1 404-574-1740 for vendor communications
-    // Otherwise use 404-991-5076 as default (A2P registered for maintenance)
+    // Use the GHL number +1 404-609-0955 for all vendor/maintenance communications
+    // This is the A2P registered GHL number for work orders and vendor SMS
     const isVendorMessage = !!vendorId;
-    const defaultNumber = isVendorMessage ? "+14045741740" : "+14049915076";
+    const defaultNumber = "+14046090955"; // GHL A2P registered number for all outbound
     const formattedFromNumber = formatPhoneE164(fromNumber || defaultNumber);
     
     console.log(`Sending SMS via GHL to ${formattedPhone} from ${formattedFromNumber} (vendor=${isVendorMessage})`);
@@ -140,8 +140,8 @@ serve(async (req) => {
           },
           body: new URLSearchParams({
             To: formattedPhone,
-            // CRITICAL: Always use A2P registered number for Twilio - GHL number won't work
-            From: "+14049915076",
+            // Use GHL A2P registered number for all SMS
+            From: "+14046090955",
             Body: message,
           }).toString(),
         }
