@@ -114,14 +114,14 @@ export function useTeamMessages(channelId: string | null) {
       if (error) throw error;
       if (!messages || messages.length === 0) return [];
 
-      // Fetch sender profiles separately
+      // Fetch sender profiles separately with avatar_url
       const senderIds = [...new Set(messages.map(m => m.sender_id))];
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, first_name, email')
+        .select('id, first_name, email, avatar_url')
         .in('id', senderIds);
 
-      const profileMap = new Map<string, { id: string; first_name: string | null; email: string | null }>();
+      const profileMap = new Map<string, { id: string; first_name: string | null; email: string | null; avatar_url: string | null }>();
       profiles?.forEach(p => profileMap.set(p.id, p));
 
       return messages.map(msg => ({
@@ -297,15 +297,20 @@ export function useTeamPresence() {
       if (error) throw error;
       if (!presences || presences.length === 0) return [];
 
-      // Fetch user profiles separately
+      // Fetch user profiles separately with avatar_url and job_title
       const userIds = presences.map(p => p.user_id);
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, first_name, email')
+        .select('id, first_name, email, avatar_url, job_title')
         .in('id', userIds);
 
-      const profileMap = new Map<string, { first_name: string | null; email: string | null }>();
-      profiles?.forEach(p => profileMap.set(p.id, { first_name: p.first_name, email: p.email }));
+      const profileMap = new Map<string, { first_name: string | null; email: string | null; avatar_url: string | null; job_title: string | null }>();
+      profiles?.forEach(p => profileMap.set(p.id, { 
+        first_name: p.first_name, 
+        email: p.email, 
+        avatar_url: p.avatar_url,
+        job_title: p.job_title,
+      }));
 
       return presences.map(p => ({
         ...p,

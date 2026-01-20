@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Users, Send, Mail, Loader2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Users, Send, Mail, Loader2, CheckCircle, Clock, AlertCircle, Copy, Link, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface TeamHubInvite {
@@ -17,6 +17,7 @@ interface TeamHubInvite {
   created_at: string;
   expires_at: string;
   accepted_at: string | null;
+  invite_token: string;
 }
 
 // Complete team member information for invites
@@ -139,12 +140,18 @@ export function TeamHubAdmin() {
     sendInvite.mutate(email.trim());
   };
 
+  const copyInviteLink = (token: string) => {
+    const link = `https://propertycentral.lovable.app/team-hub/invite/${token}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Invite link copied!');
+  };
+
   const getStatusBadge = (status: string, expiresAt: string) => {
     const isExpired = new Date(expiresAt) < new Date();
     
     if (status === 'accepted') {
       return (
-        <Badge variant="default" className="bg-green-500">
+        <Badge variant="default" className="bg-emerald-600 text-white">
           <CheckCircle className="h-3 w-3 mr-1" />
           Accepted
         </Badge>
@@ -200,10 +207,20 @@ export function TeamHubAdmin() {
                       Active
                     </Badge>
                   ) : hasPending ? (
-                    <Badge variant="secondary">
-                      <Clock className="h-3 w-3 mr-1" />
-                      Pending
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Pending
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => copyInviteLink(invite!.invite_token)}
+                        title="Copy invite link"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
                   ) : (
                     <Button 
                       size="sm" 
@@ -282,30 +299,59 @@ export function TeamHubAdmin() {
           </div>
         </div>
 
-        {/* Invite History */}
+        {/* Invite History with Links */}
         {invites.length > 0 && (
           <div className="space-y-3 pt-4 border-t">
-            <h4 className="font-medium">Invite History</h4>
+            <h4 className="font-medium flex items-center gap-2">
+              <Link className="h-4 w-4" />
+              Invite Links
+            </h4>
             {isLoading ? (
               <div className="flex justify-center py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : (
               <div className="space-y-2">
-                {invites.map((invite) => (
-                  <div
-                    key={invite.id}
-                    className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30"
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{invite.invitee_email}</span>
-                      <span className="text-xs text-muted-foreground">
-                        Sent {format(new Date(invite.created_at), 'MMM d, yyyy')}
-                      </span>
+                {invites.map((invite) => {
+                  const isExpired = new Date(invite.expires_at) < new Date();
+                  const isPending = invite.status === 'pending' && !isExpired;
+                  
+                  return (
+                    <div
+                      key={invite.id}
+                      className="py-2 px-3 rounded-lg bg-muted/30 space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{invite.invitee_email}</span>
+                          <span className="text-xs text-muted-foreground">
+                            Sent {format(new Date(invite.created_at), 'MMM d, yyyy')}
+                          </span>
+                        </div>
+                        {getStatusBadge(invite.status, invite.expires_at)}
+                      </div>
+                      
+                      {isPending && invite.invite_token && (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            readOnly
+                            value={`https://propertycentral.lovable.app/team-hub/invite/${invite.invite_token.slice(0, 16)}...`}
+                            className="text-xs h-8 bg-background"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyInviteLink(invite.invite_token)}
+                            className="h-8 shrink-0"
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    {getStatusBadge(invite.status, invite.expires_at)}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
