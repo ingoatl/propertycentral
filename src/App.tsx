@@ -46,6 +46,7 @@ const OwnerPortalManagement = lazy(() => import("./pages/OwnerPortalManagement")
 const SignDocument = lazy(() => import("./pages/SignDocument"));
 const BookInspection = lazy(() => import("./pages/BookInspection"));
 const OnboardingPresentation = lazy(() => import("./pages/OnboardingPresentation"));
+const DesignerPresentation = lazy(() => import("./pages/DesignerPresentation"));
 const RescheduleCall = lazy(() => import("./pages/RescheduleCall"));
 const VoicemailPlayer = lazy(() => import("./pages/VoicemailPlayer"));
 const VendorJobPortal = lazy(() => import("./pages/VendorJobPortal"));
@@ -115,6 +116,7 @@ const App = () => (
             <Route path="/owner" element={<OwnerDashboard />} />
             <Route path="/sign/:token" element={<Suspense fallback={<SigningLoader />}><SignDocument /></Suspense>} />
             <Route path="/onboarding-presentation" element={<OnboardingPresentation />} />
+            <Route path="/designer-presentation" element={<DesignerPresentation />} />
             <Route path="/reschedule/:callId" element={<RescheduleCall />} />
             <Route path="/vm/:token" element={<VoicemailPlayer />} />
             <Route path="/vendor-job/:token" element={<VendorJobPortal />} />
