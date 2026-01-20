@@ -1,6 +1,6 @@
 import { SlideLayout } from "../SlideLayout";
-import { Phone, Globe, Mail, Wrench } from "lucide-react";
-import ilanaHero from "@/assets/designer/ilana-hero.png";
+import { Phone, Globe, Mail } from "lucide-react";
+import ilanaHeadshot from "@/assets/designer/ilana-headshot.jpg";
 
 export function MeetIlanaSlide() {
   return (
@@ -16,9 +16,9 @@ export function MeetIlanaSlide() {
           <div className="flex justify-center">
             <div className="relative">
               <img
-                src={ilanaHero}
-                alt="Ilana - Handy Honey"
-                className="w-80 h-80 md:w-96 md:h-96 lg:w-[28rem] lg:h-[28rem] object-contain drop-shadow-2xl"
+                src={ilanaHeadshot}
+                alt="Ilana Weismark - Handy Honey"
+                className="w-80 h-auto md:w-96 lg:w-[28rem] object-cover rounded-2xl drop-shadow-2xl border-2 border-amber-400/30"
               />
             </div>
           </div>

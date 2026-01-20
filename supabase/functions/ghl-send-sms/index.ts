@@ -148,9 +148,20 @@ serve(async (req) => {
       );
       
       if (!twilioResponse.ok) {
-        const errorText = await twilioResponse.text();
-        console.error("Twilio error:", errorText);
-        throw new Error(`Failed to send SMS via Twilio: ${twilioResponse.status}`);
+        const errorData = await twilioResponse.json().catch(() => ({}));
+        console.error("Twilio error details:", JSON.stringify(errorData));
+        // Provide more specific error message based on Twilio error codes
+        const twilioCode = errorData.code;
+        const twilioMessage = errorData.message || `HTTP ${twilioResponse.status}`;
+        if (twilioCode === 21211) {
+          throw new Error(`Invalid phone number: ${formattedPhone} - ${twilioMessage}`);
+        } else if (twilioCode === 21608 || twilioCode === 21610) {
+          throw new Error(`Phone number unverified or blocked: ${twilioMessage}`);
+        } else if (twilioCode === 21660) {
+          throw new Error(`From number not registered for this region: ${twilioMessage}`);
+        } else {
+          throw new Error(`Twilio SMS failed (${twilioCode}): ${twilioMessage}`);
+        }
       }
       
       const twilioData = await twilioResponse.json();
