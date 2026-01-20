@@ -3578,6 +3578,7 @@ export type Database = {
           opportunity_source: string | null
           opportunity_value: number | null
           owner_id: string | null
+          payment_method: string | null
           phone: string | null
           project_id: string | null
           property_address: string | null
@@ -3586,6 +3587,7 @@ export type Database = {
           signwell_document_id: string | null
           stage: Database["public"]["Enums"]["lead_stage"]
           stage_changed_at: string | null
+          stripe_customer_id: string | null
           stripe_setup_intent_id: string | null
           tags: string[] | null
           updated_at: string
@@ -3618,6 +3620,7 @@ export type Database = {
           opportunity_source?: string | null
           opportunity_value?: number | null
           owner_id?: string | null
+          payment_method?: string | null
           phone?: string | null
           project_id?: string | null
           property_address?: string | null
@@ -3626,6 +3629,7 @@ export type Database = {
           signwell_document_id?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
           stage_changed_at?: string | null
+          stripe_customer_id?: string | null
           stripe_setup_intent_id?: string | null
           tags?: string[] | null
           updated_at?: string
@@ -3658,6 +3662,7 @@ export type Database = {
           opportunity_source?: string | null
           opportunity_value?: number | null
           owner_id?: string | null
+          payment_method?: string | null
           phone?: string | null
           project_id?: string | null
           property_address?: string | null
@@ -3666,6 +3671,7 @@ export type Database = {
           signwell_document_id?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
           stage_changed_at?: string | null
+          stripe_customer_id?: string | null
           stripe_setup_intent_id?: string | null
           tags?: string[] | null
           updated_at?: string
