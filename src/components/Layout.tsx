@@ -17,7 +17,7 @@ import { CallRecapModal } from "@/components/CallRecapModal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NotificationBell } from "@/components/team-hub/NotificationBell";
 import { useInAppNotifications } from "@/hooks/useTeamHub";
-import peachIcon from "@/assets/peach-icon.png";
+
 interface LayoutProps {
   children: ReactNode;
 }
@@ -81,7 +81,6 @@ const Layout = ({ children }: LayoutProps) => {
         <Card className="max-w-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <img src={peachIcon} alt="Peach" className="w-6 h-6" />
               Account Pending Approval
             </CardTitle>
           </CardHeader>
@@ -121,12 +120,7 @@ const Layout = ({ children }: LayoutProps) => {
           <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Left side: Logo */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <img src={peachIcon} alt="Peach" className="w-10 h-10 rounded-xl shadow-md" />
-                <div className="hidden sm:block">
-                  <h1 className="text-lg font-bold text-foreground">Property Central</h1>
-                </div>
-              </div>
+              <h1 className="text-lg font-bold text-foreground">Property Central</h1>
             </div>
 
             {/* Center: Desktop Navigation */}
