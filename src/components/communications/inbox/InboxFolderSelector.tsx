@@ -46,11 +46,11 @@ export function InboxFolderSelector({
         <Button
           variant="outline"
           size="sm"
-          className="h-8 gap-1.5 px-3 font-medium"
+          className="h-8 gap-1 px-2 font-medium max-w-[100px]"
         >
-          <Icon className="h-4 w-4" />
-          <span className="hidden sm:inline">{config.label}</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          <Icon className="h-3.5 w-3.5 shrink-0" />
+          <span className="hidden sm:inline text-xs truncate">{config.label}</span>
+          <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">

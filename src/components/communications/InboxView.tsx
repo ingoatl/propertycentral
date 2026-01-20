@@ -2389,53 +2389,46 @@ export function InboxView() {
     <div className="flex h-full md:h-[calc(100vh-8rem)] bg-background md:rounded-lg md:border overflow-hidden">
       {/* Left Panel - Message List (Hidden on mobile when viewing detail) */}
       <div className={`w-full md:w-96 lg:w-[420px] md:border-r flex flex-col ${showMobileDetail ? 'hidden md:flex' : 'flex'}`}>
-        {/* Compact tab bar - Gmail style */}
-        <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 border-b bg-background">
-          {/* Tabs */}
-          <div className="flex items-center gap-0.5 sm:gap-1 flex-1 min-w-0">
-            <button 
-              onClick={() => { setActiveTab("all"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <MessageSquare className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">All</span>
-            </button>
-            <button 
-              onClick={() => { setActiveTab("chats"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "chats" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <MessageSquare className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">SMS</span>
-            </button>
-            <button 
-              onClick={() => { setActiveTab("calls"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "calls" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <Phone className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Calls</span>
-            </button>
-            <button 
-              onClick={() => { setActiveTab("emails"); setSelectedMessage(null); setShowMobileDetail(false); }} 
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "emails" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <Mail className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Emails</span>
-            </button>
-            <button 
-              onClick={() => { setActiveTab("meetings"); setSelectedMessage(null); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "meetings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <Video className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Meetings</span>
-            </button>
+        {/* Compact tab bar - Gmail style - no overflow */}
+        <div className="flex items-center gap-1 px-2 py-2 border-b bg-background overflow-hidden">
+          {/* Tabs - compact, no wrapping */}
+          <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-hidden">
+            {[
+              { id: "all", icon: MessageSquare, label: "All" },
+              { id: "chats", icon: MessageSquare, label: "SMS" },
+              { id: "calls", icon: Phone, label: "Calls" },
+              { id: "emails", icon: Mail, label: "Emails" },
+              { id: "meetings", icon: Video, label: "Meetings" },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button 
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id as TabType);
+                    if (tab.id !== "emails") setSelectedGmailEmail(null);
+                    if (tab.id === "emails" || tab.id === "meetings") setSelectedMessage(null);
+                    setShowMobileDetail(false);
+                  }} 
+                  className={cn(
+                    "flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors shrink-0",
+                    isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
           
           {/* Search toggle */}
           <button 
             onClick={() => setSearch(search ? "" : " ")}
-            className="p-2 rounded-full text-muted-foreground hover:bg-muted shrink-0"
+            className="p-1.5 rounded-full text-muted-foreground hover:bg-muted shrink-0"
           >
-            <Search className="h-5 w-5" />
+            <Search className="h-4 w-4" />
           </button>
         </div>
 
@@ -2461,9 +2454,9 @@ export function InboxView() {
           </div>
         )}
 
-        {/* Filters row - compact with dropdown for filters - NO WRAP on desktop */}
-        <div className="px-2 sm:px-3 py-2 border-b">
-          <div className="flex items-center gap-1.5 flex-wrap md:flex-nowrap overflow-x-auto">
+        {/* Filters row - compact with dropdown for filters - NO WRAP, no horizontal scroll */}
+        <div className="px-2 py-1.5 border-b">
+          <div className="flex items-center gap-1 flex-nowrap overflow-hidden">
             {/* Notification bell */}
             <TeamNotificationBell />
             

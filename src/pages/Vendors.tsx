@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature, MessageSquare, Mic, PhoneCall, Trash2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature, MessageSquare, Mic, PhoneCall, Trash2, ClipboardList } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
@@ -16,6 +16,7 @@ import ActiveServicesOverview from "@/components/maintenance/ActiveServicesOverv
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DeleteVendorDialog from "@/components/maintenance/DeleteVendorDialog";
+import { StartWorkOrderDialog } from "@/components/maintenance/StartWorkOrderDialog";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 const Vendors = () => {
@@ -29,6 +30,7 @@ const Vendors = () => {
   const [smsDialogVendor, setSmsDialogVendor] = useState<Vendor | null>(null);
   const [deleteVendor, setDeleteVendor] = useState<Vendor | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showStartWorkOrder, setShowStartWorkOrder] = useState(false);
   const queryClient = useQueryClient();
   const { isAdmin } = useAdminCheck();
 
@@ -130,7 +132,15 @@ const Vendors = () => {
             <h1 className="text-3xl font-bold text-foreground">Vendor Management</h1>
             <p className="text-muted-foreground mt-1">Manage your network of trusted vendors</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              onClick={() => setShowStartWorkOrder(true)}
+              variant="default"
+              className="gap-2"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Start Work Order
+            </Button>
             <Button 
               variant="outline" 
               onClick={extractVendorsFromEmails} 
@@ -474,6 +484,15 @@ const Vendors = () => {
           contactId={smsDialogVendor.id}
         />
       )}
+
+      {/* Start Work Order Dialog */}
+      <StartWorkOrderDialog
+        open={showStartWorkOrder}
+        onOpenChange={setShowStartWorkOrder}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+        }}
+      />
     </>
   );
 };

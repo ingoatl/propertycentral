@@ -192,26 +192,26 @@ export function EnhancedInboxSelector({
         <Button
           variant="outline"
           size="sm"
-          className={cn("gap-2 min-w-[160px] justify-between", className)}
+          className={cn("gap-1.5 h-8 px-2.5 justify-between max-w-[140px]", className)}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
             {getSelectedIcon()}
-            <span className="hidden sm:inline truncate max-w-[120px]">
+            <span className="hidden sm:inline truncate text-xs">
               {getSelectedLabel()}
             </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 shrink-0">
             {selectedView === "my-inbox" && unreadCounts[currentUserId || ""] > 0 && (
-              <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+              <Badge variant="destructive" className="h-4 min-w-[16px] px-1 text-[10px]">
                 {unreadCounts[currentUserId || ""]}
               </Badge>
             )}
             {selectedView === "all" && totalUnread > 0 && (
-              <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">
+              <Badge variant="secondary" className="h-4 min-w-[16px] px-1 text-[10px]">
                 {totalUnread}
               </Badge>
             )}
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+            <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
           </div>
         </Button>
       </DropdownMenuTrigger>
