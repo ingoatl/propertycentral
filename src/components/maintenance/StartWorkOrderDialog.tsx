@@ -98,17 +98,20 @@ export function StartWorkOrderDialog({
     enabled: open,
   });
 
-  // Fetch maintenance book for selected property
-  const { data: maintenanceBook } = useQuery({
-    queryKey: ["property-maintenance-book-dialog", selectedProperty],
+  // Fetch onboarding data for all access codes
+  const { data: onboardingData } = useQuery({
+    queryKey: ["onboarding-access-data", selectedProperty],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("property_maintenance_book")
-        .select("lockbox_code, gate_code, alarm_code, access_instructions, vendor_access_code")
+      // Fetch directly via property_id
+      const { data: submission } = await supabase
+        .from("owner_onboarding_submissions")
+        .select("smart_lock_code, smart_lock_brand, vendor_access_code, lockbox_code, gate_code, alarm_code, garage_code, parking_instructions")
         .eq("property_id", selectedProperty)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
-      if (error) throw error;
-      return data;
+      
+      return submission;
     },
     enabled: !!selectedProperty,
   });
@@ -151,44 +154,38 @@ export function StartWorkOrderDialog({
     enabled: !!selectedProperty,
   });
 
-  // Fetch onboarding data for parking instructions
-  const { data: onboardingData } = useQuery({
-    queryKey: ["onboarding-for-work-order", selectedProperty],
-    queryFn: async () => {
-      // Get owner_id from property first
-      const { data: property } = await supabase
-        .from("properties")
-        .select("owner_id")
-        .eq("id", selectedProperty)
-        .maybeSingle();
-      
-      if (!property?.owner_id) return null;
-      
-      const { data: submission } = await supabase
-        .from("owner_onboarding_submissions")
-        .select("parking_instructions")
-        .eq("owner_id", property.owner_id)
-        .maybeSingle();
-      
-      if (!submission) return null;
-      return {
-        parking_instructions: submission.parking_instructions || null,
-      };
-    },
-    enabled: !!selectedProperty,
-  });
-
-  // Auto-populate fields when property is selected
+  // Auto-populate fields when property is selected (from onboarding data)
   useEffect(() => {
-    if (maintenanceBook) {
-      if (maintenanceBook.access_instructions && !accessInstructions) {
-        setAccessInstructions(maintenanceBook.access_instructions);
+    if (onboardingData) {
+      // Build access code from onboarding
+      const code = onboardingData.vendor_access_code || onboardingData.smart_lock_code || onboardingData.lockbox_code || "";
+      if (code && !vendorAccessCode) {
+        setVendorAccessCode(code);
       }
-      if (maintenanceBook.vendor_access_code && !vendorAccessCode) {
-        setVendorAccessCode(maintenanceBook.vendor_access_code);
+      
+      // Build access instructions
+      const accessParts: string[] = [];
+      if (onboardingData.smart_lock_brand && code) {
+        accessParts.push(`🔐 Smart Lock (${onboardingData.smart_lock_brand}): ${code}`);
+      } else if (code) {
+        accessParts.push(`🔑 Access Code: ${code}`);
+      }
+      if (onboardingData.lockbox_code && onboardingData.lockbox_code !== code) {
+        accessParts.push(`📦 Lockbox: ${onboardingData.lockbox_code}`);
+      }
+      if (onboardingData.gate_code) accessParts.push(`🚪 Gate: ${onboardingData.gate_code}`);
+      if (onboardingData.garage_code) accessParts.push(`🏠 Garage: ${onboardingData.garage_code}`);
+      if (onboardingData.alarm_code) accessParts.push(`🚨 Alarm: ${onboardingData.alarm_code}`);
+      
+      if (accessParts.length > 0 && !accessInstructions) {
+        setAccessInstructions(accessParts.join(" | "));
+      }
+      
+      if (onboardingData.parking_instructions && !parkingInstructions) {
+        setParkingInstructions(onboardingData.parking_instructions);
       }
     }
-  }, [maintenanceBook]);
+  }, [onboardingData]);
 
   // Auto-populate guest/tenant info from current booking
   useEffect(() => {
@@ -563,12 +560,12 @@ export function StartWorkOrderDialog({
                 rows={2}
                 className="text-sm"
               />
-              {maintenanceBook?.lockbox_code || maintenanceBook?.gate_code || maintenanceBook?.alarm_code ? (
+              {onboardingData?.lockbox_code || onboardingData?.gate_code || onboardingData?.alarm_code ? (
                 <p className="text-xs text-muted-foreground">
                   📋 Property codes: {[
-                    maintenanceBook?.lockbox_code && `Lockbox ${maintenanceBook.lockbox_code}`,
-                    maintenanceBook?.gate_code && `Gate ${maintenanceBook.gate_code}`,
-                    maintenanceBook?.alarm_code && `Alarm ${maintenanceBook.alarm_code}`,
+                    onboardingData?.lockbox_code && `Lockbox ${onboardingData.lockbox_code}`,
+                    onboardingData?.gate_code && `Gate ${onboardingData.gate_code}`,
+                    onboardingData?.alarm_code && `Alarm ${onboardingData.alarm_code}`,
                   ].filter(Boolean).join(', ')}
                 </p>
               ) : null}
