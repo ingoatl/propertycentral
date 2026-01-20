@@ -98,12 +98,12 @@ export function StartWorkOrderDialog({
     enabled: open,
   });
 
-  // Fetch onboarding data for all access codes
-  const { data: onboardingData } = useQuery({
-    queryKey: ["onboarding-access-data", selectedProperty],
+  // Fetch onboarding data from multiple sources
+  const { data: propertyAccessData } = useQuery({
+    queryKey: ["property-access-full", selectedProperty],
     queryFn: async () => {
-      // Fetch directly via property_id
-      const { data: submission } = await supabase
+      // Source 1: owner_onboarding_submissions via property_id
+      const { data: onboardingSubmission } = await supabase
         .from("owner_onboarding_submissions")
         .select("smart_lock_code, smart_lock_brand, vendor_access_code, lockbox_code, gate_code, alarm_code, garage_code, parking_instructions")
         .eq("property_id", selectedProperty)
@@ -111,9 +111,76 @@ export function StartWorkOrderDialog({
         .limit(1)
         .maybeSingle();
       
-      return submission;
+      // Source 2: Also try via owner_id if property has owner
+      let ownerSubmission = null;
+      if (!onboardingSubmission) {
+        const { data: property } = await supabase
+          .from("properties")
+          .select("owner_id")
+          .eq("id", selectedProperty)
+          .maybeSingle();
+        
+        if (property?.owner_id) {
+          const { data: ownerData } = await supabase
+            .from("owner_onboarding_submissions")
+            .select("smart_lock_code, smart_lock_brand, vendor_access_code, lockbox_code, gate_code, alarm_code, garage_code, parking_instructions")
+            .eq("owner_id", property.owner_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          ownerSubmission = ownerData;
+        }
+      }
+      
+      // Source 3: Fetch from onboarding_tasks via onboarding_projects
+      const { data: projectData } = await supabase
+        .from("onboarding_projects")
+        .select("id")
+        .eq("property_id", selectedProperty)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      let taskData: Record<string, string> = {};
+      if (projectData?.id) {
+        const { data: tasks } = await supabase
+          .from("onboarding_tasks")
+          .select("title, field_value")
+          .eq("project_id", projectData.id)
+          .not("field_value", "is", null);
+        
+        if (tasks) {
+          tasks.forEach(task => {
+            if (task.field_value) {
+              const titleMap: Record<string, string> = {
+                'Smart Lock Code': 'smart_lock_code',
+                'Smart Lock Brand': 'smart_lock_brand',
+                'Lockbox Code': 'lockbox_code',
+                'Gate Code': 'gate_code',
+                'Alarm Code': 'alarm_code',
+                'Garage Code': 'garage_code',
+                'Vendor Access Code': 'vendor_access_code',
+                'Parking Instructions': 'parking_instructions',
+              };
+              const fieldName = titleMap[task.title];
+              if (fieldName) {
+                taskData[fieldName] = task.field_value;
+              }
+            }
+          });
+        }
+      }
+      
+      const merged = {
+        ...taskData,
+        ...(ownerSubmission || {}),
+        ...(onboardingSubmission || {}),
+      };
+      
+      return Object.keys(merged).length > 0 ? merged : null;
     },
     enabled: !!selectedProperty,
+    staleTime: 0,
   });
 
   // Fetch current booking for selected property (guest/tenant info)
@@ -154,38 +221,49 @@ export function StartWorkOrderDialog({
     enabled: !!selectedProperty,
   });
 
-  // Auto-populate fields when property is selected (from onboarding data)
+  // Reset form fields when property changes
   useEffect(() => {
-    if (onboardingData) {
+    if (selectedProperty) {
+      setVendorAccessCode("");
+      setAccessInstructions("");
+      setParkingInstructions("");
+      setTenantContactName("");
+      setTenantContactPhone("");
+    }
+  }, [selectedProperty]);
+
+  // Auto-populate fields when property is selected (from merged data)
+  useEffect(() => {
+    if (propertyAccessData) {
       // Build access code from onboarding
-      const code = onboardingData.vendor_access_code || onboardingData.smart_lock_code || onboardingData.lockbox_code || "";
-      if (code && !vendorAccessCode) {
+      const code = propertyAccessData.vendor_access_code || propertyAccessData.smart_lock_code || propertyAccessData.lockbox_code || "";
+      if (code) {
         setVendorAccessCode(code);
       }
       
       // Build access instructions
       const accessParts: string[] = [];
-      if (onboardingData.smart_lock_brand && code) {
-        accessParts.push(`🔐 Smart Lock (${onboardingData.smart_lock_brand}): ${code}`);
+      if (propertyAccessData.smart_lock_brand && code) {
+        accessParts.push(`🔐 Smart Lock (${propertyAccessData.smart_lock_brand}): ${code}`);
       } else if (code) {
         accessParts.push(`🔑 Access Code: ${code}`);
       }
-      if (onboardingData.lockbox_code && onboardingData.lockbox_code !== code) {
-        accessParts.push(`📦 Lockbox: ${onboardingData.lockbox_code}`);
+      if (propertyAccessData.lockbox_code && propertyAccessData.lockbox_code !== code) {
+        accessParts.push(`📦 Lockbox: ${propertyAccessData.lockbox_code}`);
       }
-      if (onboardingData.gate_code) accessParts.push(`🚪 Gate: ${onboardingData.gate_code}`);
-      if (onboardingData.garage_code) accessParts.push(`🏠 Garage: ${onboardingData.garage_code}`);
-      if (onboardingData.alarm_code) accessParts.push(`🚨 Alarm: ${onboardingData.alarm_code}`);
+      if (propertyAccessData.gate_code) accessParts.push(`🚪 Gate: ${propertyAccessData.gate_code}`);
+      if (propertyAccessData.garage_code) accessParts.push(`🏠 Garage: ${propertyAccessData.garage_code}`);
+      if (propertyAccessData.alarm_code) accessParts.push(`🚨 Alarm: ${propertyAccessData.alarm_code}`);
       
-      if (accessParts.length > 0 && !accessInstructions) {
+      if (accessParts.length > 0) {
         setAccessInstructions(accessParts.join(" | "));
       }
       
-      if (onboardingData.parking_instructions && !parkingInstructions) {
-        setParkingInstructions(onboardingData.parking_instructions);
+      if (propertyAccessData.parking_instructions) {
+        setParkingInstructions(propertyAccessData.parking_instructions);
       }
     }
-  }, [onboardingData]);
+  }, [propertyAccessData]);
 
   // Auto-populate guest/tenant info from current booking
   useEffect(() => {
@@ -199,12 +277,7 @@ export function StartWorkOrderDialog({
     }
   }, [currentBooking]);
 
-  // Auto-populate parking from onboarding data
-  useEffect(() => {
-    if (onboardingData?.parking_instructions && !parkingInstructions) {
-      setParkingInstructions(onboardingData.parking_instructions);
-    }
-  }, [onboardingData]);
+  // Parking is already handled in the main useEffect above
 
   // Generate full property label
   const getPropertyLabel = (property: Property) => {
@@ -560,12 +633,12 @@ export function StartWorkOrderDialog({
                 rows={2}
                 className="text-sm"
               />
-              {onboardingData?.lockbox_code || onboardingData?.gate_code || onboardingData?.alarm_code ? (
+              {propertyAccessData?.lockbox_code || propertyAccessData?.gate_code || propertyAccessData?.alarm_code ? (
                 <p className="text-xs text-muted-foreground">
                   📋 Property codes: {[
-                    onboardingData?.lockbox_code && `Lockbox ${onboardingData.lockbox_code}`,
-                    onboardingData?.gate_code && `Gate ${onboardingData.gate_code}`,
-                    onboardingData?.alarm_code && `Alarm ${onboardingData.alarm_code}`,
+                    propertyAccessData?.lockbox_code && `Lockbox ${propertyAccessData.lockbox_code}`,
+                    propertyAccessData?.gate_code && `Gate ${propertyAccessData.gate_code}`,
+                    propertyAccessData?.alarm_code && `Alarm ${propertyAccessData.alarm_code}`,
                   ].filter(Boolean).join(', ')}
                 </p>
               ) : null}
