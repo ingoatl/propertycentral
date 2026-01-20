@@ -3891,7 +3891,7 @@ export function InboxView() {
               </Button>
             </div>
             <div className="p-4 overflow-y-auto max-h-[calc(100vh-80px)]">
-              <TeamSlackPanel 
+              <TeamHubPanel 
                 propertyId={selectedMessage?.owner_id ? undefined : undefined}
                 leadId={selectedMessage?.contact_type === "lead" ? selectedMessage?.contact_id : undefined}
                 ownerId={selectedMessage?.contact_type === "owner" ? selectedMessage?.contact_id : undefined}
