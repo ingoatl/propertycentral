@@ -44,8 +44,8 @@ serve(async (req) => {
     }
 
     const formattedPhone = formatPhoneE164(recipientPhone);
-    // Use the 404-800-5932 number as the default from number
-    const formattedFromNumber = formatPhoneE164(fromNumber || "+14048005932");
+    // Use the 404-991-5076 number as the default from number (A2P registered for maintenance)
+    const formattedFromNumber = formatPhoneE164(fromNumber || "+14049915076");
     
     console.log(`Sending SMS via GHL to ${formattedPhone} from ${formattedFromNumber}`);
 
