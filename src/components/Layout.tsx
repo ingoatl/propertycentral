@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from "react";
-import { Building2, LogOut, Bot } from "lucide-react";
+import { LogOut, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,13 +8,15 @@ import { useAuth } from "./ProtectedRoute";
 import { ChatDialog } from "@/components/ai-assistant/ChatDialog";
 import { MainNavigation } from "@/components/navigation/MainNavigation";
 import { MobileNavigation } from "@/components/navigation/MobileNavigation";
+import { MobileHeaderBar } from "@/components/navigation/MobileHeaderBar";
 import { QuickCommunicationButton } from "@/components/communications/QuickCommunicationButton";
 import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 import { TaskConfirmationModal } from "@/components/TaskConfirmationModal";
 import { CallRecapModal } from "@/components/CallRecapModal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NotificationBell } from "@/components/team-hub/NotificationBell";
-
+import { useInAppNotifications } from "@/hooks/useTeamHub";
+import peachIcon from "@/assets/peach-icon.png";
 interface LayoutProps {
   children: ReactNode;
 }
@@ -24,9 +26,15 @@ const Layout = ({ children }: LayoutProps) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasUserRole, setHasUserRole] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   
   // Real-time notifications for inbound lead messages
   useLeadRealtimeMessages();
+  
+  // Get notification count - must be called before any conditional returns
+  const { data: notifications = [] } = useInAppNotifications();
+  const unreadCount = notifications.length;
 
   useEffect(() => {
     const checkRoles = async () => {
@@ -72,7 +80,7 @@ const Layout = ({ children }: LayoutProps) => {
         <Card className="max-w-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-6 h-6" />
+              <img src={peachIcon} alt="Peach" className="w-6 h-6" />
               Account Pending Approval
             </CardTitle>
           </CardHeader>
@@ -97,16 +105,26 @@ const Layout = ({ children }: LayoutProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      <header className="bg-card/80 backdrop-blur-md border-b border-border shadow-sm sticky top-0 z-50">
+      {/* New Apple-style Mobile Header */}
+      <MobileHeaderBar
+        isAdmin={isAdmin}
+        hasUserRole={hasUserRole}
+        user={user}
+        unreadCount={unreadCount}
+        onOpenAiChat={() => setAiChatOpen(true)}
+        onOpenDialer={() => setDialerOpen(true)}
+        onOpenNotifications={() => setNotificationsOpen(true)}
+        navigationContent={<MobileNavigation isAdmin={isAdmin} />}
+      />
+      
+      {/* Desktop Header - Hidden on mobile */}
+      <header className="hidden md:block bg-card/80 backdrop-blur-md border-b border-border shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-2 sm:px-4">
           <div className="flex items-center justify-between h-14 sm:h-16">
-            {/* Left side: Mobile menu + Logo */}
+            {/* Left side: Logo */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {canAccessNav && <MobileNavigation isAdmin={isAdmin} />}
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
-                  <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
-                </div>
+                <img src={peachIcon} alt="Peach" className="w-10 h-10 rounded-xl shadow-md" />
                 <div className="hidden sm:block">
                   <h1 className="text-lg font-bold text-foreground">Property Central</h1>
                 </div>
@@ -131,7 +149,7 @@ const Layout = ({ children }: LayoutProps) => {
                       variant="outline" 
                       size="sm" 
                       onClick={() => setAiChatOpen(true)}
-                      className="shrink-0 h-9 gap-2 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-700"
+                      className="shrink-0 h-9 gap-2 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400"
                     >
                       <Bot className="h-4 w-4" />
                       <span className="hidden sm:inline">AI Assistant</span>
@@ -152,7 +170,7 @@ const Layout = ({ children }: LayoutProps) => {
                     variant="outline" 
                     size="sm" 
                     onClick={handleLogout} 
-                    className="shrink-0 h-9 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
+                    className="shrink-0 h-9"
                   >
                     <LogOut className="h-4 w-4 lg:mr-2" />
                     <span className="hidden lg:inline">Logout</span>
