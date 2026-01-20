@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Phone, MessageSquare, Mic, Video } from "lucide-react";
+import { Phone, MessageSquare, Mic, Video, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CallDialog } from "./CallDialog";
 import { SendSMSDialog } from "./SendSMSDialog";
@@ -16,6 +16,7 @@ interface CommunicationActionButtonsProps {
   contactAddress?: string | null;
   className?: string;
   variant?: 'default' | 'compact' | 'card';
+  showRecordMeeting?: boolean;
 }
 
 export function CommunicationActionButtons({
@@ -27,10 +28,12 @@ export function CommunicationActionButtons({
   contactAddress,
   className,
   variant = 'default',
+  showRecordMeeting = false,
 }: CommunicationActionButtonsProps) {
   const [showCallDialog, setShowCallDialog] = useState(false);
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showVoicemailDialog, setShowVoicemailDialog] = useState(false);
+  const [showVideoMessageDialog, setShowVideoMessageDialog] = useState(false);
   const [showMeetingsDialog, setShowMeetingsDialog] = useState(false);
 
   const hasPhone = !!contactPhone;
@@ -39,68 +42,88 @@ export function CommunicationActionButtons({
   if (variant === 'card') {
     return (
       <>
-        <div className={cn("flex gap-2", className)}>
-          <Button
-            size="sm"
-            className={cn(
-              "h-9 w-9 p-0 rounded-lg",
-              hasPhone 
-                ? "bg-primary hover:bg-primary/90 text-primary-foreground"
-                : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (hasPhone) setShowCallDialog(true);
-            }}
-            disabled={!hasPhone}
-            title="Call"
-          >
-            <Phone className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className={cn(
-              "h-9 w-9 p-0 rounded-lg",
-              !hasPhone && "cursor-not-allowed opacity-50"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (hasPhone) setShowSmsDialog(true);
-            }}
-            disabled={!hasPhone}
-            title="Text"
-          >
-            <MessageSquare className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className={cn(
-              "h-9 w-9 p-0 rounded-lg",
-              !hasPhone && "cursor-not-allowed opacity-50"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (hasPhone) setShowVoicemailDialog(true);
-            }}
-            disabled={!hasPhone}
-            title="Voice"
-          >
-            <Mic className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 w-9 p-0 rounded-lg"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMeetingsDialog(true);
-            }}
-            title="Video"
-          >
-            <Video className="h-4 w-4" />
-          </Button>
+        <div className={cn("flex flex-col gap-2", className)}>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className={cn(
+                "h-9 w-9 p-0 rounded-lg",
+                hasPhone 
+                  ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                  : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (hasPhone) setShowCallDialog(true);
+              }}
+              disabled={!hasPhone}
+              title="Call"
+            >
+              <Phone className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className={cn(
+                "h-9 w-9 p-0 rounded-lg",
+                !hasPhone && "cursor-not-allowed opacity-50"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (hasPhone) setShowSmsDialog(true);
+              }}
+              disabled={!hasPhone}
+              title="Text"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className={cn(
+                "h-9 w-9 p-0 rounded-lg",
+                !hasPhone && "cursor-not-allowed opacity-50"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (hasPhone) setShowVoicemailDialog(true);
+              }}
+              disabled={!hasPhone}
+              title="Voice"
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className={cn(
+                "h-9 w-9 p-0 rounded-lg",
+                !hasPhone && "cursor-not-allowed opacity-50"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (hasPhone) setShowVideoMessageDialog(true);
+              }}
+              disabled={!hasPhone}
+              title="Video Message"
+            >
+              <Video className="h-4 w-4" />
+            </Button>
+          </div>
+          {showRecordMeeting && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="w-full gap-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMeetingsDialog(true);
+              }}
+            >
+              <Camera className="h-4 w-4" />
+              Record Meeting
+            </Button>
+          )}
         </div>
 
         {/* Dialogs */}
@@ -125,6 +148,12 @@ export function CommunicationActionButtons({
             <SendVoicemailDialog
               open={showVoicemailDialog}
               onOpenChange={setShowVoicemailDialog}
+              recipientPhone={contactPhone}
+              recipientName={contactName}
+            />
+            <SendVoicemailDialog
+              open={showVideoMessageDialog}
+              onOpenChange={setShowVideoMessageDialog}
               recipientPhone={contactPhone}
               recipientName={contactName}
             />
@@ -182,8 +211,8 @@ export function CommunicationActionButtons({
       id: 'video',
       label: 'Video',
       icon: Video,
-      onClick: () => setShowMeetingsDialog(true),
-      disabled: false,
+      onClick: () => setShowVideoMessageDialog(true),
+      disabled: !hasPhone,
       activeColor: 'bg-background hover:bg-muted border border-border text-foreground',
       disabledColor: 'bg-muted text-muted-foreground cursor-not-allowed opacity-50',
     },
@@ -191,25 +220,41 @@ export function CommunicationActionButtons({
 
   return (
     <>
-      <div className={cn("flex gap-2", className)}>
-        {buttons.map((btn) => (
+      <div className={cn("flex flex-col gap-2", className)}>
+        <div className="flex gap-2">
+          {buttons.map((btn) => (
+            <Button
+              key={btn.id}
+              variant="ghost"
+              className={cn(
+                buttonClasses,
+                btn.disabled ? btn.disabledColor : btn.activeColor
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!btn.disabled) btn.onClick();
+              }}
+              disabled={btn.disabled}
+            >
+              <btn.icon className={iconSize} />
+              <span className={cn(textSize, "font-medium")}>{btn.label}</span>
+            </Button>
+          ))}
+        </div>
+        {showRecordMeeting && (
           <Button
-            key={btn.id}
-            variant="ghost"
-            className={cn(
-              buttonClasses,
-              btn.disabled ? btn.disabledColor : btn.activeColor
-            )}
+            variant="secondary"
+            size="sm"
+            className="w-full gap-2"
             onClick={(e) => {
               e.stopPropagation();
-              if (!btn.disabled) btn.onClick();
+              setShowMeetingsDialog(true);
             }}
-            disabled={btn.disabled}
           >
-            <btn.icon className={iconSize} />
-            <span className={cn(textSize, "font-medium")}>{btn.label}</span>
+            <Camera className="h-4 w-4" />
+            Record Meeting
           </Button>
-        ))}
+        )}
       </div>
 
       {/* Dialogs */}
@@ -236,6 +281,13 @@ export function CommunicationActionButtons({
           <SendVoicemailDialog
             open={showVoicemailDialog}
             onOpenChange={setShowVoicemailDialog}
+            recipientPhone={contactPhone}
+            recipientName={contactName}
+          />
+
+          <SendVoicemailDialog
+            open={showVideoMessageDialog}
+            onOpenChange={setShowVideoMessageDialog}
             recipientPhone={contactPhone}
             recipientName={contactName}
           />

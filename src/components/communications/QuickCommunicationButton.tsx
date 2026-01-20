@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Phone, MessageSquare, X, Delete, Users, Grid3X3, Mic, Video } from "lucide-react";
+import { Phone, MessageSquare, X, Delete, Users, Grid3X3, Mic, Video, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -42,7 +42,8 @@ export function QuickCommunicationButton() {
   const [showSMS, setShowSMS] = useState(false);
   const [showCall, setShowCall] = useState(false);
   const [showVoicemail, setShowVoicemail] = useState(false);
-  const [showMeetings, setShowMeetings] = useState(false);
+  const [showVideoMessage, setShowVideoMessage] = useState(false);
+  const [showRecordMeeting, setShowRecordMeeting] = useState(false);
   const [activeTab, setActiveTab] = useState<"search" | "dialpad">("search");
 
   // Fetch leads and owners for contact search
@@ -102,14 +103,11 @@ export function QuickCommunicationButton() {
     setPhoneNumber((prev) => prev.slice(0, -1));
   };
 
-  // Using formatPhoneForDisplay from phoneUtils
-
   const handleDialpadCall = () => {
     if (phoneNumber.length < 10) {
       toast.error("Please enter a valid phone number");
       return;
     }
-    // Create a manual contact and open the call dialog
     setSelectedContact({
       id: "manual",
       name: formatPhoneForDisplay(phoneNumber),
@@ -163,9 +161,19 @@ export function QuickCommunicationButton() {
     setOpen(false);
   };
 
-  const handleVideo = (contact: Contact) => {
+  const handleVideoMessage = (contact: Contact) => {
+    if (!contact.phone) {
+      toast.error("No phone number available");
+      return;
+    }
     setSelectedContact(contact);
-    setShowMeetings(true);
+    setShowVideoMessage(true);
+    setOpen(false);
+  };
+
+  const handleRecordMeeting = (contact: Contact) => {
+    setSelectedContact(contact);
+    setShowRecordMeeting(true);
     setOpen(false);
   };
 
@@ -185,7 +193,7 @@ export function QuickCommunicationButton() {
     setOpen(false);
   };
 
-  const handleDialpadVideo = () => {
+  const handleDialpadVideoMessage = () => {
     if (phoneNumber.length < 10) {
       toast.error("Please enter a valid phone number");
       return;
@@ -197,7 +205,23 @@ export function QuickCommunicationButton() {
       email: null,
       type: "lead",
     });
-    setShowMeetings(true);
+    setShowVideoMessage(true);
+    setOpen(false);
+  };
+
+  const handleDialpadRecordMeeting = () => {
+    if (phoneNumber.length < 10) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+    setSelectedContact({
+      id: "manual",
+      name: formatPhoneForDisplay(phoneNumber),
+      phone: phoneNumber,
+      email: null,
+      type: "lead",
+    });
+    setShowRecordMeeting(true);
     setOpen(false);
   };
 
@@ -238,7 +262,7 @@ export function QuickCommunicationButton() {
                 />
               </div>
 
-              <ScrollArea className="max-h-[300px]">
+              <ScrollArea className="max-h-[350px]">
                 {search.length < 2 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
                     Type at least 2 characters to search
@@ -248,79 +272,97 @@ export function QuickCommunicationButton() {
                     No contacts found
                   </div>
                 ) : (
-                  <div className="p-2 space-y-1">
+                  <div className="p-2 space-y-2">
                     {contacts.map((contact) => (
                       <div
                         key={`${contact.type}-${contact.id}`}
-                        className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 group"
+                        className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{contact.name}</span>
-                            <Badge variant={contact.type === "lead" ? "default" : "secondary"} className="text-xs">
-                              {contact.type}
-                            </Badge>
+                        {/* Contact Info */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium text-sm truncate block">{contact.name}</span>
+                            {contact.phone && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatPhoneForDisplay(contact.phone)}
+                              </span>
+                            )}
                           </div>
-                          {contact.phone && (
-                            <div className="text-xs text-muted-foreground truncate">
-                              {formatPhoneForDisplay(contact.phone)}
-                            </div>
-                          )}
+                          <Badge variant={contact.type === "lead" ? "default" : "secondary"} className="text-xs shrink-0">
+                            {contact.type}
+                          </Badge>
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          {contact.phone && (
-                            <>
+                        
+                        {/* Communication Buttons - Always visible */}
+                        {contact.phone && (
+                          <div className="space-y-2">
+                            {/* Primary 4 buttons */}
+                            <div className="grid grid-cols-4 gap-1.5">
                               <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 touch-manipulation"
+                                variant="default"
+                                size="sm"
+                                className="flex-col h-12 min-w-0 px-1 bg-primary hover:bg-primary/90 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleCall(contact);
                                 }}
-                                title="Call"
                               >
-                                <Phone className="h-4 w-4 text-primary" />
+                                <Phone className="h-4 w-4 shrink-0" />
+                                <span className="text-[10px]">Call</span>
                               </Button>
                               <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 touch-manipulation"
+                                variant="outline"
+                                size="sm"
+                                className="flex-col h-12 min-w-0 px-1 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleText(contact);
                                 }}
-                                title="Text"
                               >
-                                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                                <MessageSquare className="h-4 w-4 shrink-0" />
+                                <span className="text-[10px]">Text</span>
                               </Button>
                               <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 touch-manipulation"
+                                variant="outline"
+                                size="sm"
+                                className="flex-col h-12 min-w-0 px-1 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleVoicemail(contact);
                                 }}
-                                title="Voice Message"
                               >
-                                <Mic className="h-4 w-4 text-muted-foreground" />
+                                <Mic className="h-4 w-4 shrink-0" />
+                                <span className="text-[10px]">Voice</span>
                               </Button>
                               <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 touch-manipulation"
+                                variant="outline"
+                                size="sm"
+                                className="flex-col h-12 min-w-0 px-1 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleVideo(contact);
+                                  handleVideoMessage(contact);
                                 }}
-                                title="Video Meeting"
                               >
-                                <Video className="h-4 w-4 text-muted-foreground" />
+                                <Video className="h-4 w-4 shrink-0" />
+                                <span className="text-[10px]">Video</span>
                               </Button>
-                            </>
-                          )}
-                        </div>
+                            </div>
+                            
+                            {/* Record Meeting button */}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="w-full gap-2 touch-manipulation"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRecordMeeting(contact);
+                              }}
+                            >
+                              <Camera className="h-4 w-4" />
+                              <span className="text-xs">Record Meeting</span>
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -355,7 +397,7 @@ export function QuickCommunicationButton() {
                   <Button
                     key={digit}
                     variant="outline"
-                    className="h-12 text-xl font-medium"
+                    className="h-12 text-xl font-medium touch-manipulation"
                     onClick={() => handleDigitPress(digit)}
                   >
                     {digit}
@@ -363,11 +405,11 @@ export function QuickCommunicationButton() {
                 ))}
               </div>
 
-              {/* Action buttons - fixed 4-button grid with no overflow */}
+              {/* Action buttons - 4-button grid */}
               <div className="grid grid-cols-4 gap-1.5">
                 <Button
                   size="sm"
-                  className="flex-col h-12 min-w-0 px-1 bg-primary hover:bg-primary/90"
+                  className="flex-col h-12 min-w-0 px-1 bg-primary hover:bg-primary/90 touch-manipulation"
                   onClick={handleDialpadCall}
                   disabled={phoneNumber.length < 10}
                 >
@@ -377,7 +419,7 @@ export function QuickCommunicationButton() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="flex-col h-12 min-w-0 px-1"
+                  className="flex-col h-12 min-w-0 px-1 touch-manipulation"
                   onClick={handleDialpadSMS}
                   disabled={phoneNumber.length < 10}
                 >
@@ -387,7 +429,7 @@ export function QuickCommunicationButton() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="flex-col h-12 min-w-0 px-1"
+                  className="flex-col h-12 min-w-0 px-1 touch-manipulation"
                   onClick={handleDialpadVoicemail}
                   disabled={phoneNumber.length < 10}
                 >
@@ -397,14 +439,26 @@ export function QuickCommunicationButton() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="flex-col h-12 min-w-0 px-1"
-                  onClick={handleDialpadVideo}
+                  className="flex-col h-12 min-w-0 px-1 touch-manipulation"
+                  onClick={handleDialpadVideoMessage}
                   disabled={phoneNumber.length < 10}
                 >
                   <Video className="h-4 w-4 shrink-0" />
                   <span className="text-[10px] truncate">Video</span>
                 </Button>
               </div>
+
+              {/* Record Meeting button */}
+              <Button
+                size="sm"
+                variant="secondary"
+                className="w-full gap-2 touch-manipulation"
+                onClick={handleDialpadRecordMeeting}
+                disabled={phoneNumber.length < 10}
+              >
+                <Camera className="h-4 w-4" />
+                <span className="text-xs">Record Meeting</span>
+              </Button>
             </TabsContent>
           </Tabs>
         </PopoverContent>
@@ -433,7 +487,7 @@ export function QuickCommunicationButton() {
         />
       )}
 
-      {/* Voicemail Dialog */}
+      {/* Voice Message Dialog */}
       {selectedContact && selectedContact.phone && (
         <SendVoicemailDialog
           open={showVoicemail}
@@ -445,11 +499,23 @@ export function QuickCommunicationButton() {
         />
       )}
 
-      {/* Meetings/Video Dialog */}
+      {/* Video Message Dialog - Uses SendVoicemailDialog with video tab */}
+      {selectedContact && selectedContact.phone && (
+        <SendVoicemailDialog
+          open={showVideoMessage}
+          onOpenChange={setShowVideoMessage}
+          recipientPhone={selectedContact.phone}
+          recipientName={selectedContact.name}
+          leadId={selectedContact.type === "lead" && selectedContact.id !== "manual" ? selectedContact.id : undefined}
+          ownerId={selectedContact.type === "owner" && selectedContact.id !== "manual" ? selectedContact.id : undefined}
+        />
+      )}
+
+      {/* Record Meeting Dialog */}
       {selectedContact && (
         <MeetingsDialog
-          open={showMeetings}
-          onOpenChange={setShowMeetings}
+          open={showRecordMeeting}
+          onOpenChange={setShowRecordMeeting}
           contactName={selectedContact.name}
           contactEmail={selectedContact.email}
         />
