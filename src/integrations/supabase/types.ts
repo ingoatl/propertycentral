@@ -5788,7 +5788,9 @@ export type Database = {
           check_out: string | null
           cleaning_fee: number | null
           created_at: string
+          guest_email: string | null
           guest_name: string | null
+          guest_phone: string | null
           id: string
           management_fee: number
           other_fees: number | null
@@ -5809,7 +5811,9 @@ export type Database = {
           check_out?: string | null
           cleaning_fee?: number | null
           created_at?: string
+          guest_email?: string | null
           guest_name?: string | null
+          guest_phone?: string | null
           id?: string
           management_fee?: number
           other_fees?: number | null
@@ -5830,7 +5834,9 @@ export type Database = {
           check_out?: string | null
           cleaning_fee?: number | null
           created_at?: string
+          guest_email?: string | null
           guest_name?: string | null
+          guest_phone?: string | null
           id?: string
           management_fee?: number
           other_fees?: number | null

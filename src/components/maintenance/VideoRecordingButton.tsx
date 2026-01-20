@@ -48,8 +48,17 @@ export function VideoRecordingButton({
 
   const startCamera = async () => {
     try {
+      // Check if we're on a mobile device
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      // On desktop, use any available camera (webcam)
+      // On mobile, use facingMode for front/back camera switching
+      const videoConstraints = isMobile 
+        ? { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+        : { width: { ideal: 1280 }, height: { ideal: 720 } };
+      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: videoConstraints,
         audio: true
       });
       streamRef.current = stream;

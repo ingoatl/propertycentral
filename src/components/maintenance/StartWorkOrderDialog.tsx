@@ -136,14 +136,14 @@ export function StartWorkOrderDialog({
       // Fallback to ownerrez bookings
       const { data: strBooking, error: strError } = await supabase
         .from("ownerrez_bookings")
-        .select("guest_name")
+        .select("guest_name, guest_phone")
         .eq("property_id", selectedProperty)
         .lte("check_in", today)
         .gte("check_out", today)
         .maybeSingle();
       
       if (!strError && strBooking) {
-        return { name: strBooking.guest_name, phone: null };
+        return { name: strBooking.guest_name, phone: strBooking.guest_phone || null };
       }
       
       return null;
@@ -588,10 +588,10 @@ export function StartWorkOrderDialog({
 
             {showSiteDetails && (
               <div className="space-y-3 pt-2 border-t">
-                {/* Tenant Contact */}
+                {/* Guest/Tenant Contact */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Tenant/Resident Name</Label>
+                    <Label className="text-xs text-muted-foreground">Tenant/Guest Name</Label>
                     <Input
                       placeholder="John Smith"
                       value={tenantContactName}
@@ -600,7 +600,7 @@ export function StartWorkOrderDialog({
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Contact Phone</Label>
+                    <Label className="text-xs text-muted-foreground">Tenant/Guest Phone</Label>
                     <Input
                       placeholder="(555) 123-4567"
                       value={tenantContactPhone}
