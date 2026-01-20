@@ -37,8 +37,6 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
 
   const initializeDevice = async () => {
     try {
-      console.log('Getting Twilio token...');
-      
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
@@ -51,15 +49,11 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
       });
 
       if (error) {
-        console.error('Twilio token error:', error);
         throw new Error(error.message || 'Failed to get call token');
       }
       if (!data?.token) {
-        console.error('No token in response:', data);
         throw new Error('No token received from server');
       }
-
-      console.log('Token received, initializing device...');
       
       const device = new Device(data.token, {
         logLevel: 1,
@@ -67,7 +61,6 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
       });
 
       device.on('registered', () => {
-        console.log('Device registered successfully');
       });
 
       device.on('error', (err) => {

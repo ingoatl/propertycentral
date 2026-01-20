@@ -120,7 +120,6 @@ const VendorJobPortal = () => {
           filter: `id=eq.${workOrder.id}`,
         },
         (payload) => {
-          console.log('Work order realtime update:', payload);
           queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
         }
       )
@@ -260,8 +259,6 @@ const VendorJobPortal = () => {
       if (!workOrder?.id) throw new Error("No work order");
       const amount = Number(quoteAmount);
       
-      console.log("[VendorJobPortal] Submitting quote:", { amount, workOrderId: workOrder.id });
-      
       // Update work order with quote details
       const updateData: Record<string, unknown> = {
         quoted_cost: amount,
@@ -273,7 +270,6 @@ const VendorJobPortal = () => {
       // Set status based on amount - $300 threshold
       if (amount > 300) {
         updateData.status = "pending_approval";
-        console.log("[VendorJobPortal] Quote exceeds $300, setting status to pending_approval");
       }
       
       const { error } = await supabase
@@ -282,18 +278,13 @@ const VendorJobPortal = () => {
         .eq("id", workOrder.id);
       
       if (error) {
-        console.error("[VendorJobPortal] Failed to update work order:", error);
         throw error;
       }
       
-      console.log("[VendorJobPortal] Work order updated successfully");
-      
       // If quote > $300, trigger owner approval notification
       if (amount > 300) {
-        console.log("[VendorJobPortal] Invoking send-owner-approval-request edge function...");
-        
         try {
-          const { data, error: notifyError } = await supabase.functions.invoke("send-owner-approval-request", {
+          const { error: notifyError } = await supabase.functions.invoke("send-owner-approval-request", {
             body: { 
               workOrderId: workOrder.id,
               vendorNote: quoteNote || undefined
@@ -301,14 +292,11 @@ const VendorJobPortal = () => {
           });
           
           if (notifyError) {
-            console.error("[VendorJobPortal] Owner notification error:", notifyError);
             // Don't throw - quote was saved, notification is secondary
             toast.warning("Quote saved but owner notification may have failed");
-          } else {
-            console.log("[VendorJobPortal] Owner notification sent:", data);
           }
         } catch (invokeError) {
-          console.error("[VendorJobPortal] Failed to invoke edge function:", invokeError);
+          // Silent fail for notification
         }
       }
       
