@@ -30,7 +30,7 @@ serve(async (req) => {
     // Get invite details
     const { data: invite, error: inviteError } = await supabase
       .from("team_hub_invites")
-      .select("*, profiles:inviter_id(first_name, email)")
+      .select("*")
       .eq("id", inviteId)
       .single();
 
@@ -42,7 +42,16 @@ serve(async (req) => {
       );
     }
 
-    const inviterName = (invite.profiles as any)?.first_name || "Ingo";
+    // Get inviter profile separately
+    let inviterName = "The Team";
+    if (invite.inviter_id) {
+      const { data: inviterProfile } = await supabase
+        .from("profiles")
+        .select("first_name")
+        .eq("id", invite.inviter_id)
+        .single();
+      inviterName = inviterProfile?.first_name || "The Team";
+    }
     const appUrl = "https://propertycentral.lovable.app";
     const firstName = email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1);
 
