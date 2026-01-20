@@ -17,7 +17,7 @@ import {
   MapPin, Clock, CheckCircle, XCircle, 
   Camera, DollarSign, ExternalLink, Phone, Loader2, Send, 
   Building2, Play, X, Lock, Key, Shield, Copy, FileText,
-  ArrowRight, ChevronDown, ChevronUp, AlertCircle
+  ArrowRight, ChevronDown, ChevronUp, AlertCircle, Pause, Mic, Video
 } from "lucide-react";
 
 interface WorkOrderData {
@@ -35,6 +35,9 @@ interface WorkOrderData {
   quote_scope: string | null;
   quote_materials: string | null;
   quote_labor_hours: number | null;
+  voice_message_url: string | null;
+  voice_message_transcript: string | null;
+  video_url: string | null;
   property: { id: string; name: string | null; address: string | null; image_path: string | null } | null;
   assigned_vendor: { id: string; name: string; phone: string | null; company_name: string | null; billcom_vendor_id: string | null; billcom_invite_sent_at: string | null } | null;
 }
@@ -62,8 +65,10 @@ const VendorJobPortal = () => {
   const [declineReason, setDeclineReason] = useState("");
   const [showAccessCodes, setShowAccessCodes] = useState(false);
   const [showGetPaidModal, setShowGetPaidModal] = useState(false);
+  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const beforeInputRef = useRef<HTMLInputElement>(null);
   const afterInputRef = useRef<HTMLInputElement>(null);
+  const voiceAudioRef = useRef<HTMLAudioElement>(null);
 
   // Fetch work order by token
   const { data: workOrder, isLoading, error } = useQuery({
@@ -75,6 +80,7 @@ const VendorJobPortal = () => {
           id, title, description, category, urgency, status, 
           created_at, access_instructions, quoted_cost,
           vendor_accepted, completed_at, quote_scope, quote_materials, quote_labor_hours,
+          voice_message_url, voice_message_transcript, video_url,
           property:properties(id, name, address, image_path),
           assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, phone, company_name, billcom_vendor_id, billcom_invite_sent_at)
         `)
@@ -501,23 +507,23 @@ const VendorJobPortal = () => {
         {/* Property & Job Summary */}
         <Card className="border-neutral-200">
           <CardContent className="p-4">
-            <div className="flex gap-4">
-              {workOrder.property?.image_path ? (
-                <img 
-                  src={workOrder.property.image_path} 
-                  alt={workOrder.property.name || "Property"} 
-                  className="w-16 h-16 rounded object-cover flex-shrink-0"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded bg-neutral-100 flex items-center justify-center flex-shrink-0">
-                  <Building2 className="h-6 w-6 text-neutral-400" />
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <h2 className="font-semibold text-neutral-900 leading-tight">{workOrder.title}</h2>
-                <p className="text-sm text-neutral-500 mt-0.5">{workOrder.property?.name}</p>
-                <p className="text-xs text-neutral-400 mt-1 truncate">{workOrder.property?.address}</p>
+            {/* Larger Property Image */}
+            {workOrder.property?.image_path ? (
+              <img 
+                src={workOrder.property.image_path} 
+                alt={workOrder.property.name || "Property"} 
+                className="w-full h-48 rounded-lg object-cover mb-4"
+              />
+            ) : (
+              <div className="w-full h-32 rounded-lg bg-neutral-100 flex items-center justify-center mb-4">
+                <Building2 className="h-10 w-10 text-neutral-400" />
               </div>
+            )}
+            
+            <div className="min-w-0">
+              <h2 className="font-semibold text-neutral-900 text-lg leading-tight">{workOrder.title}</h2>
+              <p className="text-sm text-neutral-500 mt-0.5">{workOrder.property?.name}</p>
+              <p className="text-xs text-neutral-400 mt-1">{workOrder.property?.address}</p>
             </div>
             
             <div className="flex gap-2 mt-3">
@@ -531,7 +537,78 @@ const VendorJobPortal = () => {
               <p className="text-sm text-neutral-600 mt-3 p-3 bg-neutral-50 rounded border border-neutral-100">{workOrder.description}</p>
             )}
             
-            <Button variant="outline" className="w-full mt-3" size="sm" asChild>
+            {/* Voice Message Section */}
+            {workOrder.voice_message_url && (
+              <div className="mt-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Mic className="h-4 w-4 text-neutral-600" />
+                  <span className="text-sm font-medium text-neutral-700">Voice Instructions</span>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-neutral-200">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white flex-shrink-0"
+                    onClick={() => {
+                      if (voiceAudioRef.current) {
+                        if (isPlayingVoice) {
+                          voiceAudioRef.current.pause();
+                          setIsPlayingVoice(false);
+                        } else {
+                          voiceAudioRef.current.play();
+                          setIsPlayingVoice(true);
+                        }
+                      }
+                    }}
+                  >
+                    {isPlayingVoice ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+                  </Button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-neutral-500">Audio Message from Property Manager</p>
+                    <p className="text-sm text-neutral-700 font-medium">Tap to play</p>
+                  </div>
+                </div>
+                <audio 
+                  ref={voiceAudioRef} 
+                  src={workOrder.voice_message_url} 
+                  onEnded={() => setIsPlayingVoice(false)} 
+                  className="hidden" 
+                />
+                
+                {/* Voice Transcript */}
+                {workOrder.voice_message_transcript && (
+                  <div className="mt-3 p-3 bg-white rounded-lg border border-neutral-200">
+                    <p className="text-xs font-medium text-neutral-500 mb-1 flex items-center gap-1">
+                      <FileText className="h-3 w-3" />Transcript
+                    </p>
+                    <p className="text-sm text-neutral-700 whitespace-pre-wrap">{workOrder.voice_message_transcript}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Video Section */}
+            {workOrder.video_url && (
+              <div className="mt-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Video className="h-4 w-4 text-neutral-600" />
+                  <span className="text-sm font-medium text-neutral-700">Video Instructions</span>
+                </div>
+                
+                <div className="relative w-full rounded-lg overflow-hidden border border-neutral-200">
+                  <video 
+                    src={workOrder.video_url} 
+                    controls 
+                    className="w-full max-h-64 object-contain bg-black"
+                    playsInline
+                    preload="metadata"
+                  />
+                </div>
+              </div>
+            )}
+            
+            <Button variant="outline" className="w-full mt-4" size="sm" asChild>
               <a href={getGoogleMapsUrl()} target="_blank" rel="noopener noreferrer">
                 <MapPin className="h-4 w-4 mr-2" />Get Directions
               </a>
