@@ -35,9 +35,8 @@ export interface TeamMessage {
   sender?: {
     id: string;
     first_name: string | null;
-    last_name: string | null;
     email: string | null;
-  };
+  } | null;
   reply_count?: number;
 }
 
@@ -50,9 +49,8 @@ export interface TeamPresence {
   last_seen_at: string;
   user?: {
     first_name: string | null;
-    last_name: string | null;
     email: string | null;
-  };
+  } | null;
 }
 
 export function useTeamChannels() {
@@ -114,17 +112,19 @@ export function useTeamMessages(channelId: string | null) {
         .limit(100);
 
       if (error) throw error;
+      if (!messages || messages.length === 0) return [];
 
       // Fetch sender profiles separately
-      const senderIds = [...new Set(messages?.map(m => m.sender_id) || [])];
+      const senderIds = [...new Set(messages.map(m => m.sender_id))];
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, email')
         .in('id', senderIds);
 
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const profileMap = new Map<string, { id: string; first_name: string | null; email: string | null }>();
+      profiles?.forEach(p => profileMap.set(p.id, p));
 
-      return (messages || []).map(msg => ({
+      return messages.map(msg => ({
         ...msg,
         sender: profileMap.get(msg.sender_id) || null,
       })) as TeamMessage[];
@@ -175,14 +175,18 @@ export function useSendMessage() {
       if (error) throw error;
 
       // Send push notifications to other channel members
-      await supabase.functions.invoke('send-team-notification', {
-        body: {
-          channelId,
-          messageId: data.id,
-          senderId: user.id,
-          content,
-        },
-      });
+      try {
+        await supabase.functions.invoke('send-team-notification', {
+          body: {
+            channelId,
+            messageId: data.id,
+            senderId: user.id,
+            content,
+          },
+        });
+      } catch (e) {
+        console.error('Failed to send notifications:', e);
+      }
 
       return data;
     },
@@ -286,17 +290,19 @@ export function useTeamPresence() {
         .neq('status', 'offline');
 
       if (error) throw error;
+      if (!presences || presences.length === 0) return [];
 
       // Fetch user profiles separately
-      const userIds = presences?.map(p => p.user_id) || [];
+      const userIds = presences.map(p => p.user_id);
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, email')
         .in('id', userIds);
 
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const profileMap = new Map<string, { first_name: string | null; email: string | null }>();
+      profiles?.forEach(p => profileMap.set(p.id, { first_name: p.first_name, email: p.email }));
 
-      return (presences || []).map(p => ({
+      return presences.map(p => ({
         ...p,
         user: profileMap.get(p.user_id) || null,
       })) as TeamPresence[];
