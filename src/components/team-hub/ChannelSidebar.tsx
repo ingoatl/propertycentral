@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Hash, Lock, Users, ChevronDown } from 'lucide-react';
+import { memo, useState } from 'react';
+import { Hash, Lock, Users, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -21,9 +21,19 @@ export const ChannelSidebar = memo(function ChannelSidebar({
   unreadCounts,
   isLoading,
 }: ChannelSidebarProps) {
+  const [openSections, setOpenSections] = useState({
+    public: true,
+    private: true,
+    dm: true,
+  });
+
   const publicChannels = channels.filter(c => c.channel_type === 'public');
   const privateChannels = channels.filter(c => c.channel_type === 'private');
   const dmChannels = channels.filter(c => c.channel_type === 'dm');
+
+  const toggleSection = (section: 'public' | 'private' | 'dm') => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const renderChannel = (channel: TeamChannel) => {
     const unreadCount = unreadCounts[channel.id] || 0;
@@ -34,8 +44,9 @@ export const ChannelSidebar = memo(function ChannelSidebar({
         key={channel.id}
         onClick={() => onSelectChannel(channel.id)}
         className={cn(
-          'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-          'hover:bg-accent hover:text-accent-foreground',
+          'w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-sm transition-colors',
+          'hover:bg-accent hover:text-accent-foreground active:scale-[0.98]',
+          'min-h-[44px]', // Mobile touch target
           isSelected && 'bg-accent text-accent-foreground font-medium',
           !isSelected && unreadCount > 0 && 'font-semibold'
         )}
@@ -57,12 +68,43 @@ export const ChannelSidebar = memo(function ChannelSidebar({
     );
   };
 
+  const renderSection = (
+    title: string,
+    channels: TeamChannel[],
+    section: 'public' | 'private' | 'dm'
+  ) => {
+    if (channels.length === 0) return null;
+
+    const totalUnread = channels.reduce((sum, c) => sum + (unreadCounts[c.id] || 0), 0);
+
+    return (
+      <Collapsible open={openSections[section]} onOpenChange={() => toggleSection(section)}>
+        <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-2 w-full hover:text-foreground min-h-[40px]">
+          {openSections[section] ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
+          <span className="flex-1 text-left">{title}</span>
+          {totalUnread > 0 && (
+            <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+              {totalUnread}
+            </Badge>
+          )}
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-0.5 mt-1">
+          {channels.map(renderChannel)}
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
+
   if (isLoading) {
     return (
-      <div className="w-64 border-r bg-muted/30 p-4">
+      <div className="w-full md:w-64 border-r bg-muted/30 p-4 h-full">
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-8 bg-muted animate-pulse rounded-md" />
+            <div key={i} className="h-10 bg-muted animate-pulse rounded-md" />
           ))}
         </div>
       </div>
@@ -70,54 +112,22 @@ export const ChannelSidebar = memo(function ChannelSidebar({
   }
 
   return (
-    <div className="w-64 border-r bg-muted/30 flex flex-col">
+    <div className="w-full md:w-64 border-r bg-muted/30 flex flex-col h-full">
       <div className="p-4 border-b">
         <h2 className="font-bold text-lg flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
           Team Hub
         </h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          {channels.length} channels
+        </p>
       </div>
       
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-4">
-          {/* Public Channels */}
-          {publicChannels.length > 0 && (
-            <Collapsible defaultOpen>
-              <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 w-full hover:text-foreground">
-                <ChevronDown className="h-3 w-3" />
-                Channels
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0.5 mt-1">
-                {publicChannels.map(renderChannel)}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* Private Channels */}
-          {privateChannels.length > 0 && (
-            <Collapsible defaultOpen>
-              <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 w-full hover:text-foreground">
-                <ChevronDown className="h-3 w-3" />
-                Private Channels
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0.5 mt-1">
-                {privateChannels.map(renderChannel)}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* Direct Messages */}
-          {dmChannels.length > 0 && (
-            <Collapsible defaultOpen>
-              <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 w-full hover:text-foreground">
-                <ChevronDown className="h-3 w-3" />
-                Direct Messages
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0.5 mt-1">
-                {dmChannels.map(renderChannel)}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+        <div className="p-2 space-y-2">
+          {renderSection('Channels', publicChannels, 'public')}
+          {renderSection('Private Channels', privateChannels, 'private')}
+          {renderSection('Direct Messages', dmChannels, 'dm')}
         </div>
       </ScrollArea>
     </div>
