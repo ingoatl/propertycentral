@@ -208,9 +208,10 @@ interface GmailEmail {
 }
 
 // Normalize phone number to last 10 digits for comparison - strips ALL non-digit characters including Unicode
-const normalizePhone = (phone: string): string => {
-  // Remove ALL non-digit characters including invisible Unicode formatting
-  return phone.replace(/[^\d]/g, '').slice(-10);
+const normalizePhone = (phone: string | number | null | undefined): string => {
+  if (!phone) return "";
+  // Convert to string first in case it's a number, then remove ALL non-digit characters
+  return String(phone).replace(/[^\d]/g, '').slice(-10);
 };
 
 export function InboxView() {
@@ -2194,9 +2195,18 @@ export function InboxView() {
     
     // Add SMS/Call communications
     for (const comm of filteredComms) {
-      // Create unique key based on contact phone, email, or id
-      const key = comm.contact_phone ? normalizePhone(comm.contact_phone) : 
-                  comm.contact_email || comm.contact_id;
+      // Create unique key based on: lead_id (most reliable), then phone, then email, then id
+      // For leads, use lead_id as primary key to ensure all comms for same lead are grouped
+      let key: string;
+      if (comm.contact_type === "lead" && comm.contact_id) {
+        key = `lead:${comm.contact_id}`;
+      } else if (comm.contact_type === "owner" && comm.owner_id) {
+        key = `owner:${comm.owner_id}`;
+      } else if (comm.contact_phone) {
+        key = normalizePhone(comm.contact_phone);
+      } else {
+        key = comm.contact_email || comm.contact_id;
+      }
       const existing = contactMap.get(key) || [];
       existing.push(comm);
       contactMap.set(key, existing);
@@ -2342,12 +2352,20 @@ export function InboxView() {
     
     const filteredComms = enhancedCommunications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
     
-    // First, group by contact (phone or email) to show only latest message per contact
+    // First, group by contact - use lead_id/owner_id for reliability, then phone, then email
     const contactMap = new Map<string, CommunicationItem[]>();
     for (const comm of filteredComms) {
-      // Create unique key based on contact phone, email, or id
-      const key = comm.contact_phone ? normalizePhone(comm.contact_phone) : 
-                  comm.contact_email || comm.contact_id;
+      // Create unique key - prioritize lead_id/owner_id for consistent grouping
+      let key: string;
+      if (comm.contact_type === "lead" && comm.contact_id) {
+        key = `lead:${comm.contact_id}`;
+      } else if (comm.contact_type === "owner" && comm.owner_id) {
+        key = `owner:${comm.owner_id}`;
+      } else if (comm.contact_phone) {
+        key = normalizePhone(comm.contact_phone);
+      } else {
+        key = comm.contact_email || comm.contact_id;
+      }
       const existing = contactMap.get(key) || [];
       existing.push(comm);
       contactMap.set(key, existing);
@@ -3591,9 +3609,9 @@ export function InboxView() {
                                       ? "bg-primary text-primary-foreground" 
                                       : "bg-muted"
                                   }`}>
-                                    {/* Call Recording Player - styled like screenshot */}
+                                    {/* Call Recording Player - render OUTSIDE the colored bubble */}
                                     {msg.type === "call" && msg.call_recording_url && (
-                                      <div className="mb-2 -mx-5 -mt-3 px-0 pt-0">
+                                      <div className="mb-2">
                                         <CallRecordingPlayer
                                           recordingUrl={msg.call_recording_url}
                                           duration={msg.call_duration}
