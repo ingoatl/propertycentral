@@ -167,7 +167,7 @@ serve(async (req) => {
       </p>
       
       <div style="text-align: center; margin: 32px 0;">
-        <a href="${session.url}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 18px 48px; border-radius: 10px; font-weight: 600; font-size: 17px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
+        <a href="${siteUrl}/owner-payment-setup?owner=${ownerId}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 18px 48px; border-radius: 10px; font-weight: 600; font-size: 17px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
           Set Up My Payment Method →
         </a>
       </div>
@@ -185,7 +185,7 @@ serve(async (req) => {
       </p>
       
       <p style="color: #a0aec0; font-size: 12px; margin-top: 20px;">
-        This link will expire in 24 hours. If you need a new one, just let us know.
+        This link won't expire — complete setup whenever you're ready!
       </p>
     </div>
     
