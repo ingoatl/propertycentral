@@ -55,6 +55,7 @@ interface MaintenanceBook {
   gate_code: string | null;
   alarm_code: string | null;
   access_instructions: string | null;
+  vendor_access_code: string | null;
 }
 
 const VendorJobPortal = () => {
@@ -136,7 +137,7 @@ const VendorJobPortal = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("property_maintenance_book")
-        .select("lockbox_code, gate_code, alarm_code, access_instructions")
+        .select("lockbox_code, gate_code, alarm_code, access_instructions, vendor_access_code")
         .eq("property_id", workOrder!.property!.id)
         .maybeSingle();
       
@@ -441,10 +442,11 @@ const VendorJobPortal = () => {
 
   const hasAccessCodes = maintenanceBook?.lockbox_code || maintenanceBook?.gate_code || maintenanceBook?.alarm_code;
   const accessInstructions = maintenanceBook?.access_instructions || workOrder.access_instructions;
+  const vendorAccessCode = maintenanceBook?.vendor_access_code || (workOrder as any).vendor_access_code;
   const isPendingApproval = workOrder.status === "pending_approval" || workOrder.status === "awaiting_approval";
   
   // Check for any site access info
-  const hasSiteInfo = hasAccessCodes || accessInstructions || 
+  const hasSiteInfo = hasAccessCodes || accessInstructions || vendorAccessCode ||
     workOrder.tenant_contact_name || workOrder.tenant_contact_phone ||
     workOrder.pets_on_property || workOrder.parking_instructions ||
     workOrder.utility_shutoff_notes || workOrder.safety_notes;
@@ -656,6 +658,21 @@ const VendorJobPortal = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-3">
+              {/* Vendor Access Code - PROMINENT */}
+              {vendorAccessCode && (
+                <div className="p-4 bg-primary/10 border-2 border-primary rounded-lg">
+                  <p className="text-[10px] text-primary font-bold uppercase tracking-wide mb-2 flex items-center gap-1">
+                    🔑 VENDOR ACCESS CODE
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono text-2xl font-bold text-primary tracking-wider">{vendorAccessCode}</p>
+                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(vendorAccessCode, "Vendor Access Code")} className="h-10 touch-manipulation">
+                      <Copy className="h-4 w-4 mr-1" />Copy
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Entry Codes */}
               {hasAccessCodes && (
                 <div className="space-y-2">

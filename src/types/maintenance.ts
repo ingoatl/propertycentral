@@ -84,6 +84,7 @@ export interface WorkOrder {
   owner_notified: boolean;
   
   // Site Access & Safety Info
+  vendor_access_code?: string;
   tenant_contact_name?: string;
   tenant_contact_phone?: string;
   pets_on_property?: string;
@@ -184,6 +185,7 @@ export interface PropertyMaintenanceBook {
   maintenance_notes?: string;
   special_instructions?: string;
   access_instructions?: string;
+  vendor_access_code?: string;
   lockbox_code?: string;
   gate_code?: string;
   alarm_code?: string;

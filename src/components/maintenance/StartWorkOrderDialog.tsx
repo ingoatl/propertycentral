@@ -60,6 +60,7 @@ export function StartWorkOrderDialog({
   
   // Access & Site Info state
   const [accessInstructions, setAccessInstructions] = useState("");
+  const [vendorAccessCode, setVendorAccessCode] = useState("");
   const [tenantContactName, setTenantContactName] = useState("");
   const [tenantContactPhone, setTenantContactPhone] = useState("");
   const [petsOnProperty, setPetsOnProperty] = useState("");
@@ -103,7 +104,7 @@ export function StartWorkOrderDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("property_maintenance_book")
-        .select("lockbox_code, gate_code, alarm_code, access_instructions")
+        .select("lockbox_code, gate_code, alarm_code, access_instructions, vendor_access_code")
         .eq("property_id", selectedProperty)
         .maybeSingle();
       if (error) throw error;
@@ -112,12 +113,101 @@ export function StartWorkOrderDialog({
     enabled: !!selectedProperty,
   });
 
-  // Auto-populate access instructions from maintenance book
+  // Fetch current booking for selected property (guest/tenant info)
+  const { data: currentBooking } = useQuery({
+    queryKey: ["current-booking-for-work-order", selectedProperty],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // First check mid-term bookings
+      const { data: midTermBooking, error: midTermError } = await supabase
+        .from("mid_term_bookings")
+        .select("tenant_name, tenant_phone")
+        .eq("property_id", selectedProperty)
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .eq("status", "active")
+        .maybeSingle();
+      
+      if (!midTermError && midTermBooking) {
+        return { name: midTermBooking.tenant_name, phone: midTermBooking.tenant_phone };
+      }
+      
+      // Fallback to ownerrez bookings
+      const { data: strBooking, error: strError } = await supabase
+        .from("ownerrez_bookings")
+        .select("guest_name")
+        .eq("property_id", selectedProperty)
+        .lte("check_in", today)
+        .gte("check_out", today)
+        .maybeSingle();
+      
+      if (!strError && strBooking) {
+        return { name: strBooking.guest_name, phone: null };
+      }
+      
+      return null;
+    },
+    enabled: !!selectedProperty,
+  });
+
+  // Fetch onboarding data for parking instructions
+  const { data: onboardingData } = useQuery({
+    queryKey: ["onboarding-for-work-order", selectedProperty],
+    queryFn: async () => {
+      // Get owner_id from property first
+      const { data: property } = await supabase
+        .from("properties")
+        .select("owner_id")
+        .eq("id", selectedProperty)
+        .maybeSingle();
+      
+      if (!property?.owner_id) return null;
+      
+      const { data: submission } = await supabase
+        .from("owner_onboarding_submissions")
+        .select("parking_instructions")
+        .eq("owner_id", property.owner_id)
+        .maybeSingle();
+      
+      if (!submission) return null;
+      return {
+        parking_instructions: submission.parking_instructions || null,
+      };
+    },
+    enabled: !!selectedProperty,
+  });
+
+  // Auto-populate fields when property is selected
   useEffect(() => {
-    if (maintenanceBook?.access_instructions && !accessInstructions) {
-      setAccessInstructions(maintenanceBook.access_instructions);
+    if (maintenanceBook) {
+      if (maintenanceBook.access_instructions && !accessInstructions) {
+        setAccessInstructions(maintenanceBook.access_instructions);
+      }
+      if (maintenanceBook.vendor_access_code && !vendorAccessCode) {
+        setVendorAccessCode(maintenanceBook.vendor_access_code);
+      }
     }
   }, [maintenanceBook]);
+
+  // Auto-populate guest/tenant info from current booking
+  useEffect(() => {
+    if (currentBooking) {
+      if (currentBooking.name && !tenantContactName) {
+        setTenantContactName(currentBooking.name);
+      }
+      if (currentBooking.phone && !tenantContactPhone) {
+        setTenantContactPhone(currentBooking.phone);
+      }
+    }
+  }, [currentBooking]);
+
+  // Auto-populate parking from onboarding data
+  useEffect(() => {
+    if (onboardingData?.parking_instructions && !parkingInstructions) {
+      setParkingInstructions(onboardingData.parking_instructions);
+    }
+  }, [onboardingData]);
 
   // Generate full property label
   const getPropertyLabel = (property: Property) => {
@@ -262,6 +352,7 @@ export function StartWorkOrderDialog({
         video_url: videoMessageUrl,
         // Access & Site Info
         access_instructions: accessInstructions || null,
+        vendor_access_code: vendorAccessCode || null,
         tenant_contact_name: tenantContactName || null,
         tenant_contact_phone: tenantContactPhone || null,
         pets_on_property: petsOnProperty || null,
@@ -328,6 +419,7 @@ export function StartWorkOrderDialog({
       setPriority("normal");
       setCategory("general_maintenance");
       setAccessInstructions("");
+      setVendorAccessCode("");
       setTenantContactName("");
       setTenantContactPhone("");
       setPetsOnProperty("");
