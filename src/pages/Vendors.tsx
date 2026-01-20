@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, MessageSquare, PhoneCall, Trash2, ClipboardList, Mic, Video } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, MessageSquare, PhoneCall, Trash2, ClipboardList, Mic, Video, Camera } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
@@ -38,6 +38,7 @@ const Vendors = () => {
   const [smsDialogVendor, setSmsDialogVendor] = useState<Vendor | null>(null);
   const [voicemailDialogVendor, setVoicemailDialogVendor] = useState<Vendor | null>(null);
   const [videoDialogVendor, setVideoDialogVendor] = useState<Vendor | null>(null);
+  const [meetingDialogVendor, setMeetingDialogVendor] = useState<Vendor | null>(null);
   const [deleteVendor, setDeleteVendor] = useState<Vendor | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showStartWorkOrder, setShowStartWorkOrder] = useState(false);
@@ -257,8 +258,11 @@ const Vendors = () => {
                         <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setVoicemailDialogVendor(vendor); }} title="Voice">
                           <Mic className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setVideoDialogVendor(vendor); }} title="Video">
+                        <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setVideoDialogVendor(vendor); }} title="Video Message">
                           <Video className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="secondary" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setMeetingDialogVendor(vendor); }} title="Record Meeting">
+                          <Camera className="h-4 w-4" />
                         </Button>
                       </>
                     )}
@@ -294,12 +298,21 @@ const Vendors = () => {
           recipientName={voicemailDialogVendor.name}
         />
       )}
-      {videoDialogVendor && (
-        <MeetingsDialog
+      {videoDialogVendor && videoDialogVendor.phone && (
+        <SendVoicemailDialog
           open={!!videoDialogVendor}
           onOpenChange={(open) => !open && setVideoDialogVendor(null)}
-          contactName={videoDialogVendor.name}
-          contactEmail={videoDialogVendor.email}
+          recipientPhone={videoDialogVendor.phone}
+          recipientName={videoDialogVendor.name}
+          vendorId={videoDialogVendor.id}
+        />
+      )}
+      {meetingDialogVendor && (
+        <MeetingsDialog
+          open={!!meetingDialogVendor}
+          onOpenChange={(open) => !open && setMeetingDialogVendor(null)}
+          contactName={meetingDialogVendor.name}
+          contactEmail={meetingDialogVendor.email}
         />
       )}
       {deleteVendor && <DeleteVendorDialog open={!!deleteVendor} onOpenChange={(open) => !open && setDeleteVendor(null)} vendorName={deleteVendor.name} onConfirm={handleDeleteVendor} isDeleting={isDeleting} />}

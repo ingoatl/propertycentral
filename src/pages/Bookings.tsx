@@ -1048,13 +1048,13 @@ const Bookings = () => {
         />
       )}
 
-      {/* Video Meeting Dialog */}
-      {selectedGuest && (
-        <MeetingsDialog
+      {/* Video Message Dialog */}
+      {selectedGuest && selectedGuest.phone && (
+        <SendVoicemailDialog
           open={videoOpen}
           onOpenChange={setVideoOpen}
-          contactName={selectedGuest.name}
-          contactEmail={selectedGuest.email || null}
+          recipientPhone={selectedGuest.phone}
+          recipientName={selectedGuest.name}
         />
       )}
     </div>

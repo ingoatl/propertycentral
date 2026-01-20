@@ -53,6 +53,7 @@ import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DirectCallButton from "./DirectCallButton";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
+import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDialog";
 import { SendStripeAuthButton } from "./SendStripeAuthButton";
 import { MeetingsDialog } from "@/components/communications/MeetingsDialog";
 import { ExpandableMessageInput } from "@/components/communications/ExpandableMessageInput";
@@ -1307,13 +1308,16 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         </Dialog>
       )}
 
-      {/* Video Meeting Dialog */}
-      <MeetingsDialog
-        open={showVideoDialog}
-        onOpenChange={setShowVideoDialog}
-        contactName={lead.name}
-        contactEmail={lead.email}
-      />
+      {/* Video Message Dialog */}
+      {lead.phone && (
+        <SendVoicemailDialog
+          open={showVideoDialog}
+          onOpenChange={setShowVideoDialog}
+          recipientPhone={lead.phone}
+          recipientName={lead.name}
+          leadId={lead.id}
+        />
+      )}
     </Dialog>
   );
 };
