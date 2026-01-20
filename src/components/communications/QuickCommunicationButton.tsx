@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SendSMSDialog } from "./SendSMSDialog";
 import { CallDialog } from "./CallDialog";
 import { SendVoicemailDialog } from "./SendVoicemailDialog";
+import { MeetingsDialog } from "./MeetingsDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -41,6 +42,7 @@ export function QuickCommunicationButton() {
   const [showSMS, setShowSMS] = useState(false);
   const [showCall, setShowCall] = useState(false);
   const [showVoicemail, setShowVoicemail] = useState(false);
+  const [showMeetings, setShowMeetings] = useState(false);
   const [activeTab, setActiveTab] = useState<"search" | "dialpad">("search");
 
   // Fetch leads and owners for contact search
@@ -161,6 +163,12 @@ export function QuickCommunicationButton() {
     setOpen(false);
   };
 
+  const handleVideo = (contact: Contact) => {
+    setSelectedContact(contact);
+    setShowMeetings(true);
+    setOpen(false);
+  };
+
   const handleDialpadVoicemail = () => {
     if (phoneNumber.length < 10) {
       toast.error("Please enter a valid phone number");
@@ -189,7 +197,7 @@ export function QuickCommunicationButton() {
       email: null,
       type: "lead",
     });
-    setShowVoicemail(true); // Video is a tab inside voicemail dialog
+    setShowMeetings(true);
     setOpen(false);
   };
 
@@ -269,7 +277,7 @@ export function QuickCommunicationButton() {
                                 onClick={() => handleCall(contact)}
                                 title="Call"
                               >
-                                <Phone className="h-4 w-4 text-green-600" />
+                                <Phone className="h-4 w-4 text-primary" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -278,7 +286,7 @@ export function QuickCommunicationButton() {
                                 onClick={() => handleText(contact)}
                                 title="Text"
                               >
-                                <MessageSquare className="h-4 w-4 text-blue-600" />
+                                <MessageSquare className="h-4 w-4 text-muted-foreground" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -287,16 +295,16 @@ export function QuickCommunicationButton() {
                                 onClick={() => handleVoicemail(contact)}
                                 title="Voice Message"
                               >
-                                <Mic className="h-4 w-4 text-amber-600" />
+                                <Mic className="h-4 w-4 text-muted-foreground" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => handleVoicemail(contact)}
-                                title="Video Message"
+                                onClick={() => handleVideo(contact)}
+                                title="Video Meeting"
                               >
-                                <Video className="h-4 w-4 text-purple-600" />
+                                <Video className="h-4 w-4 text-muted-foreground" />
                               </Button>
                             </>
                           )}
@@ -343,42 +351,46 @@ export function QuickCommunicationButton() {
                 ))}
               </div>
 
-              {/* Action buttons - 4 buttons grid for mobile */}
-              <div className="grid grid-cols-4 gap-2">
+              {/* Action buttons - fixed 4-button grid with no overflow */}
+              <div className="grid grid-cols-4 gap-1.5">
                 <Button
-                  className="flex-col h-auto py-2 bg-green-600 hover:bg-green-700"
+                  size="sm"
+                  className="flex-col h-12 min-w-0 px-1 bg-primary hover:bg-primary/90"
                   onClick={handleDialpadCall}
                   disabled={phoneNumber.length < 10}
                 >
-                  <Phone className="h-4 w-4 mb-1" />
-                  <span className="text-xs">Call</span>
+                  <Phone className="h-4 w-4 shrink-0" />
+                  <span className="text-[10px] truncate">Call</span>
                 </Button>
                 <Button
+                  size="sm"
                   variant="outline"
-                  className="flex-col h-auto py-2"
+                  className="flex-col h-12 min-w-0 px-1"
                   onClick={handleDialpadSMS}
                   disabled={phoneNumber.length < 10}
                 >
-                  <MessageSquare className="h-4 w-4 mb-1" />
-                  <span className="text-xs">Text</span>
+                  <MessageSquare className="h-4 w-4 shrink-0" />
+                  <span className="text-[10px] truncate">Text</span>
                 </Button>
                 <Button
+                  size="sm"
                   variant="outline"
-                  className="flex-col h-auto py-2"
+                  className="flex-col h-12 min-w-0 px-1"
                   onClick={handleDialpadVoicemail}
                   disabled={phoneNumber.length < 10}
                 >
-                  <Mic className="h-4 w-4 mb-1" />
-                  <span className="text-xs">Voice</span>
+                  <Mic className="h-4 w-4 shrink-0" />
+                  <span className="text-[10px] truncate">Voice</span>
                 </Button>
                 <Button
+                  size="sm"
                   variant="outline"
-                  className="flex-col h-auto py-2"
+                  className="flex-col h-12 min-w-0 px-1"
                   onClick={handleDialpadVideo}
                   disabled={phoneNumber.length < 10}
                 >
-                  <Video className="h-4 w-4 mb-1" />
-                  <span className="text-xs">Video</span>
+                  <Video className="h-4 w-4 shrink-0" />
+                  <span className="text-[10px] truncate">Video</span>
                 </Button>
               </div>
             </TabsContent>
@@ -418,6 +430,16 @@ export function QuickCommunicationButton() {
           recipientName={selectedContact.name}
           leadId={selectedContact.type === "lead" && selectedContact.id !== "manual" ? selectedContact.id : undefined}
           ownerId={selectedContact.type === "owner" && selectedContact.id !== "manual" ? selectedContact.id : undefined}
+        />
+      )}
+
+      {/* Meetings/Video Dialog */}
+      {selectedContact && (
+        <MeetingsDialog
+          open={showMeetings}
+          onOpenChange={setShowMeetings}
+          contactName={selectedContact.name}
+          contactEmail={selectedContact.email}
         />
       )}
     </>
