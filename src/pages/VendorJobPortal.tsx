@@ -513,15 +513,22 @@ const VendorJobPortal = () => {
               <img 
                 src={workOrder.property.image_path} 
                 alt={workOrder.property.name || "Property"} 
-                className="w-full h-48 rounded-lg object-cover mb-4"
+                className="w-full h-48 rounded-lg object-cover"
               />
             ) : (
-              <div className="w-full h-32 rounded-lg bg-neutral-100 flex items-center justify-center mb-4">
+              <div className="w-full h-32 rounded-lg bg-neutral-100 flex items-center justify-center">
                 <Building2 className="h-10 w-10 text-neutral-400" />
               </div>
             )}
             
-            <div className="min-w-0">
+            {/* Get Directions - Prominent placement below image */}
+            <Button className="w-full mt-3 bg-neutral-900 hover:bg-neutral-800 text-white h-12 text-base touch-manipulation" asChild>
+              <a href={getGoogleMapsUrl()} target="_blank" rel="noopener noreferrer">
+                <MapPin className="h-5 w-5 mr-2" />Get Directions
+              </a>
+            </Button>
+            
+            <div className="min-w-0 mt-4">
               <h2 className="font-semibold text-neutral-900 text-lg leading-tight">{workOrder.title}</h2>
               <p className="text-sm text-neutral-500 mt-0.5">{workOrder.property?.name}</p>
               <p className="text-xs text-neutral-400 mt-1">{workOrder.property?.address}</p>
@@ -621,12 +628,6 @@ const VendorJobPortal = () => {
                 </div>
               </div>
             )}
-            
-            <Button variant="outline" className="w-full mt-4" size="sm" asChild>
-              <a href={getGoogleMapsUrl()} target="_blank" rel="noopener noreferrer">
-                <MapPin className="h-4 w-4 mr-2" />Get Directions
-              </a>
-            </Button>
           </CardContent>
         </Card>
 
@@ -988,9 +989,7 @@ const VendorJobPortal = () => {
                   <div>
                     <p className="font-medium text-sm text-foreground">Get Paid</p>
                     <p className="text-xs text-muted-foreground">
-                      {workOrder.assigned_vendor?.billcom_vendor_id 
-                        ? "Submit your invoice via Bill.com"
-                        : "Join Bill.com for fast payment"}
+                      Get paid fast by using Bill.com
                     </p>
                   </div>
                 </div>
