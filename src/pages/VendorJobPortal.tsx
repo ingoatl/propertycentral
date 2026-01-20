@@ -3,35 +3,36 @@ import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { 
   MapPin, Clock, AlertTriangle, CheckCircle, XCircle, 
   Camera, DollarSign, ExternalLink, Phone, Loader2, Send, 
-  ChevronDown, ChevronUp, Building2, Play, X
+  Building2, Play, X, Lock, Key, Shield, Copy, FileText,
+  ArrowRight, Info
 } from "lucide-react";
 
-const URGENCY_CONFIG: Record<string, { label: string; color: string; bgColor: string; borderColor: string }> = {
-  low: { label: "Low Priority", color: "text-green-700", bgColor: "bg-green-100", borderColor: "border-green-300" },
-  normal: { label: "Normal", color: "text-blue-700", bgColor: "bg-blue-100", borderColor: "border-blue-300" },
-  medium: { label: "Medium Priority", color: "text-yellow-700", bgColor: "bg-yellow-100", borderColor: "border-yellow-300" },
-  high: { label: "High Priority", color: "text-orange-700", bgColor: "bg-orange-100", borderColor: "border-orange-300" },
-  emergency: { label: "🚨 Emergency", color: "text-red-700", bgColor: "bg-red-100", borderColor: "border-red-300" },
+const URGENCY_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  low: { label: "Low", variant: "secondary" },
+  normal: { label: "Normal", variant: "outline" },
+  medium: { label: "Medium", variant: "default" },
+  high: { label: "High", variant: "destructive" },
+  emergency: { label: "Emergency", variant: "destructive" },
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  new: { label: "New", color: "text-gray-700", bgColor: "bg-gray-100" },
-  dispatched: { label: "Awaiting Your Response", color: "text-amber-700", bgColor: "bg-amber-100" },
-  scheduled: { label: "Scheduled", color: "text-blue-700", bgColor: "bg-blue-100" },
-  in_progress: { label: "In Progress", color: "text-purple-700", bgColor: "bg-purple-100" },
-  awaiting_approval: { label: "Awaiting Owner Approval", color: "text-yellow-700", bgColor: "bg-yellow-100" },
-  pending_verification: { label: "Pending Verification", color: "text-indigo-700", bgColor: "bg-indigo-100" },
-  completed: { label: "Completed", color: "text-green-700", bgColor: "bg-green-100" },
+const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  new: { label: "New", variant: "secondary" },
+  dispatched: { label: "Awaiting Response", variant: "default" },
+  scheduled: { label: "Scheduled", variant: "outline" },
+  in_progress: { label: "In Progress", variant: "default" },
+  awaiting_approval: { label: "Awaiting Approval", variant: "secondary" },
+  pending_verification: { label: "Pending Review", variant: "outline" },
+  completed: { label: "Completed", variant: "secondary" },
 };
 
 interface WorkOrderData {
@@ -50,19 +51,26 @@ interface WorkOrderData {
   assigned_vendor: { id: string; name: string; phone: string | null; company_name: string | null } | null;
 }
 
+interface MaintenanceBook {
+  lockbox_code: string | null;
+  gate_code: string | null;
+  alarm_code: string | null;
+  access_instructions: string | null;
+}
+
 const VendorJobPortal = () => {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
   
-  const [photoTab, setPhotoTab] = useState<"before" | "during" | "after">("before");
+  const [photoType, setPhotoType] = useState<"before" | "after">("before");
   const [uploading, setUploading] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState("");
   const [showQuoteInput, setShowQuoteInput] = useState(false);
   const [message, setMessage] = useState("");
-  const [showInstructions, setShowInstructions] = useState(false);
   const [showDeclineReason, setShowDeclineReason] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const beforeInputRef = useRef<HTMLInputElement>(null);
+  const afterInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch work order by token
   const { data: workOrder, isLoading, error } = useQuery({
@@ -86,6 +94,22 @@ const VendorJobPortal = () => {
     enabled: !!token,
   });
 
+  // Fetch property maintenance book for access codes
+  const { data: maintenanceBook } = useQuery({
+    queryKey: ["property-maintenance-book", workOrder?.property?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("property_maintenance_book")
+        .select("lockbox_code, gate_code, alarm_code, access_instructions")
+        .eq("property_id", workOrder!.property!.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data as MaintenanceBook | null;
+    },
+    enabled: !!workOrder?.property?.id,
+  });
+
   // Fetch photos for this work order
   const { data: photos = [] } = useQuery({
     queryKey: ["work-order-photos", workOrder?.id],
@@ -107,12 +131,12 @@ const VendorJobPortal = () => {
 
   // Upload photo mutation
   const uploadPhoto = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, type }: { file: File; type: "before" | "after" }) => {
       if (!workOrder?.id) throw new Error("No work order");
       setUploading(true);
       
       const fileExt = file.name.split('.').pop();
-      const fileName = `${workOrder.id}/${photoTab}/${Date.now()}.${fileExt}`;
+      const fileName = `${workOrder.id}/${type}/${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from("work-order-photos")
@@ -129,7 +153,7 @@ const VendorJobPortal = () => {
         .insert({
           work_order_id: workOrder.id,
           photo_url: publicUrl,
-          photo_type: photoTab,
+          photo_type: type,
           uploaded_by: workOrder.assigned_vendor?.name || "Vendor",
           uploaded_by_type: "vendor",
         });
@@ -138,7 +162,7 @@ const VendorJobPortal = () => {
       return publicUrl;
     },
     onSuccess: () => {
-      toast.success("Photo uploaded successfully!");
+      toast.success("Photo uploaded!");
       queryClient.invalidateQueries({ queryKey: ["work-order-photos", workOrder?.id] });
       setUploading(false);
     },
@@ -159,7 +183,7 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Job confirmed! Thank you.");
+      toast.success("Job confirmed!");
       queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
     },
     onError: (error) => toast.error("Failed to confirm: " + error.message),
@@ -176,7 +200,7 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Job declined. The property manager has been notified.");
+      toast.success("Job declined.");
       queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
       setShowDeclineReason(false);
     },
@@ -228,7 +252,7 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Job marked complete! Please submit your invoice via Bill.com.");
+      toast.success("Job marked complete!");
       queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
     },
     onError: (error) => toast.error("Failed to update: " + error.message),
@@ -247,15 +271,25 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Message sent to property manager!");
+      toast.success("Message sent!");
       setMessage("");
     },
     onError: (error) => toast.error("Failed to send: " + error.message),
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBeforePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) uploadPhoto.mutate(file);
+    if (file) uploadPhoto.mutate({ file, type: "before" });
+  };
+
+  const handleAfterPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadPhoto.mutate({ file, type: "after" });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied!`);
   };
 
   const getGoogleMapsUrl = () => {
@@ -265,10 +299,10 @@ const VendorJobPortal = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-12 mx-auto mb-6" />
-          <Loader2 className="h-8 w-8 animate-spin text-amber-600 mx-auto" />
+          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-10 mx-auto mb-6" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
         </div>
       </div>
     );
@@ -276,16 +310,16 @@ const VendorJobPortal = () => {
 
   if (error || !workOrder) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
-        <Card className="max-w-sm w-full shadow-xl border-0 rounded-3xl overflow-hidden">
-          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 p-6 text-center">
-            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-10 mx-auto" />
-          </div>
-          <CardContent className="p-8 text-center">
-            <XCircle className="h-14 w-14 text-destructive mx-auto mb-4" />
-            <h2 className="text-xl font-bold mb-2">Job Not Found</h2>
-            <p className="text-muted-foreground">This job link may have expired or is invalid.</p>
-            <Button className="mt-6 w-full" variant="outline" asChild>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-sm w-full">
+          <CardHeader className="text-center pb-2">
+            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-8 mx-auto mb-4" />
+            <XCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
+            <CardTitle>Job Not Found</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-muted-foreground text-sm">This job link may have expired or is invalid.</p>
+            <Button className="mt-4 w-full" variant="outline" asChild>
               <a href="tel:+14049915076"><Phone className="h-4 w-4 mr-2" />Call Support</a>
             </Button>
           </CardContent>
@@ -296,7 +330,6 @@ const VendorJobPortal = () => {
 
   const photosByType = {
     before: photos.filter(p => p.photo_type === "before"),
-    during: photos.filter(p => p.photo_type === "during"),
     after: photos.filter(p => p.photo_type === "after"),
   };
 
@@ -305,185 +338,378 @@ const VendorJobPortal = () => {
   const isInProgress = workOrder.status === "in_progress";
   const isPendingOrComplete = workOrder.status === "pending_verification" || workOrder.status === "completed";
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-        <div className="relative z-10 max-w-lg mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-10" />
-            <Badge className={cn("font-semibold", urgencyConfig.bgColor, urgencyConfig.color)}>{urgencyConfig.label}</Badge>
-          </div>
-          <p className="text-amber-100 text-sm mt-2">Vendor Job Portal</p>
-        </div>
-      </div>
+  const hasAccessCodes = maintenanceBook?.lockbox_code || maintenanceBook?.gate_code || maintenanceBook?.alarm_code;
+  const accessInstructions = maintenanceBook?.access_instructions || workOrder.access_instructions;
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        {/* Property Card */}
-        <Card className="overflow-hidden shadow-lg border-0 rounded-2xl">
-          {workOrder.property?.image_path ? (
-            <div className="relative h-44">
-              <img src={workOrder.property.image_path} alt={workOrder.property.name || "Property"} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                <div className="flex items-center gap-2 mb-1"><Building2 className="h-4 w-4" /><span className="font-semibold">{workOrder.property?.name}</span></div>
-                <p className="text-sm text-white/90">{workOrder.property?.address}</p>
-              </div>
-            </div>
-          ) : (
-            <CardContent className="p-4 bg-gradient-to-br from-amber-50 to-orange-50">
+  return (
+    <div className="min-h-screen bg-muted/30">
+      {/* Clean Header */}
+      <header className="bg-background border-b sticky top-0 z-10">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-8" />
+          <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+        </div>
+      </header>
+
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+        {/* Process Explanation for New Jobs */}
+        {needsResponse && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-4">
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg"><Building2 className="h-5 w-5 text-amber-600" /></div>
-                <div>
-                  <p className="font-semibold">{workOrder.property?.name || "Property"}</p>
+                <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-foreground mb-2">How This Works:</p>
+                  <ol className="space-y-1.5 text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <span className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">1</span>
+                      <span><strong>Confirm</strong> you can take the job, or <strong>Submit Quote</strong> if needed</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">2</span>
+                      <span>Take <strong>Before Photos</strong> when you arrive</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">3</span>
+                      <span>Complete work, take <strong>After Photos</strong></span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">4</span>
+                      <span>Mark Complete → Submit invoice via <strong>Bill.com</strong></span>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Property Card */}
+        <Card>
+          <CardContent className="p-0">
+            {workOrder.property?.image_path && (
+              <div className="h-32 overflow-hidden">
+                <img 
+                  src={workOrder.property.image_path} 
+                  alt={workOrder.property.name || "Property"} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            <div className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-muted rounded-lg shrink-0">
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold truncate">{workOrder.property?.name || "Property"}</p>
                   <p className="text-sm text-muted-foreground">{workOrder.property?.address}</p>
                 </div>
               </div>
-            </CardContent>
-          )}
-          <a href={getGoogleMapsUrl()} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-            <MapPin className="h-4 w-4" /><span className="font-medium">Open in Google Maps</span><ExternalLink className="h-3.5 w-3.5" />
-          </a>
+              <Button variant="outline" className="w-full mt-3" asChild>
+                <a href={getGoogleMapsUrl()} target="_blank" rel="noopener noreferrer">
+                  <MapPin className="h-4 w-4 mr-2" />Navigate<ExternalLink className="h-3 w-3 ml-2" />
+                </a>
+              </Button>
+            </div>
+          </CardContent>
         </Card>
 
-        {/* Status Banner */}
-        <Card className={cn("border-2", urgencyConfig.borderColor, "shadow-md")}>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {needsResponse ? <AlertTriangle className="h-5 w-5 text-amber-600" /> : <Clock className="h-5 w-5 text-primary" />}
-                <div>
-                  <p className="font-semibold">{needsResponse ? "Action Required" : statusConfig.label}</p>
-                  <p className="text-sm text-muted-foreground">{needsResponse ? "Please confirm or decline this job" : ""}</p>
+        {/* Access Codes - Always Visible */}
+        {(hasAccessCodes || accessInstructions) && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Key className="h-4 w-4" />Access Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {hasAccessCodes && (
+                <div className="grid grid-cols-1 gap-2">
+                  {maintenanceBook?.lockbox_code && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Lock className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Lockbox Code</p>
+                          <p className="font-mono font-semibold">{maintenanceBook.lockbox_code}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.lockbox_code!, "Lockbox code")}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                  {maintenanceBook?.gate_code && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Gate Code</p>
+                          <p className="font-mono font-semibold">{maintenanceBook.gate_code}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.gate_code!, "Gate code")}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                  {maintenanceBook?.alarm_code && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Alarm Code</p>
+                          <p className="font-mono font-semibold">{maintenanceBook.alarm_code}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.alarm_code!, "Alarm code")}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <Badge className={cn(statusConfig.bgColor, statusConfig.color)}>{statusConfig.label}</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Job Details */}
-        <Card className="shadow-lg border-0 rounded-2xl">
-          <CardContent className="p-5 space-y-4">
-            <div>
-              <h2 className="text-xl font-bold">{workOrder.title}</h2>
-              <Badge variant="outline" className="mt-2 capitalize">{workOrder.category?.replace(/_/g, " ")}</Badge>
-            </div>
-            {workOrder.description && <p className="text-muted-foreground">{workOrder.description}</p>}
-            {workOrder.access_instructions && (
-              <div>
-                <button onClick={() => setShowInstructions(!showInstructions)} className="flex items-center justify-between w-full p-3 bg-blue-50 rounded-xl text-left hover:bg-blue-100 transition-colors">
-                  <span className="font-semibold text-blue-800">🔑 Access Instructions</span>
-                  {showInstructions ? <ChevronUp className="h-4 w-4 text-blue-600" /> : <ChevronDown className="h-4 w-4 text-blue-600" />}
-                </button>
-                {showInstructions && <div className="mt-2 p-3 bg-blue-50/50 rounded-xl border border-blue-100"><p className="text-sm text-blue-700 whitespace-pre-wrap">{workOrder.access_instructions}</p></div>}
-              </div>
-            )}
-            <div className="flex items-center gap-4 text-sm pt-3 border-t">
-              <div className="flex items-center gap-1.5 text-muted-foreground"><Clock className="h-4 w-4" />Created {format(new Date(workOrder.created_at), "MMM d, yyyy")}</div>
-              {workOrder.quoted_cost && <div className="flex items-center gap-1 font-semibold text-green-600"><DollarSign className="h-4 w-4" />Quote: ${workOrder.quoted_cost}</div>}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Action Buttons */}
-        {needsResponse && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <Button size="lg" className="w-full h-14 text-base font-semibold bg-green-600 hover:bg-green-700 rounded-xl shadow-md" onClick={() => confirmJob.mutate()} disabled={confirmJob.isPending}>
-                {confirmJob.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <><CheckCircle className="h-5 w-5 mr-2" />Confirm Job</>}
-              </Button>
-              <Button size="lg" variant="outline" className="w-full h-14 text-base font-semibold rounded-xl border-2" onClick={() => setShowQuoteInput(!showQuoteInput)}>
-                <DollarSign className="h-5 w-5 mr-2" />Submit Quote
-              </Button>
-            </div>
-            <Button size="lg" variant="ghost" className="w-full h-12 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeclineReason(true)}>
-              <X className="h-4 w-4 mr-2" />Decline Job
-            </Button>
-          </div>
-        )}
-
-        {showDeclineReason && (
-          <Card className="shadow-lg border-destructive/30 rounded-2xl">
-            <CardContent className="p-5 space-y-3">
-              <h3 className="font-semibold">Reason for declining (optional)</h3>
-              <Textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} placeholder="e.g., Schedule conflict..." rows={2} />
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowDeclineReason(false)} className="flex-1">Cancel</Button>
-                <Button variant="destructive" onClick={() => declineJob.mutate(declineReason)} disabled={declineJob.isPending} className="flex-1">
-                  {declineJob.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Decline Job"}
-                </Button>
-              </div>
+              )}
+              {accessInstructions && (
+                <div className="p-3 bg-muted/50 rounded-lg border">
+                  <p className="text-xs text-muted-foreground mb-1">Access Instructions</p>
+                  <p className="text-sm whitespace-pre-wrap">{accessInstructions}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
 
+        {/* Job Details */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-lg">{workOrder.title}</CardTitle>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs capitalize">{workOrder.category?.replace(/_/g, " ")}</Badge>
+                  <Badge variant={urgencyConfig.variant} className="text-xs">{urgencyConfig.label}</Badge>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {workOrder.description && (
+              <p className="text-sm text-muted-foreground">{workOrder.description}</p>
+            )}
+            <Separator />
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Clock className="h-4 w-4" />Created {format(new Date(workOrder.created_at), "MMM d, yyyy")}
+              </span>
+              {workOrder.quoted_cost && (
+                <span className="font-semibold text-green-600 flex items-center gap-1">
+                  <DollarSign className="h-4 w-4" />{workOrder.quoted_cost}
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Action Buttons - Confirm/Decline/Quote */}
+        {needsResponse && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <Button 
+                size="lg" 
+                className="w-full" 
+                onClick={() => confirmJob.mutate()} 
+                disabled={confirmJob.isPending}
+              >
+                {confirmJob.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirm Job
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => setShowQuoteInput(!showQuoteInput)}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />Submit Quote
+              </Button>
+
+              {showQuoteInput && (
+                <div className="p-3 bg-muted rounded-lg space-y-2">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input 
+                        type="number" 
+                        value={quoteAmount} 
+                        onChange={(e) => setQuoteAmount(e.target.value)} 
+                        placeholder="Amount" 
+                        className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm bg-background"
+                      />
+                    </div>
+                    <Button onClick={() => submitQuote.mutate(Number(quoteAmount))} disabled={!quoteAmount || submitQuote.isPending}>
+                      {submitQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Quotes over $300 require owner approval</p>
+                </div>
+              )}
+
+              <Button 
+                variant="ghost" 
+                className="w-full text-muted-foreground hover:text-destructive" 
+                onClick={() => setShowDeclineReason(true)}
+              >
+                <X className="h-4 w-4 mr-2" />Decline
+              </Button>
+
+              {showDeclineReason && (
+                <div className="p-3 bg-muted rounded-lg space-y-2">
+                  <Textarea 
+                    value={declineReason} 
+                    onChange={(e) => setDeclineReason(e.target.value)} 
+                    placeholder="Reason (optional)..." 
+                    rows={2}
+                  />
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowDeclineReason(false)} className="flex-1">
+                      Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={() => declineJob.mutate(declineReason)} disabled={declineJob.isPending} className="flex-1">
+                      {declineJob.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Decline"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Start Work Button */}
         {isScheduled && (
-          <Button size="lg" className="w-full h-14 text-base font-semibold bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md" onClick={() => startWork.mutate()} disabled={startWork.isPending}>
-            {startWork.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Play className="h-5 w-5 mr-2" />Start Work</>}
+          <Button size="lg" className="w-full" onClick={() => startWork.mutate()} disabled={startWork.isPending}>
+            {startWork.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+              <>
+                <Play className="h-4 w-4 mr-2" />Start Work
+              </>
+            )}
           </Button>
         )}
 
-        {showQuoteInput && (
-          <Card className="shadow-lg border-amber-200 rounded-2xl">
-            <CardContent className="p-5 space-y-3">
-              <h3 className="font-semibold">Submit Your Quote</h3>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <input type="number" value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)} placeholder="Enter amount" className="w-full pl-10 pr-4 py-3 border-2 rounded-xl text-lg" />
-                </div>
-                <Button size="lg" onClick={() => submitQuote.mutate(Number(quoteAmount))} disabled={!quoteAmount || submitQuote.isPending} className="px-6 rounded-xl">
-                  {submitQuote.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Submit"}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Quotes over $300 require owner approval</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Photo Upload */}
+        {/* Photo Upload - Simplified */}
         {(isScheduled || isInProgress || isPendingOrComplete) && (
-          <Card className="shadow-lg border-0 rounded-2xl">
-            <CardContent className="p-5">
-              <h3 className="font-semibold flex items-center gap-2 mb-4"><Camera className="h-5 w-5 text-primary" />Upload Photos</h3>
-              <Tabs value={photoTab} onValueChange={(v) => setPhotoTab(v as typeof photoTab)}>
-                <TabsList className="grid grid-cols-3 w-full mb-4">
-                  <TabsTrigger value="before">Before ({photosByType.before.length})</TabsTrigger>
-                  <TabsTrigger value="during">During ({photosByType.during.length})</TabsTrigger>
-                  <TabsTrigger value="after">After ({photosByType.after.length})</TabsTrigger>
-                </TabsList>
-                {["before", "during", "after"].map((type) => (
-                  <TabsContent key={type} value={type} className="mt-0">
-                    {photosByType[type as keyof typeof photosByType].length > 0 && (
-                      <div className="grid grid-cols-3 gap-2 mb-4">
-                        {photosByType[type as keyof typeof photosByType].map((photo) => (
-                          <div key={photo.id} className="aspect-square rounded-xl overflow-hidden bg-muted">
-                            <img src={photo.photo_url} alt={`${type} photo`} className="w-full h-full object-cover" />
-                          </div>
-                        ))}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Camera className="h-4 w-4" />Photos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Before Photos */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Before Photos</span>
+                  <Badge variant="secondary">{photosByType.before.length}</Badge>
+                </div>
+                {photosByType.before.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 mb-2">
+                    {photosByType.before.map((photo) => (
+                      <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-muted">
+                        <img src={photo.photo_url} alt="Before" className="w-full h-full object-cover" />
                       </div>
-                    )}
-                    <Button variant="outline" className="w-full h-20 rounded-xl border-2 border-dashed" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                      {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="flex flex-col items-center gap-1"><Camera className="h-6 w-6 text-primary" /><span className="text-sm font-medium">Take or Upload Photo</span></div>}
-                    </Button>
-                  </TabsContent>
-                ))}
-              </Tabs>
-              <input type="file" ref={fileInputRef} accept="image/*" capture="environment" onChange={handleFileSelect} className="hidden" />
+                    ))}
+                  </div>
+                )}
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12"
+                  onClick={() => beforeInputRef.current?.click()} 
+                  disabled={uploading}
+                >
+                  {uploading && photoType === "before" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="h-4 w-4 mr-2" />Take Before Photo
+                    </>
+                  )}
+                </Button>
+                <input 
+                  type="file" 
+                  ref={beforeInputRef} 
+                  accept="image/*" 
+                  capture="environment" 
+                  onChange={(e) => { setPhotoType("before"); handleBeforePhoto(e); }} 
+                  className="hidden" 
+                />
+              </div>
+
+              <Separator />
+
+              {/* After Photos */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">After Photos</span>
+                  <Badge variant="secondary">{photosByType.after.length}</Badge>
+                </div>
+                {photosByType.after.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 mb-2">
+                    {photosByType.after.map((photo) => (
+                      <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-muted">
+                        <img src={photo.photo_url} alt="After" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12"
+                  onClick={() => afterInputRef.current?.click()} 
+                  disabled={uploading}
+                >
+                  {uploading && photoType === "after" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="h-4 w-4 mr-2" />Take After Photo
+                    </>
+                  )}
+                </Button>
+                <input 
+                  type="file" 
+                  ref={afterInputRef} 
+                  accept="image/*" 
+                  capture="environment" 
+                  onChange={(e) => { setPhotoType("after"); handleAfterPhoto(e); }} 
+                  className="hidden" 
+                />
+              </div>
             </CardContent>
           </Card>
         )}
 
         {/* Message Section */}
         {(isScheduled || isInProgress) && (
-          <Card className="shadow-lg border-0 rounded-2xl">
-            <CardContent className="p-5">
-              <h3 className="font-semibold flex items-center gap-2 mb-3"><Phone className="h-5 w-5 text-primary" />Message Property Manager</h3>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Phone className="h-4 w-4" />Message
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="flex gap-2">
-                <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Type your message..." rows={2} className="flex-1 rounded-xl" />
-                <Button onClick={() => sendMessage.mutate()} disabled={!message.trim() || sendMessage.isPending} className="px-4 rounded-xl">
+                <Textarea 
+                  value={message} 
+                  onChange={(e) => setMessage(e.target.value)} 
+                  placeholder="Message to property manager..." 
+                  rows={2} 
+                  className="flex-1"
+                />
+                <Button onClick={() => sendMessage.mutate()} disabled={!message.trim() || sendMessage.isPending}>
                   {sendMessage.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
@@ -493,20 +719,31 @@ const VendorJobPortal = () => {
 
         {/* Mark Complete */}
         {isInProgress && (
-          <Button size="lg" className="w-full h-14 text-base font-semibold bg-green-600 hover:bg-green-700 rounded-xl shadow-md" onClick={() => markComplete.mutate()} disabled={markComplete.isPending}>
-            {markComplete.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <><CheckCircle className="h-5 w-5 mr-2" />Mark Job Complete</>}
+          <Button size="lg" className="w-full" onClick={() => markComplete.mutate()} disabled={markComplete.isPending}>
+            {markComplete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />Mark Job Complete
+              </>
+            )}
           </Button>
         )}
 
-        {/* Bill.com Reminder */}
+        {/* Bill.com Section */}
         {isPendingOrComplete && (
-          <Card className="border-2 border-blue-300 bg-blue-50 shadow-lg rounded-2xl">
-            <CardContent className="py-5">
-              <div className="flex items-start gap-4">
-                <div className="p-2 bg-blue-100 rounded-lg"><DollarSign className="h-6 w-6 text-blue-600" /></div>
-                <div>
-                  <p className="font-semibold text-blue-800">Submit Invoice via Bill.com</p>
-                  <p className="text-sm text-blue-700 mt-1">Please submit your invoice through Bill.com for payment processing.</p>
+          <Card className="border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">Submit Your Invoice</p>
+                  <p className="text-sm text-muted-foreground mt-1">Submit your invoice through Bill.com for payment.</p>
+                  <Button className="mt-3 w-full" asChild>
+                    <a href="https://app.bill.com" target="_blank" rel="noopener noreferrer">
+                      Open Bill.com<ArrowRight className="h-4 w-4 ml-2" />
+                    </a>
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -514,9 +751,10 @@ const VendorJobPortal = () => {
         )}
 
         {/* Footer */}
-        <div className="text-center py-6">
-          <p className="text-sm text-muted-foreground">Questions? Call or text: <a href="tel:+14049915076" className="text-primary font-semibold">404-991-5076</a></p>
-          <p className="text-xs text-muted-foreground mt-2">Powered by PeachHaus</p>
+        <div className="text-center py-4">
+          <p className="text-sm text-muted-foreground">
+            Questions? <a href="tel:+14049915076" className="text-primary font-medium">404-991-5076</a>
+          </p>
         </div>
       </div>
     </div>
