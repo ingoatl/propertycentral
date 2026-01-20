@@ -63,6 +63,7 @@ export function StartWorkOrderDialog({
       const { data, error } = await supabase
         .from("properties")
         .select("id, name, address, owner_id")
+        .is("offboarded_at", null)
         .order("name");
       
       if (error) throw error;
@@ -70,6 +71,14 @@ export function StartWorkOrderDialog({
     },
     enabled: open,
   });
+
+  // Generate full property label
+  const getPropertyLabel = (property: Property) => {
+    if (property.name && property.address) {
+      return `${property.name} — ${property.address}`;
+    }
+    return property.address || property.name || "Unnamed Property";
+  };
 
   // Fetch vendors
   const { data: vendors = [], isLoading: loadingVendors } = useQuery({
@@ -90,6 +99,9 @@ export function StartWorkOrderDialog({
   // Create work order mutation
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
+      // Generate a work order number
+      const woNumber = `WO-${Date.now().toString().slice(-6)}`;
+      
       const insertData = {
         property_id: selectedProperty,
         assigned_vendor_id: selectedVendor,
@@ -97,6 +109,7 @@ export function StartWorkOrderDialog({
         description,
         category,
         urgency: priority,
+        status: "dispatched" as const, // Set to dispatched since vendor is assigned
       };
       
       const { data, error } = await supabase
@@ -106,20 +119,28 @@ export function StartWorkOrderDialog({
         .single();
       
       if (error) throw error;
-      return data;
+      return { ...data, woNumber };
     },
     onSuccess: async (workOrder) => {
       // Send SMS to vendor notifying them of the new work order
       const vendor = vendors.find(v => v.id === selectedVendor);
       const property = properties.find(p => p.id === selectedProperty);
+      const propertyLabel = property ? getPropertyLabel(property) : "Property";
+      const urgencyLabel = priority.charAt(0).toUpperCase() + priority.slice(1);
       
       if (vendor?.phone) {
         try {
+          const message = `🔧 NEW WORK ORDER ${workOrder.woNumber}\n\n` +
+            `Job: ${title}\n` +
+            `Location: ${propertyLabel}\n` +
+            `Priority: ${urgencyLabel}\n\n` +
+            `Reply CONFIRM to accept, or DECLINE [reason] if unavailable.`;
+          
           const { error: smsError } = await supabase.functions.invoke("ghl-send-sms", {
             body: {
               vendorId: vendor.id,
               phone: vendor.phone,
-              message: `New work order assigned: "${title}" at ${property?.address || property?.name || "Property"}. Priority: ${priority}. Please confirm you can take this job by replying CONFIRM, or reply DECLINE if you cannot.`,
+              message,
             },
           });
           
@@ -134,7 +155,7 @@ export function StartWorkOrderDialog({
         }
       }
       
-      toast.success("Work order created and vendor notified!");
+      toast.success(`Work order ${workOrder.woNumber} created and vendor notified!`);
       queryClient.invalidateQueries({ queryKey: ["work-orders"] });
       queryClient.invalidateQueries({ queryKey: ["vendor-work-orders"] });
       
@@ -192,8 +213,8 @@ export function StartWorkOrderDialog({
               </SelectTrigger>
               <SelectContent>
                 {properties.map((property) => (
-                  <SelectItem key={property.id} value={property.id}>
-                    {property.name || property.address || "Unnamed Property"}
+                  <SelectItem key={property.id} value={property.id} className="text-sm">
+                    {getPropertyLabel(property)}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -1,23 +1,28 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature, MessageSquare, Mic, PhoneCall, Trash2, ClipboardList } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature, MessageSquare, PhoneCall, Trash2, ClipboardList } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
 import VendorDetailModal from "@/components/maintenance/VendorDetailModal";
 import ServiceSignupDialog from "@/components/maintenance/ServiceSignupDialog";
-import ActiveServicesOverview from "@/components/maintenance/ActiveServicesOverview";
+import { CollapsibleActiveServices } from "@/components/maintenance/CollapsibleActiveServices";
+import { VendorKPIBar } from "@/components/maintenance/VendorKPIBar";
+import { WorkOrderPipeline } from "@/components/maintenance/WorkOrderPipeline";
+import { WorkOrdersTable } from "@/components/maintenance/WorkOrdersTable";
+import { WorkflowDiagram } from "@/components/maintenance/WorkflowDiagram";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DeleteVendorDialog from "@/components/maintenance/DeleteVendorDialog";
 import { StartWorkOrderDialog } from "@/components/maintenance/StartWorkOrderDialog";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
+import WorkOrderDetailModal from "@/components/maintenance/WorkOrderDetailModal";
 
 const Vendors = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -31,6 +36,7 @@ const Vendors = () => {
   const [deleteVendor, setDeleteVendor] = useState<Vendor | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showStartWorkOrder, setShowStartWorkOrder] = useState(false);
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState<any>(null);
   const queryClient = useQueryClient();
   const { isAdmin } = useAdminCheck();
 
@@ -38,9 +44,7 @@ const Vendors = () => {
     setIsExtracting(true);
     try {
       const { data, error } = await supabase.functions.invoke('extract-vendors-from-emails');
-      
       if (error) throw error;
-      
       if (data.success) {
         toast.success(data.message);
         queryClient.invalidateQueries({ queryKey: ["vendors"] });
@@ -48,34 +52,47 @@ const Vendors = () => {
         toast.error(data.error || 'Failed to extract vendors');
       }
     } catch (error: any) {
-      console.error('Error extracting vendors:', error);
       toast.error(error.message || 'Failed to extract vendors from emails');
     } finally {
       setIsExtracting(false);
     }
   };
 
-  const { data: vendors = [], isLoading, refetch } = useQuery({
+  const { data: vendors = [], isLoading: vendorsLoading } = useQuery({
     queryKey: ["vendors"],
     queryFn: async () => {
+      const { data, error } = await supabase.from("vendors").select("*").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: workOrders = [], isLoading: workOrdersLoading } = useQuery({
+    queryKey: ["all-work-orders"],
+    queryFn: async () => {
       const { data, error } = await supabase
-        .from("vendors")
-        .select("*, billcom_vendor_id, billcom_synced_at, billcom_invite_sent_at")
-        .order("name");
-      
+        .from("work_orders")
+        .select("id, title, status, urgency, category, quoted_cost, created_at, property:properties(name, address), assigned_vendor:vendors(name, company_name)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: activeServices = [] } = useQuery({
+    queryKey: ["active-vendor-services"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("property_vendor_assignments").select("monthly_cost");
       if (error) throw error;
       return data;
     },
   });
 
   const filteredVendors = vendors.filter((vendor) => {
-    const matchesSearch = 
-      vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vendor.company_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vendor.phone.includes(searchQuery);
-    
     const matchesSpecialty = !selectedSpecialty || vendor.specialty.includes(selectedSpecialty);
-    
     return matchesSearch && matchesSpecialty;
   });
 
@@ -89,30 +106,15 @@ const Vendors = () => {
     }
   };
 
-  const getSpecialtyLabel = (specialty: string) => {
-    return specialty.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
+  const getSpecialtyLabel = (specialty: string) => specialty.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
   const handleDeleteVendor = async () => {
     if (!deleteVendor) return;
     setIsDeleting(true);
     try {
-      // Unassign work orders first
-      await supabase
-        .from("work_orders")
-        .update({ assigned_vendor_id: null })
-        .eq("assigned_vendor_id", deleteVendor.id);
-      
-      // Delete the vendor
-      const { error } = await supabase
-        .from("vendors")
-        .delete()
-        .eq("id", deleteVendor.id);
-      
+      await supabase.from("work_orders").update({ assigned_vendor_id: null }).eq("assigned_vendor_id", deleteVendor.id);
+      const { error } = await supabase.from("vendors").delete().eq("id", deleteVendor.id);
       if (error) throw error;
-      
       toast.success("Vendor deleted successfully");
       setDeleteVendor(null);
       queryClient.invalidateQueries({ queryKey: ["vendors"] });
@@ -123,44 +125,28 @@ const Vendors = () => {
     }
   };
 
+  // KPI calculations
+  const openWorkOrders = workOrders.filter(wo => !["completed", "cancelled"].includes(wo.status)).length;
+  const avgResponseTime = vendors.reduce((sum, v) => sum + (v.average_response_time_hours || 0), 0) / Math.max(vendors.filter(v => v.average_response_time_hours).length, 1);
+  const monthlyServicesCost = activeServices.reduce((sum, s) => sum + (s.monthly_cost || 0), 0);
+
   return (
     <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Vendor Management</h1>
-            <p className="text-muted-foreground mt-1">Manage your network of trusted vendors</p>
+            <h1 className="text-3xl font-bold text-foreground">Vendor Command Center</h1>
+            <p className="text-muted-foreground mt-1">Manage vendors and work orders</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={() => setShowStartWorkOrder(true)}
-              variant="default"
-              className="gap-2"
-            >
+            <Button onClick={() => setShowStartWorkOrder(true)} className="gap-2">
               <ClipboardList className="h-4 w-4" />
               Start Work Order
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={extractVendorsFromEmails} 
-              disabled={isExtracting}
-              className="gap-2"
-            >
-              {isExtracting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ScanSearch className="h-4 w-4" />
-              )}
+            <Button variant="outline" onClick={extractVendorsFromEmails} disabled={isExtracting} className="gap-2">
+              {isExtracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
               {isExtracting ? 'Scanning...' : 'Extract from Emails'}
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => setShowServiceSignupDialog(true)} 
-              className="gap-2"
-            >
-              <FileSignature className="h-4 w-4" />
-              Sign Up for Service
             </Button>
             <Button onClick={() => setShowAddDialog(true)} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -169,69 +155,40 @@ const Vendors = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="text-2xl font-bold">{vendors.length}</div>
-              <p className="text-sm text-muted-foreground">Total Vendors</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="text-2xl font-bold text-green-600">
-                {vendors.filter(v => v.status === 'preferred').length}
-              </div>
-              <p className="text-sm text-muted-foreground">Preferred</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="text-2xl font-bold text-blue-600">
-                {vendors.filter(v => v.emergency_available).length}
-              </div>
-              <p className="text-sm text-muted-foreground">Emergency Available</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="text-2xl font-bold text-orange-600">
-                {vendors.filter(v => v.insurance_expiration && new Date(v.insurance_expiration) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)).length}
-              </div>
-              <p className="text-sm text-muted-foreground">Insurance Expiring</p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* KPI Bar */}
+        <VendorKPIBar
+          totalVendors={vendors.length}
+          openWorkOrders={openWorkOrders}
+          avgResponseTime={avgResponseTime || null}
+          monthlyServicesCost={monthlyServicesCost}
+        />
 
-        {/* Active Services Overview */}
-        <ActiveServicesOverview />
+        {/* Work Order Pipeline */}
+        <WorkOrderPipeline workOrders={workOrders} />
 
-        {/* Filters */}
+        {/* Workflow Diagram */}
+        <WorkflowDiagram />
+
+        {/* Work Orders Table */}
+        <WorkOrdersTable
+          workOrders={workOrders}
+          onViewDetails={(wo) => setSelectedWorkOrder(wo)}
+          isLoading={workOrdersLoading}
+        />
+
+        {/* Collapsible Active Services */}
+        <CollapsibleActiveServices />
+
+        {/* Vendor Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
-            <Input
-              placeholder="Search vendors..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+            <Input placeholder="Search vendors..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant={selectedSpecialty === null ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedSpecialty(null)}
-            >
-              All
-            </Button>
+            <Button variant={selectedSpecialty === null ? "default" : "outline"} size="sm" onClick={() => setSelectedSpecialty(null)}>All</Button>
             {VENDOR_SPECIALTIES.slice(0, 6).map((specialty) => (
-              <Button
-                key={specialty}
-                variant={selectedSpecialty === specialty ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedSpecialty(specialty)}
-              >
+              <Button key={specialty} variant={selectedSpecialty === specialty ? "default" : "outline"} size="sm" onClick={() => setSelectedSpecialty(specialty)}>
                 {getSpecialtyLabel(specialty)}
               </Button>
             ))}
@@ -239,185 +196,54 @@ const Vendors = () => {
         </div>
 
         {/* Vendor Grid */}
-        {isLoading ? (
+        {vendorsLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="pt-6 h-48" />
-              </Card>
-            ))}
+            {[1, 2, 3, 4, 5, 6].map((i) => <Card key={i} className="animate-pulse"><CardContent className="pt-6 h-48" /></Card>)}
           </div>
         ) : filteredVendors.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Wrench className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No vendors found</h3>
-              <p className="text-muted-foreground mt-1">
-                {searchQuery || selectedSpecialty 
-                  ? "Try adjusting your filters"
-                  : "Add your first vendor to get started"}
-              </p>
-              {!searchQuery && !selectedSpecialty && (
-                <Button onClick={() => setShowAddDialog(true)} className="mt-4">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Vendor
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+          <Card><CardContent className="py-12 text-center"><Wrench className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><h3 className="text-lg font-medium">No vendors found</h3></CardContent></Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredVendors.map((vendor) => (
-              <Card 
-                key={vendor.id} 
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setSelectedVendor(vendor)}
-              >
+              <Card key={vendor.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedVendor(vendor)}>
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className="text-lg">{vendor.name}</CardTitle>
-                      {vendor.company_name && (
-                        <p className="text-sm text-muted-foreground">{vendor.company_name}</p>
-                      )}
+                      {vendor.company_name && <p className="text-sm text-muted-foreground">{vendor.company_name}</p>}
                     </div>
-                    <Badge className={getStatusColor(vendor.status)}>
-                      {vendor.status}
-                    </Badge>
+                    <Badge className={getStatusColor(vendor.status)}>{vendor.status}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* Contact Info */}
                   <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Phone className="h-3.5 w-3.5" />
-                      {vendor.phone}
-                    </div>
-                    {vendor.email && (
-                      <div className="flex items-center gap-1 text-muted-foreground truncate">
-                        <Mail className="h-3.5 w-3.5" />
-                        <span className="truncate">{vendor.email}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1 text-muted-foreground"><Phone className="h-3.5 w-3.5" />{vendor.phone}</div>
+                    {vendor.email && <div className="flex items-center gap-1 text-muted-foreground truncate"><Mail className="h-3.5 w-3.5" /><span className="truncate">{vendor.email}</span></div>}
                   </div>
-
-                  {/* Specialties */}
                   <div className="flex flex-wrap gap-1">
-                    {vendor.specialty.slice(0, 3).map((s) => (
-                      <Badge key={s} variant="secondary" className="text-xs">
-                        {getSpecialtyLabel(s)}
-                      </Badge>
-                    ))}
-                    {vendor.specialty.length > 3 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{vendor.specialty.length - 3}
-                      </Badge>
-                    )}
+                    {vendor.specialty.slice(0, 3).map((s) => <Badge key={s} variant="secondary" className="text-xs">{getSpecialtyLabel(s)}</Badge>)}
+                    {vendor.specialty.length > 3 && <Badge variant="secondary" className="text-xs">+{vendor.specialty.length - 3}</Badge>}
                   </div>
-
-                  {/* Stats */}
                   <div className="flex items-center gap-4 text-sm pt-2 border-t">
-                    {vendor.average_rating > 0 && (
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
-                        <span>{vendor.average_rating.toFixed(1)}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Wrench className="h-3.5 w-3.5" />
-                      {vendor.total_jobs_completed} jobs
-                    </div>
-                    {vendor.average_response_time_hours && (
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        {vendor.average_response_time_hours}h avg
-                      </div>
-                    )}
+                    {vendor.average_rating > 0 && <div className="flex items-center gap-1"><Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />{vendor.average_rating.toFixed(1)}</div>}
+                    <div className="flex items-center gap-1 text-muted-foreground"><Wrench className="h-3.5 w-3.5" />{vendor.total_jobs_completed} jobs</div>
+                    {vendor.average_response_time_hours && <div className="flex items-center gap-1 text-muted-foreground"><Clock className="h-3.5 w-3.5" />{vendor.average_response_time_hours}h</div>}
                   </div>
-
-                  {/* Badges */}
                   <div className="flex gap-2">
-                    {vendor.emergency_available && (
-                      <Badge variant="outline" className="text-xs border-red-200 text-red-600">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        24/7
-                      </Badge>
-                    )}
-                    {vendor.insurance_verified && (
-                      <Badge variant="outline" className="text-xs border-green-200 text-green-600">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Insured
-                      </Badge>
-                    )}
+                    {vendor.emergency_available && <Badge variant="outline" className="text-xs border-red-200 text-red-600"><AlertTriangle className="h-3 w-3 mr-1" />24/7</Badge>}
+                    {vendor.insurance_verified && <Badge variant="outline" className="text-xs border-green-200 text-green-600"><Shield className="h-3 w-3 mr-1" />Insured</Badge>}
                   </div>
-
-                  {/* Quick Action Buttons - Compact Icon Grid */}
                   <div className="flex gap-2 pt-2 border-t">
                     {vendor.phone && (
                       <>
-                        <Button
-                          size="sm"
-                          className="h-9 w-9 p-0 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCallDialogVendor(vendor);
-                          }}
-                          title="Call via Twilio"
-                        >
-                          <PhoneCall className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 w-9 p-0 rounded-lg"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSmsDialogVendor(vendor);
-                          }}
-                          title="Send SMS"
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <SendVoicemailButton
-                            recipientPhone={vendor.phone}
-                            recipientName={vendor.name}
-                            variant="outline"
-                            size="sm"
-                            className="h-9 w-9 p-0 rounded-lg"
-                          />
-                        </div>
+                        <Button size="sm" className="h-9 w-9 p-0 rounded-lg" onClick={(e) => { e.stopPropagation(); setCallDialogVendor(vendor); }}><PhoneCall className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="outline" className="h-9 w-9 p-0 rounded-lg" onClick={(e) => { e.stopPropagation(); setSmsDialogVendor(vendor); }}><MessageSquare className="h-4 w-4" /></Button>
+                        <div onClick={(e) => e.stopPropagation()}><SendVoicemailButton recipientPhone={vendor.phone} recipientName={vendor.name} variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg" /></div>
                       </>
                     )}
-                    {vendor.email && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-9 w-9 p-0 rounded-lg"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.location.href = `mailto:${vendor.email}`;
-                        }}
-                        title="Email"
-                      >
-                        <Mail className="h-4 w-4" />
-                      </Button>
-                    )}
+                    {vendor.email && <Button size="sm" variant="outline" className="h-9 w-9 p-0 rounded-lg" onClick={(e) => { e.stopPropagation(); window.location.href = `mailto:${vendor.email}`; }}><Mail className="h-4 w-4" /></Button>}
                     <div className="flex-1" />
-                    {isAdmin && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-9 w-9 p-0 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteVendor(vendor);
-                        }}
-                        title="Delete vendor"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    {isAdmin && <Button size="sm" variant="ghost" className="h-9 w-9 p-0 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setDeleteVendor(vendor); }}><Trash2 className="h-4 w-4" /></Button>}
                   </div>
                 </CardContent>
               </Card>
@@ -426,72 +252,14 @@ const Vendors = () => {
         )}
       </div>
 
-      <AddVendorDialog
-        open={showAddDialog}
-        onOpenChange={setShowAddDialog}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["vendors"] });
-          toast.success("Vendor added successfully");
-        }}
-      />
-
-      {selectedVendor && (
-        <VendorDetailModal
-          vendor={selectedVendor}
-          open={!!selectedVendor}
-          onOpenChange={(open) => !open && setSelectedVendor(null)}
-          onUpdate={() => {
-            queryClient.invalidateQueries({ queryKey: ["vendors"] });
-          }}
-        />
-      )}
-
-      <ServiceSignupDialog
-        open={showServiceSignupDialog}
-        onOpenChange={setShowServiceSignupDialog}
-      />
-
-      {/* Twilio Call Dialog */}
-      {callDialogVendor && (
-        <CallDialog
-          open={!!callDialogVendor}
-          onOpenChange={(open) => !open && setCallDialogVendor(null)}
-          contactName={callDialogVendor.name}
-          contactPhone={callDialogVendor.phone}
-        />
-      )}
-
-      {/* Delete Vendor Dialog */}
-      {deleteVendor && (
-        <DeleteVendorDialog
-          vendorName={deleteVendor.name}
-          open={!!deleteVendor}
-          onOpenChange={(open) => !open && setDeleteVendor(null)}
-          onConfirm={handleDeleteVendor}
-          isDeleting={isDeleting}
-        />
-      )}
-
-      {/* GHL SMS Dialog */}
-      {smsDialogVendor && (
-        <SendSMSDialog
-          open={!!smsDialogVendor}
-          onOpenChange={(open) => !open && setSmsDialogVendor(null)}
-          contactPhone={smsDialogVendor.phone}
-          contactName={smsDialogVendor.name}
-          contactType="vendor"
-          contactId={smsDialogVendor.id}
-        />
-      )}
-
-      {/* Start Work Order Dialog */}
-      <StartWorkOrderDialog
-        open={showStartWorkOrder}
-        onOpenChange={setShowStartWorkOrder}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["work-orders"] });
-        }}
-      />
+      <AddVendorDialog open={showAddDialog} onOpenChange={setShowAddDialog} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ["vendors"] }); setShowAddDialog(false); }} />
+      <ServiceSignupDialog open={showServiceSignupDialog} onOpenChange={setShowServiceSignupDialog} />
+      {selectedVendor && <VendorDetailModal open={!!selectedVendor} onOpenChange={(open) => !open && setSelectedVendor(null)} vendor={selectedVendor} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["vendors"] })} />}
+      {callDialogVendor && <CallDialog open={!!callDialogVendor} onOpenChange={(open) => !open && setCallDialogVendor(null)} recipientName={callDialogVendor.name} recipientPhone={callDialogVendor.phone} />}
+      {smsDialogVendor && <SendSMSDialog open={!!smsDialogVendor} onOpenChange={(open) => !open && setSmsDialogVendor(null)} recipientName={smsDialogVendor.name} recipientPhone={smsDialogVendor.phone} vendorId={smsDialogVendor.id} />}
+      {deleteVendor && <DeleteVendorDialog open={!!deleteVendor} onOpenChange={(open) => !open && setDeleteVendor(null)} vendor={deleteVendor} onConfirm={handleDeleteVendor} isDeleting={isDeleting} />}
+      <StartWorkOrderDialog open={showStartWorkOrder} onOpenChange={setShowStartWorkOrder} onSuccess={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />
+      {selectedWorkOrder && <WorkOrderDetailModal workOrderId={selectedWorkOrder.id} open={!!selectedWorkOrder} onOpenChange={(open) => !open && setSelectedWorkOrder(null)} />}
     </>
   );
 };
