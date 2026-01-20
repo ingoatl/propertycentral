@@ -1,16 +1,17 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Import before/after images - using correct paired images from PDF
-// Page 2 = Whitehurst (4 pairs labeled), Page 1 = other properties (3 pairs as attachments)
-import whitehurstBefore from "@/assets/designer/whitehurst-before-1.jpg";
-import whitehurstAfter from "@/assets/designer/whitehurst-after-1.jpg";
-import southvaleBefore from "@/assets/designer/southvale-before-1.jpg";
-import southvaleAfter from "@/assets/designer/southvale-after-1.jpg";
-import justiceBefore from "@/assets/designer/justice-before-1.jpg";
-import justiceAfter from "@/assets/designer/justice-after-1.jpg";
-import lakewoodBefore from "@/assets/designer/lakewood-before-1.jpg";
-import lakewoodAfter from "@/assets/designer/lakewood-after-1.jpg";
+// Import before/after images - mapped exactly from PDF:
+// Page 2: Whitehurst (img_p1_1=before, img_p1_2=after, etc.)
+// Page 1 attachments: Southvale, Justice, Lakewood pairs
+import whitehurstBefore from "@/assets/designer/whitehurst-b1.jpg";
+import whitehurstAfter from "@/assets/designer/whitehurst-a1.jpg";
+import southvaleBefore from "@/assets/designer/southvale-b.jpg";
+import southvaleAfter from "@/assets/designer/southvale-a.jpg";
+import justiceBefore from "@/assets/designer/justice-b.jpg";
+import justiceAfter from "@/assets/designer/justice-a.jpg";
+import lakewoodBefore from "@/assets/designer/lakewood-b.jpg";
+import lakewoodAfter from "@/assets/designer/lakewood-a.jpg";
 import brushyBefore from "@/assets/designer/brushy-before.jpg";
 import brushyAfter from "@/assets/designer/brushy-after.jpg";
 import tolaniBefore from "@/assets/designer/tolani-before.jpg";
@@ -28,6 +29,7 @@ interface CaseStudy {
   highlights?: string[];
 }
 
+// Order matches PDF: Whitehurst, Southvale, Justice, Lakewood, Brushy, To Lani
 const caseStudies: Record<string, CaseStudy> = {
   whitehurst: {
     name: "Whitehurst",
@@ -42,7 +44,7 @@ const caseStudies: Record<string, CaseStudy> = {
   },
   southvale: {
     name: "Southvale",
-    budgetRange: "$20K-$30K",
+    budgetRange: "$35K",
     year: "2025",
     airbnbUrl: "https://www.airbnb.com/rooms/1394277589009252467",
     beforeImage: southvaleBefore,
@@ -51,8 +53,8 @@ const caseStudies: Record<string, CaseStudy> = {
   },
   justice: {
     name: "Justice",
-    budgetRange: "$20K-$25K",
-    year: "2024",
+    budgetRange: "$25K",
+    year: "2025",
     airbnbUrl: "https://www.airbnb.com/rooms/1395677657124996447",
     beforeImage: justiceBefore,
     afterImage: justiceAfter,
@@ -60,7 +62,7 @@ const caseStudies: Record<string, CaseStudy> = {
   },
   lakewood: {
     name: "Lakewood",
-    budgetRange: "$20K-$25K",
+    budgetRange: "$23K",
     year: "2024",
     airbnbUrl: "https://www.airbnb.com/rooms/1399393314185549107",
     beforeImage: lakewoodBefore,
@@ -69,7 +71,7 @@ const caseStudies: Record<string, CaseStudy> = {
   },
   brushy: {
     name: "Brushy",
-    budgetRange: "$20K-$25K",
+    budgetRange: "$23K",
     year: "2024",
     airbnbUrl: "https://www.airbnb.com/rooms/1108098053080240369",
     beforeImage: brushyBefore,
@@ -78,7 +80,7 @@ const caseStudies: Record<string, CaseStudy> = {
   },
   tolani: {
     name: "To Lani",
-    budgetRange: "$18K-$22K",
+    budgetRange: "$20K",
     year: "2023",
     airbnbUrl: "https://www.airbnb.com/rooms/1066144648492952003",
     beforeImage: tolaniBefore,
