@@ -358,7 +358,13 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
               <Link to="/onboarding-presentation">
                 <Button variant="default" size="sm" className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
                   <Presentation className="h-4 w-4 mr-1" />
-                  <span>Owner Presentation</span>
+                  <span>Owner Pitch</span>
+                </Button>
+              </Link>
+              <Link to="/designer-presentation">
+                <Button variant="default" size="sm" className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white">
+                  <Presentation className="h-4 w-4 mr-1" />
+                  <span>Designer Pitch</span>
                 </Button>
               </Link>
               <SendTestTeamDigestButton />
