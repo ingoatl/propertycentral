@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Home, User, Mail, Phone, MapPin, GraduationCap } from "lucide-react";
+import { Home, User, Mail, Phone, GraduationCap } from "lucide-react";
+import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
 
 interface PropertyBasicsStepProps {
   formData: NewSTROnboardingFormData;
@@ -90,18 +91,15 @@ export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsS
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="propertyAddress">Property Address *</Label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-3 h-4 w-4 text-[hsl(25,30%,60%)]" />
-              <Input
-                id="propertyAddress"
-                className="pl-10"
-                value={formData.propertyAddress}
-                onChange={(e) => updateFormData({ propertyAddress: e.target.value })}
-                placeholder="123 Main St, Atlanta, GA 30301"
-              />
-            </div>
+            <GooglePlacesAutocomplete
+              id="propertyAddress"
+              value={formData.propertyAddress}
+              onChange={(value) => updateFormData({ propertyAddress: value })}
+              placeholder="123 Main St, Atlanta, GA 30301"
+              className="h-12"
+              onPlaceSelect={(place) => updateFormData({ propertyAddress: place.formattedAddress })}
+            />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="propertyType">Property Type *</Label>
             <Select

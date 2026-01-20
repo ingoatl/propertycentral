@@ -399,6 +399,7 @@ export const STR_PERMIT_STATUS_OPTIONS = [
   'Application In Progress',
   'Need to Apply',
   'Not Required in My Area',
+  'STR Permit Required - Owner Opts Out',
   'Not Sure',
 ];
 
@@ -415,7 +416,6 @@ export const PHOTOGRAPHY_NEEDS_OPTIONS = [
   'Need Professional Photography',
   'Have Quality Photos Ready',
   'Have Photos but Need Updates',
-  'Will Take My Own Photos',
 ];
 
 export const PET_POLICY_OPTIONS = [

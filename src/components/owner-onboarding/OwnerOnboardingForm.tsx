@@ -3,7 +3,6 @@ import { Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { OwnerOnboardingFormData, initialFormData } from '@/types/owner-onboarding';
-import { ContractTypeStep } from './steps/ContractTypeStep';
 import { OwnerInfoStep } from './steps/OwnerInfoStep';
 import { AccessDetailsStep } from './steps/AccessDetailsStep';
 import { UtilitiesStep } from './steps/UtilitiesStep';
@@ -16,16 +15,15 @@ import { ReviewStep } from './steps/ReviewStep';
 import { OnboardingSuccessScreen } from './OnboardingSuccessScreen';
 
 const STEPS = [
-  { number: 1, title: 'Agreement' },
-  { number: 2, title: 'Owner Info' },
-  { number: 3, title: 'Access' },
-  { number: 4, title: 'Utilities' },
-  { number: 5, title: 'Operations' },
-  { number: 6, title: 'Vendors' },
-  { number: 7, title: 'Safety' },
-  { number: 8, title: 'Documents' },
-  { number: 9, title: 'Financial' },
-  { number: 10, title: 'Review' },
+  { number: 1, title: 'Owner Info' },
+  { number: 2, title: 'Access' },
+  { number: 3, title: 'Utilities' },
+  { number: 4, title: 'Operations' },
+  { number: 5, title: 'Vendors' },
+  { number: 6, title: 'Safety' },
+  { number: 7, title: 'Documents' },
+  { number: 8, title: 'Financial' },
+  { number: 9, title: 'Review' },
 ];
 
 export function OwnerOnboardingForm() {
@@ -42,22 +40,20 @@ export function OwnerOnboardingForm() {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!formData.contract_type;
-      case 2:
         return !!(formData.owner_name && formData.owner_email && formData.property_address);
-      case 3:
+      case 2:
         return !!(formData.wifi_ssid && formData.wifi_password && formData.smart_lock_brand && formData.smart_lock_code);
-      case 4:
+      case 3:
         return !!(formData.wastewater_system && formData.utilities.every(u => u.provider && u.account_number));
-      case 5:
+      case 4:
         return !!(formData.primary_cleaner && formData.house_quirks);
-      case 6:
+      case 5:
         return !!(formData.lawncare_provider && formData.pest_control_provider && formData.hvac_service && formData.maintenance_contact && formData.emergency_contact_24_7);
-      case 7:
+      case 6:
         return !!(formData.fire_extinguisher_locations && formData.water_shutoff_location && formData.breaker_panel_location);
-      case 8:
+      case 7:
         return !!(formData.government_id_file && formData.property_deed_file && formData.property_tax_statement_file && formData.insurance_provider && formData.insurance_policy_number);
-      case 9:
+      case 8:
         return !!(formData.average_daily_rate && formData.occupancy_rate && formData.average_monthly_revenue && formData.pricing_revenue_goals);
       default:
         return true;
@@ -72,7 +68,7 @@ export function OwnerOnboardingForm() {
     if (!completedSteps.includes(currentStep)) {
       setCompletedSteps([...completedSteps, currentStep]);
     }
-    setCurrentStep((prev) => Math.min(prev + 1, 10));
+    setCurrentStep((prev) => Math.min(prev + 1, 9));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -163,18 +159,18 @@ export function OwnerOnboardingForm() {
     const props = { formData, updateFormData };
     
     switch (currentStep) {
-      case 1: return <ContractTypeStep {...props} />;
-      case 2: return <OwnerInfoStep {...props} />;
-      case 3: return <AccessDetailsStep {...props} />;
-      case 4: return <UtilitiesStep {...props} />;
-      case 5: return <OperationsStep {...props} />;
-      case 6: return <VendorsStep {...props} />;
-      case 7: return <SafetySecurityStep {...props} />;
-      case 8: return <DocumentsStep {...props} />;
-      case 9: return <FinancialStep {...props} />;
-      case 10: return <ReviewStep formData={formData} />;
+      case 1: return <OwnerInfoStep {...props} />;
+      case 2: return <AccessDetailsStep {...props} />;
+      case 3: return <UtilitiesStep {...props} />;
+      case 4: return <OperationsStep {...props} />;
+      case 5: return <VendorsStep {...props} />;
+      case 6: return <SafetySecurityStep {...props} />;
+      case 7: return <DocumentsStep {...props} />;
+      case 8: return <FinancialStep {...props} />;
+      case 9: return <ReviewStep formData={formData} />;
       default: return null;
     }
+  };
   };
 
   return (
@@ -278,7 +274,7 @@ export function OwnerOnboardingForm() {
             Back
           </button>
           
-          {currentStep === 10 ? (
+          {currentStep === 9 ? (
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
