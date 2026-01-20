@@ -83,6 +83,14 @@ export interface WorkOrder {
   guest_notified: boolean;
   owner_notified: boolean;
   
+  // Site Access & Safety Info
+  tenant_contact_name?: string;
+  tenant_contact_phone?: string;
+  pets_on_property?: string;
+  parking_instructions?: string;
+  utility_shutoff_notes?: string;
+  safety_notes?: string;
+  
   // Financial
   estimated_cost?: number;
   quoted_cost?: number;

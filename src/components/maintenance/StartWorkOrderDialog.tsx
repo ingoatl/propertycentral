@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Wrench, Home, User, Mic, Video, X, Play, Pause } from "lucide-react";
+import { Loader2, Wrench, Home, User, Mic, Video, X, Play, Pause, Key, ChevronUp, ChevronDown, PawPrint, Car, AlertTriangle } from "lucide-react";
 import { VoiceRecorder } from "@/components/communications/VoiceRecorder";
 import { VideoRecordingButton } from "@/components/maintenance/VideoRecordingButton";
 
@@ -58,6 +58,16 @@ export function StartWorkOrderDialog({
   const [priority, setPriority] = useState<"low" | "normal" | "high" | "emergency">("normal");
   const [category, setCategory] = useState<string>("general_maintenance");
   
+  // Access & Site Info state
+  const [accessInstructions, setAccessInstructions] = useState("");
+  const [tenantContactName, setTenantContactName] = useState("");
+  const [tenantContactPhone, setTenantContactPhone] = useState("");
+  const [petsOnProperty, setPetsOnProperty] = useState("");
+  const [parkingInstructions, setParkingInstructions] = useState("");
+  const [utilityShutoffNotes, setUtilityShutoffNotes] = useState("");
+  const [safetyNotes, setSafetyNotes] = useState("");
+  const [showSiteDetails, setShowSiteDetails] = useState(false);
+  
   // Voice recording state
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
@@ -86,6 +96,28 @@ export function StartWorkOrderDialog({
     },
     enabled: open,
   });
+
+  // Fetch maintenance book for selected property
+  const { data: maintenanceBook } = useQuery({
+    queryKey: ["property-maintenance-book-dialog", selectedProperty],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("property_maintenance_book")
+        .select("lockbox_code, gate_code, alarm_code, access_instructions")
+        .eq("property_id", selectedProperty)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedProperty,
+  });
+
+  // Auto-populate access instructions from maintenance book
+  useEffect(() => {
+    if (maintenanceBook?.access_instructions && !accessInstructions) {
+      setAccessInstructions(maintenanceBook.access_instructions);
+    }
+  }, [maintenanceBook]);
 
   // Generate full property label
   const getPropertyLabel = (property: Property) => {
@@ -228,6 +260,14 @@ export function StartWorkOrderDialog({
         voice_message_url: voiceMessageUrl,
         voice_message_transcript: voiceTranscript,
         video_url: videoMessageUrl,
+        // Access & Site Info
+        access_instructions: accessInstructions || null,
+        tenant_contact_name: tenantContactName || null,
+        tenant_contact_phone: tenantContactPhone || null,
+        pets_on_property: petsOnProperty || null,
+        parking_instructions: parkingInstructions || null,
+        utility_shutoff_notes: utilityShutoffNotes || null,
+        safety_notes: safetyNotes || null,
       };
       
       const { data, error } = await supabase
@@ -287,6 +327,14 @@ export function StartWorkOrderDialog({
       setDescription("");
       setPriority("normal");
       setCategory("general_maintenance");
+      setAccessInstructions("");
+      setTenantContactName("");
+      setTenantContactPhone("");
+      setPetsOnProperty("");
+      setParkingInstructions("");
+      setUtilityShutoffNotes("");
+      setSafetyNotes("");
+      setShowSiteDetails(false);
       clearVoice();
       clearVideo();
       
@@ -407,6 +455,126 @@ export function StartWorkOrderDialog({
               rows={3}
               className="text-sm"
             />
+          </div>
+
+          {/* Access & Site Info Section */}
+          <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5 text-sm">
+                <Key className="h-3.5 w-3.5" />
+                Access Instructions
+              </Label>
+              <Textarea
+                placeholder="How should the vendor enter? Include codes, lockbox location, etc..."
+                value={accessInstructions}
+                onChange={(e) => setAccessInstructions(e.target.value)}
+                rows={2}
+                className="text-sm"
+              />
+              {maintenanceBook?.lockbox_code || maintenanceBook?.gate_code || maintenanceBook?.alarm_code ? (
+                <p className="text-xs text-muted-foreground">
+                  📋 Property codes: {[
+                    maintenanceBook?.lockbox_code && `Lockbox ${maintenanceBook.lockbox_code}`,
+                    maintenanceBook?.gate_code && `Gate ${maintenanceBook.gate_code}`,
+                    maintenanceBook?.alarm_code && `Alarm ${maintenanceBook.alarm_code}`,
+                  ].filter(Boolean).join(', ')}
+                </p>
+              ) : null}
+            </div>
+
+            {/* Collapsible Additional Details */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSiteDetails(!showSiteDetails)}
+              className="w-full justify-between text-muted-foreground h-8"
+            >
+              <span className="text-xs">Additional Site Details</span>
+              {showSiteDetails ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </Button>
+
+            {showSiteDetails && (
+              <div className="space-y-3 pt-2 border-t">
+                {/* Tenant Contact */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Tenant/Resident Name</Label>
+                    <Input
+                      placeholder="John Smith"
+                      value={tenantContactName}
+                      onChange={(e) => setTenantContactName(e.target.value)}
+                      className="text-sm h-10"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Contact Phone</Label>
+                    <Input
+                      placeholder="(555) 123-4567"
+                      value={tenantContactPhone}
+                      onChange={(e) => setTenantContactPhone(e.target.value)}
+                      className="text-sm h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Pets Warning */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <PawPrint className="h-3 w-3" />
+                    Pets on Property
+                  </Label>
+                  <Input
+                    placeholder="e.g., Large dog in backyard - enter through side gate"
+                    value={petsOnProperty}
+                    onChange={(e) => setPetsOnProperty(e.target.value)}
+                    className="text-sm h-10"
+                  />
+                </div>
+
+                {/* Parking */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Car className="h-3 w-3" />
+                    Parking Instructions
+                  </Label>
+                  <Input
+                    placeholder="e.g., Park in driveway or visitor spot #12"
+                    value={parkingInstructions}
+                    onChange={(e) => setParkingInstructions(e.target.value)}
+                    className="text-sm h-10"
+                  />
+                </div>
+
+                {/* Utility Shutoffs */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Wrench className="h-3 w-3" />
+                    Utility Shutoff Locations
+                  </Label>
+                  <Input
+                    placeholder="e.g., Water shutoff on left side of house, breaker in garage"
+                    value={utilityShutoffNotes}
+                    onChange={(e) => setUtilityShutoffNotes(e.target.value)}
+                    className="text-sm h-10"
+                  />
+                </div>
+
+                {/* Safety Notes */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Safety Notes
+                  </Label>
+                  <Input
+                    placeholder="e.g., Active construction, slippery floors"
+                    value={safetyNotes}
+                    onChange={(e) => setSafetyNotes(e.target.value)}
+                    className="text-sm h-10"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Voice & Video Recording Buttons */}
