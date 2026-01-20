@@ -1,8 +1,23 @@
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MapPin, CheckCircle, AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STATUS_CONFIG, URGENCY_CONFIG } from "@/types/maintenance";
+import { toast } from "sonner";
 
 interface WorkOrder {
   id: string;
@@ -98,6 +113,40 @@ export const WorkOrderStageCards = ({
   onViewDetails,
   isLoading,
 }: WorkOrderStageCardsProps) => {
+  const queryClient = useQueryClient();
+  const [deleteWorkOrderId, setDeleteWorkOrderId] = useState<string | null>(null);
+  const [deleteWorkOrderTitle, setDeleteWorkOrderTitle] = useState<string>("");
+
+  // Delete work order mutation
+  const deleteWorkOrderMutation = useMutation({
+    mutationFn: async (workOrderId: string) => {
+      // Delete related records first
+      await supabase.from("work_order_timeline").delete().eq("work_order_id", workOrderId);
+      await supabase.from("maintenance_messages").delete().eq("work_order_id", workOrderId);
+      await supabase.from("work_order_photos").delete().eq("work_order_id", workOrderId);
+      
+      // Delete the work order
+      const { error } = await supabase.from("work_orders").delete().eq("id", workOrderId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Work order deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["all-work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["vendor-work-orders"] });
+      setDeleteWorkOrderId(null);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete: ${error.message}`);
+    },
+  });
+
+  const handleDeleteClick = (e: React.MouseEvent, workOrder: WorkOrder) => {
+    e.stopPropagation();
+    setDeleteWorkOrderId(workOrder.id);
+    setDeleteWorkOrderTitle(workOrder.title);
+  };
+
   // Filter to only show active work orders (not completed/cancelled)
   const activeWorkOrders = workOrders.filter(
     (wo) => !["completed", "cancelled"].includes(wo.status)
@@ -130,82 +179,119 @@ export const WorkOrderStageCards = ({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Active Work Orders</h2>
-        <Badge variant="secondary">{activeWorkOrders.length} active</Badge>
-      </div>
+    <>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Active Work Orders</h2>
+          <Badge variant="secondary">{activeWorkOrders.length} active</Badge>
+        </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {activeWorkOrders.map((workOrder) => {
-          const urgencyConfig = URGENCY_CONFIG[workOrder.urgency as keyof typeof URGENCY_CONFIG];
-          const statusConfig = STATUS_CONFIG[workOrder.status as keyof typeof STATUS_CONFIG];
-          
-          return (
-            <Card
-              key={workOrder.id}
-              className="cursor-pointer hover:shadow-md transition-shadow border"
-              onClick={() => onViewDetails(workOrder)}
-            >
-              <CardContent className="p-4">
-                {/* Header with title and status badge */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold truncate">{workOrder.title}</h3>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
-                      <MapPin className="h-3 w-3 shrink-0" />
-                      <span className="truncate">
-                        {workOrder.property?.name || workOrder.property?.address || "Unknown Property"}
-                      </span>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {activeWorkOrders.map((workOrder) => {
+            const urgencyConfig = URGENCY_CONFIG[workOrder.urgency as keyof typeof URGENCY_CONFIG];
+            const statusConfig = STATUS_CONFIG[workOrder.status as keyof typeof STATUS_CONFIG];
+            
+            return (
+              <Card
+                key={workOrder.id}
+                className="cursor-pointer hover:shadow-md transition-shadow border group"
+                onClick={() => onViewDetails(workOrder)}
+              >
+                <CardContent className="p-4">
+                  {/* Header with title and status badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold truncate">{workOrder.title}</h3>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                          {workOrder.property?.name || workOrder.property?.address || "Unknown Property"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                        onClick={(e) => handleDeleteClick(e, workOrder)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Badge
+                        className={cn(
+                          "shrink-0",
+                          statusConfig?.bgColor,
+                          statusConfig?.color
+                        )}
+                      >
+                        {statusConfig?.label || workOrder.status}
+                      </Badge>
                     </div>
                   </div>
-                  <Badge
-                    className={cn(
-                      "shrink-0",
-                      statusConfig?.bgColor,
-                      statusConfig?.color
+                  
+                  {/* Vendor info */}
+                  <div className="text-sm text-muted-foreground mt-2">
+                    {workOrder.assigned_vendor ? (
+                      <span>
+                        Vendor: <span className="font-medium text-foreground">{workOrder.assigned_vendor.name}</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-amber-600">
+                        <AlertTriangle className="h-3 w-3" />
+                        Unassigned
+                      </span>
                     )}
-                  >
-                    {statusConfig?.label || workOrder.status}
-                  </Badge>
-                </div>
-                
-                {/* Vendor info */}
-                <div className="text-sm text-muted-foreground mt-2">
-                  {workOrder.assigned_vendor ? (
-                    <span>
-                      Vendor: <span className="font-medium text-foreground">{workOrder.assigned_vendor.name}</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-amber-600">
-                      <AlertTriangle className="h-3 w-3" />
-                      Unassigned
-                    </span>
-                  )}
-                </div>
+                  </div>
 
-                {/* Urgency indicator */}
-                {workOrder.urgency === "high" || workOrder.urgency === "emergency" ? (
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "mt-2 text-xs",
-                      urgencyConfig?.color,
-                      "border-current"
-                    )}
-                  >
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    {urgencyConfig?.label}
-                  </Badge>
-                ) : null}
-                
-                {/* Stage indicator */}
-                <StageIndicator currentStatus={workOrder.status} />
-              </CardContent>
-            </Card>
-          );
-        })}
+                  {/* Urgency indicator */}
+                  {workOrder.urgency === "high" || workOrder.urgency === "emergency" ? (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "mt-2 text-xs",
+                        urgencyConfig?.color,
+                        "border-current"
+                      )}
+                    >
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      {urgencyConfig?.label}
+                    </Badge>
+                  ) : null}
+                  
+                  {/* Stage indicator */}
+                  <StageIndicator currentStatus={workOrder.status} />
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteWorkOrderId} onOpenChange={(open) => !open && setDeleteWorkOrderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteWorkOrderTitle}"? This will permanently remove the work order and all associated timeline entries, messages, and photos. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteWorkOrderId && deleteWorkOrderMutation.mutate(deleteWorkOrderId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteWorkOrderMutation.isPending}
+            >
+              {deleteWorkOrderMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };

@@ -34,7 +34,7 @@ serve(async (req) => {
       throw new Error("GHL_API_KEY and GHL_LOCATION_ID are required");
     }
 
-    const { leadId, ownerId, vendorId, phone, to, message, fromNumber, mediaUrls } = await req.json();
+    const { leadId, ownerId, vendorId, workOrderId, requestedByUserId, phone, to, message, fromNumber, mediaUrls } = await req.json();
 
     // Accept either 'phone' or 'to' parameter for the recipient
     const recipientPhone = phone || to;
@@ -44,10 +44,14 @@ serve(async (req) => {
     }
 
     const formattedPhone = formatPhoneE164(recipientPhone);
-    // Use the 404-991-5076 number as the default from number (A2P registered for maintenance)
-    const formattedFromNumber = formatPhoneE164(fromNumber || "+14049915076");
     
-    console.log(`Sending SMS via GHL to ${formattedPhone} from ${formattedFromNumber}`);
+    // Use the GHL vendor number +1 404-574-1740 for vendor communications
+    // Otherwise use 404-991-5076 as default (A2P registered for maintenance)
+    const isVendorMessage = !!vendorId;
+    const defaultNumber = isVendorMessage ? "+14045741740" : "+14049915076";
+    const formattedFromNumber = formatPhoneE164(fromNumber || defaultNumber);
+    
+    console.log(`Sending SMS via GHL to ${formattedPhone} from ${formattedFromNumber} (vendor=${isVendorMessage})`);
 
     // Initialize Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -337,6 +341,9 @@ serve(async (req) => {
     // Record communication for vendors - store in lead_communications with vendor metadata
     // This allows messages to show in both the vendor tab AND the user's inbox
     if (vendorId) {
+      // Use requestedByUserId if provided, otherwise use the current user
+      const assignedUserId = requestedByUserId || userId;
+      
       await supabase.from("lead_communications").insert({
         communication_type: "sms",
         direction: "outbound",
@@ -344,7 +351,7 @@ serve(async (req) => {
         status: "sent",
         external_id: sendData.messageId || sendData.conversationId,
         ghl_conversation_id: sendData.conversationId,
-        assigned_user_id: userId, // Track who sent this message (for inbox view)
+        assigned_user_id: assignedUserId, // Track who should see replies (requester)
         metadata: {
           provider: "gohighlevel",
           ghl_contact_id: contactId,
@@ -355,6 +362,8 @@ serve(async (req) => {
           vendor_phone: formattedPhone,
           contact_type: "vendor",
           sent_by_user_id: userId,
+          requested_by_user_id: requestedByUserId, // Original requester
+          work_order_id: workOrderId, // Link to work order if provided
         },
       });
 
