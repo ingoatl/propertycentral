@@ -267,14 +267,17 @@ export function QuickCommunicationButton() {
                             </div>
                           )}
                         </div>
-                        <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-1 shrink-0">
                           {contact.phone && (
                             <>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleCall(contact)}
+                                className="h-8 w-8 touch-manipulation"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCall(contact);
+                                }}
                                 title="Call"
                               >
                                 <Phone className="h-4 w-4 text-primary" />
@@ -282,8 +285,11 @@ export function QuickCommunicationButton() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleText(contact)}
+                                className="h-8 w-8 touch-manipulation"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleText(contact);
+                                }}
                                 title="Text"
                               >
                                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -291,8 +297,11 @@ export function QuickCommunicationButton() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleVoicemail(contact)}
+                                className="h-8 w-8 touch-manipulation"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVoicemail(contact);
+                                }}
                                 title="Voice Message"
                               >
                                 <Mic className="h-4 w-4 text-muted-foreground" />
@@ -300,8 +309,11 @@ export function QuickCommunicationButton() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleVideo(contact)}
+                                className="h-8 w-8 touch-manipulation"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVideo(contact);
+                                }}
                                 title="Video Meeting"
                               >
                                 <Video className="h-4 w-4 text-muted-foreground" />
