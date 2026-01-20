@@ -512,3 +512,6 @@ verify_jwt = true
 
 [functions.owner-approval-action]
 verify_jwt = false
+
+[functions.billcom-enroll-on-completion]
+verify_jwt = false

@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import GetPaidModal from "@/components/maintenance/GetPaidModal";
 import { 
   MapPin, Clock, CheckCircle, XCircle, 
   Camera, DollarSign, ExternalLink, Phone, Loader2, Send, 
@@ -35,7 +36,7 @@ interface WorkOrderData {
   quote_materials: string | null;
   quote_labor_hours: number | null;
   property: { id: string; name: string | null; address: string | null; image_path: string | null } | null;
-  assigned_vendor: { id: string; name: string; phone: string | null; company_name: string | null } | null;
+  assigned_vendor: { id: string; name: string; phone: string | null; company_name: string | null; billcom_vendor_id: string | null; billcom_invite_sent_at: string | null } | null;
 }
 
 interface MaintenanceBook {
@@ -60,6 +61,7 @@ const VendorJobPortal = () => {
   const [showDeclineReason, setShowDeclineReason] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [showAccessCodes, setShowAccessCodes] = useState(false);
+  const [showGetPaidModal, setShowGetPaidModal] = useState(false);
   const beforeInputRef = useRef<HTMLInputElement>(null);
   const afterInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,7 +76,7 @@ const VendorJobPortal = () => {
           created_at, access_instructions, quoted_cost,
           vendor_accepted, completed_at, quote_scope, quote_materials, quote_labor_hours,
           property:properties(id, name, address, image_path),
-          assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, phone, company_name)
+          assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, phone, company_name, billcom_vendor_id, billcom_invite_sent_at)
         `)
         .eq("vendor_access_token", token)
         .single();
@@ -879,32 +881,58 @@ const VendorJobPortal = () => {
 
         {/* STEP 4: Submit Invoice */}
         {currentStep === 4 && (
-          <Card className="border-neutral-200 bg-neutral-50">
+          <Card className="border-border bg-muted/30">
             <CardContent className="p-5 text-center">
-              <CheckCircle className="h-10 w-10 text-neutral-900 mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-neutral-900 mb-1">Job Complete</h3>
-              <p className="text-xs text-neutral-500 mb-4">
+              <CheckCircle className="h-10 w-10 text-foreground mx-auto mb-3" />
+              <h3 className="text-base font-semibold text-foreground mb-1">Job Complete</h3>
+              <p className="text-xs text-muted-foreground mb-4">
                 {workOrder.completed_at ? `Completed ${format(new Date(workOrder.completed_at), "MMM d, yyyy")}` : "Great work"}
               </p>
               
-              <Separator className="my-4 bg-neutral-200" />
+              <Separator className="my-4" />
               
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-white rounded border border-neutral-200 text-left">
-                  <FileText className="h-4 w-4 text-neutral-500 flex-shrink-0" />
+                <div className="flex items-center gap-3 p-3 bg-background rounded border text-left">
+                  <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-sm text-neutral-900">Submit Your Invoice</p>
-                    <p className="text-xs text-neutral-500">Upload to Bill.com for payment</p>
+                    <p className="font-medium text-sm text-foreground">Get Paid</p>
+                    <p className="text-xs text-muted-foreground">
+                      {workOrder.assigned_vendor?.billcom_vendor_id 
+                        ? "Submit your invoice via Bill.com"
+                        : "Join Bill.com for fast payment"}
+                    </p>
                   </div>
                 </div>
-                <Button className="w-full bg-neutral-900 hover:bg-neutral-800" asChild>
-                  <a href="https://app.bill.com" target="_blank" rel="noopener noreferrer">
-                    Open Bill.com<ArrowRight className="h-4 w-4 ml-2" />
-                  </a>
+                <Button 
+                  className="w-full bg-primary hover:bg-primary/90" 
+                  onClick={() => setShowGetPaidModal(true)}
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Get Paid
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Get Paid Modal */}
+        {workOrder.assigned_vendor && (
+          <GetPaidModal
+            open={showGetPaidModal}
+            onOpenChange={setShowGetPaidModal}
+            workOrderId={workOrder.id}
+            vendorId={workOrder.assigned_vendor.id}
+            vendorName={workOrder.assigned_vendor.name}
+            vendorPhone={workOrder.assigned_vendor.phone}
+            propertyName={workOrder.property?.name || "Property"}
+            propertyAddress={workOrder.property?.address}
+            quotedAmount={workOrder.quoted_cost}
+            completedAt={workOrder.completed_at}
+            isBillComConnected={!!workOrder.assigned_vendor.billcom_vendor_id}
+            billcomInviteSentAt={workOrder.assigned_vendor.billcom_invite_sent_at}
+            onEnrollmentComplete={() => queryClient.invalidateQueries({ queryKey: ["vendor-job", token] })}
+          />
         )}
 
         {/* Cost Summary */}
