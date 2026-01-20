@@ -25,7 +25,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { 
   MapPin, User, Clock, DollarSign, Wrench, Send, 
-  CheckCircle, AlertTriangle, Phone, Mail, Calendar
+  CheckCircle, AlertTriangle, Phone, Mail, Calendar,
+  RotateCcw, ExternalLink, Loader2
 } from "lucide-react";
 import { 
   WorkOrder, WorkOrderStatus, WorkOrderTimeline, MaintenanceMessage,
@@ -50,6 +51,7 @@ const WorkOrderDetailModal = ({
   const [notifySms, setNotifySms] = useState(true);
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [isNotifying, setIsNotifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch the complete work order data
@@ -257,6 +259,58 @@ const WorkOrderDetailModal = ({
     },
   });
 
+  // Resend work order link to vendor
+  const resendVendorLink = async () => {
+    if (!workOrder?.id || !workOrder?.assigned_vendor_id) {
+      toast.error("No vendor assigned");
+      return;
+    }
+    
+    setIsResending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Generate new vendor access token
+      const newToken = crypto.randomUUID();
+      const { error: updateError } = await supabase
+        .from("work_orders")
+        .update({ 
+          vendor_access_token: newToken,
+          vendor_token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+        })
+        .eq("id", workOrder.id);
+
+      if (updateError) throw updateError;
+
+      // Notify vendor via SMS
+      const { data, error: notifyError } = await supabase.functions.invoke("notify-vendor-work-order", {
+        body: { 
+          workOrderId: workOrder.id, 
+          vendorId: workOrder.assigned_vendor_id,
+          notifyMethods: ["sms"]
+        },
+      });
+
+      if (notifyError) throw notifyError;
+
+      // Log to timeline
+      await supabase.from("work_order_timeline").insert({
+        work_order_id: workOrder.id,
+        action: `Resent job portal link to ${workOrder.assigned_vendor?.name}`,
+        performed_by_type: "pm",
+        performed_by_name: user?.email,
+        performed_by_user_id: user?.id,
+      });
+
+      toast.success("Work order link resent to vendor!");
+      queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrderId] });
+    } catch (error: any) {
+      toast.error("Failed to resend: " + error.message);
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const getSenderBadgeColor = (type: string) => {
     switch (type) {
       case 'owner': return 'bg-purple-100 text-purple-700';
@@ -388,16 +442,16 @@ const WorkOrderDetailModal = ({
                         {workOrder.assigned_vendor.phone}
                       </p>
                       {/* Vendor Response Status */}
-                      <div className="mt-2 pt-2 border-t border-border/50">
+                      <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
                         {workOrder.vendor_accepted === true && (
-                          <Badge className="bg-green-100 text-green-700">
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Confirmed
                           </Badge>
                         )}
                         {workOrder.vendor_accepted === false && (
                           <div>
-                            <Badge className="bg-red-100 text-red-700">Declined</Badge>
+                            <Badge variant="destructive">Declined</Badge>
                             {workOrder.vendor_declined_reason && (
                               <p className="text-xs text-muted-foreground mt-1">
                                 {workOrder.vendor_declined_reason}
@@ -406,11 +460,26 @@ const WorkOrderDetailModal = ({
                           </div>
                         )}
                         {workOrder.vendor_accepted === null && (
-                          <Badge className="bg-yellow-100 text-yellow-700">
+                          <Badge variant="outline" className="text-amber-700 border-amber-300">
                             <Clock className="h-3 w-3 mr-1" />
                             Awaiting Response
                           </Badge>
                         )}
+                        {/* Resend Link Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={resendVendorLink}
+                          disabled={isResending}
+                          className="w-full mt-2"
+                        >
+                          {isResending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          ) : (
+                            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                          )}
+                          Resend Job Link
+                        </Button>
                       </div>
                     </div>
                   </div>
