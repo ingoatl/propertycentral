@@ -137,6 +137,20 @@ export function useGhlCalendarAutoSync() {
         queryClient.invalidateQueries({ queryKey: ["discovery-calls-calendar"] });
         
         console.log("[GHL Auto Sync] Calendar sync completed");
+
+        // Also trigger automatic meeting recording sync
+        try {
+          console.log("[GHL Auto Sync] Checking for meetings to auto-record...");
+          const { data: recordingResult, error: recordingError } = await supabase.functions.invoke("recall-calendar-sync");
+          
+          if (recordingError) {
+            console.error("[GHL Auto Sync] Recording sync error:", recordingError);
+          } else {
+            console.log("[GHL Auto Sync] Recording sync result:", recordingResult);
+          }
+        } catch (recordingErr) {
+          console.error("[GHL Auto Sync] Recording sync failed:", recordingErr);
+        }
       } catch (err) {
         console.error("[GHL Auto Sync] Calendar sync error:", err);
       } finally {

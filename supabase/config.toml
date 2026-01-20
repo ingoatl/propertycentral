@@ -515,3 +515,6 @@ verify_jwt = false
 
 [functions.billcom-enroll-on-completion]
 verify_jwt = false
+
+[functions.recall-calendar-sync]
+verify_jwt = false
