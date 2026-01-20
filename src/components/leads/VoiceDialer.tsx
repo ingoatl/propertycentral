@@ -68,8 +68,9 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
           .not('phone', 'is', null),
         supabase
           .from('leads')
-          .select('id, name, phone, property_address')
+          .select('id, name, phone, property_address, stage')
           .not('phone', 'is', null)
+          .neq('stage', 'ops_handoff') // Exclude ops_handoff leads - they are now owners
       ]);
 
       const owners: ContactRecord[] = (ownersResult.data || []).map(o => ({
@@ -80,13 +81,24 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
         address: o.properties?.[0]?.address || undefined,
       }));
 
-      const leads: ContactRecord[] = (leadsResult.data || []).map(l => ({
-        id: l.id,
-        name: l.name,
-        phone: l.phone,
-        type: 'lead' as const,
-        address: l.property_address || undefined,
-      }));
+      // Create a set of owner phone numbers to deduplicate
+      const ownerPhones = new Set(
+        owners.map(o => cleanPhoneNumber(o.phone || '')).filter(Boolean)
+      );
+
+      const leads: ContactRecord[] = (leadsResult.data || [])
+        .filter(l => {
+          // Exclude leads whose phone matches an existing owner
+          const cleanedPhone = cleanPhoneNumber(l.phone || '');
+          return !ownerPhones.has(cleanedPhone);
+        })
+        .map(l => ({
+          id: l.id,
+          name: l.name,
+          phone: l.phone,
+          type: 'lead' as const,
+          address: l.property_address || undefined,
+        }));
 
       return [...owners, ...leads];
     },
@@ -356,8 +368,8 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
             </div>
           ) : (
             <div className={cn(
-              "flex-1 flex flex-col",
-              isMobile && "justify-center"
+              "flex-1 flex flex-col min-h-0 overflow-y-auto",
+              isMobile && "pb-4"
             )}>
               {selectedContact && !isOnCall && (
                 <div className="p-4 bg-muted rounded-xl mb-4">
@@ -437,8 +449,8 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
               </div>
 
               <div className={cn(
-                "flex gap-3",
-                isMobile ? "mt-auto" : ""
+                "flex gap-3 shrink-0 pt-4",
+                isMobile ? "" : ""
               )}>
                 {!isOnCall && (
                   <>

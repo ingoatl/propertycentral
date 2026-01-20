@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Video, X, Check, Upload, RefreshCw, Play, Pause } from "lucide-react";
+import { Video, X, Check, Upload, RefreshCw, Play, Pause, Square, Circle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,11 @@ interface VideoCaptureProps {
   className?: string;
   maxDuration?: number; // in seconds
 }
+
+// Detect if we're on a mobile device
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
 
 export function VideoCapture({
   onVideoReady,
@@ -25,17 +30,128 @@ export function VideoCapture({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isWebcamMode, setIsWebcamMode] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [webcamError, setWebcamError] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const liveVideoRef = useRef<HTMLVideoElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup URLs on unmount
+  // Cleanup URLs and streams on unmount
   useEffect(() => {
     return () => {
       if (videoUrl) {
         URL.revokeObjectURL(videoUrl);
       }
+      stopWebcam();
     };
   }, [videoUrl]);
+
+  const stopWebcam = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+    setIsWebcamMode(false);
+    setRecordingTime(0);
+  }, []);
+
+  const startWebcam = async () => {
+    setWebcamError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true,
+      });
+      streamRef.current = stream;
+      setIsWebcamMode(true);
+      
+      // Wait for the live video element to be available
+      setTimeout(() => {
+        if (liveVideoRef.current) {
+          liveVideoRef.current.srcObject = stream;
+          liveVideoRef.current.play().catch(console.error);
+        }
+      }, 100);
+    } catch (error: any) {
+      console.error("Webcam access error:", error);
+      setWebcamError(error.message || "Could not access camera. Please check permissions.");
+    }
+  };
+
+  const startRecording = () => {
+    if (!streamRef.current) return;
+
+    chunksRef.current = [];
+    const mediaRecorder = new MediaRecorder(streamRef.current, {
+      mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9") 
+        ? "video/webm;codecs=vp9" 
+        : "video/webm",
+    });
+    
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data);
+      }
+    };
+    
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: "video/webm" });
+      const file = new File([blob], `recording_${Date.now()}.webm`, { type: "video/webm" });
+      setVideoFile(file);
+      const url = URL.createObjectURL(blob);
+      setVideoUrl(url);
+      stopWebcam();
+    };
+    
+    mediaRecorderRef.current = mediaRecorder;
+    mediaRecorder.start(1000); // Collect data every second
+    setIsRecording(true);
+    setRecordingTime(0);
+    
+    // Start timer
+    timerRef.current = setInterval(() => {
+      setRecordingTime(prev => {
+        if (prev >= maxDuration - 1) {
+          stopRecording();
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+  };
+
+  const handleOpenCamera = () => {
+    if (isMobileDevice()) {
+      // On mobile, use native camera app via file input
+      fileInputRef.current?.click();
+    } else {
+      // On desktop, start webcam
+      startWebcam();
+    }
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -105,12 +221,14 @@ export function VideoCapture({
     if (videoUrl) {
       URL.revokeObjectURL(videoUrl);
     }
+    stopWebcam();
     setVideoFile(null);
     setVideoUrl(null);
     setDuration(0);
     setUploadProgress(0);
     setUploadError(null);
     setIsPlaying(false);
+    setWebcamError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -197,7 +315,73 @@ export function VideoCapture({
         className="hidden"
       />
 
-      {!videoUrl ? (
+      {isWebcamMode ? (
+        // Desktop webcam recording mode
+        <div className="flex flex-col gap-4">
+          <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
+            <video
+              ref={liveVideoRef}
+              className="w-full h-full object-cover mirror"
+              autoPlay
+              muted
+              playsInline
+              style={{ transform: 'scaleX(-1)' }}
+            />
+            {/* Recording indicator */}
+            {isRecording && (
+              <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-600 text-white text-sm font-medium">
+                <Circle className="h-3 w-3 fill-current animate-pulse" />
+                Recording • {formatTime(recordingTime)}
+              </div>
+            )}
+            {/* Max duration badge */}
+            <div className="absolute bottom-3 right-3 px-2 py-1 rounded bg-black/70 text-white text-sm">
+              Max: {formatTime(maxDuration)}
+            </div>
+          </div>
+
+          {webcamError && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              {webcamError}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            {!isRecording ? (
+              <Button
+                onClick={startRecording}
+                size="lg"
+                className="flex-1 gap-2 bg-red-600 hover:bg-red-700"
+              >
+                <Circle className="h-5 w-5 fill-current" />
+                Start Recording
+              </Button>
+            ) : (
+              <Button
+                onClick={stopRecording}
+                size="lg"
+                variant="destructive"
+                className="flex-1 gap-2"
+              >
+                <Square className="h-5 w-5 fill-current" />
+                Stop Recording
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                stopWebcam();
+                resetCapture();
+              }}
+              disabled={isRecording}
+              className="gap-2"
+            >
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : !videoUrl ? (
         // Initial state - show capture button
         <div className="flex flex-col items-center gap-4 p-8 border-2 border-dashed rounded-xl bg-muted/30">
           <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -206,11 +390,11 @@ export function VideoCapture({
           <div className="text-center">
             <p className="font-medium">Record a Video Message</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Tap below to open your camera
+              {isMobileDevice() ? "Tap below to open your camera" : "Click below to start webcam recording"}
             </p>
           </div>
           <Button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleOpenCamera}
             size="lg"
             className="gap-2"
           >
