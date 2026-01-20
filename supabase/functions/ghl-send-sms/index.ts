@@ -140,7 +140,8 @@ serve(async (req) => {
           },
           body: new URLSearchParams({
             To: formattedPhone,
-            From: formattedFromNumber,
+            // CRITICAL: Always use A2P registered number for Twilio - GHL number won't work
+            From: "+14049915076",
             Body: message,
           }).toString(),
         }
