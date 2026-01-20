@@ -7306,6 +7306,7 @@ export type Database = {
           require_owner_approval_above: number | null
           special_instructions: string | null
           updated_at: string | null
+          vendor_access_code: string | null
         }
         Insert: {
           access_instructions?: string | null
@@ -7331,6 +7332,7 @@ export type Database = {
           require_owner_approval_above?: number | null
           special_instructions?: string | null
           updated_at?: string | null
+          vendor_access_code?: string | null
         }
         Update: {
           access_instructions?: string | null
@@ -7356,6 +7358,7 @@ export type Database = {
           require_owner_approval_above?: number | null
           special_instructions?: string | null
           updated_at?: string | null
+          vendor_access_code?: string | null
         }
         Relationships: [
           {
@@ -10048,6 +10051,7 @@ export type Database = {
           utility_shutoff_notes: string | null
           vendor_accepted: boolean | null
           vendor_accepted_at: string | null
+          vendor_access_code: string | null
           vendor_access_token: string | null
           vendor_access_token_expires_at: string | null
           vendor_declined_reason: string | null
@@ -10131,6 +10135,7 @@ export type Database = {
           utility_shutoff_notes?: string | null
           vendor_accepted?: boolean | null
           vendor_accepted_at?: string | null
+          vendor_access_code?: string | null
           vendor_access_token?: string | null
           vendor_access_token_expires_at?: string | null
           vendor_declined_reason?: string | null
@@ -10214,6 +10219,7 @@ export type Database = {
           utility_shutoff_notes?: string | null
           vendor_accepted?: boolean | null
           vendor_accepted_at?: string | null
+          vendor_access_code?: string | null
           vendor_access_token?: string | null
           vendor_access_token_expires_at?: string | null
           vendor_declined_reason?: string | null

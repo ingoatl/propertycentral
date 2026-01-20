@@ -56,6 +56,7 @@ export interface OwnerOnboardingFormData {
   trash_bin_location: string;
   gate_code: string;
   garage_code: string;
+  vendor_access_code: string;
 
   // Step 3: Utilities
   wastewater_system: string;
@@ -221,6 +222,7 @@ export const initialFormData: OwnerOnboardingFormData = {
   trash_bin_location: '',
   gate_code: '',
   garage_code: '',
+  vendor_access_code: '',
 
   // Step 3
   wastewater_system: '',

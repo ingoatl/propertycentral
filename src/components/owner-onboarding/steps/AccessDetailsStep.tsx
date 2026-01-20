@@ -169,6 +169,22 @@ export function AccessDetailsStep({ formData, updateFormData }: StepProps) {
             className="h-14 mt-1"
           />
         </div>
+
+        <div className="md:col-span-2">
+          <Label htmlFor="vendor_access_code" className="text-sm font-medium">
+            Vendor Access Code
+          </Label>
+          <p className="text-xs text-muted-foreground mb-1">
+            A dedicated code for maintenance vendors (separate from guest codes)
+          </p>
+          <Input
+            id="vendor_access_code"
+            value={formData.vendor_access_code}
+            onChange={(e) => updateFormData({ vendor_access_code: e.target.value })}
+            placeholder="e.g., 9876"
+            className="h-14 mt-1"
+          />
+        </div>
       </div>
     </div>
   );
