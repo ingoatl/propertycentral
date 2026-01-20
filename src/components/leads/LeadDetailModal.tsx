@@ -39,7 +39,8 @@ import {
   Check,
   X,
   Trash2,
-  MessageCircle
+  MessageCircle,
+  Video
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
 import FollowUpManager from "./FollowUpManager";
@@ -53,6 +54,7 @@ import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DirectCallButton from "./DirectCallButton";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { SendStripeAuthButton } from "./SendStripeAuthButton";
+import { MeetingsDialog } from "@/components/communications/MeetingsDialog";
 import { ExpandableMessageInput } from "@/components/communications/ExpandableMessageInput";
 import { UnifiedConversationThread } from "@/components/communications/UnifiedConversationThread";
 import {
@@ -89,6 +91,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
   const [showScheduleCall, setShowScheduleCall] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showSMSDialog, setShowSMSDialog] = useState(false);
+  const [showVideoDialog, setShowVideoDialog] = useState(false);
   const [showFullConversation, setShowFullConversation] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -554,6 +557,14 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               leadId={lead.id}
             />
           )}
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowVideoDialog(true)}
+          >
+            <Video className="h-4 w-4 mr-2" />
+            Video
+          </Button>
           
           {/* Full Conversation Button */}
           <Button 
@@ -1295,6 +1306,14 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Video Meeting Dialog */}
+      <MeetingsDialog
+        open={showVideoDialog}
+        onOpenChange={setShowVideoDialog}
+        contactName={lead.name}
+        contactEmail={lead.email}
+      />
     </Dialog>
   );
 };
