@@ -169,8 +169,8 @@ export default function TeamHubInvite() {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Slack replacement notice */}
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-center">
-                <p className="text-amber-200 text-sm">
+              <div className="bg-black border border-zinc-700 rounded-lg p-4 text-center">
+                <p className="text-white text-sm">
                   <strong>📢 Important:</strong> Team Hub is replacing Slack for all internal communications. 
                   We're phasing out Slack over the next few weeks.
                 </p>
