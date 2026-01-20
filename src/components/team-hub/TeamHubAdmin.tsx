@@ -19,13 +19,27 @@ interface TeamHubInvite {
   accepted_at: string | null;
 }
 
-// Team email addresses
-const TEAM_EMAILS = [
-  'alex@peachhausgroup.com',
-  'anja@peachhausgroup.com',
-  'catherine@peachhausgroup.com',
-  'chris@peachhausgroup.com',
-  'ingo@peachhausgroup.com',
+// Complete team member information for invites
+const TEAM_MEMBERS = [
+  { name: 'Alex', email: 'alex@peachhausgroup.com', role: 'Property Manager' },
+  { name: 'Anja', email: 'anja@peachhausgroup.com', role: 'Operations Manager' },
+  { name: 'Catherine', email: 'catherine@peachhausgroup.com', role: 'Guest Relations' },
+  { name: 'Chris', email: 'chris@peachhausgroup.com', role: 'Maintenance Coordinator' },
+  { name: 'Ingo', email: 'ingo@peachhausgroup.com', role: 'Owner / CEO' },
+];
+
+const TEAM_EMAILS = TEAM_MEMBERS.map(m => m.email);
+
+// Recommended channels based on property management workflow
+const SUGGESTED_CHANNELS = [
+  { name: 'general', description: 'Company-wide announcements and updates' },
+  { name: 'maintenance', description: 'Work orders, repairs, vendor coordination' },
+  { name: 'owner-urgent', description: 'Time-sensitive owner communications' },
+  { name: 'guest-relations', description: 'Guest inquiries, check-ins, reviews' },
+  { name: 'leads', description: 'New lead alerts and sales pipeline' },
+  { name: 'operations', description: 'Daily ops, scheduling, property visits' },
+  { name: 'financials', description: 'Expenses, invoices, payment tracking' },
+  { name: 'random', description: 'Non-work banter and team bonding' },
 ];
 
 export function TeamHubAdmin() {
@@ -157,21 +171,60 @@ export function TeamHubAdmin() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5" />
-          Invite Team Members
+          Team Hub Management
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Quick Invite All */}
-        <div className="p-4 bg-muted/30 rounded-lg space-y-3">
-          <div>
-            <h4 className="font-medium">Quick Invite All Team Members</h4>
-            <p className="text-sm text-muted-foreground">
-              Send invites to all 5 team members at once
-            </p>
+        {/* Team Members Directory */}
+        <div className="space-y-3">
+          <h4 className="font-medium">Team Members</h4>
+          <div className="grid gap-2">
+            {TEAM_MEMBERS.map((member) => {
+              const invite = invites.find(i => i.invitee_email === member.email);
+              const hasAccepted = invite?.status === 'accepted';
+              const hasPending = invite && invite.status !== 'accepted' && new Date(invite.expires_at) > new Date();
+              
+              return (
+                <div
+                  key={member.email}
+                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{member.name}</span>
+                    <span className="text-xs text-muted-foreground">{member.role}</span>
+                    <span className="text-xs text-muted-foreground">{member.email}</span>
+                  </div>
+                  {hasAccepted ? (
+                    <Badge variant="default" className="bg-primary">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Active
+                    </Badge>
+                  ) : hasPending ? (
+                    <Badge variant="secondary">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Pending
+                    </Badge>
+                  ) : (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => sendInvite.mutate(member.email)}
+                      disabled={sendInvite.isPending}
+                    >
+                      <Send className="h-3 w-3 mr-1" />
+                      Invite
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          
+          {/* Quick Invite All */}
           <Button 
             onClick={() => sendAllInvites.mutate()}
             disabled={sendAllInvites.isPending}
+            variant="secondary"
             className="w-full"
           >
             {sendAllInvites.isPending ? (
@@ -179,13 +232,13 @@ export function TeamHubAdmin() {
             ) : (
               <Mail className="h-4 w-4 mr-2" />
             )}
-            Send Invites to All Team Members
+            Invite All Team Members
           </Button>
         </div>
 
         {/* Individual Invite */}
-        <div className="space-y-3">
-          <h4 className="font-medium">Or invite individually:</h4>
+        <div className="space-y-3 pt-4 border-t">
+          <h4 className="font-medium">Invite by Email</h4>
           <div className="flex gap-2">
             <Input
               type="email"
@@ -207,36 +260,53 @@ export function TeamHubAdmin() {
           </div>
         </div>
 
-        {/* Invite History */}
+        {/* Suggested Channels */}
         <div className="space-y-3 pt-4 border-t">
-          <h4 className="font-medium">Invite History</h4>
-          {isLoading ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : invites.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No invites sent yet
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {invites.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30"
-                >
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{invite.invitee_email}</span>
-                    <span className="text-xs text-muted-foreground">
-                      Sent {format(new Date(invite.created_at), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-                  {getStatusBadge(invite.status, invite.expires_at)}
-                </div>
-              ))}
-            </div>
-          )}
+          <h4 className="font-medium">Recommended Channels</h4>
+          <p className="text-xs text-muted-foreground">
+            Based on your property management workflow:
+          </p>
+          <div className="grid gap-2">
+            {SUGGESTED_CHANNELS.map((channel) => (
+              <div
+                key={channel.name}
+                className="flex items-start gap-3 py-2 px-3 rounded-lg bg-muted/30"
+              >
+                <span className="text-sm font-medium text-primary">#{channel.name}</span>
+                <span className="text-xs text-muted-foreground flex-1">{channel.description}</span>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* Invite History */}
+        {invites.length > 0 && (
+          <div className="space-y-3 pt-4 border-t">
+            <h4 className="font-medium">Invite History</h4>
+            {isLoading ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {invites.map((invite) => (
+                  <div
+                    key={invite.id}
+                    className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30"
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{invite.invitee_email}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Sent {format(new Date(invite.created_at), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                    {getStatusBadge(invite.status, invite.expires_at)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

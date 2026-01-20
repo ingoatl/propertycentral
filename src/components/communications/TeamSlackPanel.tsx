@@ -41,13 +41,13 @@ interface SlackMessage {
   template_used: string | null;
 }
 
-// Team members with their Slack user IDs - defined outside component to prevent recreation
+// Team members with complete information for invites and messaging
 const TEAM_MEMBERS = [
-  { id: 'alex', name: 'Alex', slackId: 'U_ALEX' },
-  { id: 'anja', name: 'Anja', slackId: 'U_ANJA' },
-  { id: 'catherine', name: 'Catherine', slackId: 'U_CATHERINE' },
-  { id: 'chris', name: 'Chris', slackId: 'U_CHRIS' },
-  { id: 'ingo', name: 'Ingo', slackId: 'U_INGO' },
+  { id: 'alex', name: 'Alex', email: 'alex@peachhausgroup.com', role: 'Property Manager' },
+  { id: 'anja', name: 'Anja', email: 'anja@peachhausgroup.com', role: 'Operations Manager' },
+  { id: 'catherine', name: 'Catherine', email: 'catherine@peachhausgroup.com', role: 'Guest Relations' },
+  { id: 'chris', name: 'Chris', email: 'chris@peachhausgroup.com', role: 'Maintenance Coordinator' },
+  { id: 'ingo', name: 'Ingo', email: 'ingo@peachhausgroup.com', role: 'Owner / CEO' },
 ] as const;
 
 const QUICK_TEMPLATES = [
@@ -299,7 +299,7 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <MessageSquare className="h-4 w-4 text-primary" />
-            <span className="font-medium text-sm">Quick Slack</span>
+            <span className="font-medium text-sm">Team Hub</span>
             {channelsError && (
               <Badge variant="destructive" className="text-[10px]">Error loading channels</Badge>
             )}
@@ -378,7 +378,7 @@ export const TeamSlackPanel = memo(function TeamSlackPanel({
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
-            Team Slack
+            Team Hub
           </CardTitle>
           <Button 
             variant="ghost" 

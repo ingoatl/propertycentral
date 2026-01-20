@@ -41,6 +41,7 @@ export function MobileNavigation({ isAdmin }: MobileNavigationProps) {
             <Link
               key={linkItem.path}
               to={linkItem.path}
+              onClick={(e) => e.stopPropagation()}
               className={cn(
                 "flex items-center gap-3 mx-3 px-4 py-3 rounded-xl text-[15px] font-medium transition-all",
                 "active:bg-secondary touch-manipulation",
@@ -74,6 +75,10 @@ export function MobileNavigation({ isAdmin }: MobileNavigationProps) {
           >
             <CollapsibleTrigger asChild>
               <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleGroup(dropdownItem.label);
+                }}
                 className={cn(
                   "flex items-center gap-3 w-full mx-3 px-4 py-3 rounded-xl text-[15px] font-medium transition-all",
                   "active:bg-secondary touch-manipulation",
@@ -103,6 +108,7 @@ export function MobileNavigation({ isAdmin }: MobileNavigationProps) {
                     <Link
                       key={item.path}
                       to={item.path}
+                      onClick={(e) => e.stopPropagation()}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
                         "active:bg-secondary touch-manipulation",

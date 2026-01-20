@@ -58,8 +58,8 @@ export const MobileHeaderBar = memo(function MobileHeaderBar({
                         <span className="text-xs text-muted-foreground">{user?.email}</span>
                       </div>
                       
-                      {/* Navigation */}
-                      <div className="flex-1 overflow-auto" onClick={() => setMenuOpen(false)}>
+                      {/* Navigation - stop propagation to allow submenu clicks */}
+                      <div className="flex-1 overflow-auto">
                         {navigationContent}
                       </div>
                       
