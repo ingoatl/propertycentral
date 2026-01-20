@@ -220,7 +220,7 @@ const Maintenance = () => {
 
       {selectedWorkOrder && (
         <WorkOrderDetailModal
-          workOrder={selectedWorkOrder}
+          workOrderId={selectedWorkOrder.id}
           open={!!selectedWorkOrder}
           onOpenChange={(open) => !open && setSelectedWorkOrder(null)}
           onUpdate={() => {

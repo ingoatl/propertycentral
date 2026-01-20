@@ -36,7 +36,7 @@ const Vendors = () => {
   const [deleteVendor, setDeleteVendor] = useState<Vendor | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showStartWorkOrder, setShowStartWorkOrder] = useState(false);
-  const [selectedWorkOrder, setSelectedWorkOrder] = useState<any>(null);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { isAdmin } = useAdminCheck();
 
@@ -172,7 +172,7 @@ const Vendors = () => {
         {/* Work Orders Table */}
         <WorkOrdersTable
           workOrders={workOrders}
-          onViewDetails={(wo) => setSelectedWorkOrder(wo)}
+          onViewDetails={(wo) => setSelectedWorkOrderId(wo.id)}
           isLoading={workOrdersLoading}
         />
 
@@ -259,7 +259,7 @@ const Vendors = () => {
       {smsDialogVendor && <SendSMSDialog open={!!smsDialogVendor} onOpenChange={(open) => !open && setSmsDialogVendor(null)} contactName={smsDialogVendor.name} contactPhone={smsDialogVendor.phone} contactType="vendor" contactId={smsDialogVendor.id} />}
       {deleteVendor && <DeleteVendorDialog open={!!deleteVendor} onOpenChange={(open) => !open && setDeleteVendor(null)} vendorName={deleteVendor.name} onConfirm={handleDeleteVendor} isDeleting={isDeleting} />}
       <StartWorkOrderDialog open={showStartWorkOrder} onOpenChange={setShowStartWorkOrder} onSuccess={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />
-      {selectedWorkOrder && <WorkOrderDetailModal workOrder={selectedWorkOrder as any} open={!!selectedWorkOrder} onOpenChange={(open) => !open && setSelectedWorkOrder(null)} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />}
+      {selectedWorkOrderId && <WorkOrderDetailModal workOrderId={selectedWorkOrderId} open={!!selectedWorkOrderId} onOpenChange={(open) => !open && setSelectedWorkOrderId(null)} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />}
     </>
   );
 };

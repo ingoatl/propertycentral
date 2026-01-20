@@ -33,14 +33,14 @@ import {
 } from "@/types/maintenance";
 
 interface WorkOrderDetailModalProps {
-  workOrder: WorkOrder;
+  workOrderId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
 }
 
 const WorkOrderDetailModal = ({ 
-  workOrder, 
+  workOrderId, 
   open, 
   onOpenChange, 
   onUpdate 
@@ -52,38 +52,60 @@ const WorkOrderDetailModal = ({
   const [isNotifying, setIsNotifying] = useState(false);
   const queryClient = useQueryClient();
 
-  const statusConfig = STATUS_CONFIG[workOrder.status];
-  const urgencyConfig = URGENCY_CONFIG[workOrder.urgency];
-  const category = WORK_ORDER_CATEGORIES.find(c => c.value === workOrder.category);
+  // Fetch the complete work order data
+  const { data: workOrder, isLoading: workOrderLoading } = useQuery({
+    queryKey: ["work-order-detail", workOrderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("work_orders")
+        .select(`
+          *,
+          property:properties(id, name, address),
+          assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, company_name, phone, email)
+        `)
+        .eq("id", workOrderId)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && !!workOrderId,
+  });
+
+  const statusConfig = workOrder ? STATUS_CONFIG[workOrder.status as WorkOrderStatus] : null;
+  const urgencyConfig = workOrder ? URGENCY_CONFIG[workOrder.urgency as keyof typeof URGENCY_CONFIG] : null;
+  const category = workOrder ? WORK_ORDER_CATEGORIES.find(c => c.value === workOrder.category) : null;
 
   // Fetch timeline
   const { data: timeline = [] } = useQuery({
-    queryKey: ["work-order-timeline", workOrder.id],
+    queryKey: ["work-order-timeline", workOrderId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("work_order_timeline")
         .select("*")
-        .eq("work_order_id", workOrder.id)
+        .eq("work_order_id", workOrderId)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
       return data as WorkOrderTimeline[];
     },
+    enabled: open && !!workOrderId,
   });
 
   // Fetch messages
   const { data: messages = [] } = useQuery({
-    queryKey: ["work-order-messages", workOrder.id],
+    queryKey: ["work-order-messages", workOrderId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("maintenance_messages")
         .select("*")
-        .eq("work_order_id", workOrder.id)
+        .eq("work_order_id", workOrderId)
         .order("created_at", { ascending: true });
       
       if (error) throw error;
       return data as MaintenanceMessage[];
     },
+    enabled: open && !!workOrderId,
   });
 
   // Fetch vendors for assignment (all active vendors, preferred ones first, matching category highlighted)
@@ -103,8 +125,8 @@ const WorkOrderDetailModal = ({
   });
 
   // Separate vendors by category match for display
-  const matchingVendors = vendors.filter(v => v.specialty?.includes(workOrder.category));
-  const otherVendors = vendors.filter(v => !v.specialty?.includes(workOrder.category));
+  const matchingVendors = vendors.filter(v => workOrder?.category && v.specialty?.includes(workOrder.category));
+  const otherVendors = vendors.filter(v => !workOrder?.category || !v.specialty?.includes(workOrder.category));
 
   // Update status
   const updateStatus = useMutation({
@@ -117,24 +139,25 @@ const WorkOrderDetailModal = ({
           status: newStatus,
           ...(newStatus === "completed" ? { completed_at: new Date().toISOString() } : {})
         })
-        .eq("id", workOrder.id);
+        .eq("id", workOrderId);
 
       if (error) throw error;
 
       await supabase.from("work_order_timeline").insert({
-        work_order_id: workOrder.id,
+        work_order_id: workOrderId,
         action: `Status changed to ${STATUS_CONFIG[newStatus].label}`,
         performed_by_type: "pm",
         performed_by_name: user?.email,
         performed_by_user_id: user?.id,
-        previous_status: workOrder.status,
+        previous_status: workOrder?.status,
         new_status: newStatus,
       });
     },
     onSuccess: () => {
       toast.success("Status updated");
       onUpdate();
-      queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrder.id] });
+      queryClient.invalidateQueries({ queryKey: ["work-order-detail", workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrderId] });
     },
     onError: (error) => {
       toast.error("Failed to update: " + error.message);
@@ -155,17 +178,17 @@ const WorkOrderDetailModal = ({
           assigned_at: new Date().toISOString(),
           status: "dispatched"
         })
-        .eq("id", workOrder.id);
+        .eq("id", workOrderId);
 
       if (error) throw error;
 
       await supabase.from("work_order_timeline").insert({
-        work_order_id: workOrder.id,
+        work_order_id: workOrderId,
         action: `Assigned to vendor: ${vendor?.name}`,
         performed_by_type: "pm",
         performed_by_name: user?.email,
         performed_by_user_id: user?.id,
-        previous_status: workOrder.status,
+        previous_status: workOrder?.status,
         new_status: "dispatched",
       });
 
@@ -179,7 +202,7 @@ const WorkOrderDetailModal = ({
         try {
           const { data, error: notifyError } = await supabase.functions.invoke("notify-vendor-work-order", {
             body: { 
-              workOrderId: workOrder.id, 
+              workOrderId: workOrderId, 
               vendorId,
               notifyMethods 
             },
@@ -202,7 +225,8 @@ const WorkOrderDetailModal = ({
       toast.success("Vendor assigned successfully");
       onUpdate();
       setSelectedVendorId(null);
-      queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrder.id] });
+      queryClient.invalidateQueries({ queryKey: ["work-order-detail", workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrderId] });
     },
     onError: (error) => {
       toast.error("Failed to assign: " + error.message);
@@ -215,7 +239,7 @@ const WorkOrderDetailModal = ({
       const { data: { user } } = await supabase.auth.getUser();
       
       const { error } = await supabase.from("maintenance_messages").insert({
-        work_order_id: workOrder.id,
+        work_order_id: workOrderId,
         sender_type: "pm",
         sender_name: user?.email || "Property Manager",
         sender_user_id: user?.id,
@@ -226,7 +250,7 @@ const WorkOrderDetailModal = ({
     },
     onSuccess: () => {
       setNewMessage("");
-      queryClient.invalidateQueries({ queryKey: ["work-order-messages", workOrder.id] });
+      queryClient.invalidateQueries({ queryKey: ["work-order-messages", workOrderId] });
     },
     onError: (error) => {
       toast.error("Failed to send: " + error.message);
@@ -244,6 +268,18 @@ const WorkOrderDetailModal = ({
     }
   };
 
+  if (workOrderLoading || !workOrder) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl">
+          <div className="flex items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -260,12 +296,16 @@ const WorkOrderDetailModal = ({
               </div>
             </div>
             <div className="flex gap-2">
-              <Badge className={`${statusConfig.bgColor} ${statusConfig.color}`}>
-                {statusConfig.label}
-              </Badge>
-              <Badge className={`${urgencyConfig.bgColor} ${urgencyConfig.color}`}>
-                {urgencyConfig.label}
-              </Badge>
+              {statusConfig && (
+                <Badge className={`${statusConfig.bgColor} ${statusConfig.color}`}>
+                  {statusConfig.label}
+                </Badge>
+              )}
+              {urgencyConfig && (
+                <Badge className={`${urgencyConfig.bgColor} ${urgencyConfig.color}`}>
+                  {urgencyConfig.label}
+                </Badge>
+              )}
             </div>
           </div>
         </DialogHeader>
@@ -285,17 +325,17 @@ const WorkOrderDetailModal = ({
               <div className="space-y-4">
                 <div>
                   <Label className="text-muted-foreground">Description</Label>
-                  <p className="mt-1">{workOrder.description}</p>
+                  <p className="mt-1">{workOrder.description || 'No description provided'}</p>
                 </div>
 
                 <div>
                   <Label className="text-muted-foreground">Category</Label>
-                  <p className="mt-1">{category?.label}</p>
+                  <p className="mt-1">{category?.label || 'Unknown'}</p>
                 </div>
 
                 <div>
                   <Label className="text-muted-foreground">Source</Label>
-                  <p className="mt-1 capitalize">{workOrder.source.replace(/_/g, ' ')}</p>
+                  <p className="mt-1 capitalize">{workOrder.source?.replace(/_/g, ' ') || 'Unknown'}</p>
                 </div>
 
                 {workOrder.reported_by && (
