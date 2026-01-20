@@ -10020,6 +10020,9 @@ export type Database = {
           owner_notified_at: string | null
           parent_work_order_id: string | null
           property_id: string
+          quote_labor_hours: number | null
+          quote_materials: string | null
+          quote_scope: string | null
           quoted_cost: number | null
           reported_by: string | null
           reported_by_email: string | null
@@ -10090,6 +10093,9 @@ export type Database = {
           owner_notified_at?: string | null
           parent_work_order_id?: string | null
           property_id: string
+          quote_labor_hours?: number | null
+          quote_materials?: string | null
+          quote_scope?: string | null
           quoted_cost?: number | null
           reported_by?: string | null
           reported_by_email?: string | null
@@ -10160,6 +10166,9 @@ export type Database = {
           owner_notified_at?: string | null
           parent_work_order_id?: string | null
           property_id?: string
+          quote_labor_hours?: number | null
+          quote_materials?: string | null
+          quote_scope?: string | null
           quoted_cost?: number | null
           reported_by?: string | null
           reported_by_email?: string | null

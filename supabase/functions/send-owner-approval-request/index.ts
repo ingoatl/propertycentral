@@ -21,13 +21,18 @@ function formatPhoneE164(phone: string): string {
   return phone;
 }
 
+// Format date for display
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { workOrderId } = await req.json();
+    const { workOrderId, vendorNote } = await req.json();
 
     if (!workOrderId) {
       return new Response(
@@ -48,8 +53,8 @@ serve(async (req) => {
       .from("work_orders")
       .select(`
         *,
-        property:properties(id, name, address, owner_id),
-        vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, phone)
+        property:properties(id, name, address, owner_id, image_path),
+        vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, phone, company_name)
       `)
       .eq("id", workOrderId)
       .single();
@@ -78,9 +83,25 @@ serve(async (req) => {
     }
 
     const results = { sms: false, email: false };
-    const propertyName = workOrder.property?.name || workOrder.property?.address || "Your property";
+    const propertyName = workOrder.property?.name || "Your property";
+    const propertyAddress = workOrder.property?.address || "";
     const quotedCost = workOrder.quoted_cost ? `$${workOrder.quoted_cost.toLocaleString()}` : "pending quote";
     const vendorName = workOrder.vendor?.name || "Assigned vendor";
+    const vendorCompany = workOrder.vendor?.company_name || "";
+    const requestId = `WO-${workOrder.id.slice(0, 8).toUpperCase()}`;
+    const issueDate = formatDate(new Date());
+    
+    // Get first name from owner
+    let ownerFirstName = "there";
+    if (owner.name) {
+      if (owner.name.includes('&')) {
+        ownerFirstName = owner.name.split('&').map((n: string) => n.trim().split(' ')[0]).join(' & ');
+      } else if (owner.name.toLowerCase().includes(' and ')) {
+        ownerFirstName = owner.name.split(/\sand\s/i).map((n: string) => n.trim().split(' ')[0]).join(' & ');
+      } else {
+        ownerFirstName = owner.name.split(' ')[0];
+      }
+    }
 
     // Update work order status and track approval request
     await supabase
@@ -92,19 +113,26 @@ serve(async (req) => {
       })
       .eq("id", workOrderId);
 
+    // Company logo URL
+    const logoUrl = `${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png`;
+
     // Send SMS via GHL if owner has phone
     if (owner.phone && ghlApiKey && ghlLocationId) {
       const formattedPhone = formatPhoneE164(owner.phone);
       
-      const smsMessage = `🏠 Approval Needed for ${propertyName}
+      // Clean, professional SMS - no emojis
+      const smsMessage = `PeachHaus Property Management
+
+Approval Required for ${propertyName}
 
 Issue: ${workOrder.title}
-Vendor: ${vendorName}
+Vendor: ${vendorName}${vendorCompany ? ` (${vendorCompany})` : ''}
 Quote: ${quotedCost}
+${vendorNote ? `\nVendor Note: ${vendorNote}` : ''}
 
 Reply APPROVE to proceed or DECLINE to reject.
 
-Questions? Reply to this message.`;
+- Ingo`;
 
       // Find or create GHL contact
       let ghlContactId = null;
@@ -152,7 +180,7 @@ Questions? Reply to this message.`;
       }
 
       if (ghlContactId) {
-        // Use owner communication number (different from vendor number)
+        // Use owner communication number
         const fromNumber = "+14046090955";
         
         const sendResponse = await fetch(
@@ -200,41 +228,181 @@ Questions? Reply to this message.`;
       }
     }
 
-    // Send email if owner has email
+    // Send Fortune 500 style email if owner has email
     if (owner.email && resendApiKey) {
+      // Fortune 500 style: Clean, institutional, bank-statement quality
+      // All black text, minimal colors, professional typography
       const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: #fef3c7; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-            <h2 style="margin: 0; color: #92400e;">⚠️ Approval Required</h2>
-          </div>
-          
-          <p>Hi ${owner.name || "there"},</p>
-          
-          <p>A maintenance quote requires your approval for <strong>${propertyName}</strong>:</p>
-          
-          <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-            <p style="margin: 0 0 8px 0;"><strong>Issue:</strong> ${workOrder.title}</p>
-            <p style="margin: 0 0 8px 0;"><strong>Description:</strong> ${workOrder.description || "N/A"}</p>
-            <p style="margin: 0 0 8px 0;"><strong>Vendor:</strong> ${vendorName}</p>
-            <p style="margin: 0; font-size: 20px;"><strong>Quote:</strong> ${quotedCost}</p>
-          </div>
-          
-          <p><strong>To approve or decline:</strong></p>
-          <ul>
-            <li>Reply to the SMS we sent with <strong>APPROVE</strong> or <strong>DECLINE</strong></li>
-            <li>Or log in to your owner portal to review details and approve</li>
-          </ul>
-          
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
-          
-          <p style="color: #6b7280; font-size: 14px;">
-            If you have questions, simply reply to this email or call us.
-          </p>
-          
-          <p style="color: #6b7280; font-size: 14px;">
-            — PeachHaus Property Management
-          </p>
-        </div>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
+    
+    <!-- Header -->
+    <div style="padding: 24px 32px; border-bottom: 1px solid #e5e5e5;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: middle;">
+            <img src="${logoUrl}" alt="PeachHaus" style="height: 32px; width: auto;" />
+          </td>
+          <td style="text-align: right; vertical-align: middle;">
+            <div style="font-size: 14px; font-weight: 600; color: #111111; margin-bottom: 4px;">APPROVAL REQUEST</div>
+            <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+              ${requestId}
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Property & Date Info -->
+    <div style="padding: 20px 32px; background: #f9f9f9; border-bottom: 1px solid #e5e5e5;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: top; width: 60%;">
+            <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Property</div>
+            <div style="font-size: 14px; font-weight: 600; color: #111111;">${propertyName}</div>
+            <div style="font-size: 12px; color: #666666; margin-top: 2px;">${propertyAddress}</div>
+          </td>
+          <td style="vertical-align: top; text-align: right;">
+            <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Date</div>
+            <div style="font-size: 14px; font-weight: 600; color: #111111;">${issueDate}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Greeting -->
+    <div style="padding: 24px 32px 16px 32px;">
+      <p style="font-size: 14px; line-height: 1.6; color: #111111; margin: 0;">
+        Dear ${ownerFirstName},
+      </p>
+      <p style="font-size: 13px; line-height: 1.6; color: #444444; margin: 12px 0 0 0;">
+        A maintenance quote for your property requires your approval before we proceed with the work.
+      </p>
+    </div>
+
+    <!-- Quote Amount - Primary Focus -->
+    <div style="padding: 0 32px 24px 32px;">
+      <table style="width: 100%; border: 2px solid #111111;">
+        <tr>
+          <td style="padding: 16px 20px; background: #111111;">
+            <table style="width: 100%;">
+              <tr>
+                <td style="vertical-align: middle;">
+                  <div style="font-size: 10px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">QUOTED AMOUNT</div>
+                  <div style="font-size: 10px; color: #ffffff; opacity: 0.6; margin-top: 2px;">Requires Owner Approval</div>
+                </td>
+                <td style="text-align: right; vertical-align: middle;">
+                  <div style="font-size: 28px; font-weight: 700; color: #ffffff; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+                    ${quotedCost}
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Work Details Section -->
+    <div style="padding: 0 32px 16px 32px;">
+      <div style="font-size: 11px; font-weight: 600; color: #111111; padding: 8px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
+        Work Details
+      </div>
+      <table style="width: 100%;">
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Issue</div>
+            <div style="color: #444444;">${workOrder.title}</div>
+          </td>
+        </tr>
+        ${workOrder.description ? `
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Description</div>
+            <div style="color: #444444;">${workOrder.description}</div>
+          </td>
+        </tr>
+        ` : ''}
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Vendor</div>
+            <div style="color: #444444;">${vendorName}${vendorCompany ? ` — ${vendorCompany}` : ''}</div>
+          </td>
+        </tr>
+        ${vendorNote ? `
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Vendor's Assessment</div>
+            <div style="color: #444444; background: #f9f9f9; padding: 12px; border-radius: 4px; border-left: 3px solid #111111;">${vendorNote}</div>
+          </td>
+        </tr>
+        ` : ''}
+        ${workOrder.quote_scope ? `
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Scope of Work</div>
+            <div style="color: #444444;">${workOrder.quote_scope}</div>
+          </td>
+        </tr>
+        ` : ''}
+        ${workOrder.quote_materials ? `
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Materials</div>
+            <div style="color: #444444;">${workOrder.quote_materials}</div>
+          </td>
+        </tr>
+        ` : ''}
+        ${workOrder.quote_labor_hours ? `
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Estimated Labor</div>
+            <div style="color: #444444;">${workOrder.quote_labor_hours} hours</div>
+          </td>
+        </tr>
+        ` : ''}
+      </table>
+    </div>
+
+    <!-- Action Section -->
+    <div style="padding: 0 32px 24px 32px;">
+      <div style="font-size: 11px; font-weight: 600; color: #111111; padding: 8px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
+        Your Response
+      </div>
+      <div style="padding: 16px 0;">
+        <p style="font-size: 13px; color: #444444; margin: 0 0 12px 0;">Please respond to approve or decline this work:</p>
+        <ul style="font-size: 13px; color: #444444; margin: 0; padding-left: 20px;">
+          <li style="margin-bottom: 8px;"><strong>Reply to the SMS</strong> we sent with <strong>APPROVE</strong> or <strong>DECLINE</strong></li>
+          <li>Or <strong>log in to your owner portal</strong> to review details and approve</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding: 24px 32px; background: #f9f9f9; border-top: 1px solid #e5e5e5;">
+      <p style="font-size: 12px; color: #666666; margin: 0 0 8px 0;">
+        If you have questions about this quote, simply reply to this email or call us.
+      </p>
+      <p style="font-size: 12px; color: #666666; margin: 0;">
+        Best,<br>
+        <strong>Ingo</strong><br>
+        PeachHaus Group
+      </p>
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e5e5;">
+        <p style="font-size: 10px; color: #999999; margin: 0;">
+          PeachHaus Property Management | Atlanta, GA | 404-991-5076
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
       `;
 
       try {
@@ -245,9 +413,10 @@ Questions? Reply to this message.`;
             Authorization: `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: "PeachHaus <noreply@peachhausgroup.com>",
+            from: "PeachHaus Property Management <noreply@peachhausgroup.com>",
             to: owner.email,
-            subject: `⚠️ Approval Needed: ${workOrder.title} - ${quotedCost}`,
+            cc: "info@peachhausgroup.com",
+            subject: `Approval Required: ${workOrder.title} — ${quotedCost}`,
             html: emailHtml,
           }),
         });
@@ -256,6 +425,9 @@ Questions? Reply to this message.`;
           const emailData = await emailResponse.json();
           console.log(`Owner approval email sent to ${owner.name}: ${emailData.id}`);
           results.email = true;
+        } else {
+          const errorText = await emailResponse.text();
+          console.error("Email send failed:", errorText);
         }
       } catch (emailError) {
         console.error("Email error:", emailError);

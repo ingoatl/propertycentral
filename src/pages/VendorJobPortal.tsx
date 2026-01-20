@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -14,7 +16,7 @@ import {
   MapPin, Clock, CheckCircle, XCircle, 
   Camera, DollarSign, ExternalLink, Phone, Loader2, Send, 
   Building2, Play, X, Lock, Key, Shield, Copy, FileText,
-  ArrowRight, ChevronDown, ChevronUp
+  ArrowRight, ChevronDown, ChevronUp, AlertCircle
 } from "lucide-react";
 
 interface WorkOrderData {
@@ -29,6 +31,9 @@ interface WorkOrderData {
   quoted_cost: number | null;
   vendor_accepted: boolean | null;
   completed_at: string | null;
+  quote_scope: string | null;
+  quote_materials: string | null;
+  quote_labor_hours: number | null;
   property: { id: string; name: string | null; address: string | null; image_path: string | null } | null;
   assigned_vendor: { id: string; name: string; phone: string | null; company_name: string | null } | null;
 }
@@ -46,7 +51,11 @@ const VendorJobPortal = () => {
   
   const [uploading, setUploading] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState("");
-  const [showQuoteInput, setShowQuoteInput] = useState(false);
+  const [quoteScope, setQuoteScope] = useState("");
+  const [quoteMaterials, setQuoteMaterials] = useState("");
+  const [quoteLaborHours, setQuoteLaborHours] = useState("");
+  const [quoteNote, setQuoteNote] = useState("");
+  const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [message, setMessage] = useState("");
   const [showDeclineReason, setShowDeclineReason] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -63,7 +72,7 @@ const VendorJobPortal = () => {
         .select(`
           id, title, description, category, urgency, status, 
           created_at, access_instructions, quoted_cost,
-          vendor_accepted, completed_at,
+          vendor_accepted, completed_at, quote_scope, quote_materials, quote_labor_hours,
           property:properties(id, name, address, image_path),
           assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, phone, company_name)
         `)
@@ -137,10 +146,11 @@ const VendorJobPortal = () => {
   // Determine current step based on status
   const getStep = () => {
     if (!workOrder) return 0;
-    if (workOrder.status === "dispatched" && workOrder.vendor_accepted === null) return 1; // Respond
-    if (workOrder.status === "scheduled") return 2; // Start Work
-    if (workOrder.status === "in_progress") return 3; // Complete
-    if (workOrder.status === "pending_verification" || workOrder.status === "completed") return 4; // Done
+    if (workOrder.status === "dispatched" && workOrder.vendor_accepted === null) return 1;
+    if (workOrder.status === "pending_approval") return 1; // Awaiting owner approval
+    if (workOrder.status === "scheduled" || workOrder.status === "awaiting_approval") return 2;
+    if (workOrder.status === "in_progress") return 3;
+    if (workOrder.status === "pending_verification" || workOrder.status === "completed") return 4;
     return 1;
   };
 
@@ -179,7 +189,7 @@ const VendorJobPortal = () => {
       return publicUrl;
     },
     onSuccess: () => {
-      toast.success("Photo uploaded!");
+      toast.success("Photo uploaded");
       queryClient.invalidateQueries({ queryKey: ["work-order-photos", workOrder?.id] });
       setUploading(false);
     },
@@ -200,7 +210,7 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Job confirmed!");
+      toast.success("Job confirmed");
       queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
     },
     onError: (error) => toast.error("Failed to confirm: " + error.message),
@@ -217,28 +227,68 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Job declined.");
+      toast.success("Job declined");
       queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
       setShowDeclineReason(false);
     },
     onError: (error) => toast.error("Failed to decline: " + error.message),
   });
 
-  // Submit quote mutation
+  // Submit quote mutation - triggers owner approval for quotes > $300
   const submitQuote = useMutation({
-    mutationFn: async (amount: number) => {
+    mutationFn: async () => {
       if (!workOrder?.id) throw new Error("No work order");
-      const newStatus = amount > 300 ? "awaiting_approval" : workOrder.status;
+      const amount = Number(quoteAmount);
+      
+      // Update work order with quote details
+      const updateData: Record<string, unknown> = {
+        quoted_cost: amount,
+        quote_scope: quoteScope || null,
+        quote_materials: quoteMaterials || null,
+        quote_labor_hours: quoteLaborHours ? Number(quoteLaborHours) : null,
+      };
+      
+      // Set status based on amount
+      if (amount > 300) {
+        updateData.status = "pending_approval";
+      }
+      
       const { error } = await supabase
         .from("work_orders")
-        .update({ quoted_cost: amount, status: newStatus as any })
+        .update(updateData)
         .eq("id", workOrder.id);
+      
       if (error) throw error;
+      
+      // If quote > $300, trigger owner approval notification
+      if (amount > 300) {
+        const { error: notifyError } = await supabase.functions.invoke("send-owner-approval-request", {
+          body: { 
+            workOrderId: workOrder.id,
+            vendorNote: quoteNote || undefined
+          }
+        });
+        
+        if (notifyError) {
+          console.error("Failed to send owner notification:", notifyError);
+          // Don't throw - quote was saved, notification is secondary
+        }
+      }
+      
+      return amount;
     },
-    onSuccess: () => {
-      toast.success("Quote submitted!");
-      setShowQuoteInput(false);
+    onSuccess: (amount) => {
+      if (amount > 300) {
+        toast.success("Quote submitted — awaiting owner approval");
+      } else {
+        toast.success("Quote submitted");
+      }
+      setShowQuoteForm(false);
       setQuoteAmount("");
+      setQuoteScope("");
+      setQuoteMaterials("");
+      setQuoteLaborHours("");
+      setQuoteNote("");
       queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
     },
     onError: (error) => toast.error("Failed to submit quote: " + error.message),
@@ -252,7 +302,7 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Work started!");
+      toast.success("Work started");
       queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
     },
     onError: (error) => toast.error("Failed to update: " + error.message),
@@ -269,7 +319,7 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Job marked complete!");
+      toast.success("Job marked complete");
       queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
     },
     onError: (error) => toast.error("Failed to update: " + error.message),
@@ -288,7 +338,7 @@ const VendorJobPortal = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Message sent!");
+      toast.success("Message sent");
       setMessage("");
     },
     onError: (error) => toast.error("Failed to send: " + error.message),
@@ -306,7 +356,7 @@ const VendorJobPortal = () => {
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(`${label} copied!`);
+    toast.success(`${label} copied`);
   };
 
   const getGoogleMapsUrl = () => {
@@ -314,29 +364,31 @@ const VendorJobPortal = () => {
     return `https://maps.google.com/?q=${encodeURIComponent(workOrder.property.address || "")}`;
   };
 
+  // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-10 mx-auto mb-6" />
-          <Loader2 className="h-8 w-8 animate-spin text-slate-600 mx-auto" />
-          <p className="text-sm text-slate-500 mt-2">Loading job details...</p>
+          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-8 mx-auto mb-6" />
+          <Loader2 className="h-6 w-6 animate-spin text-neutral-400 mx-auto" />
+          <p className="text-xs text-neutral-500 mt-2">Loading...</p>
         </div>
       </div>
     );
   }
 
+  // Error state
   if (error || !workOrder) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <Card className="max-w-sm w-full shadow-sm">
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
+        <Card className="max-w-sm w-full border-neutral-200">
           <CardHeader className="text-center pb-2">
-            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-8 mx-auto mb-4" />
-            <XCircle className="h-12 w-12 text-red-500 mx-auto mb-2" />
-            <CardTitle className="text-lg">Job Not Found</CardTitle>
+            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-7 mx-auto mb-4" />
+            <XCircle className="h-10 w-10 text-neutral-400 mx-auto mb-2" />
+            <CardTitle className="text-base font-medium">Job Not Found</CardTitle>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-slate-500 text-sm">This job link may have expired or is invalid.</p>
+            <p className="text-neutral-500 text-sm">This link may have expired or is invalid.</p>
             <Button className="mt-4 w-full" variant="outline" asChild>
               <a href="tel:+14049915076"><Phone className="h-4 w-4 mr-2" />Call Support</a>
             </Button>
@@ -353,76 +405,116 @@ const VendorJobPortal = () => {
 
   const hasAccessCodes = maintenanceBook?.lockbox_code || maintenanceBook?.gate_code || maintenanceBook?.alarm_code;
   const accessInstructions = maintenanceBook?.access_instructions || workOrder.access_instructions;
-
-  // Step indicator component
-  const StepIndicator = () => (
-    <div className="flex items-center justify-center gap-1 mb-6">
-      {[1, 2, 3, 4].map((step) => (
-        <div key={step} className="flex items-center">
-          <div className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-            step < currentStep ? "bg-green-500 text-white" :
-            step === currentStep ? "bg-slate-800 text-white" :
-            "bg-slate-200 text-slate-400"
-          )}>
-            {step < currentStep ? <CheckCircle className="h-4 w-4" /> : step}
-          </div>
-          {step < 4 && <div className={cn("w-8 h-0.5", step < currentStep ? "bg-green-500" : "bg-slate-200")} />}
-        </div>
-      ))}
-    </div>
-  );
+  const isPendingApproval = workOrder.status === "pending_approval" || workOrder.status === "awaiting_approval";
 
   // Step labels
-  const stepLabels = ["", "Respond", "Start Work", "Complete", "Submit Invoice"];
+  const steps = [
+    { num: 1, label: "Respond" },
+    { num: 2, label: "Start" },
+    { num: 3, label: "Complete" },
+    { num: 4, label: "Invoice" },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10 shadow-sm">
+      <header className="bg-white border-b border-neutral-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-8" />
-          <Badge variant="outline" className="text-xs font-medium">
-            Step {currentStep}: {stepLabels[currentStep]}
-          </Badge>
+          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" className="h-7" />
+          <span className="text-xs text-neutral-500 font-medium">
+            {isPendingApproval ? "Awaiting Approval" : `Step ${currentStep} of 4`}
+          </span>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+      <div className="max-w-lg mx-auto px-4 py-5 space-y-4">
+        
         {/* Progress Steps */}
-        <StepIndicator />
+        <div className="flex items-center justify-between mb-2">
+          {steps.map((step, idx) => (
+            <div key={step.num} className="flex items-center flex-1">
+              <div className="flex flex-col items-center flex-1">
+                <div className={cn(
+                  "w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors",
+                  step.num < currentStep 
+                    ? "bg-neutral-900 border-neutral-900 text-white" 
+                    : step.num === currentStep 
+                      ? "bg-white border-neutral-900 text-neutral-900" 
+                      : "bg-white border-neutral-200 text-neutral-400"
+                )}>
+                  {step.num < currentStep ? <CheckCircle className="h-3.5 w-3.5" /> : step.num}
+                </div>
+                <span className={cn(
+                  "text-[10px] mt-1 font-medium",
+                  step.num <= currentStep ? "text-neutral-700" : "text-neutral-400"
+                )}>
+                  {step.label}
+                </span>
+              </div>
+              {idx < steps.length - 1 && (
+                <div className={cn(
+                  "h-px flex-1 mx-1 -mt-4",
+                  step.num < currentStep ? "bg-neutral-900" : "bg-neutral-200"
+                )} />
+              )}
+            </div>
+          ))}
+        </div>
 
-        {/* Property & Job Summary Card */}
-        <Card className="shadow-sm border-slate-200">
+        {/* Pending Approval Notice */}
+        {isPendingApproval && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-900">Awaiting Owner Approval</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Your quote of ${workOrder.quoted_cost?.toLocaleString()} has been submitted. 
+                    You'll be notified once the owner responds.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Property & Job Summary */}
+        <Card className="border-neutral-200">
           <CardContent className="p-4">
             <div className="flex gap-4">
               {workOrder.property?.image_path ? (
                 <img 
                   src={workOrder.property.image_path} 
                   alt={workOrder.property.name || "Property"} 
-                  className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                  className="w-16 h-16 rounded object-cover flex-shrink-0"
                 />
               ) : (
-                <div className="w-20 h-20 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                  <Building2 className="h-8 w-8 text-slate-400" />
+                <div className="w-16 h-16 rounded bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                  <Building2 className="h-6 w-6 text-neutral-400" />
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <h2 className="font-semibold text-lg text-slate-900 leading-tight">{workOrder.title}</h2>
-                <p className="text-sm text-slate-500 mt-0.5">{workOrder.property?.name}</p>
-                <p className="text-xs text-slate-400 mt-1">{workOrder.property?.address}</p>
-                <div className="flex gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs capitalize">{workOrder.category?.replace(/_/g, " ")}</Badge>
-                  {workOrder.urgency === "emergency" && <Badge variant="destructive" className="text-xs">Emergency</Badge>}
-                </div>
+                <h2 className="font-semibold text-neutral-900 leading-tight">{workOrder.title}</h2>
+                <p className="text-sm text-neutral-500 mt-0.5">{workOrder.property?.name}</p>
+                <p className="text-xs text-neutral-400 mt-1 truncate">{workOrder.property?.address}</p>
               </div>
             </div>
+            
+            <div className="flex gap-2 mt-3">
+              <Badge variant="outline" className="text-xs capitalize bg-white">{workOrder.category?.replace(/_/g, " ")}</Badge>
+              {workOrder.urgency === "emergency" && (
+                <Badge className="text-xs bg-red-100 text-red-700 border-red-200">Emergency</Badge>
+              )}
+            </div>
+            
             {workOrder.description && (
-              <p className="text-sm text-slate-600 mt-4 p-3 bg-slate-50 rounded-lg">{workOrder.description}</p>
+              <p className="text-sm text-neutral-600 mt-3 p-3 bg-neutral-50 rounded border border-neutral-100">{workOrder.description}</p>
             )}
-            <Button variant="outline" className="w-full mt-4" size="sm" asChild>
+            
+            <Button variant="outline" className="w-full mt-3" size="sm" asChild>
               <a href={getGoogleMapsUrl()} target="_blank" rel="noopener noreferrer">
-                <MapPin className="h-4 w-4 mr-2" />Get Directions<ExternalLink className="h-3 w-3 ml-2" />
+                <MapPin className="h-4 w-4 mr-2" />Get Directions
               </a>
             </Button>
           </CardContent>
@@ -430,27 +522,27 @@ const VendorJobPortal = () => {
 
         {/* Access Codes - Collapsible */}
         {(hasAccessCodes || accessInstructions) && (
-          <Card className="shadow-sm border-slate-200">
+          <Card className="border-neutral-200">
             <CardHeader 
-              className="p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+              className="p-4 cursor-pointer"
               onClick={() => setShowAccessCodes(!showAccessCodes)}
             >
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Key className="h-4 w-4 text-slate-600" />Access Codes
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Key className="h-4 w-4 text-neutral-500" />Access Codes
                 </CardTitle>
-                {showAccessCodes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {showAccessCodes ? <ChevronUp className="h-4 w-4 text-neutral-400" /> : <ChevronDown className="h-4 w-4 text-neutral-400" />}
               </div>
             </CardHeader>
             {showAccessCodes && (
               <CardContent className="pt-0 px-4 pb-4 space-y-2">
                 {maintenanceBook?.lockbox_code && (
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-neutral-50 rounded border border-neutral-100">
                     <div className="flex items-center gap-3">
-                      <Lock className="h-4 w-4 text-slate-500" />
+                      <Lock className="h-4 w-4 text-neutral-400" />
                       <div>
-                        <p className="text-xs text-slate-500">Lockbox</p>
-                        <p className="font-mono font-semibold">{maintenanceBook.lockbox_code}</p>
+                        <p className="text-[10px] text-neutral-500 uppercase tracking-wide">Lockbox</p>
+                        <p className="font-mono font-semibold text-neutral-900">{maintenanceBook.lockbox_code}</p>
                       </div>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.lockbox_code!, "Code")}>
@@ -459,12 +551,12 @@ const VendorJobPortal = () => {
                   </div>
                 )}
                 {maintenanceBook?.gate_code && (
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-neutral-50 rounded border border-neutral-100">
                     <div className="flex items-center gap-3">
-                      <Key className="h-4 w-4 text-slate-500" />
+                      <Key className="h-4 w-4 text-neutral-400" />
                       <div>
-                        <p className="text-xs text-slate-500">Gate</p>
-                        <p className="font-mono font-semibold">{maintenanceBook.gate_code}</p>
+                        <p className="text-[10px] text-neutral-500 uppercase tracking-wide">Gate</p>
+                        <p className="font-mono font-semibold text-neutral-900">{maintenanceBook.gate_code}</p>
                       </div>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.gate_code!, "Code")}>
@@ -473,12 +565,12 @@ const VendorJobPortal = () => {
                   </div>
                 )}
                 {maintenanceBook?.alarm_code && (
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-neutral-50 rounded border border-neutral-100">
                     <div className="flex items-center gap-3">
-                      <Shield className="h-4 w-4 text-slate-500" />
+                      <Shield className="h-4 w-4 text-neutral-400" />
                       <div>
-                        <p className="text-xs text-slate-500">Alarm</p>
-                        <p className="font-mono font-semibold">{maintenanceBook.alarm_code}</p>
+                        <p className="text-[10px] text-neutral-500 uppercase tracking-wide">Alarm</p>
+                        <p className="font-mono font-semibold text-neutral-900">{maintenanceBook.alarm_code}</p>
                       </div>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => copyToClipboard(maintenanceBook.alarm_code!, "Code")}>
@@ -487,8 +579,8 @@ const VendorJobPortal = () => {
                   </div>
                 )}
                 {accessInstructions && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-xs text-amber-700 font-medium mb-1">Instructions</p>
+                  <div className="p-3 bg-amber-50 border border-amber-100 rounded">
+                    <p className="text-[10px] text-amber-700 font-medium uppercase tracking-wide mb-1">Instructions</p>
                     <p className="text-sm text-amber-900 whitespace-pre-wrap">{accessInstructions}</p>
                   </div>
                 )}
@@ -498,68 +590,136 @@ const VendorJobPortal = () => {
         )}
 
         {/* STEP 1: Respond to Job */}
-        {currentStep === 1 && (
-          <Card className="shadow-sm border-2 border-slate-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Your Response</CardTitle>
+        {currentStep === 1 && !isPendingApproval && (
+          <Card className="border-neutral-900 border-2">
+            <CardHeader className="pb-2 px-4 pt-4">
+              <CardTitle className="text-sm font-medium">Your Response</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="px-4 pb-4 space-y-3">
               <Button 
-                size="lg" 
-                className="w-full bg-green-600 hover:bg-green-700" 
+                size="default" 
+                className="w-full bg-neutral-900 hover:bg-neutral-800 text-white" 
                 onClick={() => confirmJob.mutate()} 
                 disabled={confirmJob.isPending}
               >
                 {confirmJob.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                  <><CheckCircle className="h-5 w-5 mr-2" />Accept Job</>
+                  <>Accept Job<ArrowRight className="h-4 w-4 ml-2" /></>
                 )}
               </Button>
               
               <Button 
                 variant="outline" 
                 className="w-full" 
-                onClick={() => setShowQuoteInput(!showQuoteInput)}
+                onClick={() => setShowQuoteForm(!showQuoteForm)}
               >
                 <DollarSign className="h-4 w-4 mr-2" />Submit Quote First
               </Button>
 
-              {showQuoteInput && (
-                <div className="p-3 bg-slate-50 rounded-lg space-y-2">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <input 
-                        type="number" 
-                        value={quoteAmount} 
-                        onChange={(e) => setQuoteAmount(e.target.value)} 
-                        placeholder="Amount" 
-                        className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+              {showQuoteForm && (
+                <div className="p-4 bg-neutral-50 rounded border border-neutral-200 space-y-4">
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="quoteAmount" className="text-xs text-neutral-600">Quote Amount *</Label>
+                      <div className="relative mt-1">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                        <Input 
+                          id="quoteAmount"
+                          type="number" 
+                          value={quoteAmount} 
+                          onChange={(e) => setQuoteAmount(e.target.value)} 
+                          placeholder="0.00" 
+                          className="pl-9 bg-white"
+                        />
+                      </div>
+                      {Number(quoteAmount) > 300 && (
+                        <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />Quotes over $300 require owner approval
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="quoteScope" className="text-xs text-neutral-600">Scope of Work</Label>
+                      <Textarea 
+                        id="quoteScope"
+                        value={quoteScope} 
+                        onChange={(e) => setQuoteScope(e.target.value)} 
+                        placeholder="Describe what work will be performed..."
+                        rows={2}
+                        className="mt-1 bg-white text-sm"
                       />
                     </div>
-                    <Button onClick={() => submitQuote.mutate(Number(quoteAmount))} disabled={!quoteAmount || submitQuote.isPending}>
-                      {submitQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit"}
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="quoteMaterials" className="text-xs text-neutral-600">Materials Needed</Label>
+                        <Input 
+                          id="quoteMaterials"
+                          value={quoteMaterials} 
+                          onChange={(e) => setQuoteMaterials(e.target.value)} 
+                          placeholder="Parts, supplies..."
+                          className="mt-1 bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="quoteLaborHours" className="text-xs text-neutral-600">Est. Labor (hours)</Label>
+                        <Input 
+                          id="quoteLaborHours"
+                          type="number" 
+                          value={quoteLaborHours} 
+                          onChange={(e) => setQuoteLaborHours(e.target.value)} 
+                          placeholder="2"
+                          className="mt-1 bg-white text-sm"
+                        />
+                      </div>
+                    </div>
+                    
+                    {Number(quoteAmount) > 300 && (
+                      <div>
+                        <Label htmlFor="quoteNote" className="text-xs text-neutral-600">Note for Owner (optional)</Label>
+                        <Textarea 
+                          id="quoteNote"
+                          value={quoteNote} 
+                          onChange={(e) => setQuoteNote(e.target.value)} 
+                          placeholder="Any additional context for the property owner..."
+                          rows={2}
+                          className="mt-1 bg-white text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowQuoteForm(false)} className="flex-1">
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={() => submitQuote.mutate()} 
+                      disabled={!quoteAmount || submitQuote.isPending}
+                      className="flex-1 bg-neutral-900 hover:bg-neutral-800"
+                    >
+                      {submitQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit Quote"}
                     </Button>
                   </div>
-                  <p className="text-xs text-slate-500">Quotes over $300 require owner approval</p>
                 </div>
               )}
 
               <Button 
                 variant="ghost" 
-                className="w-full text-slate-500 hover:text-red-600" 
+                className="w-full text-neutral-500 hover:text-red-600" 
                 onClick={() => setShowDeclineReason(true)}
               >
                 <X className="h-4 w-4 mr-2" />Can't Take This Job
               </Button>
 
               {showDeclineReason && (
-                <div className="p-3 bg-red-50 rounded-lg space-y-2">
+                <div className="p-3 bg-red-50 rounded border border-red-100 space-y-2">
                   <Textarea 
                     value={declineReason} 
                     onChange={(e) => setDeclineReason(e.target.value)} 
                     placeholder="Reason (optional)..." 
                     rows={2}
-                    className="border-red-200"
+                    className="border-red-200 bg-white text-sm"
                   />
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setShowDeclineReason(false)} className="flex-1">Cancel</Button>
@@ -574,23 +734,23 @@ const VendorJobPortal = () => {
         )}
 
         {/* STEP 2: Start Work */}
-        {currentStep === 2 && (
-          <Card className="shadow-sm border-2 border-slate-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Ready to Begin?</CardTitle>
-              <p className="text-sm text-slate-500">Take before photos first, then start work</p>
+        {currentStep === 2 && !isPendingApproval && (
+          <Card className="border-neutral-900 border-2">
+            <CardHeader className="pb-2 px-4 pt-4">
+              <CardTitle className="text-sm font-medium">Ready to Begin</CardTitle>
+              <p className="text-xs text-neutral-500">Take before photos, then start work</p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-4 pb-4 space-y-4">
               {/* Before Photos */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Before Photos</span>
-                  <Badge variant="secondary">{photosByType.before.length}</Badge>
+                  <span className="text-xs font-medium text-neutral-600">Before Photos</span>
+                  <Badge variant="secondary" className="text-xs">{photosByType.before.length}</Badge>
                 </div>
                 {photosByType.before.length > 0 && (
                   <div className="grid grid-cols-4 gap-2 mb-2">
                     {photosByType.before.map((photo) => (
-                      <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-slate-100">
+                      <div key={photo.id} className="aspect-square rounded overflow-hidden bg-neutral-100">
                         <img src={photo.photo_url} alt="Before" className="w-full h-full object-cover" />
                       </div>
                     ))}
@@ -607,15 +767,15 @@ const VendorJobPortal = () => {
                 <input type="file" ref={beforeInputRef} accept="image/*" capture="environment" onChange={handleBeforePhoto} className="hidden" />
               </div>
 
-              <Separator />
+              <Separator className="bg-neutral-200" />
 
               <Button 
-                size="lg" 
-                className="w-full bg-slate-800 hover:bg-slate-900" 
+                size="default" 
+                className="w-full bg-neutral-900 hover:bg-neutral-800 text-white" 
                 onClick={() => startWork.mutate()} 
                 disabled={startWork.isPending}
               >
-                {startWork.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-5 w-5 mr-2" />Start Work</>}
+                {startWork.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-2" />Start Work</>}
               </Button>
             </CardContent>
           </Card>
@@ -623,18 +783,16 @@ const VendorJobPortal = () => {
 
         {/* STEP 3: Complete Work */}
         {currentStep === 3 && (
-          <Card className="shadow-sm border-2 border-slate-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Work In Progress</CardTitle>
-              <p className="text-sm text-slate-500">Upload after photos when done</p>
+          <Card className="border-neutral-900 border-2">
+            <CardHeader className="pb-2 px-4 pt-4">
+              <CardTitle className="text-sm font-medium">Work In Progress</CardTitle>
+              <p className="text-xs text-neutral-500">Upload after photos when done</p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Photo Sections */}
+            <CardContent className="px-4 pb-4 space-y-4">
+              {/* Photo Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-slate-500">Before ({photosByType.before.length})</span>
-                  </div>
+                  <span className="text-xs font-medium text-neutral-500 mb-2 block">Before ({photosByType.before.length})</span>
                   {photosByType.before.length > 0 ? (
                     <div className="grid grid-cols-2 gap-1">
                       {photosByType.before.slice(0, 2).map((photo) => (
@@ -644,15 +802,13 @@ const VendorJobPortal = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="aspect-video rounded bg-slate-100 flex items-center justify-center">
-                      <Camera className="h-6 w-6 text-slate-300" />
+                    <div className="aspect-video rounded bg-neutral-100 flex items-center justify-center">
+                      <Camera className="h-5 w-5 text-neutral-300" />
                     </div>
                   )}
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-slate-500">After ({photosByType.after.length})</span>
-                  </div>
+                  <span className="text-xs font-medium text-neutral-500 mb-2 block">After ({photosByType.after.length})</span>
                   {photosByType.after.length > 0 ? (
                     <div className="grid grid-cols-2 gap-1">
                       {photosByType.after.slice(0, 2).map((photo) => (
@@ -662,8 +818,8 @@ const VendorJobPortal = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="aspect-video rounded bg-slate-100 flex items-center justify-center">
-                      <Camera className="h-6 w-6 text-slate-300" />
+                    <div className="aspect-video rounded bg-neutral-100 flex items-center justify-center">
+                      <Camera className="h-5 w-5 text-neutral-300" />
                     </div>
                   )}
                 </div>
@@ -679,26 +835,26 @@ const VendorJobPortal = () => {
               </Button>
               <input type="file" ref={afterInputRef} accept="image/*" capture="environment" onChange={handleAfterPhoto} className="hidden" />
 
-              <Separator />
+              <Separator className="bg-neutral-200" />
 
               {/* Message */}
               <div>
-                <p className="text-xs text-slate-500 mb-2">Message property manager (optional)</p>
+                <p className="text-xs text-neutral-500 mb-2">Message property manager (optional)</p>
                 <div className="flex gap-2">
-                  <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Any notes..." rows={1} className="flex-1" />
-                  <Button onClick={() => sendMessage.mutate()} disabled={!message.trim() || sendMessage.isPending} size="sm">
+                  <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Any notes..." rows={1} className="flex-1 text-sm" />
+                  <Button onClick={() => sendMessage.mutate()} disabled={!message.trim() || sendMessage.isPending} size="sm" variant="outline">
                     {sendMessage.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
 
               <Button 
-                size="lg" 
-                className="w-full bg-green-600 hover:bg-green-700" 
+                size="default" 
+                className="w-full bg-neutral-900 hover:bg-neutral-800 text-white" 
                 onClick={() => markComplete.mutate()} 
                 disabled={markComplete.isPending}
               >
-                {markComplete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-5 w-5 mr-2" />Mark Complete</>}
+                {markComplete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-2" />Mark Complete</>}
               </Button>
             </CardContent>
           </Card>
@@ -706,25 +862,25 @@ const VendorJobPortal = () => {
 
         {/* STEP 4: Submit Invoice */}
         {currentStep === 4 && (
-          <Card className="shadow-sm border-green-200 bg-green-50">
-            <CardContent className="p-6 text-center">
-              <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-green-900 mb-1">Job Complete!</h3>
-              <p className="text-sm text-green-700 mb-4">
-                {workOrder.completed_at ? `Completed ${format(new Date(workOrder.completed_at), "MMM d, yyyy h:mm a")}` : "Great work!"}
+          <Card className="border-neutral-200 bg-neutral-50">
+            <CardContent className="p-5 text-center">
+              <CheckCircle className="h-10 w-10 text-neutral-900 mx-auto mb-3" />
+              <h3 className="text-base font-semibold text-neutral-900 mb-1">Job Complete</h3>
+              <p className="text-xs text-neutral-500 mb-4">
+                {workOrder.completed_at ? `Completed ${format(new Date(workOrder.completed_at), "MMM d, yyyy")}` : "Great work"}
               </p>
               
-              <Separator className="my-4 bg-green-200" />
+              <Separator className="my-4 bg-neutral-200" />
               
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-white rounded-lg text-left">
-                  <FileText className="h-5 w-5 text-slate-600 flex-shrink-0" />
+                <div className="flex items-center gap-3 p-3 bg-white rounded border border-neutral-200 text-left">
+                  <FileText className="h-4 w-4 text-neutral-500 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-sm">Submit Your Invoice</p>
-                    <p className="text-xs text-slate-500">Upload to Bill.com for payment</p>
+                    <p className="font-medium text-sm text-neutral-900">Submit Your Invoice</p>
+                    <p className="text-xs text-neutral-500">Upload to Bill.com for payment</p>
                   </div>
                 </div>
-                <Button className="w-full" asChild>
+                <Button className="w-full bg-neutral-900 hover:bg-neutral-800" asChild>
                   <a href="https://app.bill.com" target="_blank" rel="noopener noreferrer">
                     Open Bill.com<ArrowRight className="h-4 w-4 ml-2" />
                   </a>
@@ -736,11 +892,11 @@ const VendorJobPortal = () => {
 
         {/* Cost Summary */}
         {workOrder.quoted_cost && (
-          <Card className="shadow-sm">
+          <Card className="border-neutral-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">Quoted Amount</span>
-                <span className="text-lg font-bold text-green-600">${workOrder.quoted_cost.toLocaleString()}</span>
+                <span className="text-sm text-neutral-500">Quoted Amount</span>
+                <span className="text-lg font-semibold text-neutral-900 font-mono">${workOrder.quoted_cost.toLocaleString()}</span>
               </div>
             </CardContent>
           </Card>
@@ -748,8 +904,8 @@ const VendorJobPortal = () => {
 
         {/* Footer */}
         <div className="text-center pt-4 pb-8">
-          <p className="text-sm text-slate-400">
-            Questions? <a href="tel:+14049915076" className="text-slate-600 font-medium">404-991-5076</a>
+          <p className="text-xs text-neutral-400">
+            Questions? <a href="tel:+14049915076" className="text-neutral-600 font-medium">404-991-5076</a>
           </p>
         </div>
       </div>
