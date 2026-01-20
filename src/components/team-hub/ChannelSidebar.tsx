@@ -1,10 +1,11 @@
 import { memo, useState } from 'react';
-import { Hash, Lock, Users, ChevronDown, ChevronRight } from 'lucide-react';
+import { Hash, Lock, Users, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { TeamChannel } from '@/hooks/useTeamHub';
+import { CreateGroupDM } from './CreateGroupDM';
 
 interface ChannelSidebarProps {
   channels: TeamChannel[];
@@ -127,7 +128,29 @@ export const ChannelSidebar = memo(function ChannelSidebar({
         <div className="p-2 space-y-2">
           {renderSection('Channels', publicChannels, 'public')}
           {renderSection('Private Channels', privateChannels, 'private')}
-          {renderSection('Direct Messages', dmChannels, 'dm')}
+          
+          {/* DM Section with Create Group Button */}
+          <div className="space-y-1">
+            <Collapsible open={openSections.dm} onOpenChange={() => toggleSection('dm')}>
+              <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-2 w-full hover:text-foreground min-h-[40px]">
+                {openSections.dm ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+                <span className="flex-1 text-left">Direct Messages</span>
+                {dmChannels.reduce((sum, c) => sum + (unreadCounts[c.id] || 0), 0) > 0 && (
+                  <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                    {dmChannels.reduce((sum, c) => sum + (unreadCounts[c.id] || 0), 0)}
+                  </Badge>
+                )}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-0.5 mt-1">
+                {dmChannels.map(renderChannel)}
+                <CreateGroupDM onGroupCreated={onSelectChannel} />
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
         </div>
       </ScrollArea>
     </div>

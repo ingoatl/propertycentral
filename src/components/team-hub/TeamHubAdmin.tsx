@@ -30,16 +30,16 @@ const TEAM_MEMBERS = [
 
 const TEAM_EMAILS = TEAM_MEMBERS.map(m => m.email);
 
-// Recommended channels based on property management workflow
+// Updated channels based on property management workflow
 const SUGGESTED_CHANNELS = [
-  { name: 'general', description: 'Company-wide announcements and updates' },
-  { name: 'maintenance', description: 'Work orders, repairs, vendor coordination' },
-  { name: 'owner-urgent', description: 'Time-sensitive owner communications' },
-  { name: 'guest-relations', description: 'Guest inquiries, check-ins, reviews' },
-  { name: 'leads', description: 'New lead alerts and sales pipeline' },
-  { name: 'operations', description: 'Daily ops, scheduling, property visits' },
-  { name: 'financials', description: 'Expenses, invoices, payment tracking' },
-  { name: 'random', description: 'Non-work banter and team bonding' },
+  { name: 'general', description: 'Company-wide announcements and updates', type: 'public' },
+  { name: 'maintenance', description: 'Work orders, repairs, vendor coordination', type: 'public' },
+  { name: 'guest-relations', description: 'Guest inquiries, check-ins, reviews', type: 'public' },
+  { name: 'leads', description: 'New lead alerts and sales pipeline', type: 'public' },
+  { name: 'operations', description: 'Daily ops, scheduling, property visits', type: 'public' },
+  { name: 'financials', description: 'Expenses, invoices, payment tracking', type: 'private' },
+  { name: 'owner-urgent', description: 'Time-sensitive owner communications', type: 'private' },
+  { name: 'random', description: 'Non-work banter and team bonding', type: 'public' },
 ];
 
 export function TeamHubAdmin() {
@@ -274,6 +274,9 @@ export function TeamHubAdmin() {
               >
                 <span className="text-sm font-medium text-primary">#{channel.name}</span>
                 <span className="text-xs text-muted-foreground flex-1">{channel.description}</span>
+                <Badge variant={channel.type === 'private' ? 'secondary' : 'outline'} className="text-[10px]">
+                  {channel.type}
+                </Badge>
               </div>
             ))}
           </div>
