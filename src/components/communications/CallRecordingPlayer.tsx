@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Play, Pause, Volume2, Download, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, Pause, Volume2, Download, FileText, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -22,7 +22,7 @@ export function CallRecordingPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(duration || 0);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(true); // EXPANDED by default
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
@@ -101,7 +101,7 @@ export function CallRecordingPlayer({
   const displayDuration = audioDuration > 0 && isFinite(audioDuration) ? formatTime(audioDuration) : "--:--";
 
   return (
-    <div className="space-y-2">
+    <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
       {/* Audio element */}
       <audio
         ref={audioRef}
@@ -112,90 +112,113 @@ export function CallRecordingPlayer({
         preload="metadata"
       />
 
-      {/* Compact inline player */}
-      <div className="flex items-center gap-3">
-        {/* Play Button */}
-        <button
-          onClick={handlePlayPause}
-          className={cn(
-            "h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-all",
-            "bg-primary text-primary-foreground hover:opacity-90",
-            "focus:outline-none focus:ring-2 focus:ring-primary/30"
-          )}
-        >
-          {isPlaying ? (
-            <Pause className="h-4 w-4" />
-          ) : (
-            <Play className="h-4 w-4 ml-0.5" />
-          )}
-        </button>
+      {/* Player Header */}
+      <div className="px-4 py-3 border-b border-border/50 bg-muted/30">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Play Button */}
+            <button
+              onClick={handlePlayPause}
+              className={cn(
+                "h-11 w-11 rounded-full flex items-center justify-center transition-all",
+                "bg-foreground text-background hover:bg-foreground/90",
+                "shadow-md hover:shadow-lg",
+                "focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              )}
+            >
+              {isPlaying ? (
+                <Pause className="h-5 w-5" />
+              ) : (
+                <Play className="h-5 w-5 ml-0.5" />
+              )}
+            </button>
 
-        {/* Progress & Time */}
-        <div className="flex-1 flex items-center gap-3 min-w-0">
-          {/* Progress Bar */}
-          <div 
-            ref={progressRef}
-            className="flex-1 h-1.5 bg-muted rounded-full cursor-pointer"
-            onClick={handleProgressClick}
-          >
-            <div 
-              className="h-full bg-primary rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
+            {/* Progress & Time */}
+            <div className="flex items-center gap-3">
+              {/* Progress Bar */}
+              <div 
+                ref={progressRef}
+                className="w-32 sm:w-48 h-1.5 bg-muted rounded-full cursor-pointer"
+                onClick={handleProgressClick}
+              >
+                <div 
+                  className="h-full bg-foreground rounded-full transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              
+              {/* Time */}
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {formatTime(currentTime)} / {displayDuration}
+              </span>
+            </div>
           </div>
-          
-          {/* Time */}
-          <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-            {formatTime(currentTime)} / {displayDuration}
-          </span>
-        </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-xs text-muted-foreground"
-            onClick={handlePlaybackRateChange}
-          >
-            {playbackRate}x
-          </Button>
-          <Volume2 className="h-4 w-4 text-muted-foreground" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground"
-            onClick={handleDownload}
-          >
-            <Download className="h-4 w-4" />
-          </Button>
+          {/* Controls */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+              onClick={handlePlaybackRateChange}
+            >
+              {playbackRate}x
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              title="Volume"
+            >
+              <Volume2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={handleDownload}
+              title="Download recording"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Transcript - Collapsed by default, expand on click */}
+      {/* Transcript Section */}
       {transcript && (
         <Collapsible open={showTranscript} onOpenChange={setShowTranscript}>
           <CollapsibleTrigger asChild>
-            <button className="flex items-center gap-2 text-sm text-primary hover:underline">
-              <FileText className="h-4 w-4" />
-              <span>{showTranscript ? "Hide Transcript" : "View Transcript"}</span>
-              {showTranscript ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-2 p-3 bg-muted/40 rounded-lg border text-sm leading-relaxed max-h-48 overflow-y-auto">
-              {transcript}
-              <div className="mt-3 pt-2 border-t flex justify-end">
+            <button className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-muted/30 transition-colors border-b border-border/50">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">Transcript</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs text-primary"
-                  onClick={handleDownloadTranscript}
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownloadTranscript();
+                  }}
                 >
                   <Download className="h-3 w-3 mr-1" />
-                  Download Transcript
+                  Download
                 </Button>
+                <ChevronRight className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform",
+                  showTranscript && "rotate-90"
+                )} />
               </div>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="p-4 max-h-64 overflow-y-auto">
+              <p className="text-sm text-foreground leading-relaxed">
+                {transcript}
+              </p>
             </div>
           </CollapsibleContent>
         </Collapsible>
