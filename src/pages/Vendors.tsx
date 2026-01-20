@@ -95,10 +95,10 @@ const Vendors = () => {
   });
 
   const filteredVendors = vendors.filter((vendor) => {
-    const matchesSearch = vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vendor.company_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vendor.phone.includes(searchQuery);
-    const matchesSpecialty = !selectedSpecialty || vendor.specialty.includes(selectedSpecialty);
+    const matchesSearch = (vendor.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (vendor.company_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (vendor.phone || '').includes(searchQuery);
+    const matchesSpecialty = !selectedSpecialty || (vendor.specialty || []).includes(selectedSpecialty);
     return matchesSearch && matchesSpecialty;
   });
 
