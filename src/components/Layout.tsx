@@ -13,6 +13,7 @@ import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 import { TaskConfirmationModal } from "@/components/TaskConfirmationModal";
 import { CallRecapModal } from "@/components/CallRecapModal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NotificationBell } from "@/components/team-hub/NotificationBell";
 
 interface LayoutProps {
   children: ReactNode;
@@ -115,9 +116,12 @@ const Layout = ({ children }: LayoutProps) => {
             {/* Center: Desktop Navigation */}
             {canAccessNav && <MainNavigation isAdmin={isAdmin} />}
 
-            {/* Right side: Quick Actions + AI Assistant + User info + Logout */}
+            {/* Right side: Quick Actions + AI Assistant + Notification Bell + User info + Logout */}
             <div className="flex items-center gap-1 sm:gap-2">
               {canAccessNav && <QuickCommunicationButton />}
+              
+              {/* Team Hub Notification Bell */}
+              {canAccessNav && <NotificationBell />}
               
               {/* AI Assistant Button in Nav */}
               {canAccessNav && (

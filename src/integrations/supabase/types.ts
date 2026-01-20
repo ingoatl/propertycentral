@@ -8506,6 +8506,7 @@ export type Database = {
       }
       team_channels: {
         Row: {
+          allowed_roles: string[] | null
           channel_type: string | null
           created_at: string | null
           created_by: string | null
@@ -8517,6 +8518,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          allowed_roles?: string[] | null
           channel_type?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -8528,6 +8530,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          allowed_roles?: string[] | null
           channel_type?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -8537,6 +8540,39 @@ export type Database = {
           is_archived?: boolean | null
           name?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      team_hub_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          invite_token: string | null
+          invitee_email: string
+          inviter_id: string | null
+          status: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          invite_token?: string | null
+          invitee_email: string
+          inviter_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          invite_token?: string | null
+          invitee_email?: string
+          inviter_id?: string | null
+          status?: string | null
         }
         Relationships: []
       }
@@ -8649,6 +8685,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      team_notification_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          muted_channels: string[] | null
+          notification_sound: boolean | null
+          push_all_messages: boolean | null
+          push_dms_only: boolean | null
+          push_enabled: boolean | null
+          push_mentions_only: boolean | null
+          quiet_hours_enabled: boolean | null
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          show_desktop_notifications: boolean | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          muted_channels?: string[] | null
+          notification_sound?: boolean | null
+          push_all_messages?: boolean | null
+          push_dms_only?: boolean | null
+          push_enabled?: boolean | null
+          push_mentions_only?: boolean | null
+          quiet_hours_enabled?: boolean | null
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          show_desktop_notifications?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          muted_channels?: string[] | null
+          notification_sound?: boolean | null
+          push_all_messages?: boolean | null
+          push_dms_only?: boolean | null
+          push_enabled?: boolean | null
+          push_mentions_only?: boolean | null
+          quiet_hours_enabled?: boolean | null
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          show_desktop_notifications?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       team_notifications: {
         Row: {
