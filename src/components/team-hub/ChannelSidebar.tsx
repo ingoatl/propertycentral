@@ -1,12 +1,13 @@
 import { memo, useState } from 'react';
-import { Hash, Lock, Users, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { Hash, Lock, Users, ChevronDown, ChevronRight, Plus, MessageSquarePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
 import { TeamChannel } from '@/hooks/useTeamHub';
 import { CreateGroupDM } from './CreateGroupDM';
-
+import { NewDirectMessage } from './NewDirectMessage';
 interface ChannelSidebarProps {
   channels: TeamChannel[];
   selectedChannelId: string | null;
@@ -126,6 +127,9 @@ export const ChannelSidebar = memo(function ChannelSidebar({
       
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-2">
+          {/* New Message Button - prominent placement */}
+          <NewDirectMessage onDMCreated={onSelectChannel} />
+          
           {renderSection('Channels', publicChannels, 'public')}
           {renderSection('Private Channels', privateChannels, 'private')}
           
