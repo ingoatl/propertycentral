@@ -38,7 +38,7 @@ const PROPERTY_TYPE_OPTIONS = [
 const STORIES_OPTIONS = ['1', '2', '3', 'Multi-level'];
 
 const POOL_TYPE_OPTIONS = [
-  { value: '', label: 'None' },
+  { value: 'none', label: 'None' },
   { value: 'pool_only', label: 'Pool Only' },
   { value: 'hot_tub_only', label: 'Hot Tub Only' },
   { value: 'pool_and_hot_tub', label: 'Pool & Hot Tub' },
