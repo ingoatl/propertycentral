@@ -21,7 +21,7 @@ export function VideoCapture({
   onVideoReady,
   onCancel,
   className,
-  maxDuration = 120,
+  maxDuration = 180, // 3 minutes default
 }: VideoCaptureProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -298,6 +298,10 @@ export function VideoCapture({
   };
 
   const formatTime = (seconds: number): string => {
+    // Handle Infinity, NaN, or invalid values
+    if (!isFinite(seconds) || isNaN(seconds) || seconds < 0) {
+      return "0:00";
+    }
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
