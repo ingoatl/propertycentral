@@ -29,8 +29,6 @@ const Layout = ({ children }: LayoutProps) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasUserRole, setHasUserRole] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
-  const [dialerOpen, setDialerOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   
   // Real-time notifications for inbound lead messages
   useLeadRealtimeMessages();
@@ -108,15 +106,12 @@ const Layout = ({ children }: LayoutProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      {/* New Apple-style Mobile Header */}
+      {/* Mobile Header */}
       <MobileHeaderBar
         isAdmin={isAdmin}
         hasUserRole={hasUserRole}
         user={user}
-        unreadCount={unreadCount}
         onOpenAiChat={() => setAiChatOpen(true)}
-        onOpenDialer={() => setDialerOpen(true)}
-        onOpenNotifications={() => setNotificationsOpen(true)}
         navigationContent={<MobileNavigation isAdmin={isAdmin} />}
       />
       
