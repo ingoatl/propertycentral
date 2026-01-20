@@ -16,11 +16,12 @@ interface MaintenanceBookTabProps {
 export function MaintenanceBookTab({ propertyId }: MaintenanceBookTabProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Fetch all onboarding data for maintenance information
-  const { data: onboardingData, isLoading } = useQuery({
-    queryKey: ["maintenance-book-data", propertyId],
+  // Fetch all maintenance data from multiple sources
+  const { data: maintenanceData, isLoading } = useQuery({
+    queryKey: ["maintenance-book-full", propertyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Source 1: owner_onboarding_submissions via property_id
+      const { data: onboardingSubmission } = await supabase
         .from("owner_onboarding_submissions")
         .select("*")
         .eq("property_id", propertyId)
@@ -28,8 +29,82 @@ export function MaintenanceBookTab({ propertyId }: MaintenanceBookTabProps) {
         .limit(1)
         .maybeSingle();
       
-      if (error) throw error;
-      return data;
+      // Source 2: Also try via owner_id if property has owner
+      let ownerSubmission = null;
+      if (!onboardingSubmission) {
+        const { data: property } = await supabase
+          .from("properties")
+          .select("owner_id")
+          .eq("id", propertyId)
+          .maybeSingle();
+        
+        if (property?.owner_id) {
+          const { data: ownerData } = await supabase
+            .from("owner_onboarding_submissions")
+            .select("*")
+            .eq("owner_id", property.owner_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          ownerSubmission = ownerData;
+        }
+      }
+      
+      // Source 3: Fetch from onboarding_tasks via onboarding_projects
+      const { data: projectData } = await supabase
+        .from("onboarding_projects")
+        .select("id")
+        .eq("property_id", propertyId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      let taskData: Record<string, string> = {};
+      if (projectData?.id) {
+        const { data: tasks } = await supabase
+          .from("onboarding_tasks")
+          .select("title, field_value")
+          .eq("project_id", projectData.id)
+          .not("field_value", "is", null);
+        
+        if (tasks) {
+          tasks.forEach(task => {
+            if (task.field_value) {
+              // Map task titles to field names
+              const titleMap: Record<string, string> = {
+                'Smart Lock Code': 'smart_lock_code',
+                'Smart Lock Brand': 'smart_lock_brand',
+                'Lockbox Code': 'lockbox_code',
+                'Gate Code': 'gate_code',
+                'Alarm Code': 'alarm_code',
+                'Garage Code': 'garage_code',
+                'Vendor Access Code': 'vendor_access_code',
+                'Parking Instructions': 'parking_instructions',
+                'Water Shutoff Location': 'water_shutoff_location',
+                'Breaker Panel Location': 'breaker_panel_location',
+                'Gas Shutoff Location': 'gas_shutoff_location',
+                'Fire Extinguisher Locations': 'fire_extinguisher_locations',
+                'Security Brand': 'security_brand',
+                'HOA Contact Name': 'hoa_contact_name',
+                'HOA Contact Phone': 'hoa_contact_phone',
+              };
+              const fieldName = titleMap[task.title];
+              if (fieldName) {
+                taskData[fieldName] = task.field_value;
+              }
+            }
+          });
+        }
+      }
+      
+      // Merge all sources (submission takes priority, then owner submission, then tasks)
+      const merged = {
+        ...taskData,
+        ...(ownerSubmission || {}),
+        ...(onboardingSubmission || {}),
+      };
+      
+      return Object.keys(merged).length > 0 ? merged : null;
     },
     enabled: !!propertyId,
   });
@@ -49,7 +124,7 @@ export function MaintenanceBookTab({ propertyId }: MaintenanceBookTabProps) {
     );
   }
 
-  if (!onboardingData) {
+  if (!maintenanceData) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Wrench className="h-12 w-12 text-muted-foreground mb-4" />
@@ -100,18 +175,18 @@ export function MaintenanceBookTab({ propertyId }: MaintenanceBookTabProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {onboardingData.smart_lock_brand && (
+            {maintenanceData.smart_lock_brand && (
               <Badge variant="secondary" className="mb-3">
-                Smart Lock: {onboardingData.smart_lock_brand}
+                Smart Lock: {maintenanceData.smart_lock_brand}
               </Badge>
             )}
-            <CopyableField label="Vendor Access Code" value={onboardingData.vendor_access_code} icon={Key} />
-            <CopyableField label="Smart Lock Code" value={onboardingData.smart_lock_code} icon={Lock} />
-            <CopyableField label="Lockbox Code" value={onboardingData.lockbox_code} icon={Lock} />
-            <CopyableField label="Gate Code" value={onboardingData.gate_code} icon={Lock} />
-            <CopyableField label="Garage Code" value={onboardingData.garage_code} icon={Home} />
-            <CopyableField label="Alarm Code" value={onboardingData.alarm_code} icon={AlertTriangle} />
-            {!onboardingData.vendor_access_code && !onboardingData.smart_lock_code && !onboardingData.lockbox_code && !onboardingData.gate_code && (
+            <CopyableField label="Vendor Access Code" value={maintenanceData.vendor_access_code} icon={Key} />
+            <CopyableField label="Smart Lock Code" value={maintenanceData.smart_lock_code} icon={Lock} />
+            <CopyableField label="Lockbox Code" value={maintenanceData.lockbox_code} icon={Lock} />
+            <CopyableField label="Gate Code" value={maintenanceData.gate_code} icon={Lock} />
+            <CopyableField label="Garage Code" value={maintenanceData.garage_code} icon={Home} />
+            <CopyableField label="Alarm Code" value={maintenanceData.alarm_code} icon={AlertTriangle} />
+            {!maintenanceData.vendor_access_code && !maintenanceData.smart_lock_code && !maintenanceData.lockbox_code && !maintenanceData.gate_code && (
               <p className="text-sm text-muted-foreground text-center py-2">No access codes on file</p>
             )}
           </CardContent>
@@ -126,10 +201,10 @@ export function MaintenanceBookTab({ propertyId }: MaintenanceBookTabProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <CopyableField label="Water Shutoff" value={onboardingData.water_shutoff_location} icon={Droplet} />
-            <CopyableField label="Breaker Panel" value={onboardingData.breaker_panel_location} icon={Zap} />
-            <CopyableField label="Gas Shutoff" value={onboardingData.gas_shutoff_location} icon={Flame} />
-            {!onboardingData.water_shutoff_location && !onboardingData.breaker_panel_location && !onboardingData.gas_shutoff_location && (
+            <CopyableField label="Water Shutoff" value={maintenanceData.water_shutoff_location} icon={Droplet} />
+            <CopyableField label="Breaker Panel" value={maintenanceData.breaker_panel_location} icon={Zap} />
+            <CopyableField label="Gas Shutoff" value={maintenanceData.gas_shutoff_location} icon={Flame} />
+            {!maintenanceData.water_shutoff_location && !maintenanceData.breaker_panel_location && !maintenanceData.gas_shutoff_location && (
               <p className="text-sm text-muted-foreground text-center py-2">No utility information on file</p>
             )}
           </CardContent>
@@ -144,11 +219,11 @@ export function MaintenanceBookTab({ propertyId }: MaintenanceBookTabProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {onboardingData.has_security_system && (
-              <CopyableField label="Security System" value={onboardingData.security_brand || "Yes"} icon={Shield} />
+            {maintenanceData.has_security_system && (
+              <CopyableField label="Security System" value={maintenanceData.security_brand || "Yes"} icon={Shield} />
             )}
-            <CopyableField label="Fire Extinguisher Locations" value={onboardingData.fire_extinguisher_locations} icon={AlertTriangle} />
-            {!onboardingData.has_security_system && !onboardingData.fire_extinguisher_locations && (
+            <CopyableField label="Fire Extinguisher Locations" value={maintenanceData.fire_extinguisher_locations} icon={AlertTriangle} />
+            {!maintenanceData.has_security_system && !maintenanceData.fire_extinguisher_locations && (
               <p className="text-sm text-muted-foreground text-center py-2">No safety information on file</p>
             )}
           </CardContent>
@@ -163,15 +238,15 @@ export function MaintenanceBookTab({ propertyId }: MaintenanceBookTabProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <CopyableField label="Parking Instructions" value={onboardingData.parking_instructions} icon={Car} />
-            {!onboardingData.parking_instructions && (
+            <CopyableField label="Parking Instructions" value={maintenanceData.parking_instructions} icon={Car} />
+            {!maintenanceData.parking_instructions && (
               <p className="text-sm text-muted-foreground text-center py-2">No parking information on file</p>
             )}
           </CardContent>
         </Card>
 
         {/* Property Contacts */}
-        {(onboardingData.hoa_contact_name || onboardingData.hoa_contact_phone) && (
+        {(maintenanceData.hoa_contact_name || maintenanceData.hoa_contact_phone) && (
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -180,8 +255,8 @@ export function MaintenanceBookTab({ propertyId }: MaintenanceBookTabProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <CopyableField label="HOA Contact Name" value={onboardingData.hoa_contact_name} icon={Phone} />
-              <CopyableField label="HOA Phone" value={onboardingData.hoa_contact_phone} icon={Phone} />
+              <CopyableField label="HOA Contact Name" value={maintenanceData.hoa_contact_name} icon={Phone} />
+              <CopyableField label="HOA Phone" value={maintenanceData.hoa_contact_phone} icon={Phone} />
             </CardContent>
           </Card>
         )}
