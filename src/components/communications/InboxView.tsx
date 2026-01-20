@@ -755,6 +755,25 @@ export function InboxView() {
   // Enhanced inbox selector state - default to user's own inbox, not all
   const [selectedEmailInboxView, setSelectedEmailInboxView] = useState<InboxViewType>("my-inbox");
 
+  // CRITICAL: Sync EnhancedInboxSelector state with communications query filters
+  // When user selects a different inbox, update the query filters accordingly
+  useEffect(() => {
+    if (selectedEmailInboxView === "all") {
+      setViewAllInboxes(true);
+      setSelectedInboxUserId(null);
+    } else if (selectedEmailInboxView === "my-inbox") {
+      setViewAllInboxes(false);
+      setSelectedInboxUserId(currentUserId);
+    } else if (selectedEmailInboxView === "unassigned") {
+      setViewAllInboxes(false);
+      setSelectedInboxUserId(null); // Will show unassigned items
+    } else {
+      // Specific user ID selected
+      setViewAllInboxes(false);
+      setSelectedInboxUserId(selectedEmailInboxView);
+    }
+  }, [selectedEmailInboxView, currentUserId]);
+
   // Fetch Gmail inbox emails for ALL team members - always fetch for All and Emails tabs
   const { data: gmailEmails = [], isLoading: isLoadingGmail } = useQuery({
     queryKey: ["gmail-inbox"],
