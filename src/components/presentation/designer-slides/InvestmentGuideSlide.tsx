@@ -32,17 +32,17 @@ export function InvestmentGuideSlide() {
 
   return (
     <SlideLayout overlay="gradient">
-      <div className="w-full max-w-7xl mx-auto">
+      <div className="w-full max-w-7xl mx-auto overflow-hidden">
         {/* Header */}
-        <div className="text-center mb-8 lg:mb-10">
-          <p className="text-amber-400 uppercase tracking-widest text-base lg:text-lg mb-4">Investment Guide</p>
-          <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4">
+        <div className="text-center mb-6 lg:mb-8">
+          <p className="text-amber-400 uppercase tracking-widest text-sm lg:text-base mb-3">Investment Guide</p>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-3">
             Design{" "}
             <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
               Fee
             </span>
           </h2>
-          <p className="text-white/60 text-xl lg:text-2xl">
+          <p className="text-white/60 text-lg lg:text-xl">
             Professional design services — furniture purchased separately at cost
           </p>
         </div>
@@ -122,7 +122,6 @@ export function InvestmentGuideSlide() {
                   <li>• Purchased separately at cost</li>
                   <li>• <span className="text-amber-400 font-semibold">No markups</span> on furniture</li>
                   <li>• Full transparency on pricing</li>
-                  <li>• Owner approves all purchases</li>
                 </ul>
               </div>
             </div>

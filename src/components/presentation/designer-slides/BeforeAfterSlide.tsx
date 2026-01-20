@@ -13,7 +13,7 @@ import lakewoodAfter from "@/assets/designer/lakewood-after-1.jpg";
 import brushyBefore from "@/assets/designer/brushy-before.jpg";
 import brushyAfter from "@/assets/designer/brushy-after.jpg";
 import tolaniBefore from "@/assets/designer/tolani-before.jpg";
-import tolaniAfter from "@/assets/designer/tolani-after.jpg";
+import tolaniAfter from "@/assets/to-lani-after.jpeg";
 
 interface CaseStudy {
   name: string;
