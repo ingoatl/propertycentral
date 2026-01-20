@@ -20,13 +20,13 @@ interface TeamHubInvite {
   invite_token: string;
 }
 
-// Complete team member information for invites
+// Complete team member information for invites - roles match Team Metrics panel
 const TEAM_MEMBERS = [
   { name: 'Alex', email: 'alex@peachhausgroup.com', role: 'Property Manager' },
-  { name: 'Anja', email: 'anja@peachhausgroup.com', role: 'Operations Manager' },
-  { name: 'Catherine', email: 'catherine@peachhausgroup.com', role: 'Guest Relations' },
-  { name: 'Chris', email: 'chris@peachhausgroup.com', role: 'Maintenance Coordinator' },
-  { name: 'Ingo', email: 'ingo@peachhausgroup.com', role: 'Owner / CEO' },
+  { name: 'Anja', email: 'anja@peachhausgroup.com', role: 'Broker, Bookkeeping' },
+  { name: 'Catherine', email: 'catherine@peachhausgroup.com', role: 'Marketing' },
+  { name: 'Chris', email: 'chris@peachhausgroup.com', role: 'Corporate Relations' },
+  { name: 'Ingo', email: 'ingo@peachhausgroup.com', role: 'Operations Manager' },
 ];
 
 const TEAM_EMAILS = TEAM_MEMBERS.map(m => m.email);

@@ -20,13 +20,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-// Team members for group creation
+// Team members for group creation - roles match Team Metrics panel
 const TEAM_MEMBERS = [
   { id: 'alex', name: 'Alex', email: 'alex@peachhausgroup.com', role: 'Property Manager' },
-  { id: 'anja', name: 'Anja', email: 'anja@peachhausgroup.com', role: 'Operations Manager' },
-  { id: 'catherine', name: 'Catherine', email: 'catherine@peachhausgroup.com', role: 'Guest Relations' },
-  { id: 'chris', name: 'Chris', email: 'chris@peachhausgroup.com', role: 'Maintenance Coordinator' },
-  { id: 'ingo', name: 'Ingo', email: 'ingo@peachhausgroup.com', role: 'Owner / CEO' },
+  { id: 'anja', name: 'Anja', email: 'anja@peachhausgroup.com', role: 'Broker, Bookkeeping' },
+  { id: 'catherine', name: 'Catherine', email: 'catherine@peachhausgroup.com', role: 'Marketing' },
+  { id: 'chris', name: 'Chris', email: 'chris@peachhausgroup.com', role: 'Corporate Relations' },
+  { id: 'ingo', name: 'Ingo', email: 'ingo@peachhausgroup.com', role: 'Operations Manager' },
 ];
 
 interface CreateGroupDMProps {
