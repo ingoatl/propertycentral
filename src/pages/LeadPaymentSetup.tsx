@@ -1,34 +1,37 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Building2, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Loader2, CreditCard, CheckCircle2, Building2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 interface LeadData {
-  id: string;
   name: string;
   email: string;
-  phone: string | null;
-  propertyAddress: string | null;
-  stripeCustomerId: string | null;
-  paymentMethod: string | null;
-  hasPaymentMethod: boolean;
+  payment_method: string | null;
+  stripe_customer_id: string | null;
+  has_payment_method: boolean;
+  properties: { name: string }[];
 }
 
 const LeadPaymentSetup = () => {
   const [searchParams] = useSearchParams();
-  const leadId = searchParams.get("lead");
-  const wasCanceled = searchParams.get("canceled") === "true";
-
   const [isLoading, setIsLoading] = useState(true);
   const [leadData, setLeadData] = useState<LeadData | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [wasCanceled, setWasCanceled] = useState(false);
+
+  const leadId = searchParams.get("lead");
+  const canceled = searchParams.get("canceled");
 
   useEffect(() => {
+    if (canceled === "true") {
+      setWasCanceled(true);
+    }
+    
     const fetchLeadData = async () => {
       if (!leadId) {
-        setError("No lead ID provided");
         setIsLoading(false);
         return;
       }
@@ -39,186 +42,238 @@ const LeadPaymentSetup = () => {
         });
 
         if (error) throw error;
-        if (!data) throw new Error("Lead not found");
-
+        if (data.error) throw new Error(data.error);
+        
         setLeadData(data);
-      } catch (err: any) {
-        console.error("Error fetching lead:", err);
-        setError(err.message || "Failed to load lead information");
+      } catch (error) {
+        console.error("Error fetching lead:", error);
+        toast.error("Could not find your information");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchLeadData();
-  }, [leadId]);
+  }, [leadId, canceled]);
 
   const handleSetupPayment = async () => {
-    if (!leadId) return;
+    if (!leadId || !leadData) {
+      toast.error("Missing lead information");
+      return;
+    }
 
     setIsRedirecting(true);
+
     try {
       const { data, error } = await supabase.functions.invoke("create-lead-payment-setup", {
         body: { leadId },
       });
 
       if (error) throw error;
-      if (!data?.url) throw new Error("Failed to create payment session");
 
-      window.location.href = data.url;
-    } catch (err: any) {
-      console.error("Error creating payment session:", err);
-      setError(err.message || "Failed to start payment setup");
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (error) {
+      console.error("Error creating payment session:", error);
+      toast.error("Failed to start payment setup. Please try again.");
       setIsRedirecting(false);
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
-        <div className="text-center">
-          <img 
-            src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
-            alt="PeachHaus" 
-            className="h-16 mx-auto mb-4"
-          />
-          <Loader2 className="h-8 w-8 animate-spin text-[#fae052] mx-auto mb-3" />
-          <p className="text-white/80 text-sm">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
       </div>
     );
   }
 
-  if (error || !leadData) {
+  if (!leadId || !leadData) {
     return (
-      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <img 
-            src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
-            alt="PeachHaus" 
-            className="h-16 mx-auto mb-6"
-          />
-          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-white mb-2">Something went wrong</h1>
-          <p className="text-white/60 text-sm">{error || "Unable to load your information"}</p>
-          <p className="text-white/40 text-xs mt-4">
-            Please contact us at (404) 800-6804 if you need assistance.
-          </p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle className="text-red-600">Invalid Link</CardTitle>
+            <CardDescription>
+              This payment setup link is invalid or has expired. Please contact us at info@peachhausgroup.com for assistance.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
 
-  if (leadData.hasPaymentMethod) {
+  // If already has payment method set up
+  if (leadData.has_payment_method) {
     return (
-      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <img 
-            src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
-            alt="PeachHaus" 
-            className="h-16 mx-auto mb-6"
-          />
-          <CheckCircle className="h-16 w-16 text-emerald-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-semibold text-white mb-2">Already Set Up!</h1>
-          <p className="text-white/70">
-            Your payment method has already been configured. You're all set!
-          </p>
-          <div className="mt-6 p-4 bg-white/5 rounded-lg">
-            <p className="text-white/50 text-sm">Payment Method</p>
-            <p className="text-white font-medium capitalize">
-              {leadData.paymentMethod === "ach" ? "Bank Account" : "Credit Card"}
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
+        <Card className="max-w-lg w-full">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4">
+              <img 
+                src="/peachhaus-logo.png" 
+                alt="PeachHaus" 
+                className="h-12 mx-auto"
+              />
+            </div>
+            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <CardTitle className="text-2xl text-green-700">Already Set Up!</CardTitle>
+            <CardDescription className="text-base">
+              Your payment method has already been configured. You're all set!
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+              <p className="text-green-700">
+                <strong>Payment Method:</strong>{" "}
+                {leadData.payment_method === "ach" ? "Bank Account (ACH)" : "Credit Card"}
+              </p>
+            </div>
+            <p className="text-center text-sm text-muted-foreground mt-4">
+              Questions? Contact us at{" "}
+              <a href="mailto:info@peachhausgroup.com" className="text-amber-600 hover:underline">
+                info@peachhausgroup.com
+              </a>
             </p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center p-4">
-      <div className="max-w-lg w-full">
-        <div className="text-center mb-8">
-          <img 
-            src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
-            alt="PeachHaus" 
-            className="h-16 mx-auto mb-6"
-          />
-          <h1 className="text-2xl font-semibold text-white mb-2">Payment Authorization</h1>
-          <p className="text-white/60">Set up your payment method for property management</p>
-        </div>
-
-        {wasCanceled && (
-          <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-            <p className="text-yellow-400 text-sm text-center">
-              Setup was canceled. You can try again whenever you're ready.
-            </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
+      <Card className="max-w-lg w-full">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4">
+            <img 
+              src="/peachhaus-logo.png" 
+              alt="PeachHaus" 
+              className="h-12 mx-auto"
+            />
           </div>
-        )}
-
-        <div className="bg-white/5 rounded-xl p-6 mb-6">
-          <h2 className="text-white font-medium mb-4">Hello, {leadData.name.split(" ")[0]}!</h2>
-          
-          {leadData.propertyAddress && (
-            <div className="flex items-start gap-3 mb-4 p-3 bg-[#fae052]/10 rounded-lg">
-              <Building2 className="h-5 w-5 text-[#fae052] mt-0.5" />
+          <CardTitle className="text-2xl">Set Up Your Payment Method</CardTitle>
+          <CardDescription className="text-base">
+            Hi {leadData.name.split(' ')[0]}! Please set up a secure payment method for your account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {wasCanceled && (
+            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-[#fae052] text-xs font-medium uppercase tracking-wide">Property</p>
-                <p className="text-white text-sm">{leadData.propertyAddress}</p>
+                <p className="font-medium text-amber-800">Setup was canceled</p>
+                <p className="text-sm text-amber-700">You can try again when you're ready.</p>
               </div>
             </div>
           )}
 
-          <div className="space-y-3 text-white/70 text-sm">
-            <p>This authorizes PeachHaus to charge for:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Monthly property management fees</li>
-              <li>Pre-approved maintenance & supplies</li>
-              <li>Utility reimbursements (if applicable)</li>
-            </ul>
-            <p className="text-emerald-400 font-medium">
-              ✓ You won't be charged today — this just saves your payment method.
+          {/* Properties under management */}
+          {leadData.properties.length > 0 && (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 className="h-5 w-5 text-slate-600" />
+                <p className="font-medium text-slate-800">Property</p>
+              </div>
+              <ul className="space-y-1 ml-7">
+                {leadData.properties.map((prop, idx) => (
+                  <li key={idx} className="text-sm text-slate-600">{prop.name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Current payment method info */}
+          {leadData.payment_method && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-700">
+                <strong>Current method:</strong> {leadData.payment_method}
+                {leadData.stripe_customer_id && (
+                  <span className="ml-2 text-green-600">(Already connected to Stripe ✓)</span>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* What this is for */}
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <CheckCircle2 className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-amber-800">Monthly Property Charges</p>
+                <p className="text-amber-700">Management fees, property expenses, and visit fees</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-blue-800">Secure & Automatic</p>
+                <p className="text-blue-700">No more manual transfers – we handle it securely</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment method options */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <p className="font-medium text-center">Choose Your Payment Method</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col items-center p-3 bg-green-50 border-2 border-green-200 rounded-lg">
+                <span className="text-2xl mb-1">🏦</span>
+                <span className="font-medium text-green-800">US Bank Account</span>
+                <span className="text-xs text-green-700">No fees • Recommended</span>
+              </div>
+              <div className="flex flex-col items-center p-3 bg-gray-50 border-2 border-gray-200 rounded-lg">
+                <span className="text-2xl mb-1">💳</span>
+                <span className="font-medium text-gray-800">Credit Card</span>
+                <span className="text-xs text-gray-600">3% processing fee</span>
+              </div>
+            </div>
+            <p className="text-xs text-center text-muted-foreground">
+              You'll choose your preferred method on the next screen
             </p>
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-white/5 rounded-lg p-4 text-center">
-            <div className="text-2xl mb-2">🏦</div>
-            <p className="text-white text-sm font-medium">Bank Account</p>
-            <p className="text-white/50 text-xs">1% processing fee</p>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-green-800">Secure & Encrypted</p>
+                <p className="text-sm text-green-700">
+                  We use Stripe, the industry leader in payment security. Your information is never stored on our servers.
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="bg-white/5 rounded-lg p-4 text-center">
-            <div className="text-2xl mb-2">💳</div>
-            <p className="text-white text-sm font-medium">Credit Card</p>
-            <p className="text-white/50 text-xs">3% processing fee</p>
-          </div>
-        </div>
 
-        <Button
-          onClick={handleSetupPayment}
-          disabled={isRedirecting}
-          className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white py-6 text-lg font-medium rounded-xl shadow-lg shadow-emerald-500/25"
-        >
-          {isRedirecting ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Redirecting to Stripe...
-            </>
-          ) : (
-            <>
-              <CreditCard className="h-5 w-5 mr-2" />
-              Continue to Stripe
-            </>
-          )}
-        </Button>
+          <Button 
+            onClick={handleSetupPayment} 
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white py-6 text-lg"
+            disabled={isRedirecting}
+          >
+            {isRedirecting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Redirecting to Stripe...
+              </>
+            ) : (
+              <>
+                <CreditCard className="mr-2 h-5 w-5" />
+                Continue to Stripe
+              </>
+            )}
+          </Button>
 
-        <p className="text-center text-white/40 text-xs mt-4">
-          Secure payment processing by Stripe. Your information is encrypted.
-        </p>
-        <p className="text-center text-white/30 text-xs mt-2">
-          Questions? Call (404) 800-6804
-        </p>
-      </div>
+          <p className="text-center text-sm text-muted-foreground">
+            Questions? Contact us at{" "}
+            <a href="mailto:info@peachhausgroup.com" className="text-amber-600 hover:underline">
+              info@peachhausgroup.com
+            </a>
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 };

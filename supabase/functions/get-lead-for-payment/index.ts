@@ -29,10 +29,10 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch only the necessary lead data for payment setup
+    // Fetch lead data including payment info and property address
     const { data, error } = await supabase
       .from("leads")
-      .select("id, name, email")
+      .select("id, name, email, phone, property_address, stripe_customer_id, payment_method, has_payment_method")
       .eq("id", leadId)
       .single();
 
@@ -44,8 +44,17 @@ serve(async (req) => {
       );
     }
 
+    // Return data in format matching owner payment setup
     return new Response(
-      JSON.stringify({ name: data.name, email: data.email }),
+      JSON.stringify({
+        name: data.name,
+        email: data.email,
+        payment_method: data.payment_method,
+        stripe_customer_id: data.stripe_customer_id,
+        has_payment_method: data.has_payment_method || false,
+        // For leads, we use property_address as the "property" info
+        properties: data.property_address ? [{ name: data.property_address }] : [],
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
