@@ -53,6 +53,7 @@ serve(async (req) => {
       inviterName = inviterProfile?.first_name || "The Team";
     }
     const appUrl = "https://propertycentral.lovable.app";
+    const inviteLink = `${appUrl}/team-hub/invite/${invite.invite_token}`;
     const firstName = email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1);
 
     // Professional email HTML template (styled like owner statements)
@@ -209,7 +210,7 @@ serve(async (req) => {
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
                   <td align="center">
-                    <a href="${appUrl}/team-hub" style="display: inline-block; background: linear-gradient(135deg, #18181b 0%, #27272a 100%); color: #ffffff; padding: 16px 40px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    <a href="${inviteLink}" style="display: inline-block; background: linear-gradient(135deg, #18181b 0%, #27272a 100%); color: #ffffff; padding: 16px 40px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
                       Join Team Hub →
                     </a>
                   </td>

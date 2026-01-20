@@ -174,7 +174,11 @@ export function useSendMessage() {
 
       if (error) throw error;
 
-      // Send push notifications to other channel members
+      // Detect @mentions and send notifications
+      const mentionRegex = /@(\w+)/g;
+      const mentions = content.match(mentionRegex) || [];
+      
+      // Send push notifications to other channel members + mentioned users
       try {
         await supabase.functions.invoke('send-team-notification', {
           body: {
@@ -182,6 +186,7 @@ export function useSendMessage() {
             messageId: data.id,
             senderId: user.id,
             content,
+            mentions: mentions.map(m => m.replace('@', '').toLowerCase()),
           },
         });
       } catch (e) {
