@@ -129,30 +129,30 @@ const CreateWorkOrderDialog = ({
       
       const today = new Date().toISOString().split('T')[0];
       
-      // Check mid-term bookings first
+      // Check mid-term bookings first (uses tenant_name, tenant_phone, start_date, end_date)
       const { data: midTermBooking } = await supabase
         .from("mid_term_bookings")
-        .select("guest_name, guest_phone, check_in, check_out")
+        .select("tenant_name, tenant_phone, tenant_email, start_date, end_date")
         .eq("property_id", formData.property_id)
-        .lte("check_in", today)
-        .gte("check_out", today)
+        .lte("start_date", today)
+        .gte("end_date", today)
         .not("status", "eq", "cancelled")
-        .order("check_in", { ascending: false })
+        .order("start_date", { ascending: false })
         .limit(1)
         .maybeSingle();
       
       if (midTermBooking) {
         return {
           type: "mid_term",
-          name: midTermBooking.guest_name,
-          phone: midTermBooking.guest_phone,
-          email: null,
-          checkIn: midTermBooking.check_in,
-          checkOut: midTermBooking.check_out,
+          name: midTermBooking.tenant_name,
+          phone: midTermBooking.tenant_phone,
+          email: midTermBooking.tenant_email,
+          checkIn: midTermBooking.start_date,
+          checkOut: midTermBooking.end_date,
         };
       }
       
-      // Check OwnerRez bookings
+      // Check OwnerRez bookings (uses guest_name, check_in, check_out)
       const { data: ownerrezBooking } = await supabase
         .from("ownerrez_bookings")
         .select("guest_name, check_in, check_out")
