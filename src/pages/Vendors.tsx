@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature, MessageSquare, PhoneCall, Trash2, ClipboardList } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, MessageSquare, PhoneCall, Trash2, ClipboardList } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
@@ -16,6 +16,7 @@ import { CollapsibleActiveServices } from "@/components/maintenance/CollapsibleA
 import { VendorKPIBar } from "@/components/maintenance/VendorKPIBar";
 import { WorkOrderStageCards } from "@/components/maintenance/WorkOrderStageCards";
 import { WorkOrdersTable } from "@/components/maintenance/WorkOrdersTable";
+import { VendorCommunicationsTab } from "@/components/maintenance/VendorCommunicationsTab";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DeleteVendorDialog from "@/components/maintenance/DeleteVendorDialog";
@@ -176,6 +177,9 @@ const Vendors = () => {
           isLoading={workOrdersLoading}
         />
 
+        {/* Vendor Communications Tab */}
+        <VendorCommunicationsTab />
+
         {/* Collapsible Active Services */}
         <CollapsibleActiveServices />
 
@@ -233,17 +237,17 @@ const Vendors = () => {
                     {vendor.emergency_available && <Badge variant="outline" className="text-xs border-red-200 text-red-600"><AlertTriangle className="h-3 w-3 mr-1" />24/7</Badge>}
                     {vendor.insurance_verified && <Badge variant="outline" className="text-xs border-green-200 text-green-600"><Shield className="h-3 w-3 mr-1" />Insured</Badge>}
                   </div>
-                  <div className="flex gap-2 pt-2 border-t">
+                  <div className="flex items-center gap-1.5 pt-2 border-t">
                     {vendor.phone && (
                       <>
-                        <Button size="sm" className="h-9 w-9 p-0 rounded-lg" onClick={(e) => { e.stopPropagation(); setCallDialogVendor(vendor); }}><PhoneCall className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="outline" className="h-9 w-9 p-0 rounded-lg" onClick={(e) => { e.stopPropagation(); setSmsDialogVendor(vendor); }}><MessageSquare className="h-4 w-4" /></Button>
-                        <div onClick={(e) => e.stopPropagation()}><SendVoicemailButton recipientPhone={vendor.phone} recipientName={vendor.name} variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg" /></div>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setCallDialogVendor(vendor); }}><PhoneCall className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setSmsDialogVendor(vendor); }}><MessageSquare className="h-4 w-4" /></Button>
+                        <div onClick={(e) => e.stopPropagation()}><SendVoicemailButton recipientPhone={vendor.phone} recipientName={vendor.name} variant="ghost" size="sm" className="h-8 w-8 p-0" /></div>
                       </>
                     )}
-                    {vendor.email && <Button size="sm" variant="outline" className="h-9 w-9 p-0 rounded-lg" onClick={(e) => { e.stopPropagation(); window.location.href = `mailto:${vendor.email}`; }}><Mail className="h-4 w-4" /></Button>}
+                    {vendor.email && <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); window.location.href = `mailto:${vendor.email}`; }}><Mail className="h-4 w-4" /></Button>}
                     <div className="flex-1" />
-                    {isAdmin && <Button size="sm" variant="ghost" className="h-9 w-9 p-0 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setDeleteVendor(vendor); }}><Trash2 className="h-4 w-4" /></Button>}
+                    {isAdmin && <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteVendor(vendor); }}><Trash2 className="h-4 w-4" /></Button>}
                   </div>
                 </CardContent>
               </Card>

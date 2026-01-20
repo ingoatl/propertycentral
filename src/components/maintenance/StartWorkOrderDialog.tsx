@@ -99,6 +99,10 @@ export function StartWorkOrderDialog({
   // Create work order mutation
   const createWorkOrderMutation = useMutation({
     mutationFn: async () => {
+      // Get current user ID for tracking who created the work order
+      const { data: { user } } = await supabase.auth.getUser();
+      const createdByUserId = user?.id;
+      
       // Generate a work order number
       const woNumber = `WO-${Date.now().toString().slice(-6)}`;
       
@@ -117,6 +121,7 @@ export function StartWorkOrderDialog({
         status: "dispatched" as const, // Set to dispatched since vendor is assigned
         vendor_access_token: vendorAccessToken,
         vendor_access_token_expires_at: tokenExpiresAt.toISOString(),
+        created_by: createdByUserId, // Track who created for inbox routing
       };
       
       const { data, error } = await supabase
@@ -126,7 +131,7 @@ export function StartWorkOrderDialog({
         .single();
       
       if (error) throw error;
-      return { ...data, woNumber, vendorAccessToken };
+      return { ...data, woNumber, vendorAccessToken, createdByUserId };
     },
     onSuccess: async (workOrder) => {
       // Send SMS to vendor notifying them of the new work order with portal link
@@ -152,6 +157,8 @@ export function StartWorkOrderDialog({
               vendorId: vendor.id,
               phone: vendor.phone,
               message,
+              workOrderId: workOrder.id,
+              requestedByUserId: workOrder.createdByUserId, // Route replies to requester's inbox
             },
           });
           
