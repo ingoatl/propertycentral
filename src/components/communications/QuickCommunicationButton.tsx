@@ -308,55 +308,55 @@ export function QuickCommunicationButton() {
                         {/* Communication Buttons - Always visible */}
                         {contact.phone && (
                           <div className="space-y-2">
-                            {/* Primary 4 buttons */}
-                            <div className="grid grid-cols-4 gap-1.5">
+                            {/* Primary 4 buttons - compact sizing */}
+                            <div className="grid grid-cols-4 gap-1">
                               <Button
                                 variant="default"
                                 size="sm"
-                                className="flex-col h-12 min-w-0 px-1 bg-primary hover:bg-primary/90 touch-manipulation"
+                                className="flex-col h-9 min-w-0 px-0.5 gap-0.5 bg-primary hover:bg-primary/90 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleCall(contact);
                                 }}
                               >
-                                <Phone className="h-4 w-4 shrink-0" />
-                                <span className="text-[10px]">Call</span>
+                                <Phone className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-[9px]">Call</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="flex-col h-12 min-w-0 px-1 touch-manipulation"
+                                className="flex-col h-9 min-w-0 px-0.5 gap-0.5 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleText(contact);
                                 }}
                               >
-                                <MessageSquare className="h-4 w-4 shrink-0" />
-                                <span className="text-[10px]">Text</span>
+                                <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-[9px]">Text</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="flex-col h-12 min-w-0 px-1 touch-manipulation"
+                                className="flex-col h-9 min-w-0 px-0.5 gap-0.5 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleVoicemail(contact);
                                 }}
                               >
-                                <Mic className="h-4 w-4 shrink-0" />
-                                <span className="text-[10px]">Voice</span>
+                                <Mic className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-[9px]">Voice</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="flex-col h-12 min-w-0 px-1 touch-manipulation"
+                                className="flex-col h-9 min-w-0 px-0.5 gap-0.5 touch-manipulation"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleVideoMessage(contact);
                                 }}
                               >
-                                <Video className="h-4 w-4 shrink-0" />
-                                <span className="text-[10px]">Video</span>
+                                <Video className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-[9px]">Video</span>
                               </Button>
                             </div>
                             
