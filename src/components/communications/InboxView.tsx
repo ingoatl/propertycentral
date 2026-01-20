@@ -1077,11 +1077,9 @@ export function InboxView() {
             let contactType: CommunicationItem["contact_type"] = "external";
             let contactId = comm.id;
 
-            // Check for Voice AI transcript FIRST - before other matching logic
-            if (isVoiceAITranscript(comm.body)) {
-              const callerPhone = extractCallerPhoneFromTranscript(comm.body);
-              // Extract the caller's actual name from the transcript conversation
-              const callerName = extractCallerNameFromTranscript(comm.body);
+            // Check for Voice AI transcript - but still respect lead_id if present
+            const isVoiceAI = isVoiceAITranscript(comm.body);
+            if (isVoiceAI) {
               // Check if a specific team member was mentioned in the call
               const mentionedMember = extractMentionedTeamMember(comm.body);
               
@@ -1095,13 +1093,10 @@ export function InboxView() {
                   }
                 }
               }
-              
-              // Use the caller's name if found, otherwise use "PeachHaus Receptionist" to indicate it was AI-handled
-              contactName = callerName || "PeachHaus Receptionist";
-              contactPhone = callerPhone || metadata?.unmatched_phone || metadata?.ghl_data?.contactPhone;
-              contactType = "external";
-            } else if (comm.lead_id && lead) {
-              // Has a linked lead
+            }
+            
+            // PRIORITY: If we have a lead_id, ALWAYS use lead info for consistent grouping
+            if (comm.lead_id && lead) {
               contactName = lead.name;
               contactPhone = lead.phone || undefined;
               contactEmail = lead.email || undefined;
