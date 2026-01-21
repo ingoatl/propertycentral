@@ -186,13 +186,15 @@ serve(async (req) => {
                     arguments: {
                       calendarId: "primary",
                       eventId: call.google_calendar_event_id,
+                      // IMPORTANT: Use timeZone: "UTC" since toISOString() produces UTC times
+                      // Using "America/New_York" with UTC ISO strings causes a 5-hour offset error
                       start: {
                         dateTime: newTime.toISOString(),
-                        timeZone: "America/New_York",
+                        timeZone: "UTC",
                       },
                       end: {
                         dateTime: endTime.toISOString(),
-                        timeZone: "America/New_York",
+                        timeZone: "UTC",
                       },
                       summary: `[RESCHEDULED] Discovery Call - ${lead?.name || "Guest"}`,
                       description: `Rescheduled discovery call with ${lead?.name || "Guest"}\n\nOriginal time: ${oldTime.toLocaleString('en-US', { timeZone: 'America/New_York' })} EST\nNew time: ${newTime.toLocaleString('en-US', { timeZone: 'America/New_York' })} EST\n\nReschedule count: ${(call.reschedule_count || 0) + 1}`,
