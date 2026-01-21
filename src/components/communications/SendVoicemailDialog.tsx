@@ -16,7 +16,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Sparkles, Send, Loader2, User, Phone, Video } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Mic, Sparkles, Send, Loader2, User, Phone, Video, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { VoiceRecorder } from "./VoiceRecorder";
@@ -34,6 +36,8 @@ interface SendVoicemailDialogProps {
   vendorId?: string;
   propertyAddress?: string;
   onSuccess?: () => void;
+  /** Allow editing recipient name for manual dial scenarios */
+  allowNameEdit?: boolean;
 }
 
 export function SendVoicemailDialog({
@@ -46,6 +50,7 @@ export function SendVoicemailDialog({
   vendorId,
   propertyAddress,
   onSuccess,
+  allowNameEdit = false,
 }: SendVoicemailDialogProps) {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<"record" | "ai" | "video">("ai");
@@ -61,6 +66,17 @@ export function SendVoicemailDialog({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoStoragePath, setVideoStoragePath] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState<number>(0);
+  
+  // Editable name for manual dial scenarios
+  const [editableName, setEditableName] = useState<string>(recipientName);
+  
+  // Update editable name when prop changes
+  useEffect(() => {
+    setEditableName(recipientName);
+  }, [recipientName]);
+  
+  // The name to actually use (editable or prop)
+  const effectiveRecipientName = allowNameEdit ? editableName : recipientName;
   
   // Show video option for all contacts (not just owners)
   const showVideoOption = true;
@@ -153,7 +169,7 @@ export function SendVoicemailDialog({
       const { data, error } = await supabase.functions.invoke("send-voicemail", {
         body: {
           recipientPhone,
-          recipientName,
+          recipientName: effectiveRecipientName,
           leadId,
           ownerId,
           vendorId,
@@ -216,14 +232,30 @@ export function SendVoicemailDialog({
 
   const content = (
     <div className="flex flex-col gap-4">
-      {/* Recipient Info */}
+      {/* Recipient Info - with editable name for manual dial */}
       <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
           <User className="h-5 w-5 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{recipientName}</p>
-          <p className="text-sm text-muted-foreground flex items-center gap-1">
+          {allowNameEdit ? (
+            <div className="space-y-1">
+              <Label htmlFor="recipient-name" className="text-xs text-muted-foreground flex items-center gap-1">
+                <Pencil className="h-3 w-3" />
+                First Name (for greeting)
+              </Label>
+              <Input
+                id="recipient-name"
+                value={editableName}
+                onChange={(e) => setEditableName(e.target.value)}
+                placeholder="Enter first name..."
+                className="h-8 text-sm"
+              />
+            </div>
+          ) : (
+            <p className="font-medium truncate">{effectiveRecipientName}</p>
+          )}
+          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
             <Phone className="h-3 w-3" />
             {recipientPhone}
           </p>
@@ -263,7 +295,7 @@ export function SendVoicemailDialog({
 
         <TabsContent value="ai" className="mt-4">
           <AIVoiceGenerator
-            recipientName={recipientName}
+            recipientName={effectiveRecipientName}
             senderName={senderName}
             propertyAddress={propertyAddress}
             onAudioGenerated={handleAIAudioGenerated}
