@@ -56,6 +56,7 @@ import {
   startOfWeek,
   endOfWeek,
 } from "date-fns";
+import { formatInEST, formatInESTWithLabel } from "@/lib/timezone-utils";
 import { cn } from "@/lib/utils";
 import { PropertyPhotos } from "@/components/ui/property-photos";
 import { toast } from "sonner";
@@ -357,10 +358,10 @@ export function DiscoveryCallCalendar() {
                           {score}
                         </Badge>
                       </div>
-                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="text-xs text-muted-foreground space-y-1">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 flex-shrink-0" />
-                          {format(event.time, "MMM d, h:mm a")}
+                          {formatInESTWithLabel(event.time, "MMM d, h:mm a")}
                         </div>
                         <div className="flex items-center gap-1">
                           {call.meeting_type === "video" ? (
@@ -399,7 +400,7 @@ export function DiscoveryCallCalendar() {
                       <div className="text-xs text-muted-foreground space-y-1">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 flex-shrink-0" />
-                          {format(event.time, "MMM d, h:mm a")}
+                          {formatInESTWithLabel(event.time, "MMM d, h:mm a")}
                         </div>
                         <div className="flex items-center gap-1">
                           {isVirtual ? (
@@ -437,7 +438,7 @@ export function DiscoveryCallCalendar() {
                       <div className="text-xs text-muted-foreground space-y-1">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 flex-shrink-0" />
-                          {format(event.time, "MMM d, h:mm a")}
+                          {formatInESTWithLabel(event.time, "MMM d, h:mm a")}
                         </div>
                         <div className="flex items-center gap-1">
                           <CalendarCheck className="h-3 w-3 text-cyan-600 flex-shrink-0" />
@@ -595,7 +596,7 @@ export function DiscoveryCallCalendar() {
                                   <Phone className="h-3 w-3 shrink-0" />
                                 )}
                                 <span className="truncate font-medium">
-                                  {format(new Date(call.scheduled_at), "h:mm a")}
+                                  {formatInEST(call.scheduled_at, "h:mm a")}
                                 </span>
                               </div>
                               <div className="truncate opacity-80">
@@ -623,7 +624,7 @@ export function DiscoveryCallCalendar() {
                                   <Home className="h-3 w-3 shrink-0" />
                                 )}
                                 <span className="truncate font-medium">
-                                  {format(new Date(call.scheduled_at), "h:mm a")}
+                                  {formatInEST(call.scheduled_at, "h:mm a")}
                                 </span>
                               </div>
                               <div className="truncate opacity-80">
@@ -646,7 +647,7 @@ export function DiscoveryCallCalendar() {
                               <div className="flex items-center gap-1">
                                 <CalendarCheck className="h-3 w-3 shrink-0" />
                                 <span className="truncate font-medium">
-                                  {format(new Date(apt.scheduled_at), "h:mm a")}
+                                  {formatInEST(apt.scheduled_at, "h:mm a")}
                                 </span>
                               </div>
                               <div className="truncate opacity-80">
