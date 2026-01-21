@@ -477,6 +477,9 @@ serve(async (req) => {
           
           console.log(`Creating calendar event for call ${call.id} with attendee ${attendeeEmail}`);
           
+          // IMPORTANT: Database stores UTC times, so we use timeZone: "UTC" to ensure Google Calendar
+          // correctly interprets the ISO string. Using "America/New_York" with a UTC ISO string
+          // would cause Google to treat the UTC time as if it were EST (5-hour offset error).
           const result = await callMCPTool(
             accessToken,
             syncUserId,
@@ -487,17 +490,17 @@ serve(async (req) => {
               description: `Discovery call with ${call.leads?.name}\nPhone: ${call.leads?.phone || "N/A"}\nEmail: ${call.leads?.email || "N/A"}\n\nScheduled via PeachHaus Property Management`,
               start: {
                 dateTime: startTime.toISOString(),
-                timeZone: "America/New_York",
+                timeZone: "UTC",
               },
               end: {
                 dateTime: endTime.toISOString(),
-                timeZone: "America/New_York",
+                timeZone: "UTC",
               },
               attendees: attendeeEmail ? [{ email: attendeeEmail }] : [],
               sendUpdates: "all",
               guestsCanModify: false,
               guestsCanInviteOthers: false,
-              instruction: `Create a Google Calendar event titled "Discovery Call: ${call.leads?.name || "Unknown"}" starting at ${startTime.toISOString()} (America/New_York timezone) for ${call.duration_minutes || 30} minutes. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} The event should be on the primary calendar.`
+              instruction: `Create a Google Calendar event titled "Discovery Call: ${call.leads?.name || "Unknown"}" starting at ${startTime.toISOString()} (UTC timezone) for ${call.duration_minutes || 30} minutes. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} The event should be on the primary calendar.`
             }
           );
 
@@ -702,7 +705,9 @@ serve(async (req) => {
       
       console.log(`Creating calendar event for call ${callId} with attendee ${attendeeEmail}`);
       
-      // Create event using MCP tool with explicit invite instructions
+      // IMPORTANT: Database stores UTC times, so we use timeZone: "UTC" to ensure Google Calendar
+      // correctly interprets the ISO string. Using "America/New_York" with a UTC ISO string
+      // would cause Google to treat the UTC time as if it were EST (5-hour offset error).
       const result = await callMCPTool(
         accessToken,
         userId,
@@ -713,17 +718,17 @@ serve(async (req) => {
           description: `Discovery call with ${call.leads?.name}\nPhone: ${call.leads?.phone || "N/A"}\nEmail: ${call.leads?.email || "N/A"}\n\nScheduled via PeachHaus Property Management`,
           start: {
             dateTime: startTime.toISOString(),
-            timeZone: "America/New_York",
+            timeZone: "UTC",
           },
           end: {
             dateTime: endTime.toISOString(),
-            timeZone: "America/New_York",
+            timeZone: "UTC",
           },
           attendees: attendeeEmail ? [{ email: attendeeEmail }] : [],
           sendUpdates: "all",
           guestsCanModify: false,
           guestsCanInviteOthers: false,
-          instruction: `Create a Google Calendar event titled "Discovery Call: ${call.leads?.name || "Unknown"}" starting at ${startTime.toISOString()} (America/New_York timezone) for ${call.duration_minutes || 30} minutes. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} The event should be on the primary calendar.`
+          instruction: `Create a Google Calendar event titled "Discovery Call: ${call.leads?.name || "Unknown"}" starting at ${startTime.toISOString()} (UTC timezone) for ${call.duration_minutes || 30} minutes. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} The event should be on the primary calendar.`
         }
       );
 
@@ -869,6 +874,8 @@ serve(async (req) => {
         ? "IMPORTANT: Add a Google Meet video conferencing link to this event by setting conferenceData with createRequest.requestId and conferenceDataVersion to 1." 
         : "";
       
+      // IMPORTANT: When startTime/endTime are ISO strings (UTC), use timeZone: "UTC"
+      // to ensure Google Calendar correctly interprets them without timezone offset errors.
       const result = await callMCPTool(
         accessToken,
         userId,
@@ -879,11 +886,11 @@ serve(async (req) => {
           description: description || "",
           start: {
             dateTime: startTime,
-            timeZone: "America/New_York",
+            timeZone: "UTC",
           },
           end: {
             dateTime: endTime,
-            timeZone: "America/New_York",
+            timeZone: "UTC",
           },
           attendees: attendeeEmail ? [{ email: attendeeEmail }] : [],
           sendUpdates: "all",
@@ -896,7 +903,7 @@ serve(async (req) => {
               conferenceSolutionKey: { type: "hangoutsMeet" }
             }
           } : undefined,
-          instruction: `Create a Google Calendar event titled "${summary}" starting at ${startTime} (America/New_York timezone). ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} ${conferenceInstruction} The event should be on the primary calendar.`
+          instruction: `Create a Google Calendar event titled "${summary}" starting at ${startTime} (UTC timezone). ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} ${conferenceInstruction} The event should be on the primary calendar.`
         }
       );
 

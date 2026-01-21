@@ -254,8 +254,10 @@ serve(async (req) => {
                     arguments: {
                       calendarId: "primary",
                       eventId: googleCalendarEventId,
-                      start: { dateTime: newTime.toISOString(), timeZone: "America/New_York" },
-                      end: { dateTime: endTime.toISOString(), timeZone: "America/New_York" },
+                      // IMPORTANT: Use timeZone: "UTC" since toISOString() produces UTC times
+                      // Using "America/New_York" with UTC ISO strings causes a 5-hour offset error
+                      start: { dateTime: newTime.toISOString(), timeZone: "UTC" },
+                      end: { dateTime: endTime.toISOString(), timeZone: "UTC" },
                       summary: `[RESCHEDULED] ${appointmentType === "inspection" ? "Inspection" : "Discovery Call"} - ${lead?.name || "Guest"}`,
                     },
                   },
