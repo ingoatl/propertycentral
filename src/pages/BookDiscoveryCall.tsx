@@ -396,20 +396,36 @@ export default function BookDiscoveryCall() {
     mutationFn: async () => {
       if (!selectedDate || !selectedTime) throw new Error("Select date and time");
 
-      // Time slots are in EST - create the date in EST then convert to UTC
+      // Time slots are in EST - create the correct UTC time
       const [hours, minutes] = selectedTime.split(":").map(Number);
       
-      // Create the scheduled time - the hours are EST hours
-      // We need to convert EST to UTC for storage
-      const estOffset = getESTOffset(selectedDate);
+      // Build an ISO string that explicitly represents EST time
+      // Format: YYYY-MM-DDTHH:MM:SS in America/New_York timezone
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const hourStr = String(hours).padStart(2, '0');
+      const minStr = String(minutes).padStart(2, '0');
       
-      // Create date with EST time, then adjust to UTC
-      const localDate = setMinutes(setHours(selectedDate, hours), minutes);
+      // Create the date string and use Intl to get proper UTC conversion
+      const estDateString = `${year}-${month}-${day}T${hourStr}:${minStr}:00`;
       
-      // Calculate UTC time: EST is UTC-5 or UTC-4 (during DST)
-      // So we need to ADD the offset hours to get UTC
-      const utcTime = new Date(localDate.getTime() - (estOffset * 60 * 60 * 1000));
-      const scheduledAt = utcTime;
+      // Use a reliable method: create Date with explicit EST interpretation
+      // Parse the EST time by creating a formatter that tells us the UTC equivalent
+      const estDate = new Date(estDateString);
+      const estOffset = getESTOffset(selectedDate); // -5 for EST, -4 for EDT
+      
+      // estDate is interpreted in local timezone, we need to adjust to represent EST
+      // Get local timezone offset in hours
+      const localOffsetMinutes = estDate.getTimezoneOffset(); // e.g., 300 for EST (UTC-5)
+      const localOffsetHours = -localOffsetMinutes / 60; // Convert to hours with correct sign
+      
+      // Calculate the difference between local and EST
+      const diffFromEST = localOffsetHours - estOffset;
+      
+      // Adjust the time: if we're in UTC (offset 0) and EST is -5, we need to add 5 hours
+      // to the parsed time to get the correct UTC representation of that EST time
+      const scheduledAt = new Date(estDate.getTime() - (diffFromEST * 60 * 60 * 1000));
 
       const notes = [
         `Current Situation: ${CURRENT_MANAGEMENT.find(c => c.value === formData.currentManagement)?.label || "Not specified"}`,
