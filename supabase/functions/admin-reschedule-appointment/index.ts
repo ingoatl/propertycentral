@@ -136,11 +136,50 @@ serve(async (req) => {
           reminder_48h_sent: false,
           reminder_24h_sent: false,
           reminder_1h_sent: false,
-          meeting_notes: `${data.meeting_notes || ""}\n\n[${format(now, "yyyy-MM-dd HH:mm")}] Rescheduled by ${userName}: ${REASON_LABELS[reason] || reason}${notes ? ` - ${notes}` : ""}`.trim(),
+          meeting_notes: `${data.meeting_notes || ""}\n\n[${formatInEST(now)}] Rescheduled by ${userName}: ${REASON_LABELS[reason] || reason}${notes ? ` - ${notes}` : ""}`.trim(),
         })
         .eq("id", appointmentId);
 
       if (updateError) throw updateError;
+
+      // CRITICAL: Dynamically adjust all pending follow-up schedules for this lead
+      if (lead?.id) {
+        const oldTime = new Date(oldScheduledAt);
+        const timeDiffMs = newTime.getTime() - oldTime.getTime();
+        
+        // Fetch all pending follow-ups for this lead
+        const { data: pendingFollowUps, error: followUpFetchError } = await supabase
+          .from("lead_follow_up_schedules")
+          .select("id, scheduled_for")
+          .eq("lead_id", lead.id)
+          .eq("status", "pending");
+
+        if (followUpFetchError) {
+          console.error("Error fetching follow-ups:", followUpFetchError);
+        } else if (pendingFollowUps && pendingFollowUps.length > 0) {
+          console.log(`Adjusting ${pendingFollowUps.length} pending follow-ups by ${timeDiffMs}ms`);
+          
+          // Update each follow-up with the new adjusted time
+          for (const followUp of pendingFollowUps) {
+            const oldFollowUpTime = new Date(followUp.scheduled_for);
+            const newFollowUpTime = new Date(oldFollowUpTime.getTime() + timeDiffMs);
+            
+            const { error: followUpUpdateError } = await supabase
+              .from("lead_follow_up_schedules")
+              .update({ 
+                scheduled_for: newFollowUpTime.toISOString(),
+                updated_at: now.toISOString()
+              })
+              .eq("id", followUp.id);
+
+            if (followUpUpdateError) {
+              console.error(`Error updating follow-up ${followUp.id}:`, followUpUpdateError);
+            } else {
+              console.log(`Adjusted follow-up ${followUp.id}: ${followUp.scheduled_for} → ${newFollowUpTime.toISOString()}`);
+            }
+          }
+        }
+      }
     }
 
     // Log the reschedule
@@ -163,13 +202,14 @@ serve(async (req) => {
         lead_id: lead.id,
         event_type: "call_rescheduled",
         title: "Appointment Rescheduled by Admin",
-        description: `${userName} rescheduled from ${format(new Date(oldScheduledAt), "MMM d, h:mm a")} to ${format(newTime, "MMM d, h:mm a")}. Reason: ${REASON_LABELS[reason] || reason}`,
+        description: `${userName} rescheduled from ${formatInEST(new Date(oldScheduledAt))} to ${formatInEST(newTime)} EST. Reason: ${REASON_LABELS[reason] || reason}`,
         metadata: {
           old_time: oldScheduledAt,
           new_time: newScheduledAt,
           reason,
           notes,
           rescheduled_by: userName,
+          follow_ups_adjusted: true,
         },
       });
     }
