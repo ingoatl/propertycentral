@@ -19,6 +19,32 @@ export function isVoiceAITranscript(body: string): boolean {
   );
 }
 
+// Helper to detect if a Voice AI call is low importance (short, no real conversation)
+export function isLowImportanceVoiceAI(body: string): boolean {
+  if (!body) return false;
+  if (!isVoiceAITranscript(body)) return false;
+  
+  // Check for short call duration indicators
+  const durationMatch = body.match(/Call Duration:\s*(\d+)\s*seconds?/i);
+  if (durationMatch) {
+    const duration = parseInt(durationMatch[1], 10);
+    if (duration < 15) return true; // Very short calls are low importance
+  }
+  
+  // Check for no meaningful conversation in the transcript
+  const lowValueIndicators = [
+    "no further information about the user's response",
+    "no response from the caller",
+    "caller did not respond",
+    "there is no further information",
+    "outcome of the call",
+    "The agent greeted the caller and asked how they could assist, but there is no further information",
+  ];
+  
+  const bodyLower = body.toLowerCase();
+  return lowValueIndicators.some(indicator => bodyLower.includes(indicator.toLowerCase()));
+}
+
 // Helper to extract caller phone from Voice AI transcript
 export function extractCallerPhoneFromTranscript(body: string): string | null {
   if (!body) return null;
