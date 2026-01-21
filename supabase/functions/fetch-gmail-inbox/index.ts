@@ -171,9 +171,22 @@ serve(async (req) => {
         }
 
         // Fetch emails for each query and deduplicate by message ID
+        // CRITICAL: Track targetInbox per message to prefer labeled matches over TO-based matches
         const seenMessageIds = new Set<string>();
+        const messageTargetInbox = new Map<string, string>(); // message_id -> best targetInbox
+        const messageData = new Map<string, any>(); // message_id -> full email data
         
-        for (const { query, labelTarget } of queries) {
+        // Sort queries to process label-based queries FIRST (they have priority)
+        const sortedQueries = [...queries].sort((a, b) => {
+          // Label queries first (labelTarget is set), then TO queries (labelTarget is null)
+          if (a.labelTarget && !b.labelTarget) return -1;
+          if (!a.labelTarget && b.labelTarget) return 1;
+          return 0;
+        });
+        
+        console.log(`[${accountLabel}] Processing ${sortedQueries.length} queries in order: ${sortedQueries.map(q => q.labelTarget || 'TO-fallback').join(', ')}`);
+        
+        for (const { query, labelTarget } of sortedQueries) {
           const messagesResponse = await fetch(
             `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=${encodeURIComponent(query)}`,
             { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -187,14 +200,34 @@ serve(async (req) => {
 
           const messagesData = await messagesResponse.json();
           const messageIds = messagesData.messages || [];
-          console.log(`[${accountLabel}] Query "${query.substring(0, 50)}..." found ${messageIds.length} emails`);
+          console.log(`[${accountLabel}] Query "${labelTarget || 'TO-fallback'}" found ${messageIds.length} emails`);
 
           // Fetch full email data for each message
           for (const msg of messageIds.slice(0, 50)) {
-            // Skip if we've already processed this message
-            if (seenMessageIds.has(msg.id)) {
+            const existingTarget = messageTargetInbox.get(msg.id);
+            
+            // If we've already seen this message with a label-based target, skip it
+            // Only upgrade from 'unknown' or null to a labeled target
+            if (existingTarget && existingTarget !== 'unknown' && labelTarget) {
+              // Already has a good target, skip
               continue;
             }
+            
+            // If this is a TO-fallback query and we already have this message, skip
+            if (!labelTarget && seenMessageIds.has(msg.id)) {
+              continue;
+            }
+            
+            // If we have labelTarget and the message was seen but has 'unknown', we'll upgrade it
+            const shouldUpgrade = labelTarget && existingTarget === 'unknown';
+            
+            if (shouldUpgrade) {
+              // Upgrade the targetInbox for this message
+              messageTargetInbox.set(msg.id, labelTarget);
+              console.log(`[${accountLabel}] Upgrading message ${msg.id} targetInbox from 'unknown' to '${labelTarget}'`);
+              continue;
+            }
+            
             seenMessageIds.add(msg.id);
 
             try {
@@ -274,11 +307,10 @@ serve(async (req) => {
                   .trim();
               }
 
-              // Determine targetInbox - prioritize the label we queried with
-              const toLower = to.toLowerCase();
-              let targetInbox = labelTarget || tokenData.label_name || 'unknown';
+              // CRITICAL FIX: Determine targetInbox - PRIORITIZE the label we queried with
+              let targetInbox = labelTarget || 'unknown';
               
-              // If we don't have a label target, check email labels for matching user labels
+              // If we don't have a label target from the query, check email's actual Gmail labels
               if (!labelTarget && gmailLabels && gmailLabels.length > 0) {
                 // Check the email's actual labels to find matching user label
                 const emailLabels = emailData.labelIds || [];
@@ -287,12 +319,14 @@ serve(async (req) => {
                   const gmailLabelId = gmailLabelMap.get(userLabelName);
                   if (gmailLabelId && emailLabels.includes(gmailLabelId)) {
                     targetInbox = userLabelName;
+                    console.log(`[${accountLabel}] Email ${msg.id} matched label '${userLabelName}' via labelIds`);
                     break;
                   }
                 }
                 
                 // Fallback to TO field matching if no label match
                 if (targetInbox === 'unknown') {
+                  const toLower = to.toLowerCase();
                   for (const label of gmailLabels) {
                     const labelLower = label.label_name.toLowerCase();
                     if (toLower.includes(`${labelLower}@`) || 
@@ -302,16 +336,20 @@ serve(async (req) => {
                     }
                   }
                 }
+              } else if (targetInbox !== 'unknown') {
+                console.log(`[${accountLabel}] Email ${msg.id} assigned to '${targetInbox}' via label query`);
               }
 
-              accountEmails.push({
+              // Store the targetInbox and email data
+              messageTargetInbox.set(msg.id, targetInbox);
+              messageData.set(msg.id, {
                 id: `${tokenData.id}_${msg.id}`,
                 threadId: emailData.threadId,
                 subject,
                 from: senderEmail,
                 fromName: senderName,
                 to,
-                targetInbox,
+                targetInbox, // Will be updated later if needed
                 date: new Date(dateStr).toISOString(),
                 body: bodyText.substring(0, 3000),
                 bodyHtml: bodyHtml,
@@ -324,6 +362,21 @@ serve(async (req) => {
             }
           }
         }
+        
+        // Build final email list with best targetInbox assignments
+        for (const [msgId, emailObj] of messageData.entries()) {
+          const bestTarget = messageTargetInbox.get(msgId) || 'unknown';
+          emailObj.targetInbox = bestTarget;
+          accountEmails.push(emailObj);
+        }
+        
+        // Log targetInbox distribution for debugging
+        const inboxCounts = new Map<string, number>();
+        for (const email of accountEmails) {
+          const count = inboxCounts.get(email.targetInbox) || 0;
+          inboxCounts.set(email.targetInbox, count + 1);
+        }
+        console.log(`[${accountLabel}] TargetInbox distribution:`, Object.fromEntries(inboxCounts));
         
         console.log(`[${accountLabel}] Total unique emails fetched: ${accountEmails.length}`);
       } catch (err) {
