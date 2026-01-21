@@ -72,7 +72,7 @@ import { EmailActionModal } from "./EmailActionModal";
 import { InboxZeroGuide } from "./InboxZeroGuide";
 import { ConversationQuickActions } from "./ConversationQuickActions";
 import { PriorityBadge } from "./PriorityBadge";
-import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript, extractCallerNameFromTranscript, extractMentionedTeamMember } from "./VoiceAIBadge";
+import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript, extractCallerNameFromTranscript, extractMentionedTeamMember, isLowImportanceVoiceAI } from "./VoiceAIBadge";
 import { CallRecordingPlayer } from "./CallRecordingPlayer";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 
@@ -142,6 +142,9 @@ interface CommunicationItem {
   gmail_email?: GmailEmail;
   // GHL contact ID for AI context lookup
   ghl_contact_id?: string;
+  // Voice AI detection flags
+  is_voice_ai?: boolean;
+  is_low_importance?: boolean;
 }
 
 interface ConversationStatusRecord {
@@ -1108,8 +1111,10 @@ export function InboxView() {
             let contactType: CommunicationItem["contact_type"] = "external";
             let contactId = comm.id;
 
-            // Check for Voice AI transcript - but still respect lead_id if present
+            // Check for Voice AI transcript - handle special naming
             const isVoiceAI = isVoiceAITranscript(comm.body);
+            const isLowImportance = isVoiceAI && isLowImportanceVoiceAI(comm.body);
+            
             if (isVoiceAI) {
               // Check if a specific team member was mentioned in the call
               const mentionedMember = extractMentionedTeamMember(comm.body);
@@ -1124,6 +1129,15 @@ export function InboxView() {
                   }
                 }
               }
+              
+              // For Voice AI calls: try to extract caller name from transcript, or use "AI Voice Agent"
+              const callerNameFromTranscript = extractCallerNameFromTranscript(comm.body);
+              const callerPhone = extractCallerPhoneFromTranscript(comm.body);
+              
+              // Use extracted name if found, otherwise display as "AI Voice Agent"
+              contactName = callerNameFromTranscript || "AI Voice Agent";
+              contactPhone = callerPhone || undefined;
+              contactType = "external"; // Still treat as external for grouping
             }
             
             // PRIORITY: If we have a lead_id, ALWAYS use lead info for consistent grouping
@@ -1136,14 +1150,14 @@ export function InboxView() {
             } else if (comm.owner_id) {
               // Skip owner comms here - they're fetched separately
               continue;
-            } else if (metadata?.tenant_id) {
-              // Tenant match from metadata
+            } else if (!isVoiceAI && metadata?.tenant_id) {
+              // Tenant match from metadata (skip for Voice AI as we already set the name)
               contactName = metadata.tenant_name || "Tenant";
               contactPhone = metadata.tenant_phone;
               contactType = "tenant";
               contactId = metadata.tenant_id;
-            } else if (metadata?.unmatched_phone || metadata?.ghl_data?.contactPhone) {
-              // External/unmatched contact - try to match to tenant
+            } else if (!isVoiceAI && (metadata?.unmatched_phone || metadata?.ghl_data?.contactPhone)) {
+              // External/unmatched contact - try to match to tenant (skip for Voice AI)
               const phone = metadata.unmatched_phone || metadata.ghl_data?.contactPhone;
               const normalizedPhone = phone ? normalizePhone(phone) : "";
               const matchedTenant = tenantMap.get(normalizedPhone);
@@ -1181,6 +1195,8 @@ export function InboxView() {
               media_urls: Array.isArray(comm.media_urls) ? comm.media_urls as string[] : undefined,
               ghl_contact_id: (comm as any).ghl_contact_id || undefined,
               lead_id: comm.lead_id || undefined,
+              is_voice_ai: isVoiceAI,
+              is_low_importance: isLowImportance,
             };
 
             if (search) {
@@ -2420,6 +2436,7 @@ export function InboxView() {
     };
     
     // Get only the latest message per contact, with best name selected
+    // Sort: important messages first, low importance at the bottom (faded)
     const latestByContact = Array.from(contactMap.values())
       .map(messages => {
         const sortedMsgs = messages.sort((a, b) => 
@@ -2429,9 +2446,13 @@ export function InboxView() {
         const bestName = selectBestNameLocal(sortedMsgs);
         return { ...latest, contact_name: bestName };
       })
-      .sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      .sort((a, b) => {
+        // Low importance messages go to the bottom
+        if (a.is_low_importance && !b.is_low_importance) return 1;
+        if (!a.is_low_importance && b.is_low_importance) return -1;
+        // Then sort by date (newest first)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
     
     // Now group these by date
     const groups: Record<string, CommunicationItem[]> = {};
@@ -2780,15 +2801,19 @@ export function InboxView() {
                           emailColors && `border-l-4 ${emailColors.borderColor} ${emailColors.bgColor}`,
                           // Fade promotional emails
                           isPromotional && !isDone && !isSnoozed && emailColors?.opacity,
+                          // Low importance Voice AI calls - faded appearance
+                          comm.is_low_importance && !isDone && !isSnoozed && "opacity-50 bg-muted/20",
                           // Done status: green border + fade + pale green background
-                          isDone && "border-l-4 border-l-green-500 opacity-50 bg-green-50/30 dark:bg-green-950/10",
+                          isDone && "border-l-4 border-l-green-500/70 opacity-50 bg-green-50/30 dark:bg-green-950/10",
                           // Snoozed status: amber border + fade + pale amber background
-                          isSnoozed && "border-l-4 border-l-amber-500 opacity-50 bg-amber-50/30 dark:bg-amber-950/10",
+                          isSnoozed && "border-l-4 border-l-amber-500/70 opacity-50 bg-amber-50/30 dark:bg-amber-950/10",
+                          // Voice AI marker: violet border
+                          comm.is_voice_ai && !isDone && !isSnoozed && !emailColors && "border-l-4 border-l-violet-500/70",
                           // Awaiting status: cyan border (non-emails only)
-                          !emailColors && isAwaiting && !isDone && !isSnoozed && "border-l-4 border-l-cyan-500",
+                          !emailColors && !comm.is_voice_ai && isAwaiting && !isDone && !isSnoozed && "border-l-4 border-l-cyan-500/70",
                           // Priority colors for non-emails
-                          !emailColors && comm.priority === "urgent" && !isDone && !isSnoozed && !isAwaiting && "border-l-4 border-l-red-500",
-                          !emailColors && comm.priority === "important" && !isDone && !isSnoozed && !isAwaiting && "border-l-4 border-l-amber-500"
+                          !emailColors && !comm.is_voice_ai && comm.priority === "urgent" && !isDone && !isSnoozed && !isAwaiting && "border-l-4 border-l-red-500",
+                          !emailColors && !comm.is_voice_ai && comm.priority === "important" && !isDone && !isSnoozed && !isAwaiting && "border-l-4 border-l-amber-500"
                         )}
                       >
                         
@@ -2798,13 +2823,20 @@ export function InboxView() {
                             "h-10 w-10 rounded-full flex items-center justify-center",
                             // Use email classification colors for avatar if email
                             emailColors ? emailColors.avatarBg :
-                            comm.contact_type === "owner" 
+                            // Voice AI calls get violet avatar
+                            comm.is_voice_ai 
+                              ? "bg-gradient-to-br from-violet-500 to-violet-600"
+                              : comm.contact_type === "owner" 
                               ? "bg-gradient-to-br from-purple-500 to-purple-600" 
                               : comm.contact_type === "tenant"
                               ? "bg-gradient-to-br from-blue-500 to-blue-600"
                               : "bg-gradient-to-br from-emerald-500 to-emerald-600"
                           )}>
-                            <span className="text-sm font-semibold text-white">{getInitials(comm.contact_name)}</span>
+                            {comm.is_voice_ai ? (
+                              <Bot className="h-5 w-5 text-white" />
+                            ) : (
+                              <span className="text-sm font-semibold text-white">{getInitials(comm.contact_name)}</span>
+                            )}
                           </div>
                           {comm.conversation_status === "done" && (
                             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
@@ -2824,20 +2856,25 @@ export function InboxView() {
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               <span className={cn(
                                 "font-semibold text-base truncate",
-                                isPromotional && "text-muted-foreground font-medium"
+                                isPromotional && "text-muted-foreground font-medium",
+                                comm.is_low_importance && "text-muted-foreground font-medium"
                               )}>{comm.contact_name}</span>
+                              {/* Voice AI badge */}
+                              {comm.is_voice_ai && (
+                                <VoiceAIBadge compact />
+                              )}
                               {/* Email classification badge */}
                               {emailClassification && emailClassification !== "normal" && (
                               <span className={cn(
                                   "inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium",
                                   isImportant && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-                                  isPromotional && "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                                  isPromotional && "bg-muted text-muted-foreground"
                                 )}>
                                   {isImportant ? "Priority" : "Promo"}
                                 </span>
                               )}
                               {/* Priority/Status badge for non-emails */}
-                              {!emailClassification && (
+                              {!emailClassification && !comm.is_voice_ai && (
                                 <PriorityBadge 
                                   priority={comm.priority} 
                                   status={comm.conversation_status}
@@ -2845,7 +2882,7 @@ export function InboxView() {
                                 />
                               )}
                               {/* Type indicator */}
-                              {comm.type === "call" && (
+                              {comm.type === "call" && !comm.is_voice_ai && (
                                 <Phone className="h-3 w-3 text-orange-500 flex-shrink-0" />
                               )}
                               {comm.type === "email" && (
