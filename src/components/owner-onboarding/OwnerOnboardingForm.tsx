@@ -44,7 +44,7 @@ export function OwnerOnboardingForm() {
       case 2:
         return !!(formData.wifi_ssid && formData.wifi_password && formData.smart_lock_brand && formData.smart_lock_code);
       case 3:
-        return !!(formData.wastewater_system && formData.utilities.every(u => u.provider && u.account_number));
+        return !!(formData.wastewater_system && formData.utilities.every(u => u.provider));
       case 4:
         return !!(formData.primary_cleaner && formData.house_quirks);
       case 5:

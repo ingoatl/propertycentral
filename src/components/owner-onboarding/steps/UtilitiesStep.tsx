@@ -12,9 +12,9 @@ interface StepProps {
 }
 
 export function UtilitiesStep({ formData, updateFormData }: StepProps) {
-  const updateUtility = (index: number, field: keyof UtilityInfo, value: string) => {
+  const updateUtility = (index: number, value: string) => {
     const newUtilities = [...formData.utilities];
-    newUtilities[index] = { ...newUtilities[index], [field]: value };
+    newUtilities[index] = { ...newUtilities[index], provider: value };
     updateFormData({ utilities: newUtilities });
   };
 
@@ -131,29 +131,16 @@ export function UtilitiesStep({ formData, updateFormData }: StepProps) {
           {formData.utilities.map((utility, index) => (
             <div key={utility.type} className="p-4 bg-gray-50 rounded-xl">
               <h4 className="font-medium text-gray-900 mb-3">{utility.type}</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium">
-                    Provider <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    value={utility.provider}
-                    onChange={(e) => updateUtility(index, 'provider', e.target.value)}
-                    placeholder={`${utility.type} provider name`}
-                    className="h-14 mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">
-                    Account Number <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    value={utility.account_number}
-                    onChange={(e) => updateUtility(index, 'account_number', e.target.value)}
-                    placeholder="Account #"
-                    className="h-14 mt-1"
-                  />
-                </div>
+              <div>
+                <Label className="text-sm font-medium">
+                  Provider <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={utility.provider}
+                  onChange={(e) => updateUtility(index, e.target.value)}
+                  placeholder={`${utility.type} provider name`}
+                  className="h-14 mt-1"
+                />
               </div>
             </div>
           ))}

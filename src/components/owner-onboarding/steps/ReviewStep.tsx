@@ -90,7 +90,6 @@ export function ReviewStep({ formData }: ReviewStepProps) {
           {formData.utilities.map((util, index) => (
             <div key={index} className="pl-2 border-l-2 border-gray-200 ml-2">
               <Field label={`${util.type} Provider`} value={util.provider} />
-              <Field label={`${util.type} Account #`} value={util.account_number} />
             </div>
           ))}
         </Section>
@@ -166,10 +165,9 @@ export function ReviewStep({ formData }: ReviewStepProps) {
 
         {/* Financial */}
         <Section title="Financial Performance">
-          <Field label="Last Year's Revenue" value={formData.last_year_revenue ? `$${formData.last_year_revenue}` : ''} />
           <Field label="Average Daily Rate" value={formData.average_daily_rate ? `$${formData.average_daily_rate}` : ''} />
           <Field label="Occupancy Rate" value={formData.occupancy_rate ? `${formData.occupancy_rate}%` : ''} />
-          <Field label="Average Booking Window" value={formData.average_booking_window ? `${formData.average_booking_window} days` : ''} />
+          <Field label="Average Monthly Revenue" value={formData.average_monthly_revenue ? `$${formData.average_monthly_revenue}` : ''} />
           <Field label="Average Monthly Revenue" value={formData.average_monthly_revenue ? `$${formData.average_monthly_revenue}` : ''} />
           <Field label="Peak Season" value={formData.peak_season} />
           <Field label="Peak Season ADR" value={formData.peak_season_adr ? `$${formData.peak_season_adr}` : ''} />
