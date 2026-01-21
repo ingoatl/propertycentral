@@ -109,6 +109,27 @@ serve(async (req) => {
     daysAgo.setDate(daysAgo.getDate() - daysBack);
     const afterDate = Math.floor(daysAgo.getTime() / 1000);
 
+    // Fetch Gmail labels from account to match with user_gmail_labels
+    const fetchGmailLabels = async (accessToken: string): Promise<Map<string, string>> => {
+      const labelMap = new Map<string, string>();
+      try {
+        const labelsResponse = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/labels`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (labelsResponse.ok) {
+          const labelsData = await labelsResponse.json();
+          for (const label of labelsData.labels || []) {
+            // Store label name -> label id mapping (lowercase for matching)
+            labelMap.set(label.name.toLowerCase(), label.id);
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching Gmail labels:', e);
+      }
+      return labelMap;
+    };
+
     // Helper function to fetch emails from a single account
     const fetchEmailsFromAccount = async (tokenData: any, accountLabel: string) => {
       const accountEmails: any[] = [];
@@ -116,153 +137,195 @@ serve(async (req) => {
       try {
         const accessToken = await ensureValidToken(tokenData);
         
+        // Get Gmail labels from the account
+        const gmailLabelMap = await fetchGmailLabels(accessToken);
+        console.log(`[${accountLabel}] Found ${gmailLabelMap.size} Gmail labels`);
+        
         // For individual accounts, fetch their own inbox
-        // For shared account, fetch emails TO team members
-        let query: string;
+        // For shared account, fetch emails by LABELS (not just TO addresses)
+        let queries: { query: string; labelTarget: string | null }[] = [];
         
         if (tokenData.email_address && tokenData.label_name) {
           // Individual account - fetch their inbox directly (no TO filter)
-          query = `in:inbox after:${afterDate}`;
+          queries.push({ query: `in:inbox after:${afterDate}`, labelTarget: tokenData.label_name.toLowerCase() });
           console.log(`[${accountLabel}] Fetching inbox emails`);
         } else {
-          // Shared account - fetch emails TO team members
+          // Shared account - fetch emails by Gmail labels for each team member
+          // This is the key fix: use label:X instead of to:X to capture all assigned emails
+          for (const gmailLabel of gmailLabels || []) {
+            const labelName = gmailLabel.label_name.toLowerCase();
+            // Check if this label exists in the Gmail account
+            if (gmailLabelMap.has(labelName)) {
+              queries.push({ 
+                query: `label:${labelName} after:${afterDate}`, 
+                labelTarget: labelName 
+              });
+              console.log(`[${accountLabel}] Adding label query: label:${labelName}`);
+            }
+          }
+          
+          // Fallback: also fetch by TO addresses for emails without labels
           const toQuery = targetEmails.map(e => `to:${e}`).join(' OR ');
-          query = `(${toQuery}) after:${afterDate}`;
-          console.log(`[${accountLabel}] Fetching with query: ${query}`);
+          queries.push({ query: `(${toQuery}) after:${afterDate}`, labelTarget: null });
+          console.log(`[${accountLabel}] Adding TO query: ${toQuery}`);
         }
 
-        const messagesResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=200&q=${encodeURIComponent(query)}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+        // Fetch emails for each query and deduplicate by message ID
+        const seenMessageIds = new Set<string>();
+        
+        for (const { query, labelTarget } of queries) {
+          const messagesResponse = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=${encodeURIComponent(query)}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
 
-        if (!messagesResponse.ok) {
-          const error = await messagesResponse.text();
-          console.error(`[${accountLabel}] Failed to fetch messages:`, error);
-          return [];
-        }
+          if (!messagesResponse.ok) {
+            const error = await messagesResponse.text();
+            console.error(`[${accountLabel}] Failed to fetch messages for query "${query}":`, error);
+            continue;
+          }
 
-        const messagesData = await messagesResponse.json();
-        const messageIds = messagesData.messages || [];
+          const messagesData = await messagesResponse.json();
+          const messageIds = messagesData.messages || [];
+          console.log(`[${accountLabel}] Query "${query.substring(0, 50)}..." found ${messageIds.length} emails`);
 
-        console.log(`[${accountLabel}] Found ${messageIds.length} emails`);
-
-        // Fetch full email data for each message
-        for (const msg of messageIds.slice(0, 100)) {
-          try {
-            const messageResponse = await fetch(
-              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-
-            if (!messageResponse.ok) continue;
-
-            const emailData = await messageResponse.json();
-            const headers = emailData.payload.headers;
-            
-            const subject = headers.find((h: any) => h.name.toLowerCase() === 'subject')?.value || '(No subject)';
-            const from = headers.find((h: any) => h.name.toLowerCase() === 'from')?.value || '';
-            const to = headers.find((h: any) => h.name.toLowerCase() === 'to')?.value || '';
-            const dateStr = headers.find((h: any) => h.name.toLowerCase() === 'date')?.value || '';
-
-            // Extract sender name and email
-            const fromMatch = from.match(/^(.+?)\s*<(.+?)>$/) || [null, from, from];
-            const senderName = fromMatch[1]?.replace(/"/g, '').trim() || from;
-            const senderEmail = fromMatch[2]?.trim() || from;
-
-            // Get email body
-            let bodyText = '';
-            let bodyHtml = '';
-            
-            const extractBody = (payload: any): { text: string; html: string } => {
-              let text = '';
-              let html = '';
-              
-              if (payload.body?.data) {
-                const decoded = decodeBase64Utf8(payload.body.data);
-                if (payload.mimeType === 'text/html') {
-                  html = decoded;
-                } else {
-                  text = decoded;
-                }
-              }
-              
-              if (payload.parts) {
-                for (const part of payload.parts) {
-                  if (part.mimeType === 'text/plain' && part.body?.data) {
-                    text = decodeBase64Utf8(part.body.data);
-                  }
-                  if (part.mimeType === 'text/html' && part.body?.data) {
-                    html = decodeBase64Utf8(part.body.data);
-                  }
-                  if (part.parts) {
-                    const nested = extractBody(part);
-                    if (nested.text) text = nested.text;
-                    if (nested.html) html = nested.html;
-                  }
-                }
-              }
-              
-              return { text, html };
-            };
-            
-            const extracted = extractBody(emailData.payload);
-            bodyText = extracted.text;
-            bodyHtml = extracted.html;
-
-            // CRITICAL: If plain text is empty but HTML exists, extract text from HTML
-            // Many emails are HTML-only and without this, AI receives empty body
-            if (!bodyText && bodyHtml) {
-              console.log(`[${accountLabel}] Extracting text from HTML for message ${msg.id}`);
-              bodyText = bodyHtml
-                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style blocks
-                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script blocks
-                .replace(/<[^>]+>/g, ' ') // Remove all HTML tags
-                .replace(/&nbsp;/g, ' ')
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&quot;/g, '"')
-                .replace(/&#39;/g, "'")
-                .replace(/\s+/g, ' ') // Collapse multiple spaces
-                .trim();
+          // Fetch full email data for each message
+          for (const msg of messageIds.slice(0, 50)) {
+            // Skip if we've already processed this message
+            if (seenMessageIds.has(msg.id)) {
+              continue;
             }
+            seenMessageIds.add(msg.id);
 
-            // Determine targetInbox - use account label for individual accounts
-            const toLower = to.toLowerCase();
-            let targetInbox = tokenData.label_name || 'unknown';
-            
-            // For shared account, check TO field
-            if (!tokenData.label_name && gmailLabels && gmailLabels.length > 0) {
-              for (const label of gmailLabels) {
-                const labelLower = label.label_name.toLowerCase();
-                if (toLower.includes(`${labelLower}@`) || 
-                    (label.email_address && toLower.includes(label.email_address.toLowerCase()))) {
-                  targetInbox = labelLower;
-                  break;
+            try {
+              const messageResponse = await fetch(
+                `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+                { headers: { Authorization: `Bearer ${accessToken}` } }
+              );
+
+              if (!messageResponse.ok) continue;
+
+              const emailData = await messageResponse.json();
+              const headers = emailData.payload.headers;
+              
+              const subject = headers.find((h: any) => h.name.toLowerCase() === 'subject')?.value || '(No subject)';
+              const from = headers.find((h: any) => h.name.toLowerCase() === 'from')?.value || '';
+              const to = headers.find((h: any) => h.name.toLowerCase() === 'to')?.value || '';
+              const dateStr = headers.find((h: any) => h.name.toLowerCase() === 'date')?.value || '';
+
+              // Extract sender name and email
+              const fromMatch = from.match(/^(.+?)\s*<(.+?)>$/) || [null, from, from];
+              const senderName = fromMatch[1]?.replace(/"/g, '').trim() || from;
+              const senderEmail = fromMatch[2]?.trim() || from;
+
+              // Get email body
+              let bodyText = '';
+              let bodyHtml = '';
+              
+              const extractBody = (payload: any): { text: string; html: string } => {
+                let text = '';
+                let html = '';
+                
+                if (payload.body?.data) {
+                  const decoded = decodeBase64Utf8(payload.body.data);
+                  if (payload.mimeType === 'text/html') {
+                    html = decoded;
+                  } else {
+                    text = decoded;
+                  }
+                }
+                
+                if (payload.parts) {
+                  for (const part of payload.parts) {
+                    if (part.mimeType === 'text/plain' && part.body?.data) {
+                      text = decodeBase64Utf8(part.body.data);
+                    }
+                    if (part.mimeType === 'text/html' && part.body?.data) {
+                      html = decodeBase64Utf8(part.body.data);
+                    }
+                    if (part.parts) {
+                      const nested = extractBody(part);
+                      if (nested.text) text = nested.text;
+                      if (nested.html) html = nested.html;
+                    }
+                  }
+                }
+                
+                return { text, html };
+              };
+              
+              const extracted = extractBody(emailData.payload);
+              bodyText = extracted.text;
+              bodyHtml = extracted.html;
+
+              // CRITICAL: If plain text is empty but HTML exists, extract text from HTML
+              if (!bodyText && bodyHtml) {
+                bodyText = bodyHtml
+                  .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                  .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                  .replace(/<[^>]+>/g, ' ')
+                  .replace(/&nbsp;/g, ' ')
+                  .replace(/&amp;/g, '&')
+                  .replace(/&lt;/g, '<')
+                  .replace(/&gt;/g, '>')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&#39;/g, "'")
+                  .replace(/\s+/g, ' ')
+                  .trim();
+              }
+
+              // Determine targetInbox - prioritize the label we queried with
+              const toLower = to.toLowerCase();
+              let targetInbox = labelTarget || tokenData.label_name || 'unknown';
+              
+              // If we don't have a label target, check email labels for matching user labels
+              if (!labelTarget && gmailLabels && gmailLabels.length > 0) {
+                // Check the email's actual labels to find matching user label
+                const emailLabels = emailData.labelIds || [];
+                for (const label of gmailLabels) {
+                  const userLabelName = label.label_name.toLowerCase();
+                  const gmailLabelId = gmailLabelMap.get(userLabelName);
+                  if (gmailLabelId && emailLabels.includes(gmailLabelId)) {
+                    targetInbox = userLabelName;
+                    break;
+                  }
+                }
+                
+                // Fallback to TO field matching if no label match
+                if (targetInbox === 'unknown') {
+                  for (const label of gmailLabels) {
+                    const labelLower = label.label_name.toLowerCase();
+                    if (toLower.includes(`${labelLower}@`) || 
+                        (label.email_address && toLower.includes(label.email_address.toLowerCase()))) {
+                      targetInbox = labelLower;
+                      break;
+                    }
+                  }
                 }
               }
-            }
 
-            accountEmails.push({
-              id: `${tokenData.id}_${msg.id}`, // Unique ID combining account + message
-              threadId: emailData.threadId,
-              subject,
-              from: senderEmail,
-              fromName: senderName,
-              to,
-              targetInbox,
-              date: new Date(dateStr).toISOString(),
-              body: bodyText.substring(0, 3000),
-              bodyHtml: bodyHtml,
-              snippet: emailData.snippet,
-              labelIds: emailData.labelIds || [],
-              accountSource: accountLabel,
-            });
-          } catch (err) {
-            console.error(`[${accountLabel}] Error fetching email ${msg.id}:`, err);
+              accountEmails.push({
+                id: `${tokenData.id}_${msg.id}`,
+                threadId: emailData.threadId,
+                subject,
+                from: senderEmail,
+                fromName: senderName,
+                to,
+                targetInbox,
+                date: new Date(dateStr).toISOString(),
+                body: bodyText.substring(0, 3000),
+                bodyHtml: bodyHtml,
+                snippet: emailData.snippet,
+                labelIds: emailData.labelIds || [],
+                accountSource: accountLabel,
+              });
+            } catch (err) {
+              console.error(`[${accountLabel}] Error fetching email ${msg.id}:`, err);
+            }
           }
         }
+        
+        console.log(`[${accountLabel}] Total unique emails fetched: ${accountEmails.length}`);
       } catch (err) {
         console.error(`[${accountLabel}] Error:`, err);
       }
