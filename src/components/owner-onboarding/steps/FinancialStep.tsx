@@ -128,19 +128,6 @@ export function FinancialStep({ formData, updateFormData }: StepProps) {
             />
           </div>
 
-          <div>
-            <Label htmlFor="average_booking_window" className="text-sm font-medium">
-              Average Booking Window (days)
-            </Label>
-            <Input
-              id="average_booking_window"
-              type="number"
-              value={formData.average_booking_window}
-              onChange={(e) => updateFormData({ average_booking_window: e.target.value })}
-              placeholder="14"
-              className="h-14 mt-1"
-            />
-          </div>
 
           <div>
             <Label htmlFor="average_monthly_revenue" className="text-sm font-medium">

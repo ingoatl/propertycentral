@@ -158,7 +158,6 @@ export interface OwnerOnboardingFormData {
 export interface UtilityInfo {
   type: string;
   provider: string;
-  account_number: string;
 }
 
 export const CHECKIN_TIME_OPTIONS = [
@@ -231,11 +230,11 @@ export const initialFormData: OwnerOnboardingFormData = {
   septic_last_pumped: '',
   septic_company: '',
   utilities: [
-    { type: 'Water', provider: '', account_number: '' },
-    { type: 'Power', provider: '', account_number: '' },
-    { type: 'Gas', provider: '', account_number: '' },
-    { type: 'Internet', provider: '', account_number: '' },
-    { type: 'Trash', provider: '', account_number: '' },
+    { type: 'Water', provider: '' },
+    { type: 'Power', provider: '' },
+    { type: 'Gas', provider: '' },
+    { type: 'Internet', provider: '' },
+    { type: 'Trash', provider: '' },
   ],
   has_gas_stove: false,
   natural_gas_detector_installed: false,

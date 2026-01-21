@@ -383,7 +383,7 @@ async function sendAdminEmail(formData: any) {
       <div style="background: #eff6ff; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
         <h2 style="color: #2563eb; margin-top: 0;">Utilities</h2>
         <p><strong>Wastewater:</strong> ${formData.wastewater_system}</p>
-        ${formData.utilities?.map((u: any) => `<p><strong>${u.type}:</strong> ${u.provider} - Account: ${u.account_number}</p>`).join('') || ''}
+        ${formData.utilities?.map((u: any) => `<p><strong>${u.type}:</strong> ${u.provider}</p>`).join('') || ''}
       </div>
 
       <div style="background: #fefce8; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
@@ -917,14 +917,12 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // 8b. Process utilities array into individual tasks
+    // 8b. Process utilities array into individual tasks (provider only, no account numbers)
     if (formData.utilities && Array.isArray(formData.utilities)) {
       for (const utility of formData.utilities) {
-        if (utility.type && (utility.provider || utility.account_number)) {
+        if (utility.type && utility.provider) {
           const taskTitle = UTILITY_TASK_MAPPINGS[utility.type] || `${utility.type} Provider`;
-          const value = utility.provider 
-            ? `Provider: ${utility.provider}${utility.account_number ? ` | Account: ${utility.account_number}` : ''}`
-            : `Account: ${utility.account_number}`;
+          const value = `Provider: ${utility.provider}`;
           
           const success = await createOrUpdateTask(
             project.id,

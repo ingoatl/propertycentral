@@ -51,11 +51,11 @@ export interface NewSTROnboardingFormData {
   smartLockCode: string;
   utilitiesSetup: boolean;
   utilities: {
-    electric: { provider: string; accountNumber: string };
-    gas: { provider: string; accountNumber: string };
-    water: { provider: string; accountNumber: string };
-    trash: { provider: string; accountNumber: string };
-    internet: { provider: string; accountNumber: string };
+    electric: { provider: string };
+    gas: { provider: string };
+    water: { provider: string };
+    trash: { provider: string };
+    internet: { provider: string };
   };
   // Septic System
   hasSepticTank: boolean;
@@ -230,11 +230,11 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   smartLockCode: '',
   utilitiesSetup: false,
   utilities: {
-    electric: { provider: '', accountNumber: '' },
-    gas: { provider: '', accountNumber: '' },
-    water: { provider: '', accountNumber: '' },
-    trash: { provider: '', accountNumber: '' },
-    internet: { provider: '', accountNumber: '' },
+    electric: { provider: '' },
+    gas: { provider: '' },
+    water: { provider: '' },
+    trash: { provider: '' },
+    internet: { provider: '' },
   },
   hasSepticTank: false,
   septicLastFlushed: '',

@@ -259,21 +259,21 @@ serve(async (req) => {
         value = `Contact: ${formData.hoa_contact_name || 'N/A'} | Phone: ${formData.hoa_contact_phone || 'N/A'}`;
       }
       
-      // Handle utility providers
+      // Handle utility providers (provider only, no account numbers)
       if (fieldKey === 'electric_provider' && formData.utilities?.electric) {
-        value = `Provider: ${formData.utilities.electric.provider || 'N/A'} | Account: ${formData.utilities.electric.accountNumber || 'N/A'}`;
+        value = `Provider: ${formData.utilities.electric.provider || 'N/A'}`;
       }
       if (fieldKey === 'gas_provider' && formData.utilities?.gas) {
-        value = `Provider: ${formData.utilities.gas.provider || 'N/A'} | Account: ${formData.utilities.gas.accountNumber || 'N/A'}`;
+        value = `Provider: ${formData.utilities.gas.provider || 'N/A'}`;
       }
       if (fieldKey === 'water_provider' && formData.utilities?.water) {
-        value = `Provider: ${formData.utilities.water.provider || 'N/A'} | Account: ${formData.utilities.water.accountNumber || 'N/A'}`;
+        value = `Provider: ${formData.utilities.water.provider || 'N/A'}`;
       }
       if (fieldKey === 'trash_provider' && formData.utilities?.trash) {
-        value = `Provider: ${formData.utilities.trash.provider || 'N/A'} | Account: ${formData.utilities.trash.accountNumber || 'N/A'}`;
+        value = `Provider: ${formData.utilities.trash.provider || 'N/A'}`;
       }
       if (fieldKey === 'internet_provider' && formData.utilities?.internet) {
-        value = `Provider: ${formData.utilities.internet.provider || 'N/A'} | Account: ${formData.utilities.internet.accountNumber || 'N/A'}`;
+        value = `Provider: ${formData.utilities.internet.provider || 'N/A'}`;
       }
 
       // Handle setup status fields

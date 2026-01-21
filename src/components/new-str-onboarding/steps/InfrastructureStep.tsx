@@ -15,15 +15,13 @@ interface InfrastructureStepProps {
 export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureStepProps) => {
   const updateUtility = (
     utilityType: keyof typeof formData.utilities,
-    field: 'provider' | 'accountNumber',
     value: string
   ) => {
     updateFormData({
       utilities: {
         ...formData.utilities,
         [utilityType]: {
-          ...formData.utilities[utilityType],
-          [field]: value,
+          provider: value,
         },
       },
     });
@@ -275,143 +273,88 @@ export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureS
           </div>
 
               {/* Electric */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 md:col-span-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4 text-yellow-500" />
                   <span className="font-medium text-[hsl(25,40%,25%)]">Electric</span>
                   <span className="text-[hsl(25,95%,50%)]">*</span>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
-                  <Input
-                    value={formData.utilities.electric.provider}
-                    onChange={(e) => updateUtility('electric', 'provider', e.target.value)}
-                    placeholder="e.g., Georgia Power"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Account Number</Label>
-                  <Input
-                    value={formData.utilities.electric.accountNumber}
-                    onChange={(e) => updateUtility('electric', 'accountNumber', e.target.value)}
-                    placeholder="Account #"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                  />
-                </div>
+                <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
+                <Input
+                  value={formData.utilities.electric.provider}
+                  onChange={(e) => updateUtility('electric', e.target.value)}
+                  placeholder="e.g., Georgia Power"
+                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                  required
+                />
               </div>
 
               {/* Gas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 md:col-span-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
                   <Flame className="w-4 h-4 text-orange-500" />
                   <span className="font-medium text-[hsl(25,40%,25%)]">Gas</span>
                   <span className="text-[hsl(25,95%,50%)]">*</span>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
-                  <Input
-                    value={formData.utilities.gas.provider}
-                    onChange={(e) => updateUtility('gas', 'provider', e.target.value)}
-                    placeholder="e.g., Gas South"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Account Number</Label>
-                  <Input
-                    value={formData.utilities.gas.accountNumber}
-                    onChange={(e) => updateUtility('gas', 'accountNumber', e.target.value)}
-                    placeholder="Account #"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                  />
-                </div>
+                <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
+                <Input
+                  value={formData.utilities.gas.provider}
+                  onChange={(e) => updateUtility('gas', e.target.value)}
+                  placeholder="e.g., Gas South"
+                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                  required
+                />
               </div>
 
               {/* Water */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 md:col-span-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
                   <Droplets className="w-4 h-4 text-blue-500" />
                   <span className="font-medium text-[hsl(25,40%,25%)]">Water</span>
                   <span className="text-[hsl(25,95%,50%)]">*</span>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
-                  <Input
-                    value={formData.utilities.water.provider}
-                    onChange={(e) => updateUtility('water', 'provider', e.target.value)}
-                    placeholder="e.g., DeKalb County Water"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Account Number</Label>
-                  <Input
-                    value={formData.utilities.water.accountNumber}
-                    onChange={(e) => updateUtility('water', 'accountNumber', e.target.value)}
-                    placeholder="Account #"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                  />
-                </div>
+                <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
+                <Input
+                  value={formData.utilities.water.provider}
+                  onChange={(e) => updateUtility('water', e.target.value)}
+                  placeholder="e.g., DeKalb County Water"
+                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                  required
+                />
               </div>
 
               {/* Trash */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 md:col-span-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
                   <Trash2 className="w-4 h-4 text-green-500" />
                   <span className="font-medium text-[hsl(25,40%,25%)]">Trash</span>
                   <span className="text-[hsl(25,95%,50%)]">*</span>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
-                  <Input
-                    value={formData.utilities.trash.provider}
-                    onChange={(e) => updateUtility('trash', 'provider', e.target.value)}
-                    placeholder="e.g., City Services"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Account Number</Label>
-                  <Input
-                    value={formData.utilities.trash.accountNumber}
-                    onChange={(e) => updateUtility('trash', 'accountNumber', e.target.value)}
-                    placeholder="Account #"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                  />
-                </div>
+                <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
+                <Input
+                  value={formData.utilities.trash.provider}
+                  onChange={(e) => updateUtility('trash', e.target.value)}
+                  placeholder="e.g., City Services"
+                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                  required
+                />
               </div>
 
               {/* Internet */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 md:col-span-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-purple-500" />
                   <span className="font-medium text-[hsl(25,40%,25%)]">Internet</span>
                   <span className="text-[hsl(25,95%,50%)]">*</span>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
-                  <Input
-                    value={formData.utilities.internet.provider}
-                    onChange={(e) => updateUtility('internet', 'provider', e.target.value)}
-                    placeholder="e.g., AT&T, Xfinity"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[hsl(25,30%,30%)]">Account Number</Label>
-                  <Input
-                    value={formData.utilities.internet.accountNumber}
-                    onChange={(e) => updateUtility('internet', 'accountNumber', e.target.value)}
-                    placeholder="Account #"
-                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                  />
-                </div>
+                <Label className="text-[hsl(25,30%,30%)]">Provider <span className="text-[hsl(25,95%,50%)]">*</span></Label>
+                <Input
+                  value={formData.utilities.internet.provider}
+                  onChange={(e) => updateUtility('internet', e.target.value)}
+                  placeholder="e.g., AT&T, Xfinity"
+                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                  required
+                />
               </div>
         </CardContent>
       </Card>
