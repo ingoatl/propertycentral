@@ -191,20 +191,28 @@ export function DiscoveryCallCalendar() {
   // Fetch GHL calendar appointments (auto-synced)
   const { appointments: ghlAppointments, isLoading: isLoadingGhl } = useGhlCalendarSync(currentMonth);
 
-  // Filter GHL appointments to current month and exclude duplicates
+  // Filter GHL appointments: ONLY show appointments that were booked directly through GHL
+  // (not website bookings that sync to GHL). We identify GHL-native bookings by checking
+  // if they have a matching discovery_call - if they do, they came from our website.
   const filteredGhlAppointments = ghlAppointments.filter((apt) => {
     const aptDate = new Date(apt.scheduled_at);
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
     if (aptDate < monthStart || aptDate > monthEnd) return false;
     
-    // Check if already in discovery_calls
+    // EXCLUDE if this appointment matches any discovery_call (means it's a website booking)
+    // Check by time proximity AND contact name/email match
     const aptTime = aptDate.getTime();
-    return !calls.some((call) => {
+    const isWebsiteBooking = calls.some((call) => {
       const callTime = new Date(call.scheduled_at).getTime();
-      return Math.abs(aptTime - callTime) < 5 * 60 * 1000 && 
-             call.leads?.name?.toLowerCase() === apt.contact_name?.toLowerCase();
+      const timesMatch = Math.abs(aptTime - callTime) < 30 * 60 * 1000; // 30 min window
+      const nameMatches = call.leads?.name?.toLowerCase() === apt.contact_name?.toLowerCase();
+      const emailMatches = call.leads?.email?.toLowerCase() === apt.contact_email?.toLowerCase();
+      return timesMatch && (nameMatches || emailMatches);
     });
+    
+    // Only include if NOT a website booking (i.e., was booked directly in GHL)
+    return !isWebsiteBooking;
   });
 
   const isLoading = isLoadingCalls || isLoadingGhl;

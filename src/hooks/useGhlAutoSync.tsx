@@ -47,7 +47,7 @@ export function useGhlAutoSync() {
           console.log("[GHL Sync] Conversations result:", convData);
         }
         
-        // Sync call transcripts
+        // Sync call transcripts (phone calls only, not calendar appointments)
         const { data: callData, error: callError } = await supabase.functions.invoke("ghl-fetch-call-transcripts", {
           body: { syncAll: true }
         });
@@ -58,7 +58,11 @@ export function useGhlAutoSync() {
           console.log("[GHL Sync] Call transcripts result:", callData);
         }
 
-        // Sync GHL calendar appointments (current month + next month)
+        // NOTE: GHL calendar sync is intentionally limited - we only display GHL appointments
+        // that were booked DIRECTLY through GHL, not website bookings. The DiscoveryCallCalendar
+        // component filters out any GHL appointments that match existing discovery_calls.
+        
+        // Sync GHL calendar appointments (current month + next month) - for display only
         try {
           const now = new Date();
           const startTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
