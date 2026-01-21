@@ -438,6 +438,22 @@ serve(async (req) => {
   }
 });
 
+// Format a date in EST timezone for display
+function formatInEST(date: Date): string {
+  // Convert to EST/EDT timezone offset (-5 or -4 hours from UTC)
+  // For simplicity, we'll format as a readable string
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  };
+  return date.toLocaleString('en-US', options);
+}
+
 function format(date: Date, formatStr: string): string {
   const pad = (n: number) => n.toString().padStart(2, "0");
   
