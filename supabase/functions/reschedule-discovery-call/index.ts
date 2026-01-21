@@ -53,6 +53,7 @@ serve(async (req) => {
 
     const oldScheduledAt = call.scheduled_at;
     const newTime = new Date(newScheduledAt);
+    const oldTime = new Date(oldScheduledAt);
     const now = new Date();
 
     // Ensure new time is in the future
@@ -95,13 +96,51 @@ serve(async (req) => {
         reminder_24h_sent: false,
         reminder_1h_sent: false,
         last_reminder_scheduled_at: newScheduledAt,
-        meeting_notes: `${call.meeting_notes || ""}\n\n[${now.toISOString()}] Rescheduled by client from ${new Date(oldScheduledAt).toLocaleString()} to ${newTime.toLocaleString()}`.trim(),
+        meeting_notes: `${call.meeting_notes || ""}\n\n[${now.toISOString()}] Rescheduled by client from ${oldTime.toLocaleString('en-US', { timeZone: 'America/New_York' })} to ${newTime.toLocaleString('en-US', { timeZone: 'America/New_York' })} EST`.trim(),
       })
       .eq("id", callId);
 
     if (updateError) {
       console.error("Error updating call:", updateError);
       throw updateError;
+    }
+
+    // CRITICAL: Dynamically adjust all pending follow-up schedules for this lead
+    if (call.lead_id) {
+      const timeDiffMs = newTime.getTime() - oldTime.getTime();
+      
+      // Fetch all pending follow-ups for this lead
+      const { data: pendingFollowUps, error: followUpFetchError } = await supabase
+        .from("lead_follow_up_schedules")
+        .select("id, scheduled_for")
+        .eq("lead_id", call.lead_id)
+        .eq("status", "pending");
+
+      if (followUpFetchError) {
+        console.error("Error fetching follow-ups:", followUpFetchError);
+      } else if (pendingFollowUps && pendingFollowUps.length > 0) {
+        console.log(`Adjusting ${pendingFollowUps.length} pending follow-ups by ${timeDiffMs}ms`);
+        
+        // Update each follow-up with the new adjusted time
+        for (const followUp of pendingFollowUps) {
+          const oldFollowUpTime = new Date(followUp.scheduled_for);
+          const newFollowUpTime = new Date(oldFollowUpTime.getTime() + timeDiffMs);
+          
+          const { error: followUpUpdateError } = await supabase
+            .from("lead_follow_up_schedules")
+            .update({ 
+              scheduled_for: newFollowUpTime.toISOString(),
+              updated_at: now.toISOString()
+            })
+            .eq("id", followUp.id);
+
+          if (followUpUpdateError) {
+            console.error(`Error updating follow-up ${followUp.id}:`, followUpUpdateError);
+          } else {
+            console.log(`Adjusted follow-up ${followUp.id}: ${followUp.scheduled_for} → ${newFollowUpTime.toISOString()}`);
+          }
+        }
+      }
     }
 
     // Update Google Calendar event if exists
@@ -155,8 +194,8 @@ serve(async (req) => {
                         dateTime: endTime.toISOString(),
                         timeZone: "America/New_York",
                       },
-                      summary: `[RESCHEDULED] Discovery Call - ${lead?.first_name || "Guest"} ${lead?.last_name || ""}`,
-                      description: `Rescheduled discovery call with ${lead?.first_name || "Guest"}\n\nOriginal time: ${new Date(oldScheduledAt).toLocaleString()}\nNew time: ${newTime.toLocaleString()}\n\nReschedule count: ${(call.reschedule_count || 0) + 1}`,
+                      summary: `[RESCHEDULED] Discovery Call - ${lead?.name || "Guest"}`,
+                      description: `Rescheduled discovery call with ${lead?.name || "Guest"}\n\nOriginal time: ${oldTime.toLocaleString('en-US', { timeZone: 'America/New_York' })} EST\nNew time: ${newTime.toLocaleString('en-US', { timeZone: 'America/New_York' })} EST\n\nReschedule count: ${(call.reschedule_count || 0) + 1}`,
                     },
                   },
                 }),
@@ -182,12 +221,13 @@ serve(async (req) => {
         lead_id: call.lead_id,
         event_type: "call_rescheduled",
         title: "Discovery Call Rescheduled",
-        description: `Call rescheduled from ${new Date(oldScheduledAt).toLocaleString()} to ${newTime.toLocaleString()}`,
+        description: `Call rescheduled from ${oldTime.toLocaleString('en-US', { timeZone: 'America/New_York' })} EST to ${newTime.toLocaleString('en-US', { timeZone: 'America/New_York' })} EST`,
         metadata: {
           old_time: oldScheduledAt,
           new_time: newScheduledAt,
           reschedule_count: (call.reschedule_count || 0) + 1,
           rescheduled_by: "client",
+          follow_ups_adjusted: true,
         },
       });
     }
@@ -212,6 +252,7 @@ serve(async (req) => {
         message: "Call rescheduled successfully",
         newScheduledAt: newScheduledAt,
         oldScheduledAt: oldScheduledAt,
+        followUpsAdjusted: true,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

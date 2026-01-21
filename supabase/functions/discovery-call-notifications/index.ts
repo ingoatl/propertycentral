@@ -17,19 +17,68 @@ const BOOKING_URL = "https://propertycentral.lovable.app/book-discovery-call";
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
 const FROM_EMAIL = "PeachHaus <info@peachhausgroup.com>";
 const RESCHEDULE_BASE_URL = "https://propertycentral.lovable.app/reschedule";
+const OWNER_PITCH_URL = "https://propertycentral.lovable.app/onboarding-presentation";
 
 interface DiscoveryCallNotificationRequest {
   discoveryCallId: string;
   notificationType: "confirmation" | "admin_notification" | "reminder_24h" | "reminder_1h" | "reminder_48h" | "reschedule_confirmation";
-  oldScheduledAt?: string; // For reschedule confirmation
+  oldScheduledAt?: string;
+}
+
+// Intelligent name personalization - NEVER use "Hi Unknown"
+function getPersonalizedGreeting(lead: any): { firstName: string; greeting: string; formalGreeting: string } {
+  const fullName = lead?.name?.trim() || '';
+  
+  if (fullName && fullName.toLowerCase() !== 'unknown') {
+    const firstName = fullName.split(' ')[0];
+    return { 
+      firstName, 
+      greeting: `Hi ${firstName}`,
+      formalGreeting: `Dear ${firstName}`
+    };
+  }
+  
+  // Fallback: Extract name from email prefix
+  const email = lead?.email || '';
+  if (email) {
+    const emailPrefix = email.split('@')[0] || '';
+    // Clean up email prefix - remove numbers, dots, underscores
+    const cleanName = emailPrefix
+      .replace(/[0-9._-]/g, ' ')
+      .trim()
+      .split(' ')[0];
+    
+    if (cleanName && cleanName.length >= 2) {
+      const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1).toLowerCase();
+      return {
+        firstName: capitalizedName,
+        greeting: `Hi ${capitalizedName}`,
+        formalGreeting: `Dear ${capitalizedName}`
+      };
+    }
+  }
+  
+  // Ultimate fallback - warm but generic
+  return { 
+    firstName: 'there', 
+    greeting: 'Hi there',
+    formalGreeting: 'Hello'
+  };
+}
+
+// Get property context for personalized messaging
+function getPropertyContext(lead: any): string {
+  if (lead?.property_address) {
+    return ` regarding your property at ${lead.property_address}`;
+  }
+  return '';
 }
 
 // Calculate revenue potential score based on property location and type
 function calculateRevenueScore(propertyAddress: string, propertyType: string | null): { score: number; reasoning: string } {
-  let score = 50; // Base score
+  let score = 50;
   const reasons: string[] = [];
 
-  // Location-based scoring
   const address = propertyAddress?.toLowerCase() || "";
   
   if (address.includes("atlanta") || address.includes("buckhead") || address.includes("midtown")) {
@@ -43,7 +92,6 @@ function calculateRevenueScore(propertyAddress: string, propertyType: string | n
     reasons.push("Strong suburban market (+12)");
   }
 
-  // Property type scoring
   if (propertyType === "single_family") {
     score += 15;
     reasons.push("Single family home - high demand (+15)");
@@ -55,7 +103,6 @@ function calculateRevenueScore(propertyAddress: string, propertyType: string | n
     reasons.push("Townhouse - family friendly (+12)");
   }
 
-  // Cap at 100
   score = Math.min(score, 100);
 
   return {
@@ -75,6 +122,32 @@ function getStaticMapUrl(address: string): string {
 function getGoogleMapsLink(address: string): string {
   const encodedAddress = encodeURIComponent(address);
   return `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+}
+
+// Format date/time in EST - consistent across all messages
+function formatInEST(date: Date): { date: string; time: string; dateTime: string } {
+  const estDateFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const estTimeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  
+  const formattedDate = estDateFormatter.format(date);
+  const formattedTime = estTimeFormatter.format(date) + " EST";
+  
+  return {
+    date: formattedDate,
+    time: formattedTime,
+    dateTime: `${formattedDate} at ${formattedTime}`
+  };
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -109,23 +182,12 @@ const handler = async (req: Request): Promise<Response> => {
     const lead = call.leads;
     const scheduledAt = new Date(call.scheduled_at);
     
-    // Always format times in EST (America/New_York) for consistency
-    const estFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York',
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const estTimeFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    // Get personalized greeting (never "Unknown")
+    const { firstName, greeting, formalGreeting } = getPersonalizedGreeting(lead);
+    const propertyContext = getPropertyContext(lead);
     
-    const formattedDate = estFormatter.format(scheduledAt);
-    const formattedTime = estTimeFormatter.format(scheduledAt) + " EST";
+    // Format times in EST
+    const { date: formattedDate, time: formattedTime, dateTime: formattedDateTime } = formatInEST(scheduledAt);
 
     const isVideoCall = call.meeting_type === "video";
     const meetingDetails = isVideoCall
@@ -197,11 +259,26 @@ const handler = async (req: Request): Promise<Response> => {
                   <!-- Greeting -->
                   <div style="padding: 24px 32px 16px 32px;">
                     <p style="font-size: 14px; line-height: 1.6; color: #111111; margin: 0;">
-                      Dear ${lead.name},
+                      ${formalGreeting},
                     </p>
                     <p style="font-size: 13px; line-height: 1.6; color: #444444; margin: 12px 0 0 0;">
-                      Thank you for scheduling a discovery call with PeachHaus. We're looking forward to learning about your property and discussing how we can help maximize your investment.
+                      Thank you for scheduling a discovery call with PeachHaus${propertyContext}. We're looking forward to learning about your property and discussing how we can help maximize your investment.
                     </p>
+                  </div>
+
+                  <!-- Pre-Call Preparation Section - Owner Pitch Presentation -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="background: linear-gradient(135deg, #fef9e7 0%, #fff8e1 100%); border: 1px solid #f9e79f; border-radius: 8px; padding: 20px;">
+                      <p style="margin: 0; font-size: 14px; color: #7d6608; font-weight: 600;">
+                        📊 Prepare for Your Call
+                      </p>
+                      <p style="margin: 10px 0 14px 0; font-size: 13px; color: #9a7b0a; line-height: 1.5;">
+                        Take 5 minutes to explore what PeachHaus can do for your property. See how we've helped other Atlanta property owners maximize their rental income.
+                      </p>
+                      <a href="${OWNER_PITCH_URL}" style="display: inline-block; background: linear-gradient(135deg, #f1c40f 0%, #d4ac0d 100%); color: #7d6608; padding: 12px 24px; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px; box-shadow: 0 2px 4px rgba(241, 196, 15, 0.3);">
+                        View Owner Presentation →
+                      </a>
+                    </div>
                   </div>
 
                   <!-- Call Details Table -->
@@ -212,7 +289,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <table style="width: 100%;">
                       <tr>
                         <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5; width: 140px;">Date & Time</td>
-                        <td style="padding: 12px 0; font-size: 13px; color: #111111; font-weight: 600; border-bottom: 1px solid #e5e5e5;">${formattedDate} at ${formattedTime}</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; font-weight: 600; border-bottom: 1px solid #e5e5e5;">${formattedDateTime}</td>
                       </tr>
                       <tr>
                         <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Meeting Type</td>
@@ -313,12 +390,14 @@ const handler = async (req: Request): Promise<Response> => {
           `,
         });
         console.log("Confirmation email result:", JSON.stringify(emailResult));
+        
+        // Send SMS with pitch link
         if (lead?.phone) {
           try {
             await supabase.functions.invoke("send-sms", {
               body: {
                 to: lead.phone,
-                message: `Hi ${lead.name?.split(' ')[0]}! Your PeachHaus call is confirmed for ${formattedDate} at ${formattedTime}. ${isVideoCall ? `Join: ${GOOGLE_MEET_LINK}` : "We'll call you!"} Check email & confirm the calendar invite! Reply STOP to opt out.`,
+                message: `${greeting}! Your PeachHaus call is confirmed for ${formattedDate} at ${formattedTime}. Before we chat, check out what we can do for your property: ${OWNER_PITCH_URL} ${isVideoCall ? `Join: ${GOOGLE_MEET_LINK}` : "We'll call you!"} - Ingo`,
               },
             });
           } catch (smsError) {
@@ -342,14 +421,13 @@ const handler = async (req: Request): Promise<Response> => {
             console.log("Recall auto-schedule result:", recallResult.data);
           } catch (recallError) {
             console.error("Failed to auto-schedule Recall bot:", recallError);
-            // Don't fail confirmation if Recall scheduling fails
           }
         }
       }
     }
 
     if (notificationType === "admin_notification") {
-      // Send admin notification with owner statement styling (Fortune 500, institutional)
+      // Send admin notification with owner statement styling
       const revenueData = calculateRevenueScore(lead?.property_address || "", lead?.property_type);
       const mapsLink = getGoogleMapsLink(lead?.property_address || "");
       const scoreColor = revenueData.score >= 75 ? "#2e7d32" : revenueData.score >= 50 ? "#ed6c02" : "#d32f2f";
@@ -359,7 +437,7 @@ const handler = async (req: Request): Promise<Response> => {
       const adminEmailResult = await resend.emails.send({
         from: FROM_EMAIL,
         to: ["info@peachhausgroup.com", "alex@peachhausgroup.com", "anja@peachhausgroup.com"],
-        subject: `New Discovery Call Booked - ${lead?.name}`,
+        subject: `New Discovery Call Booked - ${lead?.name || firstName}`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -395,7 +473,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <tr>
                       <td style="vertical-align: top; width: 60%;">
                         <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Lead</div>
-                        <div style="font-size: 18px; font-weight: 600; color: #111111;">${lead?.name || "Unknown"}</div>
+                        <div style="font-size: 18px; font-weight: 600; color: #111111;">${lead?.name || firstName}</div>
                         <div style="font-size: 12px; color: #666666; margin-top: 4px;">
                           ${lead?.email || ""} ${lead?.phone ? `• ${lead.phone}` : ""}
                         </div>
@@ -491,21 +569,8 @@ const handler = async (req: Request): Promise<Response> => {
     if (notificationType === "reschedule_confirmation") {
       const oldDate = oldScheduledAt ? new Date(oldScheduledAt) : null;
       
-      // Format old date/time in EST as well
-      const oldFormattedDate = oldDate ? new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }).format(oldDate) : null;
-      
-      const oldFormattedTime = oldDate ? new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      }).format(oldDate) + " EST" : null;
+      // Format old date/time in EST
+      const oldFormatted = oldDate ? formatInEST(oldDate) : null;
 
       if (lead?.email) {
         await resend.emails.send({
@@ -513,34 +578,71 @@ const handler = async (req: Request): Promise<Response> => {
           to: [lead.email],
           subject: `✅ Call Rescheduled - New Time: ${formattedDate} at ${formattedTime}`,
           html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
-              <div style="padding: 24px 32px; border-bottom: 2px solid #111;">
-                <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px;" />
-              </div>
-              <div style="padding: 32px;">
-                <h2 style="color: #16a34a; margin: 0 0 16px 0;">✅ Your Call Has Been Rescheduled</h2>
-                <p style="color: #444; line-height: 1.6;">Hi ${lead.name?.split(' ')[0]},</p>
-                <p style="color: #444; line-height: 1.6;">Your discovery call has been successfully rescheduled.</p>
-                
-                ${oldDate ? `<div style="background: #fef2f2; padding: 12px 16px; border-radius: 6px; margin: 16px 0;">
-                  <p style="margin: 0; color: #991b1b; font-size: 13px;"><strong>Previous:</strong> ${oldFormattedDate} at ${oldFormattedTime}</p>
-                </div>` : ''}
-                
-                <div style="background: #f0fdf4; padding: 16px; border-radius: 6px; border-left: 4px solid #16a34a; margin: 16px 0;">
-                  <p style="margin: 0 0 8px 0; color: #166534; font-weight: 600;">NEW DATE & TIME:</p>
-                  <p style="margin: 0; color: #166534; font-size: 18px;"><strong>${formattedDate}</strong></p>
-                  <p style="margin: 4px 0 0 0; color: #166534;">${formattedTime}</p>
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              </head>
+              <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: Georgia, 'Times New Roman', serif;">
+                <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
+                  
+                  <!-- Header -->
+                  <div style="background: linear-gradient(135deg, #b8956a 0%, #c9a87a 50%, #d4b896 100%); padding: 32px; text-align: center;">
+                    <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; margin-bottom: 16px;" />
+                    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 400;">✅ Call Rescheduled</h1>
+                  </div>
+                  
+                  <div style="padding: 32px;">
+                    <p style="font-size: 16px; color: #444; line-height: 1.6; margin: 0 0 16px 0;">${greeting},</p>
+                    <p style="font-size: 15px; color: #444; line-height: 1.6; margin: 0 0 24px 0;">Your discovery call${propertyContext} has been successfully rescheduled.</p>
+                    
+                    ${oldFormatted ? `
+                    <div style="background: #fef2f2; padding: 14px 18px; border-radius: 8px; margin: 0 0 16px 0; border-left: 4px solid #ef4444;">
+                      <p style="margin: 0; color: #991b1b; font-size: 13px;"><strong>Previous:</strong> ${oldFormatted.dateTime}</p>
+                    </div>
+                    ` : ''}
+                    
+                    <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; border-left: 4px solid #16a34a; margin: 0 0 24px 0;">
+                      <p style="margin: 0 0 8px 0; color: #166534; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">NEW DATE & TIME:</p>
+                      <p style="margin: 0; color: #166534; font-size: 20px; font-weight: 600;">${formattedDate}</p>
+                      <p style="margin: 4px 0 0 0; color: #166534; font-size: 16px;">${formattedTime}</p>
+                    </div>
+                    
+                    <!-- Owner Pitch Reminder -->
+                    <div style="background: #fef9e7; padding: 16px; border-radius: 8px; border: 1px solid #f9e79f; margin: 0 0 24px 0; text-align: center;">
+                      <p style="margin: 0 0 10px 0; color: #7d6608; font-size: 13px;">Haven't seen our presentation yet?</p>
+                      <a href="${OWNER_PITCH_URL}" style="display: inline-block; background: #f1c40f; color: #7d6608; padding: 10px 20px; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px;">
+                        View Owner Presentation
+                      </a>
+                    </div>
+                    
+                    ${isVideoCall ? `
+                    <div style="text-align: center; margin: 0 0 24px 0;">
+                      <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #16a34a; color: white; padding: 14px 32px; text-decoration: none; font-weight: 600; border-radius: 8px; font-size: 15px;">📹 Join Video Call</a>
+                      <p style="margin: 8px 0 0 0; font-size: 12px; color: #666;">${GOOGLE_MEET_LINK}</p>
+                    </div>
+                    ` : `
+                    <p style="text-align: center; color: #666; font-size: 15px; margin: 0 0 24px 0;">
+                      📞 We will call you at <strong>${lead.phone || 'your phone number'}</strong>
+                    </p>
+                    `}
+                    
+                    <div style="text-align: center; padding: 16px; background: #f5f5f5; border-radius: 8px;">
+                      <p style="font-size: 12px; color: #666; margin: 0 0 8px 0;">Need to reschedule again?</p>
+                      <a href="${rescheduleUrl}" style="color: #2563eb; font-size: 13px; text-decoration: underline;">Click here</a>
+                    </div>
+                  </div>
+                  
+                  <!-- Signature -->
+                  <div style="padding: 24px 32px; border-top: 1px solid #e8e4de; text-align: center;">
+                    <img src="${SIGNATURE_URL}" alt="Signature" style="height: 36px; margin-bottom: 8px;">
+                    <p style="margin: 0; font-size: 12px; color: #888;">PeachHaus Property Management</p>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #aaa;">(404) 800-5932 · info@peachhausgroup.com</p>
+                  </div>
                 </div>
-                
-                ${isVideoCall ? `<div style="text-align: center; margin: 24px 0;">
-                  <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #16a34a; color: white; padding: 12px 32px; text-decoration: none; font-weight: 600; border-radius: 6px;">Join Video Call</a>
-                </div>` : `<p style="text-align: center; color: #666;">📞 We will call you at ${lead.phone}</p>`}
-                
-                <p style="color: #666; font-size: 13px; text-align: center; margin-top: 24px;">
-                  Need to reschedule again? <a href="${rescheduleUrl}" style="color: #2563eb;">Click here</a>
-                </p>
-              </div>
-            </div>
+              </body>
+            </html>
           `,
         });
       }
@@ -550,7 +652,7 @@ const handler = async (req: Request): Promise<Response> => {
           await supabase.functions.invoke("send-sms", {
             body: {
               to: lead.phone,
-              message: `✅ Your PeachHaus call has been rescheduled to ${formattedDate} at ${formattedTime}. ${isVideoCall ? `Join: ${GOOGLE_MEET_LINK}` : "We'll call you!"} Questions? Reply here.`,
+              message: `✅ ${greeting}! Your PeachHaus call has been rescheduled to ${formattedDate} at ${formattedTime}. ${isVideoCall ? `Join: ${GOOGLE_MEET_LINK}` : "We'll call you!"} Questions? Reply here. - Ingo`,
             },
           });
         } catch (smsError) {
@@ -559,6 +661,101 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // 48h Reminder - Email only (psychology: value reinforcement, reduce pre-call anxiety)
+    if (notificationType === "reminder_48h") {
+      if (lead?.email) {
+        await resend.emails.send({
+          from: FROM_EMAIL,
+          to: [lead.email],
+          subject: `📅 Your Discovery Call is in 2 Days - ${formattedDate}`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              </head>
+              <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: Georgia, 'Times New Roman', serif;">
+                <div style="max-width: 600px; margin: 0 auto; background: #fdfcfb;">
+                  
+                  <!-- Header -->
+                  <div style="background: linear-gradient(135deg, #b8956a 0%, #c9a87a 50%, #d4b896 100%); padding: 32px; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 400; letter-spacing: 1px;">📅 2 Days Until Your Call</h1>
+                  </div>
+                  
+                  <div style="padding: 32px;">
+                    <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 16px 0;">
+                      ${greeting},
+                    </p>
+                    
+                    <p style="font-size: 15px; line-height: 1.8; color: #4a4a4a; margin: 0 0 24px 0;">
+                      Just a friendly reminder that we're looking forward to speaking with you${propertyContext} in 2 days!
+                    </p>
+                    
+                    <!-- Call Details -->
+                    <div style="background: #fff8f0; padding: 20px; border-radius: 12px; margin: 0 0 24px 0; border-left: 4px solid #b8956a;">
+                      <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>📅 Date:</strong> ${formattedDate}</p>
+                      <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>🕐 Time:</strong> ${formattedTime}</p>
+                      <p style="margin: 0; font-size: 15px; color: #333;"><strong>${isVideoCall ? '📹' : '📞'} Type:</strong> ${isVideoCall ? 'Video Call' : 'Phone Call'}</p>
+                    </div>
+                    
+                    <!-- Pre-Call Preparation -->
+                    <div style="background: linear-gradient(135deg, #fef9e7 0%, #fff8e1 100%); padding: 24px; border-radius: 12px; margin: 0 0 24px 0; text-align: center;">
+                      <p style="margin: 0 0 8px 0; font-size: 14px; color: #7d6608; font-weight: 600;">📊 Before We Chat</p>
+                      <p style="margin: 0 0 16px 0; font-size: 14px; color: #9a7b0a; line-height: 1.6;">
+                        Take 5 minutes to see how we've helped other Atlanta property owners like you maximize their rental income.
+                      </p>
+                      <a href="${OWNER_PITCH_URL}" style="display: inline-block; background: linear-gradient(135deg, #f1c40f 0%, #d4ac0d 100%); color: #7d6608; padding: 14px 28px; text-decoration: none; font-size: 14px; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 8px rgba(241, 196, 15, 0.3);">
+                        View Owner Presentation →
+                      </a>
+                    </div>
+                    
+                    ${isVideoCall ? `
+                    <div style="text-align: center; margin: 0 0 24px 0;">
+                      <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">📹 Join Video Call</a>
+                      <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">${GOOGLE_MEET_LINK}</p>
+                    </div>
+                    ` : ''}
+                    
+                    <p style="font-size: 15px; line-height: 1.8; color: #4a4a4a; margin: 0;">
+                      We're excited to discuss your property's potential and answer any questions you have!
+                    </p>
+                  </div>
+                  
+                  <!-- Signature -->
+                  <div style="padding: 24px 32px; text-align: center; border-top: 1px solid #e8e4de;">
+                    <p style="margin: 0 0 12px 0; font-size: 13px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
+                      SEE YOU SOON
+                    </p>
+                    <img src="${SIGNATURE_URL}" alt="Signature" style="height: 40px; margin-bottom: 8px;">
+                    <p style="margin: 0; font-size: 12px; color: #8a8a8a;">
+                      (404) 800-5932 | info@peachhausgroup.com
+                    </p>
+                  </div>
+                </div>
+              </body>
+            </html>
+          `,
+        });
+      }
+
+      // Update reminder sent status
+      await supabase
+        .from("discovery_calls")
+        .update({ reminder_48h_sent: true })
+        .eq("id", discoveryCallId);
+
+      // Log reminder
+      await supabase.from("discovery_call_reminders").insert({
+        discovery_call_id: discoveryCallId,
+        reminder_type: "48h",
+        channel: "email",
+        sent_at: new Date().toISOString(),
+        status: "sent",
+      });
+    }
+
+    // 24h and 1h Reminders
     if (notificationType === "reminder_24h" || notificationType === "reminder_1h") {
       const reminderText = notificationType === "reminder_24h" ? "tomorrow" : "in 1 hour";
       const urgencyEmoji = notificationType === "reminder_1h" ? "⏰" : "📅";
@@ -570,55 +767,74 @@ const handler = async (req: Request): Promise<Response> => {
           to: [lead.email],
           subject: `${urgencyEmoji} Reminder: Discovery Call ${reminderText} - ${formattedTime}`,
           html: `
-            <div style="font-family: Georgia, 'Times New Roman', serif; max-width: 600px; margin: 0 auto; background: #fdfcfb;">
-              <div style="background: linear-gradient(135deg, #b8956a 0%, #c9a87a 50%, #d4b896 100%); padding: 35px 30px; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 26px; font-weight: 400; letter-spacing: 1px;">${urgencyEmoji} Call Reminder</h1>
-              </div>
-              
-              <div style="padding: 35px; background: #fff;">
-                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 20px 0;">
-                  Hi ${lead.name},
-                </p>
-                
-                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 25px 0;">
-                  Just a friendly reminder that your discovery call is <strong>${reminderText}</strong>!
-                </p>
-                
-                <div style="background: #fff8f0; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #b8956a;">
-                  <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>📅 Date:</strong> ${formattedDate}</p>
-                  <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>🕐 Time:</strong> ${formattedTime}</p>
-                  ${meetingDetails}
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              </head>
+              <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: Georgia, 'Times New Roman', serif;">
+                <div style="max-width: 600px; margin: 0 auto; background: #fdfcfb;">
+                  
+                  <!-- Header -->
+                  <div style="background: linear-gradient(135deg, #b8956a 0%, #c9a87a 50%, #d4b896 100%); padding: 32px; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 400; letter-spacing: 1px;">${urgencyEmoji} Call Reminder</h1>
+                  </div>
+                  
+                  <div style="padding: 32px;">
+                    <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 16px 0;">
+                      ${greeting},
+                    </p>
+                    
+                    <p style="font-size: 15px; line-height: 1.8; color: #4a4a4a; margin: 0 0 24px 0;">
+                      Just a friendly reminder that your discovery call${propertyContext} is <strong>${reminderText}</strong>!
+                    </p>
+                    
+                    <div style="background: #fff8f0; padding: 20px; border-radius: 12px; margin: 0 0 24px 0; border-left: 4px solid #b8956a;">
+                      <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>📅 Date:</strong> ${formattedDate}</p>
+                      <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>🕐 Time:</strong> ${formattedTime}</p>
+                      ${meetingDetails}
+                    </div>
+                    
+                    ${notificationType === "reminder_24h" ? `
+                    <!-- Final pitch link reminder for 24h -->
+                    <div style="background: #fef9e7; padding: 16px; border-radius: 8px; border: 1px solid #f9e79f; margin: 0 0 24px 0; text-align: center;">
+                      <p style="margin: 0 0 10px 0; color: #7d6608; font-size: 13px;">Don't forget to review our presentation before we chat!</p>
+                      <a href="${OWNER_PITCH_URL}" style="display: inline-block; background: #f1c40f; color: #7d6608; padding: 10px 20px; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px;">
+                        View Owner Presentation
+                      </a>
+                    </div>
+                    ` : ''}
+                    
+                    ${isVideoCall ? `
+                    <div style="text-align: center; margin: 0 0 24px 0;">
+                      <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">📹 Join Video Call</a>
+                      <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">${GOOGLE_MEET_LINK}</p>
+                    </div>
+                    ` : `
+                    <p style="text-align: center; font-size: 15px; color: #666; margin: 0 0 24px 0;">
+                      📞 We will call you at <strong>${lead.phone || 'your phone number'}</strong>
+                    </p>
+                    `}
+                    
+                    <p style="font-size: 15px; line-height: 1.8; color: #4a4a4a; margin: 0;">
+                      We're looking forward to discussing how we can help you with your property!
+                    </p>
+                  </div>
+                  
+                  <!-- Signature -->
+                  <div style="padding: 24px 32px; text-align: center; border-top: 1px solid #e8e4de;">
+                    <p style="margin: 0 0 12px 0; font-size: 13px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
+                      SEE YOU SOON
+                    </p>
+                    <img src="${SIGNATURE_URL}" alt="Signature" style="height: 40px; margin-bottom: 8px;">
+                    <p style="margin: 0; font-size: 12px; color: #8a8a8a;">
+                      (404) 800-5932 | info@peachhausgroup.com
+                    </p>
+                  </div>
                 </div>
-                
-                ${isVideoCall ? `
-                <div style="text-align: center; margin: 25px 0;">
-                  <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">📹 Join Video Call</a>
-                  <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">${GOOGLE_MEET_LINK}</p>
-                </div>
-                ` : `
-                <p style="text-align: center; font-size: 16px; color: #666; margin: 25px 0;">
-                  📞 We will call you at <strong>${lead.phone}</strong>
-                </p>
-                `}
-                
-                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 25px 0 0 0;">
-                  We're looking forward to discussing how we can help you with your property!
-                </p>
-              </div>
-              
-              <!-- Signature Section -->
-              <div style="padding: 25px 35px; text-align: center; border-top: 1px solid #e8e4de;">
-                <p style="margin: 0 0 12px 0; font-family: Georgia, serif; font-size: 13px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
-                  SEE YOU SOON
-                </p>
-                <img src="${SIGNATURE_URL}" 
-                     alt="Anja & Ingo Schaer" 
-                     style="height: 45px; width: auto; margin-bottom: 10px;">
-                <p style="margin: 0; font-family: Georgia, serif; font-size: 12px; color: #8a8a8a;">
-                  (404) 800-5932 | info@peachhausgroup.com
-                </p>
-              </div>
-            </div>
+              </body>
+            </html>
           `,
         });
       }
@@ -626,10 +842,14 @@ const handler = async (req: Request): Promise<Response> => {
       // SMS reminder
       if (lead?.phone) {
         try {
+          const smsMessage = notificationType === "reminder_1h" 
+            ? `⏰ ${greeting}! Your PeachHaus call is in 1 hour at ${formattedTime}. ${isVideoCall ? `Join now: ${GOOGLE_MEET_LINK}` : "We'll call you soon!"}`
+            : `📅 ${greeting}! Reminder: Your PeachHaus call is tomorrow at ${formattedTime}. ${isVideoCall ? `Join: ${GOOGLE_MEET_LINK}` : "We'll call you!"} See you soon! - Ingo`;
+          
           await supabase.functions.invoke("send-sms", {
             body: {
               to: lead.phone,
-              message: `${urgencyEmoji} Hi ${lead.name}! Reminder: Your PeachHaus call is ${reminderText} at ${formattedTime}. ${isVideoCall ? `Join: ${GOOGLE_MEET_LINK}` : "We'll call you!"} See you soon!`,
+              message: smsMessage,
             },
           });
         } catch (smsError) {
@@ -660,13 +880,12 @@ const handler = async (req: Request): Promise<Response> => {
           const recallResult = await supabase.functions.invoke("recall-send-bot", {
             body: {
               meetingUrl: GOOGLE_MEET_LINK,
-              meetingTitle: `Discovery Call: ${lead?.name || "Unknown"}`,
+              meetingTitle: `Discovery Call: ${lead?.name || firstName}`,
               platform: "google_meet",
             },
           });
           
           if (recallResult.data?.recordingId) {
-            // Link the recording to the discovery call
             await supabase
               .from("meeting_recordings")
               .update({
@@ -679,7 +898,6 @@ const handler = async (req: Request): Promise<Response> => {
           }
         } catch (recallError) {
           console.error("Failed to send Recall bot:", recallError);
-          // Don't fail the reminder if Recall fails
         }
       }
     }
