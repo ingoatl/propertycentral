@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addDays, setHours, setMinutes, isBefore, addMinutes, getDay, getMonth, getDate, getYear } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
 import { cn } from "@/lib/utils";
 
 // US General Holidays (not bank holidays) - returns true if date is a holiday
@@ -86,53 +87,7 @@ import anjaIngoHosts from "@/assets/anja-ingo-hosts.jpg";
 
 const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
 
-// EST timezone offset (Eastern Standard Time = UTC-5, EDT = UTC-4)
-// We use EST business hours, so availability is defined in EST
-const getESTOffset = (date: Date): number => {
-  // Check if we're in daylight saving time (EDT)
-  // EDT runs from second Sunday of March to first Sunday of November
-  const year = date.getFullYear();
-  const marchSecondSunday = new Date(year, 2, 8 + (7 - new Date(year, 2, 1).getDay()) % 7);
-  const novFirstSunday = new Date(year, 10, 1 + (7 - new Date(year, 10, 1).getDay()) % 7);
-  
-  if (date >= marchSecondSunday && date < novFirstSunday) {
-    return -4; // EDT (Eastern Daylight Time)
-  }
-  return -5; // EST (Eastern Standard Time)
-};
-
-// Convert a time in EST to the user's local time for display
-const convertESTToLocal = (hour: number, minute: number, date: Date): { hour: number; minute: number } => {
-  // Create a date in EST
-  const estOffset = getESTOffset(date);
-  const estDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
-  
-  // Get local offset in hours
-  const localOffset = -date.getTimezoneOffset() / 60;
-  
-  // Calculate the difference
-  const hourDiff = localOffset - estOffset;
-  
-  let adjustedHour = hour + hourDiff;
-  let adjustedMinute = minute;
-  
-  // Handle day overflow (shouldn't happen with business hours, but be safe)
-  if (adjustedHour >= 24) adjustedHour -= 24;
-  if (adjustedHour < 0) adjustedHour += 24;
-  
-  return { hour: adjustedHour, minute: adjustedMinute };
-};
-
-// Convert local time back to EST for storage
-const convertLocalToEST = (localDate: Date): Date => {
-  const estOffset = getESTOffset(localDate);
-  const localOffset = -localDate.getTimezoneOffset() / 60;
-  const hourDiff = estOffset - localOffset;
-  
-  return new Date(localDate.getTime() + hourDiff * 60 * 60 * 1000);
-};
-
-// Generate 30-minute time slots in EST, displayed in local time
+// Generate 30-minute time slots in EST (displayed as EST to user)
 const generateTimeSlots = (startHourEST: number, endHourEST: number) => {
   const slots: string[] = [];
   for (let hour = startHourEST; hour < endHourEST; hour++) {
@@ -396,36 +351,30 @@ export default function BookDiscoveryCall() {
     mutationFn: async () => {
       if (!selectedDate || !selectedTime) throw new Error("Select date and time");
 
-      // Time slots are in EST - create the correct UTC time
+      // Time slots are displayed and selected in EST timezone
       const [hours, minutes] = selectedTime.split(":").map(Number);
       
-      // Build an ISO string that explicitly represents EST time
-      // Format: YYYY-MM-DDTHH:MM:SS in America/New_York timezone
+      // Build a date string representing the selected EST time
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const hourStr = String(hours).padStart(2, '0');
       const minStr = String(minutes).padStart(2, '0');
       
-      // Create the date string and use Intl to get proper UTC conversion
-      const estDateString = `${year}-${month}-${day}T${hourStr}:${minStr}:00`;
+      // This represents the time as selected in EST (e.g., "2026-01-22 15:30:00")
+      const estTimeString = `${year}-${month}-${day} ${hourStr}:${minStr}:00`;
       
-      // Use a reliable method: create Date with explicit EST interpretation
-      // Parse the EST time by creating a formatter that tells us the UTC equivalent
-      const estDate = new Date(estDateString);
-      const estOffset = getESTOffset(selectedDate); // -5 for EST, -4 for EDT
+      // Use date-fns-tz to correctly convert EST time to UTC
+      // fromZonedTime takes a local time string and a timezone, returns the UTC equivalent
+      const utcDate = fromZonedTime(estTimeString, 'America/New_York');
       
-      // estDate is interpreted in local timezone, we need to adjust to represent EST
-      // Get local timezone offset in hours
-      const localOffsetMinutes = estDate.getTimezoneOffset(); // e.g., 300 for EST (UTC-5)
-      const localOffsetHours = -localOffsetMinutes / 60; // Convert to hours with correct sign
+      console.log('Booking time conversion:', {
+        selectedTime,
+        estTimeString,
+        utcDate: utcDate.toISOString(),
+      });
       
-      // Calculate the difference between local and EST
-      const diffFromEST = localOffsetHours - estOffset;
-      
-      // Adjust the time: if we're in UTC (offset 0) and EST is -5, we need to add 5 hours
-      // to the parsed time to get the correct UTC representation of that EST time
-      const scheduledAt = new Date(estDate.getTime() - (diffFromEST * 60 * 60 * 1000));
+      const scheduledAt = utcDate;
 
       const notes = [
         `Current Situation: ${CURRENT_MANAGEMENT.find(c => c.value === formData.currentManagement)?.label || "Not specified"}`,
