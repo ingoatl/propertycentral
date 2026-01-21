@@ -14,6 +14,7 @@ interface SendVoicemailButtonProps {
   className?: string;
   /** Allow editing recipient name for manual dial scenarios */
   allowNameEdit?: boolean;
+  disabled?: boolean;
 }
 
 export function SendVoicemailButton({
@@ -25,11 +26,11 @@ export function SendVoicemailButton({
   size = "sm",
   className,
   allowNameEdit = false,
+  disabled = false,
 }: SendVoicemailButtonProps) {
   const [open, setOpen] = useState(false);
 
-  if (!recipientPhone) return null;
-
+  const isDisabled = disabled || !recipientPhone;
   const isIconOnly = size === "icon";
 
   const button = (
@@ -38,6 +39,8 @@ export function SendVoicemailButton({
       size={size}
       onClick={() => setOpen(true)}
       className={className}
+      disabled={isDisabled}
+      title={isDisabled ? "Add phone first" : "Send voice message"}
     >
       <Mic className={isIconOnly ? "h-4 w-4" : "h-4 w-4 mr-2"} />
       {!isIconOnly && "Voice Message"}
@@ -55,15 +58,17 @@ export function SendVoicemailButton({
         button
       )}
 
-      <SendVoicemailDialog
-        open={open}
-        onOpenChange={setOpen}
-        recipientPhone={recipientPhone}
-        recipientName={recipientName}
-        leadId={leadId}
-        ownerId={ownerId}
-        allowNameEdit={allowNameEdit}
-      />
+      {recipientPhone && (
+        <SendVoicemailDialog
+          open={open}
+          onOpenChange={setOpen}
+          recipientPhone={recipientPhone}
+          recipientName={recipientName}
+          leadId={leadId}
+          ownerId={ownerId}
+          allowNameEdit={allowNameEdit}
+        />
+      )}
     </>
   );
 }

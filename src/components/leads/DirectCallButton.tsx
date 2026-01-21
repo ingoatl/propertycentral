@@ -10,9 +10,10 @@ interface DirectCallButtonProps {
   leadPhone: string | null;
   leadName: string;
   leadAddress?: string | null;
+  disabled?: boolean;
 }
 
-const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCallButtonProps) => {
+const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress, disabled }: DirectCallButtonProps) => {
   const [showCall, setShowCall] = useState(false);
   const [showVoicemail, setShowVoicemail] = useState(false);
 
@@ -34,9 +35,7 @@ const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCa
     setShowVoicemail(true);
   };
 
-  if (!leadPhone) {
-    return null;
-  }
+  const isDisabled = disabled || !leadPhone;
 
   return (
     <>
@@ -45,6 +44,8 @@ const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCa
         size="sm" 
         className="flex-1"
         onClick={handleClick}
+        disabled={isDisabled}
+        title={isDisabled ? "Add phone first" : "Call lead"}
       >
         <Phone className="h-4 w-4 mr-2" />
         Call
@@ -55,27 +56,33 @@ const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCa
         size="sm" 
         className="flex-1"
         onClick={handleVoicemailClick}
+        disabled={isDisabled}
+        title={isDisabled ? "Add phone first" : "Send voicemail"}
       >
         <Mic className="h-4 w-4 mr-2" />
         Voicemail
       </Button>
 
-      <CallDialog
-        open={showCall}
-        onOpenChange={setShowCall}
-        contactName={leadName}
-        contactPhone={leadPhone}
-        contactType="lead"
-        contactAddress={leadAddress}
-      />
+      {leadPhone && (
+        <>
+          <CallDialog
+            open={showCall}
+            onOpenChange={setShowCall}
+            contactName={leadName}
+            contactPhone={leadPhone}
+            contactType="lead"
+            contactAddress={leadAddress}
+          />
 
-      <SendVoicemailDialog
-        open={showVoicemail}
-        onOpenChange={setShowVoicemail}
-        recipientPhone={leadPhone}
-        recipientName={leadName}
-        leadId={leadId}
-      />
+          <SendVoicemailDialog
+            open={showVoicemail}
+            onOpenChange={setShowVoicemail}
+            recipientPhone={leadPhone}
+            recipientName={leadName}
+            leadId={leadId}
+          />
+        </>
+      )}
     </>
   );
 };
