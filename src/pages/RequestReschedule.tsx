@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { format, addDays, setHours, setMinutes, isBefore, addMinutes, getDay, getMonth, getDate, getYear } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
 import { Calendar as CalendarIcon, Clock, Check, Loader2, ArrowRight, ArrowLeft, Phone, Video, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -194,7 +195,19 @@ export default function RequestReschedule() {
       }
 
       const [hours, minutes] = selectedTime.split(":").map(Number);
-      const newScheduledAt = setMinutes(setHours(selectedDate, hours), minutes);
+      
+      // Build a date string representing the selected EST time
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const hourStr = String(hours).padStart(2, '0');
+      const minStr = String(minutes).padStart(2, '0');
+      
+      // This represents the time as selected in EST
+      const estTimeString = `${year}-${month}-${day} ${hourStr}:${minStr}:00`;
+      
+      // Use date-fns-tz to correctly convert EST time to UTC
+      const newScheduledAt = fromZonedTime(estTimeString, 'America/New_York');
 
       const { data, error } = await supabase.functions.invoke("reschedule-discovery-call", {
         body: {
