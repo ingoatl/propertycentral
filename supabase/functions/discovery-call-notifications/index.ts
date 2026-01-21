@@ -108,17 +108,24 @@ const handler = async (req: Request): Promise<Response> => {
 
     const lead = call.leads;
     const scheduledAt = new Date(call.scheduled_at);
-    const formattedDate = scheduledAt.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+    
+    // Always format times in EST (America/New_York) for consistency
+    const estFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
-    const formattedTime = scheduledAt.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      timeZoneName: "short",
+    const estTimeFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
     });
+    
+    const formattedDate = estFormatter.format(scheduledAt);
+    const formattedTime = estTimeFormatter.format(scheduledAt) + " EST";
 
     const isVideoCall = call.meeting_type === "video";
     const meetingDetails = isVideoCall
@@ -483,8 +490,22 @@ const handler = async (req: Request): Promise<Response> => {
     // Handle reschedule confirmation
     if (notificationType === "reschedule_confirmation") {
       const oldDate = oldScheduledAt ? new Date(oldScheduledAt) : null;
-      const oldFormattedDate = oldDate?.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-      const oldFormattedTime = oldDate?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+      
+      // Format old date/time in EST as well
+      const oldFormattedDate = oldDate ? new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(oldDate) : null;
+      
+      const oldFormattedTime = oldDate ? new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }).format(oldDate) + " EST" : null;
 
       if (lead?.email) {
         await resend.emails.send({
