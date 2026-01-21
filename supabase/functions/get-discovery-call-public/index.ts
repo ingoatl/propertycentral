@@ -6,6 +6,50 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// EST timezone constant
+const EST_TIMEZONE = 'America/New_York';
+
+// Convert an EST time to UTC
+function estToUTC(year: number, month: number, day: number, hour: number, minute: number): Date {
+  // Create a date string in EST
+  const estString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+  
+  // Use Intl to determine the offset for this specific date in EST
+  const testDate = new Date(estString + 'Z'); // Treat as UTC temporarily
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: EST_TIMEZONE,
+    hour: 'numeric',
+    hour12: false
+  });
+  
+  // Determine if EST (-5) or EDT (-4) by checking the hour difference
+  const parts = formatter.formatToParts(testDate);
+  const estHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const utcHour = testDate.getUTCHours();
+  const offset = (estHour - utcHour + 24) % 24;
+  
+  // Standard EST is -5 (offset would show as 19), EDT is -4 (offset would show as 20)
+  const hoursToAdd = offset <= 12 ? offset : offset - 24;
+  
+  // Create the actual EST time and add the offset to get UTC
+  const estDate = new Date(Date.UTC(year, month, day, hour, minute, 0, 0));
+  // Adjust: if EST is -5, we need to add 5 hours to get UTC
+  const isDST = isESTinDST(new Date(year, month, day));
+  const utcDate = new Date(estDate.getTime() + (isDST ? 4 : 5) * 60 * 60 * 1000);
+  
+  return utcDate;
+}
+
+// Check if a date is in EDT (Daylight Saving Time)
+function isESTinDST(date: Date): boolean {
+  const jan = new Date(date.getFullYear(), 0, 1);
+  const jul = new Date(date.getFullYear(), 6, 1);
+  const janOffset = jan.getTimezoneOffset();
+  const julOffset = jul.getTimezoneOffset();
+  const maxOffset = Math.max(janOffset, julOffset);
+  return date.getTimezoneOffset() < maxOffset;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -36,7 +80,7 @@ serve(async (req) => {
         google_meet_link,
         status,
         lead:leads!discovery_calls_lead_id_fkey (
-          first_name,
+          name,
           email,
           phone
         )
@@ -113,21 +157,31 @@ serve(async (req) => {
     const availableSlots: string[] = [];
     const lead = call.lead as any;
 
+    // Get current time in EST for proper comparison
+    const nowUTC = now.getTime();
+
     for (let dayOffset = 1; dayOffset <= 30; dayOffset++) {
-      const date = new Date(now);
-      date.setDate(date.getDate() + dayOffset);
-      const dateStr = date.toISOString().split("T")[0];
+      const futureDate = new Date(now);
+      futureDate.setDate(futureDate.getDate() + dayOffset);
       
-      // Skip blocked dates
-      if (blockedDateSet.has(dateStr)) continue;
+      // Get the EST date for this future date
+      const estDateStr = futureDate.toLocaleDateString('en-CA', { timeZone: EST_TIMEZONE });
+      const [yearStr, monthStr, dayStr] = estDateStr.split('-');
+      const year = parseInt(yearStr);
+      const month = parseInt(monthStr) - 1;
+      const day = parseInt(dayStr);
       
-      const dayOfWeek = date.getDay();
+      // Skip blocked dates (comparing in EST)
+      if (blockedDateSet.has(estDateStr)) continue;
+      
+      // Get day of week in EST
+      const estDayOfWeek = new Date(year, month, day).getDay();
       
       // Find availability for this day
-      const daySlots = availabilitySlots?.filter(s => s.day_of_week === dayOfWeek) || [];
+      const daySlots = availabilitySlots?.filter(s => s.day_of_week === estDayOfWeek) || [];
       
       for (const slot of daySlots) {
-        // Generate 30-minute intervals within this slot
+        // Generate 30-minute intervals within this slot (times are in EST)
         const [startHour, startMin] = slot.start_time.split(":").map(Number);
         const [endHour, endMin] = slot.end_time.split(":").map(Number);
         
@@ -135,21 +189,22 @@ serve(async (req) => {
         let currentMin = startMin;
         
         while (currentHour < endHour || (currentHour === endHour && currentMin < endMin)) {
-          const slotTime = new Date(date);
-          slotTime.setHours(currentHour, currentMin, 0, 0);
+          // Convert EST slot time to UTC
+          const slotTimeUTC = estToUTC(year, month, day, currentHour, currentMin);
           
           // Check if this slot conflicts with any booked call
           const duration = call.duration_minutes || 30;
-          const slotEnd = new Date(slotTime.getTime() + duration * 60 * 1000);
+          const slotEndUTC = new Date(slotTimeUTC.getTime() + duration * 60 * 1000);
           
           const hasConflict = bookedCalls?.some(booked => {
             const bookedStart = new Date(booked.scheduled_at);
             const bookedEnd = new Date(bookedStart.getTime() + (booked.duration_minutes || 30) * 60 * 1000);
-            return slotTime < bookedEnd && slotEnd > bookedStart;
+            return slotTimeUTC < bookedEnd && slotEndUTC > bookedStart;
           });
           
-          if (!hasConflict && slotTime > now) {
-            availableSlots.push(slotTime.toISOString());
+          // Only add if not conflicting and in the future
+          if (!hasConflict && slotTimeUTC.getTime() > nowUTC) {
+            availableSlots.push(slotTimeUTC.toISOString());
           }
           
           // Move to next 30-minute slot
@@ -162,6 +217,8 @@ serve(async (req) => {
       }
     }
 
+    console.log(`Generated ${availableSlots.length} available slots`);
+
     return new Response(
       JSON.stringify({
         canReschedule: true,
@@ -170,7 +227,7 @@ serve(async (req) => {
           scheduledAt: call.scheduled_at,
           durationMinutes: call.duration_minutes || 30,
           meetingType: call.meeting_type || "video",
-          firstName: lead?.first_name || "Guest",
+          firstName: lead?.name?.split(' ')[0] || "Guest",
         },
         availableSlots: availableSlots.slice(0, 100), // Limit to first 100 slots
       }),

@@ -1,11 +1,21 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format, parseISO, isSameDay } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { Calendar, Clock, Video, Phone, CheckCircle, AlertCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const EST_TIMEZONE = 'America/New_York';
+
+// Helper to format a UTC date as EST for display
+const formatInEST = (utcDateStr: string, formatStr: string) => {
+  const utcDate = parseISO(utcDateStr);
+  const estDate = toZonedTime(utcDate, EST_TIMEZONE);
+  return format(estDate, formatStr);
+};
 
 interface CallData {
   id: string;
@@ -95,14 +105,18 @@ export default function RescheduleCall() {
     }
   };
 
-  // Get unique dates from available slots
+  // Get unique dates from available slots - converting to EST for proper grouping
   const availableDates = [...new Set(
-    availableSlots.map(slot => format(parseISO(slot), "yyyy-MM-dd"))
+    availableSlots.map(slot => formatInEST(slot, "yyyy-MM-dd"))
   )];
 
-  // Get slots for selected date
+  // Get slots for selected date - compare in EST timezone
   const slotsForSelectedDate = selectedDate
-    ? availableSlots.filter(slot => isSameDay(parseISO(slot), selectedDate))
+    ? availableSlots.filter(slot => {
+        const slotDateInEST = formatInEST(slot, "yyyy-MM-dd");
+        const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+        return slotDateInEST === selectedDateStr;
+      })
     : [];
 
   // Generate calendar days
@@ -175,10 +189,10 @@ export default function RescheduleCall() {
             </p>
             <div className="bg-primary/10 rounded-lg p-4 mb-6">
               <p className="text-lg font-medium text-primary">
-                {selectedSlot && format(parseISO(selectedSlot), "EEEE, MMMM d, yyyy")}
+                {selectedSlot && formatInEST(selectedSlot, "EEEE, MMMM d, yyyy")}
               </p>
               <p className="text-primary">
-                {selectedSlot && format(parseISO(selectedSlot), "h:mm a")}
+                {selectedSlot && formatInEST(selectedSlot, "h:mm a")} EST
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -224,13 +238,13 @@ export default function RescheduleCall() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-muted-foreground" />
                 <span className="text-sm">
-                  {callData?.scheduledAt && format(parseISO(callData.scheduledAt), "MMM d, yyyy")}
+                  {callData?.scheduledAt && formatInEST(callData.scheduledAt, "MMM d, yyyy")}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-muted-foreground" />
                 <span className="text-sm">
-                  {callData?.scheduledAt && format(parseISO(callData.scheduledAt), "h:mm a")}
+                  {callData?.scheduledAt && formatInEST(callData.scheduledAt, "h:mm a")} EST
                 </span>
               </div>
             </div>
@@ -311,7 +325,7 @@ export default function RescheduleCall() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">
                 {selectedDate 
-                  ? `Available Times for ${format(selectedDate, "MMM d")}`
+                  ? `Available Times for ${format(selectedDate, "MMM d")} (EST)`
                   : "Select a Time"
                 }
               </CardTitle>
@@ -347,7 +361,7 @@ export default function RescheduleCall() {
                         }
                       `}
                     >
-                      {format(parseISO(slot), "h:mm a")}
+                      {formatInEST(slot, "h:mm a")}
                     </button>
                   ))}
                 </div>
@@ -381,7 +395,7 @@ export default function RescheduleCall() {
             <p className="text-sm text-muted-foreground">
               New appointment:{" "}
               <span className="font-medium text-foreground">
-                {format(parseISO(selectedSlot), "EEEE, MMMM d, yyyy 'at' h:mm a")}
+                {formatInEST(selectedSlot, "EEEE, MMMM d, yyyy 'at' h:mm a")} EST
               </span>
             </p>
           </div>
