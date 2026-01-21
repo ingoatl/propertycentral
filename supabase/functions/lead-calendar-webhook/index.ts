@@ -49,7 +49,20 @@ serve(async (req) => {
     const validateBookingTime = (scheduledAtStr: string): { valid: boolean; error?: string } => {
       const scheduledAt = new Date(scheduledAtStr);
       
-      // Convert to EST/EDT
+      // Log the incoming time for debugging
+      console.log("Validating booking time:", scheduledAtStr, "parsed as:", scheduledAt.toISOString());
+      
+      // Convert to EST/EDT using proper timezone formatting
+      const estTimeStr = scheduledAt.toLocaleString('en-US', { 
+        timeZone: 'America/New_York', 
+        hour: 'numeric', 
+        minute: 'numeric',
+        weekday: 'long',
+        hour12: false 
+      });
+      console.log("Formatted in EST:", estTimeStr);
+      
+      // Parse the EST time components
       const estOptions: Intl.DateTimeFormatOptions = { 
         timeZone: 'America/New_York', 
         hour: 'numeric', 
@@ -63,8 +76,13 @@ serve(async (req) => {
       const hourPart = estParts.find(p => p.type === 'hour');
       const weekdayPart = estParts.find(p => p.type === 'weekday');
       
-      const estHour = hourPart ? parseInt(hourPart.value) : 0;
+      let estHour = hourPart ? parseInt(hourPart.value) : 0;
+      // Handle midnight edge case (hour12: false returns 24 for midnight in some locales)
+      if (estHour === 24) estHour = 0;
+      
       const weekday = weekdayPart?.value || '';
+      
+      console.log("Parsed EST hour:", estHour, "weekday:", weekday);
       
       // Block weekends
       if (weekday === 'Saturday' || weekday === 'Sunday') {
@@ -72,9 +90,9 @@ serve(async (req) => {
       }
       
       // Block outside business hours (11 AM - 4 PM EST means last slot is 3:30 PM)
-      // end_time is 16:00, so slots go up to 15:30
+      // Allow 11:00 through 15:59 (4 PM slot would start at 15:30)
       if (estHour < 11 || estHour >= 16) {
-        return { valid: false, error: `Bookings are only available 11 AM - 4 PM EST. Requested: ${estHour}:00 EST` };
+        return { valid: false, error: `Bookings are only available 11 AM - 4 PM EST. Requested: ${estHour}:${String(estParts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')} EST` };
       }
       
       return { valid: true };
