@@ -929,6 +929,9 @@ export function InboxView() {
           const targetInbox = email.targetInbox?.toLowerCase() || '';
           return targetInbox.includes(selectedUserLabel.label_name.toLowerCase());
         });
+      } else {
+        // No label found for this user - show no emails
+        filtered = [];
       }
     }
 
@@ -1047,48 +1050,37 @@ export function InboxView() {
             // For personal inboxes (not admin "all" view), only show messages that belong to this user:
             // 1. Explicitly assigned to this user (assigned_to, recipient_user_id, assigned_user_id)
             // 2. Received on the user's personal phone number (received_on_number matches)
-            // 3. Messages from company lines are visible to all team members
+            // NOTE: Company line messages are NOT included when viewing a specific user's inbox
+            // They should only appear in "All Communications" view
             if (!viewAllInboxes && targetUserId) {
               const isExplicitlyAssigned = 
                 comm.assigned_to === targetUserId || 
                 comm.recipient_user_id === targetUserId || 
                 comm.assigned_user_id === targetUserId;
               
-              // Check if message was received on a phone number assigned to another user
-              let isReceivedOnOtherPersonalLine = false;
+              // Check if message was received on a phone number assigned to this user
               let isReceivedOnUserPersonalLine = false;
-              let isReceivedOnCompanyLine = false;
               
               if (comm.received_on_number) {
                 const normalizedReceivedOn = normalizePhone(comm.received_on_number);
                 const phoneOwner = phoneToUserMap.get(normalizedReceivedOn);
                 
                 if (phoneOwner) {
-                  if (phoneOwner.phone_type === "company") {
-                    // Company line - visible to all team members
-                    isReceivedOnCompanyLine = true;
-                  } else if (phoneOwner.user_id === targetUserId) {
+                  if (phoneOwner.phone_type === "personal" && phoneOwner.user_id === targetUserId) {
                     // Personal line belonging to this user
                     isReceivedOnUserPersonalLine = true;
-                  } else {
-                    // Personal line belonging to ANOTHER user - skip this message
-                    isReceivedOnOtherPersonalLine = true;
                   }
+                  // Company line messages and other users' personal lines are NOT included
+                  // in a specific user's inbox view
                 }
               }
               
-              // Skip if received on another user's personal line
-              if (isReceivedOnOtherPersonalLine) {
-                continue;
-              }
-              
-              // Include message if:
+              // Include message ONLY if:
               // - Explicitly assigned to this user, OR
-              // - Received on user's personal line, OR
-              // - Received on company line (visible to all), OR
-              // - Has no routing info (legacy messages - visible to all for now)
-              const hasNoRoutingInfo = !comm.received_on_number && !comm.assigned_to && !comm.recipient_user_id && !comm.assigned_user_id;
-              const shouldInclude = isExplicitlyAssigned || isReceivedOnUserPersonalLine || isReceivedOnCompanyLine || hasNoRoutingInfo;
+              // - Received on user's personal line
+              // NOTE: Legacy messages without routing info are NOT included in user-specific views
+              // to prevent data leakage - they will only show in "All Communications"
+              const shouldInclude = isExplicitlyAssigned || isReceivedOnUserPersonalLine;
               
               if (!shouldInclude) {
                 continue;
@@ -2220,22 +2212,9 @@ export function InboxView() {
       // Filter by unread (inbound + not resolved)
       if (activeFilter === "unread" && (c.direction !== "inbound" || c.is_resolved)) return false;
       
-      // Filter SMS by inbox view (personal phone assignments)
-      // For "all" view (admin only), show everything
-      // For specific user or "my-inbox", show company line messages + personal line messages for that user
-      if (selectedEmailInboxView !== "all" && filterUserId) {
-        // This is SMS/call from lead_communications - show for all users since it's the shared line
-        // Personal phone messages are already filtered in the query
-        // For the shared business line, show to all users
-        // The filtering is done by type: personal_sms/personal_call are user-specific
-        if (c.type === "personal_sms" || c.type === "personal_call") {
-          // Personal messages are already filtered by user in the query (line 1037)
-          // They should show only for the user who owns them
-          // This is already handled, but let's double-check by matching the phone
-          // For now, include all personal messages since query already filters by user
-        }
-        // Company SMS (type: "sms" or "call") go to everyone
-      }
+      // NOTE: SMS/call filtering is already done at the query level (lines 1046-1083)
+      // The enhancedCommunications array only contains messages for the selected user
+      // when a specific inbox is selected, so no additional filtering is needed here
       
       return true;
     });
