@@ -12,6 +12,8 @@ interface SendVoicemailButtonProps {
   variant?: "default" | "outline" | "ghost" | "secondary";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
+  /** Allow editing recipient name for manual dial scenarios */
+  allowNameEdit?: boolean;
 }
 
 export function SendVoicemailButton({
@@ -22,6 +24,7 @@ export function SendVoicemailButton({
   variant = "outline",
   size = "sm",
   className,
+  allowNameEdit = false,
 }: SendVoicemailButtonProps) {
   const [open, setOpen] = useState(false);
 
@@ -59,6 +62,7 @@ export function SendVoicemailButton({
         recipientName={recipientName}
         leadId={leadId}
         ownerId={ownerId}
+        allowNameEdit={allowNameEdit}
       />
     </>
   );
