@@ -525,41 +525,40 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         <ScrollArea className="flex-1 overflow-y-auto pr-4">
         {/* Quick Action Buttons */}
         <div className="flex flex-wrap items-center gap-3 py-4 border-b mb-4">
-          {lead.phone && (
-            <DirectCallButton 
-              leadId={lead.id}
-              leadPhone={lead.phone}
-              leadName={lead.name}
-              leadAddress={lead.property_address}
-            />
-          )}
-          {lead.email && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowEmailDialog(true)}
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Email
-            </Button>
-          )}
-          {lead.phone && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowSMSDialog(true)}
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Text
-            </Button>
-          )}
-          {lead.phone && (
-            <SendVoicemailButton
-              recipientPhone={lead.phone}
-              recipientName={lead.name}
-              leadId={lead.id}
-            />
-          )}
+          {/* Show all communication buttons, disabled state if no contact info */}
+          <DirectCallButton 
+            leadId={lead.id}
+            leadPhone={lead.phone || ""}
+            leadName={lead.name}
+            leadAddress={lead.property_address}
+            disabled={!lead.phone}
+          />
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowEmailDialog(true)}
+            disabled={!lead.email}
+            title={!lead.email ? "Add email first" : "Send email"}
+          >
+            <Mail className="h-4 w-4 mr-2" />
+            Email
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowSMSDialog(true)}
+            disabled={!lead.phone}
+            title={!lead.phone ? "Add phone first" : "Send text"}
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Text
+          </Button>
+          <SendVoicemailButton
+            recipientPhone={lead.phone || ""}
+            recipientName={lead.name}
+            leadId={lead.id}
+            disabled={!lead.phone}
+          />
           <Button 
             variant="outline" 
             size="sm"
@@ -585,6 +584,15 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             )}
           </Button>
         </div>
+        
+        {/* Missing contact info warning */}
+        {(!lead.phone || !lead.email) && (
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-4 flex items-start gap-2">
+            <span className="text-warning text-sm">
+              ⚠️ Missing contact info - click the pencil icon below to add {!lead.phone && !lead.email ? 'phone and email' : !lead.phone ? 'phone' : 'email'}
+            </span>
+          </div>
+        )}
 
         {/* Lead Info */}
         <div className="space-y-3 pb-4">
@@ -631,11 +639,13 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               </div>
             ) : (
               <>
-                <span className="text-sm">{lead.email || "No email"}</span>
+                <span className={`text-sm ${!lead.email ? 'text-muted-foreground italic' : ''}`}>
+                  {lead.email || "Add email"}
+                </span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className={`h-6 w-6 transition-opacity ${!lead.email ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-100'}`}
                   onClick={() => setIsEditingEmail(true)}
                 >
                   <Pencil className="h-3 w-3" />
@@ -687,11 +697,13 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               </div>
             ) : (
               <>
-                <span className="text-sm">{lead.phone || "No phone"}</span>
+                <span className={`text-sm ${!lead.phone ? 'text-muted-foreground italic' : ''}`}>
+                  {lead.phone || "Add phone"}
+                </span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className={`h-6 w-6 transition-opacity ${!lead.phone ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-100'}`}
                   onClick={() => setIsEditingPhone(true)}
                 >
                   <Pencil className="h-3 w-3" />
