@@ -106,7 +106,57 @@ serve(async (req) => {
       );
     }
 
-    // Get all reviews with phone numbers
+    // PRIORITY 1: Get pending google_review_requests that never got sent (permission_asked_at is null)
+    const { data: pendingRequests, error: pendingError } = await supabase
+      .from("google_review_requests")
+      .select(`
+        id,
+        review_id,
+        guest_phone,
+        opted_out,
+        workflow_status,
+        permission_asked_at,
+        ownerrez_reviews (
+          id,
+          guest_phone,
+          review_source,
+          review_text,
+          review_date,
+          guest_name
+        )
+      `)
+      .eq("workflow_status", "pending")
+      .is("permission_asked_at", null)
+      .eq("opted_out", false)
+      .limit(remainingToday);
+
+    if (pendingError) {
+      console.error("Error fetching pending requests:", pendingError);
+    }
+
+    console.log(`Found ${pendingRequests?.length || 0} pending requests that never got SMS sent`);
+
+    // Convert pending requests to review format for processing
+    // Note: ownerrez_reviews is returned as an object (single relation via review_id)
+    const pendingReviewsToContact = (pendingRequests || [])
+      .filter(r => r.ownerrez_reviews && r.guest_phone)
+      .map(r => {
+        const review = r.ownerrez_reviews as any;
+        return {
+          id: review.id,
+          guest_phone: r.guest_phone,
+          review_source: review.review_source,
+          review_text: review.review_text,
+          review_date: review.review_date,
+          guest_name: review.guest_name,
+          existingRequestId: r.id, // Track the existing request ID
+        };
+      });
+
+    // Calculate how many more we can add from new reviews
+    const remainingAfterPending = Math.max(0, remainingToday - pendingReviewsToContact.length);
+
+    // Get all reviews with phone numbers (for new ones)
     const { data: allReviews, error: reviewError } = await supabase
       .from("ownerrez_reviews")
       .select(`
@@ -150,7 +200,7 @@ serve(async (req) => {
     );
 
     // Find reviews that need contact - prioritize NEW reviews from today
-    let reviewsToContact: typeof allReviews = [];
+    let newReviewsToContact: typeof allReviews = [];
     
     // First, find reviews posted today that don't have a request yet (priority)
     const today = new Date();
@@ -219,14 +269,15 @@ serve(async (req) => {
       return true;
     });
 
-    // Combine: today's reviews first (up to remaining quota), then fill with older ones
+    // Combine: PRIORITY 1 = pending requests that never got SMS, then new reviews
     // CRITICAL: Respect the remaining daily quota
-    reviewsToContact = [
-      ...filteredTodayReviews.slice(0, remainingToday),
-      ...filteredOlderReviews.slice(0, Math.max(0, remainingToday - filteredTodayReviews.length))
+    const reviewsToContact = [
+      ...pendingReviewsToContact.slice(0, remainingToday),
+      ...filteredTodayReviews.slice(0, Math.max(0, remainingToday - pendingReviewsToContact.length)),
+      ...filteredOlderReviews.slice(0, Math.max(0, remainingToday - pendingReviewsToContact.length - filteredTodayReviews.length))
     ].slice(0, remainingToday);
 
-    console.log(`Found ${filteredTodayReviews.length} eligible new reviews from today, ${filteredOlderReviews.length} eligible older reviews`);
+    console.log(`Found ${pendingReviewsToContact.length} pending (never sent), ${filteredTodayReviews.length} new from today, ${filteredOlderReviews.length} older reviews`);
     console.log(`Processing ${reviewsToContact.length} reviews in this batch (limited by remaining quota: ${remainingToday})`);
     console.log(`Daily send stats: ${sentToday} already sent + ${reviewsToContact.length} this batch = ${sentToday + reviewsToContact.length} total`);
 
@@ -239,12 +290,13 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: `All ${totalReviews} reviews have been processed. ${alreadyContacted} requests exist (${pendingStatus} pending status).`,
+          message: `All ${totalReviews} reviews have been processed. ${alreadyContacted} requests exist (${pendingStatus} pending status, ${pendingReviewsToContact.length} never sent).`,
           sentCount: 0,
           stats: {
             totalReviews,
             alreadyContacted,
             pendingStatus,
+            pendingNeverSent: pendingReviewsToContact.length,
             optedOut: optedOutPhones.size
           }
         }),

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Mic, MicOff, Loader2, Sparkles, Check, X, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,8 +15,51 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useScribe, CommitStrategy } from "@elevenlabs/react";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+// Type definitions for Web Speech API
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: Event & { error: string }) => void) | null;
+  onend: (() => void) | null;
+  onstart: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
 
 interface VoiceDictationButtonProps {
   onResult: (text: string) => void;
@@ -40,70 +83,122 @@ export function VoiceDictationButton({
   const [isOpen, setIsOpen] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [polishedPreview, setPolishedPreview] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
   const isMobile = useIsMobile();
+  
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const finalTranscriptRef = useRef("");
 
-  const scribe = useScribe({
-    modelId: "scribe_v2_realtime",
-    commitStrategy: CommitStrategy.VAD,
-    onPartialTranscript: (data) => {
-      console.log("[Scribe] Partial:", data.text);
-      setTranscript(prev => {
-        const parts = prev.split(/(?<=\. )/);
-        if (parts.length > 0 && !data.text.includes('.')) {
-          parts[parts.length - 1] = data.text;
-          return parts.join('');
-        }
-        return prev + data.text;
-      });
-    },
-    onCommittedTranscript: (data) => {
-      console.log("[Scribe] Committed:", data.text);
-      setTranscript(prev => {
-        const cleaned = prev.replace(/[^.]*$/, '');
-        return (cleaned + ' ' + data.text).trim();
-      });
-    },
-  });
+  // Check if browser supports speech recognition
+  const getSpeechRecognition = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    return window.SpeechRecognition || window.webkitSpeechRecognition;
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
 
   const startListening = useCallback(async () => {
     setIsConnecting(true);
     setTranscript("");
     setPolishedPreview(null);
+    finalTranscriptRef.current = "";
     
+    const SpeechRecognitionClass = getSpeechRecognition();
+    
+    if (!SpeechRecognitionClass) {
+      toast.error("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      setIsConnecting(false);
+      return;
+    }
+
     try {
-      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
+      // Request microphone permission first
+      await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      if (error || !data?.token) {
-        console.error("[Scribe] Token error:", error);
-        toast.error("Failed to start speech recognition. Please try again.");
+      const recognition = new SpeechRecognitionClass();
+      recognitionRef.current = recognition;
+      
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        console.log("[WebSpeech] Recognition started");
         setIsConnecting(false);
-        return;
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript + ' ';
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+
+        if (finalTranscript) {
+          finalTranscriptRef.current += finalTranscript;
+        }
+
+        const displayTranscript = (finalTranscriptRef.current + interimTranscript).trim();
+        setTranscript(displayTranscript);
+        console.log("[WebSpeech] Transcript:", displayTranscript);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("[WebSpeech] Error:", event.error);
+        if (event.error === 'not-allowed') {
+          toast.error("Microphone access denied. Please allow microphone access in your browser settings.");
+        } else if (event.error === 'no-speech') {
+          toast.info("No speech detected. Try speaking louder or closer to the microphone.");
+        } else {
+          toast.error(`Speech recognition error: ${event.error}`);
+        }
+        setIsListening(false);
+        setIsConnecting(false);
+      };
+
+      recognition.onend = () => {
+        console.log("[WebSpeech] Recognition ended");
+        setIsListening(false);
+        // Set final transcript
+        if (finalTranscriptRef.current.trim()) {
+          setTranscript(finalTranscriptRef.current.trim());
+        }
+      };
+
+      recognition.start();
+      console.log("[WebSpeech] Starting recognition...");
+    } catch (error: any) {
+      console.error("[WebSpeech] Connection error:", error);
+      if (error.name === 'NotAllowedError') {
+        toast.error("Microphone access denied. Please allow microphone access in your browser settings.");
+      } else {
+        toast.error("Failed to start speech recognition. Please check your microphone.");
       }
-
-      console.log("[Scribe] Got token, connecting...");
-
-      await scribe.connect({
-        token: data.token,
-        microphone: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      console.log("[Scribe] Connected successfully");
-    } catch (error) {
-      console.error("[Scribe] Connection error:", error);
-      toast.error("Failed to connect to speech recognition service.");
-    } finally {
       setIsConnecting(false);
     }
-  }, [scribe]);
+  }, [getSpeechRecognition]);
 
   const stopListening = useCallback(() => {
-    console.log("[Scribe] Stopping...");
-    scribe.disconnect();
-  }, [scribe]);
+    console.log("[WebSpeech] Stopping...");
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+  }, []);
 
   const handlePolishAndInsert = async () => {
     if (!transcript.trim()) {
@@ -209,6 +304,7 @@ export function VoiceDictationButton({
   const resetState = () => {
     setPolishedPreview(null);
     setTranscript("");
+    finalTranscriptRef.current = "";
     setIsOpen(false);
   };
 
@@ -216,7 +312,8 @@ export function VoiceDictationButton({
     setPolishedPreview(null);
   };
 
-  const isListening = scribe.isConnected;
+  // Check browser support
+  const isSupported = !!getSpeechRecognition();
 
   // Trigger button - shared between desktop and mobile - ENHANCED SIZE
   const TriggerButton = (
@@ -228,9 +325,11 @@ export function VoiceDictationButton({
         "h-11 w-11 md:h-10 md:w-10 rounded-full transition-all duration-200 flex-shrink-0 active:scale-95",
         isListening && "animate-pulse bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30",
         !isListening && "hover:bg-primary/10",
+        !isSupported && "opacity-50 cursor-not-allowed",
         className
       )}
-      title="Voice dictation - Click to speak"
+      title={isSupported ? "Voice dictation - Click to speak" : "Speech recognition not supported in this browser"}
+      disabled={!isSupported}
     >
       {isListening ? (
         <MicOff className="h-5 w-5" />
