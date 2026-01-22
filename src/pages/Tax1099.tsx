@@ -16,13 +16,15 @@ export default function Tax1099() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", user.id)
-        .single();
+      // Check user_roles table for admin role (not is_admin column)
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
 
-      if (!profile?.is_admin) {
+      const hasAdminRole = roles?.some(r => r.role === "admin");
+
+      if (!hasAdminRole) {
         navigate("/");
         return;
       }
