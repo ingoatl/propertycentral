@@ -239,6 +239,26 @@ serve(async (req) => {
       );
     }
 
+    // ========== GUEST SCREENING EMAIL DETECTION ==========
+    // Detect verification emails from Truvi, Authenticate, Superhog, Autohost
+    const screeningProviders = [
+      { name: 'truvi', senderPatterns: ['@truvi.com', 'noreply@truvi'], subjectPatterns: ['verification complete', 'guest verified', 'id verified', 'truvi'] },
+      { name: 'authenticate', senderPatterns: ['@authenticate.com', '@autohost.ai'], subjectPatterns: ['screening result', 'verification status', 'guest approved', 'background check'] },
+      { name: 'superhog', senderPatterns: ['@superhog.com'], subjectPatterns: ['superhog', 'guest protection', 'verification complete'] },
+      { name: 'autohost', senderPatterns: ['@autohost.ai', '@autohost.com'], subjectPatterns: ['autohost', 'guest screening', 'verification'] },
+    ];
+    
+    let detectedScreeningProvider: string | null = null;
+    for (const provider of screeningProviders) {
+      const senderMatch = provider.senderPatterns.some(p => safeSenderEmail.toLowerCase().includes(p));
+      const subjectMatch = provider.subjectPatterns.some(p => safeSubject.toLowerCase().includes(p));
+      if (senderMatch || subjectMatch) {
+        detectedScreeningProvider = provider.name;
+        console.log(`Detected guest screening email from provider: ${provider.name}`);
+        break;
+      }
+    }
+
     // PHASE 1.5: PROMOTIONAL/NEWSLETTER DETECTION - Classify but don't skip
     const promotionalKeywords = [
       'unsubscribe', 'newsletter', 'promotional', 'marketing',
@@ -825,8 +845,144 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       }
     }
 
+    // ========== GUEST SCREENING EMAIL PROCESSING ==========
+    // If we detected a screening email, create a guest_screenings record
+    let screeningCreated = false;
+    let screeningId = null;
+    
+    if (detectedScreeningProvider && property) {
+      console.log('Processing guest screening email for property:', property.name);
+      
+      // Parse screening results from email body
+      const bodyLower = safeBody.toLowerCase();
+      const subjectLower = safeSubject.toLowerCase();
+      
+      // Determine screening status
+      let screeningStatus = 'pending';
+      if (bodyLower.includes('passed') || bodyLower.includes('verified') || bodyLower.includes('approved') || 
+          subjectLower.includes('verified') || subjectLower.includes('approved')) {
+        screeningStatus = 'passed';
+      } else if (bodyLower.includes('failed') || bodyLower.includes('denied') || bodyLower.includes('rejected') ||
+                 subjectLower.includes('failed') || subjectLower.includes('denied')) {
+        screeningStatus = 'failed';
+      } else if (bodyLower.includes('flagged') || bodyLower.includes('review') || bodyLower.includes('attention')) {
+        screeningStatus = 'flagged';
+      }
+      
+      // Determine risk score
+      let riskScore = 'medium';
+      if (bodyLower.includes('low risk') || bodyLower.includes('no concerns') || bodyLower.includes('all clear')) {
+        riskScore = 'low';
+      } else if (bodyLower.includes('high risk') || bodyLower.includes('flagged') || bodyLower.includes('concern')) {
+        riskScore = 'high';
+      }
+      
+      // Check verification types
+      const idVerified = bodyLower.includes('id verified') || bodyLower.includes('identity verified') || 
+                         bodyLower.includes('photo id') || bodyLower.includes('document verified');
+      const backgroundPassed = bodyLower.includes('background check') && (bodyLower.includes('passed') || bodyLower.includes('clear'));
+      const watchlistClear = bodyLower.includes('watchlist') && (bodyLower.includes('clear') || bodyLower.includes('no matches'));
+      
+      // Extract guest name from email if possible
+      let guestName = 'Unknown Guest';
+      const guestNamePatterns = [
+        /guest[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        /name[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        /for\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        /verified\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+      ];
+      for (const pattern of guestNamePatterns) {
+        const match = safeBody.match(pattern) || safeSubject.match(pattern);
+        if (match) {
+          guestName = match[1].trim();
+          break;
+        }
+      }
+      
+      // Try to match to an existing booking by guest name and property
+      let matchedBookingId = null;
+      const { data: recentBookings } = await supabase
+        .from('ownerrez_bookings')
+        .select('id, guest_name, check_in, check_out')
+        .eq('property_id', property.id)
+        .gte('check_in', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .order('check_in', { ascending: false })
+        .limit(10);
+      
+      if (recentBookings && recentBookings.length > 0) {
+        // Try to match by guest name
+        const matchedBooking = recentBookings.find(b => 
+          b.guest_name && guestName && 
+          (b.guest_name.toLowerCase().includes(guestName.toLowerCase()) || 
+           guestName.toLowerCase().includes(b.guest_name.toLowerCase()))
+        );
+        if (matchedBooking) {
+          matchedBookingId = matchedBooking.id;
+          console.log('Matched screening to booking:', matchedBooking.id, matchedBooking.guest_name);
+        }
+      }
+      
+      // Check for existing screening with same gmail_message_id
+      const { data: existingScreening } = await supabase
+        .from('guest_screenings')
+        .select('id')
+        .eq('gmail_message_id', gmailMessageId)
+        .maybeSingle();
+      
+      if (!existingScreening) {
+        // Create guest screening record
+        const { data: newScreening, error: screeningError } = await supabase
+          .from('guest_screenings')
+          .insert({
+            booking_id: matchedBookingId,
+            property_id: property.id,
+            guest_name: guestName,
+            screening_provider: detectedScreeningProvider,
+            screening_status: screeningStatus,
+            id_verified: idVerified,
+            background_passed: backgroundPassed,
+            watchlist_clear: watchlistClear,
+            risk_score: riskScore,
+            screening_date: emailDate,
+            gmail_message_id: gmailMessageId,
+            raw_result: { subject, body: safeBody.substring(0, 2000), senderEmail },
+          })
+          .select()
+          .single();
+        
+        if (screeningError) {
+          console.error('Error creating guest screening:', screeningError);
+        } else {
+          screeningCreated = true;
+          screeningId = newScreening.id;
+          console.log('Created guest screening:', newScreening.id, 'Status:', screeningStatus);
+          
+          // Trigger owner notification for completed screenings
+          if (screeningStatus === 'passed' || screeningStatus === 'failed' || screeningStatus === 'flagged') {
+            try {
+              const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+              const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+              
+              fetch(`${supabaseUrl}/functions/v1/notify-owner-screening`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({ screeningId: newScreening.id })
+              }).catch(err => console.error('Background screening notification error:', err));
+            } catch (notifyErr) {
+              console.error('Failed to trigger screening notification:', notifyErr);
+            }
+          }
+        }
+      } else {
+        console.log('Guest screening already exists for this email');
+      }
+    }
+
     // Apply promotional/newsletter override from pre-detection
-    const finalCategory = preDetectedCategory || analysis.category;
+    const finalCategory = detectedScreeningProvider ? 'guest_screening' : (preDetectedCategory || analysis.category);
     const finalPriority = preDetectedPriority || analysis.priority;
     
     // Log if we overrode the AI's classification
@@ -1059,6 +1215,8 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
         insight,
         expenseCreated,
         expenseId,
+        screeningCreated,
+        screeningId,
         ownerConversationCreated,
         ownerConversationId,
         analysis
