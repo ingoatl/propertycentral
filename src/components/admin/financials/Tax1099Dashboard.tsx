@@ -284,6 +284,10 @@ export function Tax1099Dashboard() {
     setViewingW9({ filePath, name, type });
   };
 
+  const onOpenVoiceModal = (entity: TaxEntity) => {
+    setVoiceModalEntity(entity);
+  };
+
   const handleVoiceReminder = async (entityId: string, entityType: "owner" | "vendor", entityName: string) => {
     try {
       setSendingVoiceReminder(entityId);
@@ -693,6 +697,7 @@ export function Tax1099Dashboard() {
                 onViewW9={handleViewW9}
                 onVoiceReminder={handleVoiceReminder}
                 onSendReminder={handleSendReminder}
+                onOpenVoiceModal={onOpenVoiceModal}
                 sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
@@ -706,6 +711,7 @@ export function Tax1099Dashboard() {
                 onViewW9={handleViewW9}
                 onVoiceReminder={handleVoiceReminder}
                 onSendReminder={handleSendReminder}
+                onOpenVoiceModal={onOpenVoiceModal}
                 sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
@@ -719,6 +725,7 @@ export function Tax1099Dashboard() {
                 onViewW9={handleViewW9}
                 onVoiceReminder={handleVoiceReminder}
                 onSendReminder={handleSendReminder}
+                onOpenVoiceModal={onOpenVoiceModal}
                 sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
@@ -734,6 +741,17 @@ export function Tax1099Dashboard() {
         title={`W-9 - ${viewingW9?.name}`}
         bucketName="onboarding-documents"
       />
+
+      {/* Voice Follow-up Dialog */}
+      {voiceModalEntity && (
+        <SendVoicemailDialog
+          open={!!voiceModalEntity}
+          onOpenChange={(open) => !open && setVoiceModalEntity(null)}
+          recipientName={voiceModalEntity.name}
+          recipientPhone={voiceModalEntity.phone || ""}
+          allowNameEdit={true}
+        />
+      )}
     </div>
   );
 }
@@ -747,6 +765,7 @@ interface EntityTableProps {
   onViewW9: (filePath: string, type: string, name: string) => void;
   onVoiceReminder: (id: string, type: "owner" | "vendor", name: string) => void;
   onSendReminder: (id: string, type: "owner" | "vendor", name: string, day: number) => void;
+  onOpenVoiceModal: (entity: TaxEntity) => void;
   sendingVoiceReminder: string | null;
 }
 
@@ -759,6 +778,7 @@ function EntityTable({
   onViewW9,
   onVoiceReminder,
   onSendReminder,
+  onOpenVoiceModal,
   sendingVoiceReminder,
 }: EntityTableProps) {
   return (
