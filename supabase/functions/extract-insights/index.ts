@@ -851,7 +851,48 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
     let screeningCreated = false;
     let screeningId = null;
     
-    if (detectedScreeningProvider && property) {
+    // ENHANCED: Try to match property even if not matched initially for screening emails
+    if (detectedScreeningProvider && !property) {
+      console.log('Screening email detected but no property matched - searching email content...');
+      
+      // Try to find property by street address in email body
+      for (const prop of safeProperties) {
+        if (!prop.address) continue;
+        
+        // Extract street address (first part before comma)
+        const streetAddress = prop.address.toLowerCase().split(',')[0].trim();
+        const streetParts = streetAddress.split(' ');
+        
+        // Look for street number + name combination
+        if (streetParts.length >= 2) {
+          const streetPattern = streetParts.slice(0, 3).join(' '); // e.g. "123 main st"
+          if (safeBody.toLowerCase().includes(streetPattern) || 
+              safeSubject.toLowerCase().includes(streetPattern)) {
+            property = prop;
+            console.log('Matched property from screening email body by address:', prop.name, streetPattern);
+            break;
+          }
+        }
+      }
+      
+      // Also try property name matching if address didn't work
+      if (!property) {
+        for (const prop of safeProperties) {
+          if (!prop.name) continue;
+          
+          const propNameLower = prop.name.toLowerCase();
+          if (safeBody.toLowerCase().includes(propNameLower) ||
+              safeSubject.toLowerCase().includes(propNameLower)) {
+            property = prop;
+            console.log('Matched property by name from screening email:', prop.name);
+            break;
+          }
+        }
+      }
+    }
+    
+    // Process screening even without property match (for manual review later)
+    if (detectedScreeningProvider) {
       console.log('Processing guest screening email for property:', property.name);
       
       // Parse screening results from email body
@@ -946,7 +987,7 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
           .from('guest_screenings')
           .insert({
             booking_id: matchedBookingId,
-            property_id: property.id,
+            property_id: property?.id || null, // Allow null property for manual review
             guest_name: guestName,
             screening_provider: detectedScreeningProvider,
             screening_status: screeningStatus,
