@@ -634,27 +634,58 @@ const PropertyOwners = () => {
                           {owner.service_type === 'cohosting' ? 'Co-Hosting' : 'Full Service'}
                         </Badge>
                         
-                        {/* W9 Request Button - Only for co-hosting */}
-                        {owner.service_type === 'cohosting' && (
+                        {/* W-9 Button - Dual direction based on service type */}
+                        {owner.service_type === 'cohosting' ? (
+                          // Co-hosting: Send OUR W-9 TO them (they issue 1099 to us)
                           <Button
-                            variant={owner.w9_sent_at ? "ghost" : "outline"}
+                            variant={owner.our_w9_sent_at ? "ghost" : "outline"}
                             size="sm"
-                            onClick={() => handleSendW9Request(owner)}
+                            onClick={() => handleSendOurW9(owner)}
                             disabled={sendingW9 === owner.id}
-                            title={owner.w9_sent_at ? `W-9 sent ${new Date(owner.w9_sent_at).toLocaleDateString()}` : "Send W-9 form to owner"}
-                            className={owner.w9_sent_at ? "text-green-600" : ""}
+                            title={owner.our_w9_sent_at ? `Our W-9 sent ${new Date(owner.our_w9_sent_at).toLocaleDateString()}` : "Send our W-9 to owner"}
+                            className={owner.our_w9_sent_at ? "text-green-600" : ""}
                           >
                             {sendingW9 === owner.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : owner.w9_uploaded_at ? (
+                            ) : owner.our_w9_sent_at ? (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Our W-9 Sent
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="w-4 h-4 mr-1" />
+                                Send Our W-9
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          // Full-service: Request THEIR W-9 FROM them (we issue 1099 to them)
+                          <Button
+                            variant={owner.owner_w9_uploaded_at ? "ghost" : owner.owner_w9_requested_at ? "ghost" : "outline"}
+                            size="sm"
+                            onClick={() => handleRequestOwnerW9(owner)}
+                            disabled={requestingW9 === owner.id}
+                            title={
+                              owner.owner_w9_uploaded_at 
+                                ? `W-9 received ${new Date(owner.owner_w9_uploaded_at).toLocaleDateString()}` 
+                                : owner.owner_w9_requested_at 
+                                  ? `W-9 requested ${new Date(owner.owner_w9_requested_at).toLocaleDateString()}`
+                                  : "Request W-9 from owner"
+                            }
+                            className={owner.owner_w9_uploaded_at ? "text-green-600" : owner.owner_w9_requested_at ? "text-amber-600" : ""}
+                          >
+                            {requestingW9 === owner.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : owner.owner_w9_uploaded_at ? (
                               <>
                                 <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
                                 W-9 Received
                               </>
-                            ) : owner.w9_sent_at ? (
+                            ) : owner.owner_w9_requested_at ? (
                               <>
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                W-9 Sent
+                                <FileText className="w-4 h-4 mr-1" />
+                                W-9 Requested
                               </>
                             ) : (
                               <>
@@ -737,14 +768,22 @@ const PropertyOwners = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            {/* W9 for co-hosting in mobile */}
-                            {owner.service_type === 'cohosting' && (
+                            {/* W-9 for mobile - dual direction */}
+                            {owner.service_type === 'cohosting' ? (
                               <DropdownMenuItem 
-                                onClick={() => handleSendW9Request(owner)}
+                                onClick={() => handleSendOurW9(owner)}
                                 disabled={sendingW9 === owner.id}
                               >
                                 <FileText className="w-4 h-4 mr-2" />
-                                {owner.w9_sent_at ? 'Resend W-9' : 'Request W-9'}
+                                {owner.our_w9_sent_at ? 'Resend Our W-9' : 'Send Our W-9'}
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem 
+                                onClick={() => handleRequestOwnerW9(owner)}
+                                disabled={requestingW9 === owner.id}
+                              >
+                                <FileText className="w-4 h-4 mr-2" />
+                                {owner.owner_w9_uploaded_at ? 'W-9 Received' : owner.owner_w9_requested_at ? 'Resend W-9 Request' : 'Request W-9'}
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem 
