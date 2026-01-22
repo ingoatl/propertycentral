@@ -85,7 +85,14 @@ const Properties = () => {
   const canDeleteProperties = currentUserEmail === "ingo@peachhausgroup.com";
 
   const handleDeleteProperty = async (property: Property) => {
-    if (!confirm(`Are you sure you want to permanently delete "${property.name}"? This will also delete all associated data (expenses, visits, bookings, etc.). This action cannot be undone.`)) {
+    // First require the security code
+    const securityCode = prompt(`To delete "${property.name}", please enter the security code:`);
+    if (securityCode !== "4201") {
+      toast.error("Incorrect security code. Property deletion cancelled.");
+      return;
+    }
+    
+    if (!confirm(`FINAL CONFIRMATION: Are you sure you want to permanently delete "${property.name}"? This will also delete all associated data (expenses, visits, bookings, etc.). This action cannot be undone.`)) {
       return;
     }
     
@@ -225,9 +232,11 @@ const Properties = () => {
 
   const loadPropertyProjects = async () => {
     try {
+      // Order by progress DESC so we prefer projects with actual data over empty duplicates
       const { data: projects, error } = await supabase
         .from("onboarding_projects")
         .select("id, property_id, progress")
+        .order("progress", { ascending: false })
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -236,6 +245,7 @@ const Properties = () => {
       const progressMap: Record<string, number> = {};
       
       // For each project, recalculate progress based on tasks with data
+      // The first project per property_id wins (the one with highest progress)
       for (const project of projects || []) {
         if (project.property_id && !projectMap[project.property_id]) {
           projectMap[project.property_id] = project.id;
