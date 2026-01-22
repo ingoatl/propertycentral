@@ -170,6 +170,7 @@ export function SendEmailDialog({
       setSubject("");
       setBody("");
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["sent-communications"] });
       queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
       queryClient.invalidateQueries({ queryKey: ["gmail-emails"] });
       if (onEmailSent) {

@@ -94,6 +94,7 @@ import { useEmailClassification, classifyEmail, getClassificationColor } from "@
 import { ArchivedMessagesList } from "./saved/ArchivedMessagesList";
 import { VideoMeetingsList } from "./VideoMeetingsList";
 import { InboxFolderSelector, type InboxFolder } from "./inbox/InboxFolderSelector";
+import { SentMessagesList } from "./inbox/SentMessagesList";
 import { SaveCommunicationButton } from "./saved/SaveCommunicationButton";
 import { InboxMoreActionsDropdown } from "./inbox/InboxMoreActionsDropdown";
 import { SendVoicemailButton } from "./SendVoicemailButton";
@@ -1506,6 +1507,160 @@ export function InboxView() {
     },
   });
 
+  // Sent messages query - only fetch when viewing Sent folder
+  const { data: sentMessages = [], isLoading: isLoadingSent } = useQuery({
+    queryKey: ["sent-communications", currentUserId, viewAllInboxes, isAdmin],
+    queryFn: async () => {
+      interface SentMessage {
+        id: string;
+        communication_type: string;
+        subject: string | null;
+        body: string | null;
+        created_at: string;
+        sent_at: string | null;
+        status: string | null;
+        recipient_name: string;
+        recipient_email: string | null;
+        recipient_phone: string | null;
+        contact_type: "lead" | "owner" | "tenant" | "external";
+        sender_name?: string;
+      }
+      
+      const results: SentMessage[] = [];
+      
+      // Fetch outbound lead communications
+      let leadQuery = supabase
+        .from("lead_communications")
+        .select(`
+          id, communication_type, direction, body, subject, created_at, sent_at, status,
+          lead_id, assigned_user_id, metadata,
+          leads(id, name, phone, email)
+        `)
+        .eq("direction", "outbound")
+        .in("communication_type", ["sms", "email"])
+        .order("created_at", { ascending: false })
+        .limit(100);
+      
+      // Non-admins only see their own sent items
+      if (!isAdmin && currentUserId) {
+        leadQuery = leadQuery.eq("assigned_user_id", currentUserId);
+      }
+      
+      const { data: leadComms } = await leadQuery;
+      
+      if (leadComms) {
+        // Fetch sender profiles for display
+        const senderIds = [...new Set(leadComms.map(c => c.assigned_user_id).filter(Boolean))];
+        let senderMap: Record<string, string> = {};
+        
+        if (senderIds.length > 0) {
+          const { data: senderProfiles } = await supabase
+            .from("profiles")
+            .select("id, first_name, email")
+            .in("id", senderIds);
+          
+          if (senderProfiles) {
+            senderProfiles.forEach(p => {
+              senderMap[p.id] = p.first_name || p.email?.split("@")[0] || "Unknown";
+            });
+          }
+        }
+        
+        for (const comm of leadComms) {
+          const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null } | null;
+          const metadata = comm.metadata as { sender_email?: string; sender_name?: string } | null;
+          
+          results.push({
+            id: comm.id,
+            communication_type: comm.communication_type,
+            subject: comm.subject,
+            body: comm.body,
+            created_at: comm.created_at,
+            sent_at: comm.sent_at,
+            status: comm.status,
+            recipient_name: lead?.name || "Unknown",
+            recipient_email: lead?.email,
+            recipient_phone: lead?.phone,
+            contact_type: "lead",
+            sender_name: comm.assigned_user_id ? senderMap[comm.assigned_user_id] : metadata?.sender_name,
+          });
+        }
+      }
+      
+      // Fetch outbound owner communications
+      let ownerQuery = supabase
+        .from("lead_communications")
+        .select(`
+          id, communication_type, direction, body, subject, created_at, sent_at, status,
+          owner_id, assigned_user_id, assigned_to, metadata,
+          property_owners(id, name, phone, email)
+        `)
+        .eq("direction", "outbound")
+        .in("communication_type", ["sms", "email"])
+        .not("owner_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      
+      // Non-admins only see their own sent items
+      if (!isAdmin && currentUserId) {
+        ownerQuery = ownerQuery.or(`assigned_user_id.eq.${currentUserId},assigned_to.eq.${currentUserId}`);
+      }
+      
+      const { data: ownerComms } = await ownerQuery;
+      
+      if (ownerComms) {
+        // Build sender map for these too
+        const senderIds = [...new Set(ownerComms.map(c => c.assigned_user_id || c.assigned_to).filter(Boolean))];
+        let senderMap: Record<string, string> = {};
+        
+        if (senderIds.length > 0) {
+          const { data: senderProfiles } = await supabase
+            .from("profiles")
+            .select("id, first_name, email")
+            .in("id", senderIds);
+          
+          if (senderProfiles) {
+            senderProfiles.forEach(p => {
+              senderMap[p.id] = p.first_name || p.email?.split("@")[0] || "Unknown";
+            });
+          }
+        }
+        
+        for (const comm of ownerComms) {
+          const owner = comm.property_owners as { id: string; name: string; phone: string | null; email: string | null } | null;
+          const senderId = comm.assigned_user_id || comm.assigned_to;
+          const metadata = comm.metadata as { sender_email?: string; sender_name?: string } | null;
+          
+          results.push({
+            id: comm.id,
+            communication_type: comm.communication_type,
+            subject: comm.subject,
+            body: comm.body,
+            created_at: comm.created_at,
+            sent_at: comm.sent_at,
+            status: comm.status,
+            recipient_name: owner?.name || "Unknown Owner",
+            recipient_email: owner?.email,
+            recipient_phone: owner?.phone,
+            contact_type: "owner",
+            sender_name: senderId ? senderMap[senderId] : metadata?.sender_name,
+          });
+        }
+      }
+      
+      // Sort by sent_at or created_at descending
+      results.sort((a, b) => {
+        const dateA = new Date(a.sent_at || a.created_at).getTime();
+        const dateB = new Date(b.sent_at || b.created_at).getTime();
+        return dateB - dateA;
+      });
+      
+      return results;
+    },
+    enabled: selectedFolder === "sent" && !!currentUserId,
+    staleTime: 10000,
+  });
+
   // Trigger phone lookups for unknown contacts - more aggressive matching
   useEffect(() => {
     if (!communications || communications.length === 0) return;
@@ -2197,6 +2352,10 @@ export function InboxView() {
     
     // Apply filter based on active filter AND inbox view
     const filteredComms = enhancedCommunications.filter(c => {
+      // CRITICAL: When viewing "inbox" folder, exclude outbound messages
+      // Outbound messages should ONLY appear in the "sent" folder
+      if (selectedFolder === "inbox" && c.direction === "outbound") return false;
+      
       // Filter by contact type
       if (activeFilter === "owners" && c.contact_type !== "owner") return false;
       
@@ -2686,7 +2845,13 @@ export function InboxView() {
 
         {/* Message List - Clean, content-first cards */}
         <ScrollArea className="flex-1">
-          {activeTab === "saved" || selectedFolder === "archived" ? (
+          {selectedFolder === "sent" ? (
+            // Sent Messages List
+            <SentMessagesList
+              messages={sentMessages}
+              isLoading={isLoadingSent}
+            />
+          ) : activeTab === "saved" || selectedFolder === "archived" ? (
             // My Archive - Archived Messages List
             <ArchivedMessagesList />
           ) : activeTab === "meetings" ? (
