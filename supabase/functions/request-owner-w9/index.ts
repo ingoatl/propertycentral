@@ -10,6 +10,8 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const TELNYX_API_KEY = Deno.env.get("TELNYX_API_KEY");
+const TELNYX_PHONE_NUMBER = Deno.env.get("TELNYX_PHONE_NUMBER");
 
 // Company logo URL
 const LOGO_URL = `${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png`;
@@ -34,6 +36,53 @@ function generateUploadToken(): string {
     token += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return token;
+}
+
+function formatPhoneForTelnyx(phone: string): string {
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    return `+1${cleaned}`;
+  } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    return `+${cleaned}`;
+  }
+  return phone.startsWith('+') ? phone : `+${cleaned}`;
+}
+
+async function sendSMS(phone: string, message: string): Promise<boolean> {
+  if (!TELNYX_API_KEY || !TELNYX_PHONE_NUMBER) {
+    console.log("Telnyx not configured, skipping SMS");
+    return false;
+  }
+
+  try {
+    const formattedPhone = formatPhoneForTelnyx(phone);
+    console.log(`Sending SMS to ${formattedPhone}`);
+
+    const response = await fetch("https://api.telnyx.com/v2/messages", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${TELNYX_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: TELNYX_PHONE_NUMBER,
+        to: formattedPhone,
+        text: message,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("SMS send failed:", errorText);
+      return false;
+    }
+
+    console.log("SMS sent successfully");
+    return true;
+  } catch (error) {
+    console.error("SMS error:", error);
+    return false;
+  }
 }
 
 // Build professional W-9 request email HTML
@@ -236,7 +285,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Fetch owner details
     const { data: owner, error: ownerError } = await supabase
       .from("property_owners")
-      .select("id, name, email, service_type, second_owner_name, second_owner_email, payments_ytd")
+      .select("id, name, email, phone, service_type, second_owner_name, second_owner_email, payments_ytd")
       .eq("id", ownerId)
       .single();
 
@@ -309,6 +358,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("W-9 request email sent:", emailResponse);
 
+    // Send SMS if phone exists and not test mode
+    let smsSent = false;
+    if (!isTestMode && owner.phone) {
+      const smsMessage = `Hi ${firstName}! PeachHaus needs your W-9 form for ${taxYear} tax filing.\n\n📤 Upload here: ${uploadUrl}\n\n⏰ Deadline: Dec 15th\n📞 Questions? Call (404) 800-5932\n\n- Ingo, PeachHaus`;
+      smsSent = await sendSMS(owner.phone, smsMessage);
+    }
+
     // Log and update database if not test
     if (!isTestMode) {
       // Log communication
@@ -316,7 +372,7 @@ const handler = async (req: Request): Promise<Response> => {
         communication_type: "email",
         direction: "outbound",
         subject: emailSubject,
-        body: `W-9 form requested for ${taxYear} tax filing`,
+        body: `W-9 form requested for ${taxYear} tax filing${smsSent ? ' (SMS also sent)' : ''}`,
         recipient_email: owner.email,
         owner_id: ownerId,
         status: "sent",
@@ -325,23 +381,25 @@ const handler = async (req: Request): Promise<Response> => {
           message_id: emailResponse.data?.id,
           tax_year: taxYear,
           upload_url: uploadUrl,
+          sms_sent: smsSent,
         },
       });
 
       // Update owner record
       await supabase
         .from("property_owners")
-        .update({ owner_w9_requested_at: new Date().toISOString() })
+        .update({ w9_requested_at: new Date().toISOString() })
         .eq("id", ownerId);
 
-      console.log("Updated owner_w9_requested_at for:", ownerId);
+      console.log("Updated w9_requested_at for:", ownerId);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `W-9 request sent to ${recipients.join(", ")}`,
+        message: `W-9 request sent to ${recipients.join(", ")}${smsSent ? ' and SMS sent' : ''}`,
         messageId: emailResponse.data?.id,
+        smsSent,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
