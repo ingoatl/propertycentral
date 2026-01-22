@@ -52,6 +52,7 @@ interface PropertyOwner {
   owner_w9_requested_at: string | null;
   owner_w9_uploaded_at: string | null;
   owner_w9_file_path: string | null;
+  is_archived: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -107,6 +108,7 @@ const PropertyOwners = () => {
   const [selectedOwnerForComms, setSelectedOwnerForComms] = useState<PropertyOwner | null>(null);
   const [sendingW9, setSendingW9] = useState<string | null>(null);
   const [requestingW9, setRequestingW9] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   // Format date helper
   const formatDate = (dateString: string | null) => {
@@ -376,6 +378,25 @@ const PropertyOwners = () => {
     toast.success("Payment method added successfully");
   };
 
+  const handleToggleArchive = async (owner: PropertyOwner) => {
+    const newStatus = !owner.is_archived;
+    try {
+      const { error } = await supabase
+        .from("property_owners")
+        .update({ is_archived: newStatus })
+        .eq("id", owner.id);
+      if (error) throw error;
+      toast.success(newStatus ? "Owner archived - records kept for tax purposes" : "Owner restored to active");
+      loadData();
+    } catch (error: any) {
+      toast.error("Failed to update owner: " + error.message);
+    }
+  };
+
+  // Filter owners based on archive status
+  const filteredOwners = owners.filter(o => showArchived ? o.is_archived : !o.is_archived);
+  const archivedCount = owners.filter(o => o.is_archived).length;
+
   const handleEditOwner = (owner: PropertyOwner) => {
     setEditingOwner(owner);
     setEditForm({
@@ -470,20 +491,29 @@ const PropertyOwners = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="pb-4 border-b border-border/50 flex justify-between items-center">
+      <div className="pb-4 border-b border-border/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
             Property Owners
           </h1>
           <p className="text-muted-foreground mt-1">Manage owners and their payment methods</p>
         </div>
-        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Add Owner
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant={showArchived ? "default" : "outline"} 
+            size="sm"
+            onClick={() => setShowArchived(!showArchived)}
+            className="gap-2"
+          >
+            {showArchived ? "Show Active" : `Archived (${archivedCount})`}
+          </Button>
+          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Add Owner
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add Property Owner</DialogTitle>
@@ -548,6 +578,7 @@ const PropertyOwners = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Edit Owner Dialog */}
@@ -632,10 +663,10 @@ const PropertyOwners = () => {
             </CardContent>
           </Card>
         ) : (
-          owners.map((owner) => {
+          filteredOwners.map((owner) => {
             const ownerProperties = getOwnerProperties(owner.id);
             return (
-              <Card key={owner.id} className="shadow-card border-border/50">
+              <Card key={owner.id} className={`shadow-card border-border/50 ${owner.is_archived ? 'opacity-60' : ''}`}>
                 <CardHeader className="bg-gradient-subtle rounded-t-lg">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -785,12 +816,26 @@ const PropertyOwners = () => {
                             
                             <DropdownMenuSeparator />
                             
+                            <DropdownMenuItem onClick={() => handleToggleArchive(owner)}>
+                              {owner.is_archived ? (
+                                <>
+                                  <Users className="w-4 h-4 mr-2" />
+                                  Restore to Active
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="w-4 h-4 mr-2" />
+                                  Archive (Keep Tax Records)
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            
                             <DropdownMenuItem 
                               onClick={() => handleDeleteOwner(owner.id)}
                               className="text-destructive"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
-                              Delete Owner
+                              Delete Permanently
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -852,12 +897,25 @@ const PropertyOwners = () => {
                               Add Payment Method
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleToggleArchive(owner)}>
+                              {owner.is_archived ? (
+                                <>
+                                  <Users className="w-4 h-4 mr-2" />
+                                  Restore
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="w-4 h-4 mr-2" />
+                                  Archive
+                                </>
+                              )}
+                            </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => handleDeleteOwner(owner.id)}
                               className="text-destructive"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
-                              Delete Owner
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
