@@ -187,6 +187,8 @@ serve(async (req) => {
           name: formData.owner_name,
           email: formData.owner_email,
           phone: formData.owner_phone,
+          payment_method: 'pending',
+          service_type: 'full_service',
         })
         .select("id")
         .single();
@@ -205,9 +207,6 @@ serve(async (req) => {
         address: formData.property_address,
         owner_id: ownerId,
         property_type: 'Client-Managed',
-        status: 'Onboarding',
-        bedrooms: formData.bedrooms,
-        bathrooms: formData.bathrooms,
       })
       .select("id")
       .single();
@@ -215,12 +214,14 @@ serve(async (req) => {
     if (propertyError) throw new Error(`Failed to create property: ${propertyError.message}`);
     console.log("Created property:", property.id);
 
-    // 3. Create property details
+    // 3. Create property details with bedrooms/bathrooms
     await supabase.from("property_details").insert({
       property_id: property.id,
       property_type: formData.property_type,
       square_footage: formData.square_footage,
       parking_spaces: formData.max_vehicles,
+      bedrooms: formData.bedrooms,
+      bathrooms: formData.bathrooms,
     });
 
     // 4. Create property policies

@@ -7506,7 +7506,7 @@ export type Database = {
           has_payment_method: boolean | null
           id: string
           name: string
-          payment_method: string
+          payment_method: string | null
           payout_bank_account_id: string | null
           payout_method: string | null
           phone: string | null
@@ -7526,7 +7526,7 @@ export type Database = {
           has_payment_method?: boolean | null
           id?: string
           name: string
-          payment_method: string
+          payment_method?: string | null
           payout_bank_account_id?: string | null
           payout_method?: string | null
           phone?: string | null
@@ -7546,7 +7546,7 @@ export type Database = {
           has_payment_method?: boolean | null
           id?: string
           name?: string
-          payment_method?: string
+          payment_method?: string | null
           payout_bank_account_id?: string | null
           payout_method?: string | null
           phone?: string | null
