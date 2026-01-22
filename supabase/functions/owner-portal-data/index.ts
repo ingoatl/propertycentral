@@ -980,6 +980,20 @@ serve(async (req: Request): Promise<Response> => {
           strFromBookings: calculatedSTRRevenue,
         }
       },
+      guestScreenings: guestScreenings.map((gs: any) => ({
+        id: gs.id,
+        bookingId: gs.booking_id,
+        guestName: gs.guest_name,
+        provider: gs.screening_provider,
+        status: gs.screening_status,
+        idVerified: gs.id_verified,
+        backgroundPassed: gs.background_passed,
+        watchlistClear: gs.watchlist_clear,
+        riskScore: gs.risk_score,
+        screeningDate: gs.screening_date,
+        ownerNotified: gs.owner_notified,
+        booking: gs.booking,
+      })),
       dataWarnings, // Include any data quality warnings for admin awareness
     };
 

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare, Eye } from "lucide-react";
+import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare, Eye, FileText, CheckCircle, Users } from "lucide-react";
 import { z } from "zod";
 import { AddPaymentMethod } from "@/components/AddPaymentMethod";
 import { SendOwnerPaymentRequestButton } from "@/components/owners/SendOwnerPaymentRequestButton";
@@ -45,6 +45,9 @@ interface PropertyOwner {
   second_owner_email: string | null;
   stripe_customer_id: string | null;
   payment_method: "card" | "ach";
+  service_type: "full_service" | "cohosting" | null;
+  w9_sent_at: string | null;
+  w9_uploaded_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -98,6 +101,33 @@ const PropertyOwners = () => {
   });
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
   const [selectedOwnerForComms, setSelectedOwnerForComms] = useState<PropertyOwner | null>(null);
+  const [sendingW9, setSendingW9] = useState<string | null>(null);
+
+  const handleSendW9Request = async (owner: PropertyOwner) => {
+    setSendingW9(owner.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-w9-email", {
+        body: { ownerId: owner.id },
+      });
+
+      if (error) throw error;
+
+      if (data.skipped) {
+        toast.info(data.message);
+      } else {
+        toast.success(`W-9 request sent to ${owner.email}!`, {
+          description: "They'll receive a W-9 form to keep for their records.",
+        });
+        // Reload to update w9_sent_at
+        loadData();
+      }
+    } catch (error: any) {
+      console.error("Error sending W9:", error);
+      toast.error("Failed to send W-9: " + (error.message || "Unknown error"));
+    } finally {
+      setSendingW9(null);
+    }
+  };
 
   const handleSendPortalInvite = async (owner: PropertyOwner) => {
     setSendingInvite(owner.id);
@@ -569,6 +599,46 @@ const PropertyOwners = () => {
                     <div className="flex gap-2 items-center">
                       {/* Desktop buttons */}
                       <div className="hidden md:flex gap-2 items-center">
+                        {/* Service Type Badge */}
+                        <Badge 
+                          variant={owner.service_type === 'cohosting' ? 'outline' : 'default'}
+                          className={owner.service_type === 'cohosting' ? 'border-orange-500 text-orange-600' : ''}
+                        >
+                          <Users className="w-3 h-3 mr-1" />
+                          {owner.service_type === 'cohosting' ? 'Co-Hosting' : 'Full Service'}
+                        </Badge>
+                        
+                        {/* W9 Request Button - Only for co-hosting */}
+                        {owner.service_type === 'cohosting' && (
+                          <Button
+                            variant={owner.w9_sent_at ? "ghost" : "outline"}
+                            size="sm"
+                            onClick={() => handleSendW9Request(owner)}
+                            disabled={sendingW9 === owner.id}
+                            title={owner.w9_sent_at ? `W-9 sent ${new Date(owner.w9_sent_at).toLocaleDateString()}` : "Send W-9 form to owner"}
+                            className={owner.w9_sent_at ? "text-green-600" : ""}
+                          >
+                            {sendingW9 === owner.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : owner.w9_uploaded_at ? (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
+                                W-9 Received
+                              </>
+                            ) : owner.w9_sent_at ? (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                W-9 Sent
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="w-4 h-4 mr-1" />
+                                Request W-9
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        
                         <SendOwnerPaymentRequestButton
                           ownerId={owner.id}
                           email={owner.email}
@@ -641,6 +711,16 @@ const PropertyOwners = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
+                            {/* W9 for co-hosting in mobile */}
+                            {owner.service_type === 'cohosting' && (
+                              <DropdownMenuItem 
+                                onClick={() => handleSendW9Request(owner)}
+                                disabled={sendingW9 === owner.id}
+                              >
+                                <FileText className="w-4 h-4 mr-2" />
+                                {owner.w9_sent_at ? 'Resend W-9' : 'Request W-9'}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem 
                               onClick={() => handleSendPortalInvite(owner)}
                               disabled={sendingInvite === owner.id}
