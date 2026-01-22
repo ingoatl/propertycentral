@@ -108,7 +108,7 @@ const PropertyOwners = () => {
   const [selectedOwnerForComms, setSelectedOwnerForComms] = useState<PropertyOwner | null>(null);
   const [sendingW9, setSendingW9] = useState<string | null>(null);
   const [requestingW9, setRequestingW9] = useState<string | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
+  
 
   // Format date helper
   const formatDate = (dateString: string | null) => {
@@ -393,9 +393,17 @@ const PropertyOwners = () => {
     }
   };
 
-  // Filter owners based on archive status
-  const filteredOwners = owners.filter(o => showArchived ? o.is_archived : !o.is_archived);
-  const archivedCount = owners.filter(o => o.is_archived).length;
+  // Sort owners: active first, then archived at the bottom
+  const sortedOwners = [...owners].sort((a, b) => {
+    // Archived owners go to the bottom
+    if (a.is_archived && !b.is_archived) return 1;
+    if (!a.is_archived && b.is_archived) return -1;
+    // Within same archive status, sort by name
+    return a.name.localeCompare(b.name);
+  });
+  const activeOwners = owners.filter(o => !o.is_archived);
+  const archivedOwners = owners.filter(o => o.is_archived);
+  const archivedCount = archivedOwners.length;
 
   const handleEditOwner = (owner: PropertyOwner) => {
     setEditingOwner(owner);
@@ -499,14 +507,6 @@ const PropertyOwners = () => {
           <p className="text-muted-foreground mt-1">Manage owners and their payment methods</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
-            variant={showArchived ? "default" : "outline"} 
-            size="sm"
-            onClick={() => setShowArchived(!showArchived)}
-            className="gap-2"
-          >
-            {showArchived ? "Show Active" : `Archived (${archivedCount})`}
-          </Button>
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
@@ -663,23 +663,25 @@ const PropertyOwners = () => {
             </CardContent>
           </Card>
         ) : (
-          filteredOwners.map((owner) => {
-            const ownerProperties = getOwnerProperties(owner.id);
-            return (
-              <Card key={owner.id} className={`shadow-card border-border/50 ${owner.is_archived ? 'opacity-60' : ''}`}>
-                <CardHeader className="bg-gradient-subtle rounded-t-lg">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2">
-                        <Building2 className="w-5 h-5" />
-                        {owner.name}
-                      </CardTitle>
-                      <CardDescription className="mt-2 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-3.5 h-3.5" />
-                          {owner.email}
-                        </div>
-                        {owner.phone && (
+          <>
+            {/* Active Owners */}
+            {activeOwners.map((owner) => {
+              const ownerProperties = getOwnerProperties(owner.id);
+              return (
+                <Card key={owner.id} className="shadow-card border-border/50">
+                  <CardHeader className="bg-gradient-subtle rounded-t-lg">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <CardTitle className="flex items-center gap-2">
+                          <Building2 className="w-5 h-5" />
+                          {owner.name}
+                        </CardTitle>
+                        <CardDescription className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-3.5 h-3.5" />
+                            {owner.email}
+                          </div>
+                          {owner.phone && (
                           <div className="flex items-center gap-2">
                             <Phone className="w-3.5 h-3.5" />
                             {owner.phone}
@@ -1116,7 +1118,107 @@ const PropertyOwners = () => {
                 </CardContent>
               </Card>
             );
-          })
+          })}
+            
+            {/* Archived Owners Section */}
+            {archivedOwners.length > 0 && (
+              <div className="mt-8">
+                <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+                  <Badge variant="outline" className="bg-muted">
+                    Archived ({archivedOwners.length})
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">Former clients - tax records preserved</span>
+                </div>
+                {archivedOwners.map((owner) => {
+                  const ownerProperties = getOwnerProperties(owner.id);
+                  return (
+                    <Card key={owner.id} className="shadow-card border-border/50 opacity-60 mb-6">
+                      <CardHeader className="bg-muted/50 rounded-t-lg">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <CardTitle className="flex items-center gap-2">
+                              <Building2 className="w-5 h-5" />
+                              {owner.name}
+                              <Badge variant="secondary" className="ml-2">Archived</Badge>
+                            </CardTitle>
+                            <CardDescription className="mt-2 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Mail className="w-3.5 h-3.5" />
+                                {owner.email}
+                              </div>
+                              {owner.phone && (
+                                <div className="flex items-center gap-2">
+                                  <Phone className="w-3.5 h-3.5" />
+                                  {owner.phone}
+                                </div>
+                              )}
+                            </CardDescription>
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <Badge 
+                              variant={owner.service_type === 'cohosting' ? 'outline' : 'default'}
+                              className={owner.service_type === 'cohosting' ? 'border-orange-500 text-orange-600' : ''}
+                            >
+                              <Users className="w-3 h-3 mr-1" />
+                              {owner.service_type === 'cohosting' ? 'Co-Hosting' : 'Full Service'}
+                            </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleArchive(owner)}
+                            >
+                              Restore to Active
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-4 space-y-4">
+                        {/* W-9 Tax Info */}
+                        <div className="p-3 bg-muted/30 rounded-lg">
+                          <Label className="text-xs font-medium mb-2 block">Tax Records</Label>
+                          <div className="flex flex-wrap gap-4 text-sm">
+                            {owner.owner_w9_uploaded_at && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewOwnerW9(owner)}
+                                className="text-green-600 gap-1"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                View Their W-9
+                              </Button>
+                            )}
+                            {owner.our_w9_sent_at && (
+                              <span className="text-muted-foreground">
+                                Our W-9 Sent: {formatDate(owner.our_w9_sent_at)}
+                              </span>
+                            )}
+                            {!owner.owner_w9_uploaded_at && !owner.our_w9_sent_at && (
+                              <span className="text-muted-foreground italic">No W-9 records</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Properties were assigned */}
+                        {ownerProperties.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-xs">Previously Managed Properties ({ownerProperties.length})</Label>
+                            <div className="space-y-1">
+                              {ownerProperties.map((property) => (
+                                <div key={property.id} className="text-sm text-muted-foreground">
+                                  {property.name} - {property.address}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
