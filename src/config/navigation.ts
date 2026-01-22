@@ -138,6 +138,13 @@ export const navigationConfig: NavElement[] = [
         description: "Owner billing",
         adminOnly: true,
       },
+      {
+        path: "/tax-1099",
+        label: "1099 Tax Center",
+        icon: FileSignature,
+        description: "W-9 & 1099 tracking",
+        adminOnly: true,
+      },
     ],
   },
   {
