@@ -42,6 +42,9 @@ verify_jwt = true
 [functions.billcom-sync-vendor]
 verify_jwt = true
 
+[functions.billcom-import-vendors]
+verify_jwt = true
+
 [functions.charge-individual-owner]
 verify_jwt = true
 
