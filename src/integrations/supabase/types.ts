@@ -5879,6 +5879,38 @@ export type Database = {
           },
         ]
       }
+      owner_w9_tokens: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          owner_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          owner_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          owner_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_w9_tokens_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: true
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ownerrez_bookings: {
         Row: {
           accommodation_revenue: number | null
@@ -7506,7 +7538,14 @@ export type Database = {
           has_payment_method: boolean | null
           id: string
           name: string
+          our_w9_sent_at: string | null
+          owner_ein_last4: string | null
+          owner_tax_name: string | null
+          owner_w9_file_path: string | null
+          owner_w9_requested_at: string | null
+          owner_w9_uploaded_at: string | null
           payment_method: string | null
+          payments_ytd: number | null
           payout_bank_account_id: string | null
           payout_method: string | null
           phone: string | null
@@ -7526,7 +7565,14 @@ export type Database = {
           has_payment_method?: boolean | null
           id?: string
           name: string
+          our_w9_sent_at?: string | null
+          owner_ein_last4?: string | null
+          owner_tax_name?: string | null
+          owner_w9_file_path?: string | null
+          owner_w9_requested_at?: string | null
+          owner_w9_uploaded_at?: string | null
           payment_method?: string | null
+          payments_ytd?: number | null
           payout_bank_account_id?: string | null
           payout_method?: string | null
           phone?: string | null
@@ -7546,7 +7592,14 @@ export type Database = {
           has_payment_method?: boolean | null
           id?: string
           name?: string
+          our_w9_sent_at?: string | null
+          owner_ein_last4?: string | null
+          owner_tax_name?: string | null
+          owner_w9_file_path?: string | null
+          owner_w9_requested_at?: string | null
+          owner_w9_uploaded_at?: string | null
           payment_method?: string | null
+          payments_ytd?: number | null
           payout_bank_account_id?: string | null
           payout_method?: string | null
           phone?: string | null

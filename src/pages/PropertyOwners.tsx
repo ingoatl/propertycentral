@@ -48,6 +48,9 @@ interface PropertyOwner {
   service_type: "full_service" | "cohosting" | null;
   w9_sent_at: string | null;
   w9_uploaded_at: string | null;
+  our_w9_sent_at: string | null;
+  owner_w9_requested_at: string | null;
+  owner_w9_uploaded_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -102,11 +105,35 @@ const PropertyOwners = () => {
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
   const [selectedOwnerForComms, setSelectedOwnerForComms] = useState<PropertyOwner | null>(null);
   const [sendingW9, setSendingW9] = useState<string | null>(null);
+  const [requestingW9, setRequestingW9] = useState<string | null>(null);
 
-  const handleSendW9Request = async (owner: PropertyOwner) => {
+  // Send OUR W-9 to co-hosting clients (they issue 1099 to us)
+  const handleSendOurW9 = async (owner: PropertyOwner) => {
     setSendingW9(owner.id);
     try {
       const { data, error } = await supabase.functions.invoke("send-w9-email", {
+        body: { ownerId: owner.id, isManualSend: true },
+      });
+
+      if (error) throw error;
+
+      toast.success(`Our W-9 sent to ${owner.email}!`, {
+        description: "They'll use this to issue us a 1099 at year-end.",
+      });
+      loadData();
+    } catch (error: any) {
+      console.error("Error sending W9:", error);
+      toast.error("Failed to send W-9: " + (error.message || "Unknown error"));
+    } finally {
+      setSendingW9(null);
+    }
+  };
+
+  // Request W-9 FROM full-service clients (we issue 1099 to them)
+  const handleRequestOwnerW9 = async (owner: PropertyOwner) => {
+    setRequestingW9(owner.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("request-owner-w9", {
         body: { ownerId: owner.id },
       });
 
@@ -116,16 +143,15 @@ const PropertyOwners = () => {
         toast.info(data.message);
       } else {
         toast.success(`W-9 request sent to ${owner.email}!`, {
-          description: "They'll receive a W-9 form to keep for their records.",
+          description: "They'll receive a link to upload their W-9.",
         });
-        // Reload to update w9_sent_at
         loadData();
       }
     } catch (error: any) {
-      console.error("Error sending W9:", error);
-      toast.error("Failed to send W-9: " + (error.message || "Unknown error"));
+      console.error("Error requesting W9:", error);
+      toast.error("Failed to request W-9: " + (error.message || "Unknown error"));
     } finally {
-      setSendingW9(null);
+      setRequestingW9(null);
     }
   };
 

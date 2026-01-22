@@ -42,6 +42,7 @@ const OwnerPaymentSetup = lazy(() => import("./pages/OwnerPaymentSetup"));
 const OwnerPaymentSuccess = lazy(() => import("./pages/OwnerPaymentSuccess"));
 const AuditPortal = lazy(() => import("./pages/AuditPortal"));
 const OwnerDashboard = lazy(() => import("./pages/owner/OwnerDashboard"));
+const OwnerW9Upload = lazy(() => import("./pages/owner/OwnerW9Upload"));
 const OwnerPortalManagement = lazy(() => import("./pages/OwnerPortalManagement"));
 const SignDocument = lazy(() => import("./pages/SignDocument"));
 const BookInspection = lazy(() => import("./pages/BookInspection"));
@@ -118,6 +119,7 @@ const App = () => (
             <Route path="/owner-payment-success" element={<OwnerPaymentSuccess />} />
             <Route path="/audit/:token" element={<AuditPortal />} />
             <Route path="/owner" element={<OwnerDashboard />} />
+            <Route path="/owner/w9-upload" element={<OwnerW9Upload />} />
             <Route path="/lead-payment-setup" element={<LeadPaymentSetup />} />
             <Route path="/lead-payment-success" element={<LeadPaymentSuccess />} />
             <Route path="/sign/:token" element={<Suspense fallback={<SigningLoader />}><SignDocument /></Suspense>} />
