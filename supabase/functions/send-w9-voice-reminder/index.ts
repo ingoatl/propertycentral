@@ -69,15 +69,20 @@ async function generateVoiceAudio(text: string, voiceId: string): Promise<ArrayB
   }
 }
 
+interface SendResult {
+  success: boolean;
+  error?: string;
+}
+
 async function sendMMSWithAudio(
   phone: string,
   textMessage: string,
   audioBuffer: ArrayBuffer,
   supabase: any
-): Promise<boolean> {
+): Promise<SendResult> {
   if (!TELNYX_API_KEY || !TELNYX_PHONE_NUMBER) {
     console.log("Telnyx not configured, skipping MMS");
-    return false;
+    return { success: false, error: "Telnyx not configured - missing API key or phone number" };
   }
 
   try {
@@ -94,7 +99,7 @@ async function sendMMSWithAudio(
 
     if (uploadError) {
       console.error("Audio upload error:", uploadError);
-      return false;
+      return { success: false, error: "Failed to upload audio file" };
     }
 
     // Get public URL
@@ -105,7 +110,7 @@ async function sendMMSWithAudio(
     const audioUrl = urlData?.publicUrl;
     if (!audioUrl) {
       console.error("Failed to get audio URL");
-      return false;
+      return { success: false, error: "Failed to get audio URL" };
     }
 
     console.log("Audio uploaded, sending MMS to:", phone);
@@ -131,6 +136,11 @@ async function sendMMSWithAudio(
       const errorText = await response.text();
       console.error("MMS send failed:", errorText);
       
+      // Check for account inactive error
+      if (errorText.includes("20012") || errorText.includes("Account inactive")) {
+        return { success: false, error: "Telnyx account is inactive or out of funds. Please add funds to your Telnyx account." };
+      }
+      
       // Fallback to SMS without audio
       console.log("Falling back to SMS without audio...");
       const smsResponse = await fetch("https://api.telnyx.com/v2/messages", {
@@ -146,14 +156,25 @@ async function sendMMSWithAudio(
         }),
       });
       
-      return smsResponse.ok;
+      if (!smsResponse.ok) {
+        const smsErrorText = await smsResponse.text();
+        console.error("SMS fallback also failed:", smsErrorText);
+        
+        if (smsErrorText.includes("20012") || smsErrorText.includes("Account inactive")) {
+          return { success: false, error: "Telnyx account is inactive or out of funds. Please add funds to your Telnyx account." };
+        }
+        return { success: false, error: "Failed to send SMS" };
+      }
+      
+      console.log("SMS fallback sent successfully");
+      return { success: true };
     }
 
     console.log("MMS sent successfully");
-    return true;
+    return { success: true };
   } catch (error) {
     console.error("MMS error:", error);
-    return false;
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error sending message" };
   }
 }
 
@@ -268,11 +289,15 @@ const handler = async (req: Request): Promise<Response> => {
     // Send MMS with audio
     const textMessage = `🎙️ Voice Message from PeachHaus\n\nHi ${firstName}! We still need your W-9 form for ${taxYear} tax filing.\n\n📤 Upload here: ${uploadUrl}\n\n⏰ Deadline: Dec 15th\n📞 Questions? Call (404) 800-5932\n\n[Listen to the voice message attached]`;
 
-    const sent = await sendMMSWithAudio(phone, textMessage, audioBuffer, supabase);
+    const sendResult = await sendMMSWithAudio(phone, textMessage, audioBuffer, supabase);
 
-    if (!sent) {
+    if (!sendResult.success) {
       return new Response(
-        JSON.stringify({ success: false, error: "Failed to send voice reminder" }),
+        JSON.stringify({ 
+          success: false, 
+          error: sendResult.error || "Failed to send voice reminder",
+          audioGenerated: true 
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
