@@ -20,6 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
   FileText,
   Download,
   Search,
@@ -38,6 +46,10 @@ import {
   Wrench,
   Phone,
   Loader2,
+  Mail,
+  MessageSquare,
+  Bell,
+  ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -283,6 +295,35 @@ export function Tax1099Dashboard() {
     } catch (error) {
       console.error("Error sending voice reminder:", error);
       toast.error("Failed to send voice reminder");
+    } finally {
+      setSendingVoiceReminder(null);
+    }
+  };
+
+  const handleSendReminder = async (entityId: string, entityType: "owner" | "vendor", entityName: string, reminderDay: number) => {
+    try {
+      setSendingVoiceReminder(entityId); // Reuse for loading state
+      const { error } = await supabase.functions.invoke("send-w9-reminder", {
+        body: { type: entityType, id: entityId, reminderDay },
+      });
+      if (error) throw error;
+      
+      const reminderLabels: Record<number, string> = {
+        2: "Helpful follow-up",
+        3: "Social proof",
+        4: "Commitment nudge",
+        5: "Urgency (5 days)",
+        6: "IRS Authority",
+        7: "Personal touch",
+        8: "Final countdown",
+        9: "Tomorrow deadline",
+        10: "Last chance",
+      };
+      
+      toast.success(`"${reminderLabels[reminderDay]}" reminder sent to ${entityName}`);
+    } catch (error) {
+      console.error("Error sending reminder:", error);
+      toast.error("Failed to send reminder");
     } finally {
       setSendingVoiceReminder(null);
     }
@@ -651,6 +692,7 @@ export function Tax1099Dashboard() {
                 onRequestW9={handleRequestW9}
                 onViewW9={handleViewW9}
                 onVoiceReminder={handleVoiceReminder}
+                onSendReminder={handleSendReminder}
                 sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
@@ -663,6 +705,7 @@ export function Tax1099Dashboard() {
                 onRequestW9={handleRequestW9}
                 onViewW9={handleViewW9}
                 onVoiceReminder={handleVoiceReminder}
+                onSendReminder={handleSendReminder}
                 sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
@@ -675,6 +718,7 @@ export function Tax1099Dashboard() {
                 onRequestW9={handleRequestW9}
                 onViewW9={handleViewW9}
                 onVoiceReminder={handleVoiceReminder}
+                onSendReminder={handleSendReminder}
                 sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
@@ -702,6 +746,7 @@ interface EntityTableProps {
   onRequestW9: (id: string, type: "owner" | "vendor", name: string) => void;
   onViewW9: (filePath: string, type: string, name: string) => void;
   onVoiceReminder: (id: string, type: "owner" | "vendor", name: string) => void;
+  onSendReminder: (id: string, type: "owner" | "vendor", name: string, day: number) => void;
   sendingVoiceReminder: string | null;
 }
 
@@ -713,6 +758,7 @@ function EntityTable({
   onRequestW9,
   onViewW9,
   onVoiceReminder,
+  onSendReminder,
   sendingVoiceReminder,
 }: EntityTableProps) {
   return (
@@ -760,7 +806,7 @@ function EntityTable({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  <span className={entity.requires_1099 ? "font-semibold text-yellow-700" : ""}>
+                  <span className={entity.requires_1099 ? "font-semibold text-amber-700" : ""}>
                     {formatCurrency(entity.payments_ytd)}
                   </span>
                 </TableCell>
@@ -792,20 +838,116 @@ function EntityTable({
                           <Send className="w-4 h-4" />
                           Resend
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onVoiceReminder(entity.id, entity.type, entity.name)}
-                          title="Send Voice Reminder"
-                          disabled={sendingVoiceReminder === entity.id}
-                          className="gap-1 text-muted-foreground"
-                        >
-                          {sendingVoiceReminder === entity.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Phone className="w-4 h-4" />
-                          )}
-                        </Button>
+                        
+                        {/* Follow-up Reminder Dropdown */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={sendingVoiceReminder === entity.id}
+                              className="gap-1"
+                            >
+                              {sendingVoiceReminder === entity.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Bell className="w-4 h-4" />
+                              )}
+                              Follow Up
+                              <ChevronDown className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                              10-Day Reminder Sequence
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            
+                            {/* Early Stage - Low Urgency */}
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 2)}>
+                              <Mail className="w-4 h-4 mr-2 text-primary" />
+                              <div className="flex-1">
+                                <div className="text-sm">Helpful Follow-up</div>
+                                <div className="text-xs text-muted-foreground">Day 2 · Reciprocity</div>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 3)}>
+                              <Users className="w-4 h-4 mr-2 text-primary" />
+                              <div className="flex-1">
+                                <div className="text-sm">Social Proof</div>
+                                <div className="text-xs text-muted-foreground">Day 3 · "90% have submitted"</div>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 4)}>
+                              <CheckCircle2 className="w-4 h-4 mr-2 text-primary" />
+                              <div className="flex-1">
+                                <div className="text-sm">Commitment Nudge</div>
+                                <div className="text-xs text-muted-foreground">Day 4 · "Almost there"</div>
+                              </div>
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            {/* Mid Stage - Medium Urgency */}
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 5)}>
+                              <Clock className="w-4 h-4 mr-2 text-amber-600" />
+                              <div className="flex-1">
+                                <div className="text-sm">5 Days Left</div>
+                                <div className="text-xs text-muted-foreground">Day 5 · Scarcity/Urgency</div>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 6)}>
+                              <FileText className="w-4 h-4 mr-2 text-amber-600" />
+                              <div className="flex-1">
+                                <div className="text-sm">IRS Authority</div>
+                                <div className="text-xs text-muted-foreground">Day 6 · Compliance required</div>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 7)}>
+                              <MessageSquare className="w-4 h-4 mr-2 text-amber-600" />
+                              <div className="flex-1">
+                                <div className="text-sm">Personal Touch</div>
+                                <div className="text-xs text-muted-foreground">Day 7 · Direct from Ingo</div>
+                              </div>
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            {/* Final Stage - High/Critical Urgency */}
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 8)}>
+                              <AlertTriangle className="w-4 h-4 mr-2 text-orange-600" />
+                              <div className="flex-1">
+                                <div className="text-sm">Final Countdown</div>
+                                <div className="text-xs text-muted-foreground">Day 8 · 3 days left</div>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 9)}>
+                              <AlertCircle className="w-4 h-4 mr-2 text-destructive" />
+                              <div className="flex-1">
+                                <div className="text-sm">Tomorrow Deadline</div>
+                                <div className="text-xs text-muted-foreground">Day 9 · Urgent</div>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onSendReminder(entity.id, entity.type, entity.name, 10)}>
+                              <AlertCircle className="w-4 h-4 mr-2 text-destructive" />
+                              <div className="flex-1">
+                                <div className="text-sm font-semibold text-destructive">LAST CHANCE</div>
+                                <div className="text-xs text-muted-foreground">Day 10 · Final notice</div>
+                              </div>
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            {/* Voice Reminder */}
+                            <DropdownMenuItem onClick={() => onVoiceReminder(entity.id, entity.type, entity.name)}>
+                              <Phone className="w-4 h-4 mr-2 text-primary" />
+                              <div className="flex-1">
+                                <div className="text-sm">AI Voice Call</div>
+                                <div className="text-xs text-muted-foreground">Send voice message via MMS</div>
+                              </div>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </>
                     )}
                     {entity.w9_file_path && (
