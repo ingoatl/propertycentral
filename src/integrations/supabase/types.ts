@@ -7515,6 +7515,9 @@ export type Database = {
           service_type: string
           stripe_customer_id: string | null
           updated_at: string
+          w9_file_path: string | null
+          w9_sent_at: string | null
+          w9_uploaded_at: string | null
         }
         Insert: {
           auth_user_id?: string | null
@@ -7532,6 +7535,9 @@ export type Database = {
           service_type?: string
           stripe_customer_id?: string | null
           updated_at?: string
+          w9_file_path?: string | null
+          w9_sent_at?: string | null
+          w9_uploaded_at?: string | null
         }
         Update: {
           auth_user_id?: string | null
@@ -7549,6 +7555,9 @@ export type Database = {
           service_type?: string
           stripe_customer_id?: string | null
           updated_at?: string
+          w9_file_path?: string | null
+          w9_sent_at?: string | null
+          w9_uploaded_at?: string | null
         }
         Relationships: []
       }

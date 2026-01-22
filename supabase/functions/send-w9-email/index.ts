@@ -310,7 +310,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("W-9 email sent successfully:", emailResponse);
 
-    // Log the email send
+    // Log the email send and update w9_sent_at
     if (!isTestMode) {
       const communicationData: any = {
         communication_type: "email",
@@ -335,6 +335,15 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       await supabase.from("lead_communications").insert(communicationData);
+
+      // Update w9_sent_at on the owner record
+      if (ownerId || ownerRecord?.id) {
+        await supabase
+          .from("property_owners")
+          .update({ w9_sent_at: new Date().toISOString() })
+          .eq("id", ownerId || ownerRecord?.id);
+        console.log("Updated w9_sent_at for owner:", ownerId || ownerRecord?.id);
+      }
 
       // Add timeline entry if we have a lead
       if (leadId || leadRecord?.id) {
