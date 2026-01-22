@@ -7553,6 +7553,11 @@ export type Database = {
           second_owner_name: string | null
           service_type: string
           stripe_customer_id: string | null
+          tax_classification: string | null
+          tax_year_1099_generated: boolean | null
+          tax_year_1099_generated_at: string | null
+          taxpayer_address: string | null
+          taxpayer_name: string | null
           updated_at: string
           w9_file_path: string | null
           w9_sent_at: string | null
@@ -7580,6 +7585,11 @@ export type Database = {
           second_owner_name?: string | null
           service_type?: string
           stripe_customer_id?: string | null
+          tax_classification?: string | null
+          tax_year_1099_generated?: boolean | null
+          tax_year_1099_generated_at?: string | null
+          taxpayer_address?: string | null
+          taxpayer_name?: string | null
           updated_at?: string
           w9_file_path?: string | null
           w9_sent_at?: string | null
@@ -7607,6 +7617,11 @@ export type Database = {
           second_owner_name?: string | null
           service_type?: string
           stripe_customer_id?: string | null
+          tax_classification?: string | null
+          tax_year_1099_generated?: boolean | null
+          tax_year_1099_generated_at?: string | null
+          taxpayer_address?: string | null
+          taxpayer_name?: string | null
           updated_at?: string
           w9_file_path?: string | null
           w9_sent_at?: string | null

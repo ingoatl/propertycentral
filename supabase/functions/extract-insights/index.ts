@@ -241,11 +241,12 @@ serve(async (req) => {
 
     // ========== GUEST SCREENING EMAIL DETECTION ==========
     // Detect verification emails from Truvi, Authenticate, Superhog, Autohost
+    // ENHANCED: Added "verification completed", "completed for", "guest passed" patterns
     const screeningProviders = [
-      { name: 'truvi', senderPatterns: ['@truvi.com', 'noreply@truvi'], subjectPatterns: ['verification complete', 'guest verified', 'id verified', 'truvi'] },
-      { name: 'authenticate', senderPatterns: ['@authenticate.com', '@autohost.ai'], subjectPatterns: ['screening result', 'verification status', 'guest approved', 'background check'] },
-      { name: 'superhog', senderPatterns: ['@superhog.com'], subjectPatterns: ['superhog', 'guest protection', 'verification complete'] },
-      { name: 'autohost', senderPatterns: ['@autohost.ai', '@autohost.com'], subjectPatterns: ['autohost', 'guest screening', 'verification'] },
+      { name: 'truvi', senderPatterns: ['@truvi.com', 'noreply@truvi'], subjectPatterns: ['verification complete', 'verification completed', 'completed for', 'guest verified', 'guest passed', 'id verified', 'truvi'] },
+      { name: 'authenticate', senderPatterns: ['@authenticate.com', '@autohost.ai'], subjectPatterns: ['screening result', 'verification status', 'verification completed', 'guest approved', 'background check'] },
+      { name: 'superhog', senderPatterns: ['@superhog.com'], subjectPatterns: ['superhog', 'guest protection', 'verification complete', 'verification completed'] },
+      { name: 'autohost', senderPatterns: ['@autohost.ai', '@autohost.com'], subjectPatterns: ['autohost', 'guest screening', 'verification', 'verification completed'] },
     ];
     
     let detectedScreeningProvider: string | null = null;
@@ -254,7 +255,7 @@ serve(async (req) => {
       const subjectMatch = provider.subjectPatterns.some(p => safeSubject.toLowerCase().includes(p));
       if (senderMatch || subjectMatch) {
         detectedScreeningProvider = provider.name;
-        console.log(`Detected guest screening email from provider: ${provider.name}`);
+        console.log(`Detected guest screening email from provider: ${provider.name}, subject: ${safeSubject}`);
         break;
       }
     }
@@ -883,18 +884,28 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       const backgroundPassed = bodyLower.includes('background check') && (bodyLower.includes('passed') || bodyLower.includes('clear'));
       const watchlistClear = bodyLower.includes('watchlist') && (bodyLower.includes('clear') || bodyLower.includes('no matches'));
       
-      // Extract guest name from email if possible
+      // Extract guest name from email if possible - ENHANCED PATTERNS
       let guestName = 'Unknown Guest';
       const guestNamePatterns = [
+        // Highest priority: Subject line patterns
+        /verification completed for ([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        /completed for ([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        /guest verified[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        /guest passed[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        // Body patterns
         /guest[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
         /name[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
         /for\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
         /verified\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        /reservation by ([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        /booking for ([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
       ];
+      // Try subject first, then body
       for (const pattern of guestNamePatterns) {
-        const match = safeBody.match(pattern) || safeSubject.match(pattern);
+        const match = safeSubject.match(pattern) || safeBody.match(pattern);
         if (match) {
           guestName = match[1].trim();
+          console.log(`Extracted guest name: ${guestName} from pattern: ${pattern}`);
           break;
         }
       }

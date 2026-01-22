@@ -55,6 +55,7 @@ const VoicemailPlayer = lazy(() => import("./pages/VoicemailPlayer"));
 const VendorJobPortal = lazy(() => import("./pages/VendorJobPortal"));
 const TeamHub = lazy(() => import("./pages/TeamHub"));
 const TeamHubInvite = lazy(() => import("./pages/TeamHubInvite"));
+const Tax1099 = lazy(() => import("./pages/Tax1099"));
 
 // QueryClient configured with optimized caching and stale time settings
 const queryClient = new QueryClient({
@@ -151,6 +152,7 @@ const App = () => (
                     <Route path="/communications" element={<Communications />} />
                     <Route path="/team-hub" element={<TeamHub />} />
                     <Route path="/team-hub/invite/:token" element={<TeamHubInvite />} />
+                    <Route path="/tax-1099" element={<Tax1099 />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
