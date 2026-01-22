@@ -10116,6 +10116,41 @@ export type Database = {
           },
         ]
       }
+      vendor_w9_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+          used_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          token: string
+          used_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          used_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_w9_tokens_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           average_rating: number | null
@@ -10153,6 +10188,7 @@ export type Database = {
           w9_file_path: string | null
           w9_on_file: boolean | null
           w9_received_at: string | null
+          w9_requested_at: string | null
         }
         Insert: {
           average_rating?: number | null
@@ -10190,6 +10226,7 @@ export type Database = {
           w9_file_path?: string | null
           w9_on_file?: boolean | null
           w9_received_at?: string | null
+          w9_requested_at?: string | null
         }
         Update: {
           average_rating?: number | null
@@ -10227,6 +10264,7 @@ export type Database = {
           w9_file_path?: string | null
           w9_on_file?: boolean | null
           w9_received_at?: string | null
+          w9_requested_at?: string | null
         }
         Relationships: []
       }

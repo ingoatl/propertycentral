@@ -238,21 +238,21 @@ export function Tax1099Dashboard() {
     toast.success("Tax data refreshed");
   };
 
-  const handleRequestW9 = async (entityId: string, entityType: "owner" | "vendor") => {
+  const handleRequestW9 = async (entityId: string, entityType: "owner" | "vendor", entityName: string) => {
     try {
       if (entityType === "owner") {
         const { error } = await supabase.functions.invoke("request-owner-w9", {
           body: { ownerId: entityId },
         });
         if (error) throw error;
+        toast.success(`W-9 request sent to ${entityName}`);
       } else {
-        // For vendors, update the request status
-        await supabase
-          .from("vendors")
-          .update({ w9_on_file: false })
-          .eq("id", entityId);
+        const { error } = await supabase.functions.invoke("request-vendor-w9", {
+          body: { vendorId: entityId },
+        });
+        if (error) throw error;
+        toast.success(`W-9 request sent to ${entityName}`);
       }
-      toast.success("W-9 request sent");
       await loadTaxData();
     } catch (error) {
       console.error("Error requesting W-9:", error);
@@ -653,7 +653,7 @@ interface EntityTableProps {
   formatCurrency: (amount: number) => string;
   getW9StatusBadge: (entity: TaxEntity) => React.ReactNode;
   get1099StatusBadge: (entity: TaxEntity) => React.ReactNode;
-  onRequestW9: (id: string, type: "owner" | "vendor") => void;
+  onRequestW9: (id: string, type: "owner" | "vendor", name: string) => void;
 }
 
 function EntityTable({
@@ -718,12 +718,26 @@ function EntityTable({
                   <div className="flex gap-1">
                     {entity.w9_status === "missing" && entity.requires_1099 && (
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        onClick={() => onRequestW9(entity.id, entity.type)}
+                        onClick={() => onRequestW9(entity.id, entity.type, entity.name)}
                         title="Request W-9"
+                        className="gap-1"
                       >
                         <Send className="w-4 h-4" />
+                        Request W-9
+                      </Button>
+                    )}
+                    {entity.w9_status === "requested" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRequestW9(entity.id, entity.type, entity.name)}
+                        title="Resend W-9 Request"
+                        className="gap-1 text-muted-foreground"
+                      >
+                        <Send className="w-4 h-4" />
+                        Resend
                       </Button>
                     )}
                     {entity.w9_file_path && (
