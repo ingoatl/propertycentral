@@ -98,6 +98,7 @@ export function SendSMSDialog({
       queryClient.invalidateQueries({ queryKey: ["owner-communications"] });
       queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["sent-communications"] });
       queryClient.invalidateQueries({ queryKey: ["vendor-communications"] });
       onOpenChange(false);
     },
