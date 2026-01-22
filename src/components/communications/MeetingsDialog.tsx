@@ -28,8 +28,8 @@ export function MeetingsDialog({
   contactName,
   contactEmail,
 }: MeetingsDialogProps) {
-  const DEFAULT_MEETING_URL = "https://meet.google.com/jww-deey-iaa";
-  const [meetingUrl, setMeetingUrl] = useState(DEFAULT_MEETING_URL);
+  // Use blank as default - user should paste the meeting URL
+  const [meetingUrl, setMeetingUrl] = useState("");
   const [meetingTitle, setMeetingTitle] = useState("");
   const [isJoiningMeeting, setIsJoiningMeeting] = useState(false);
   const isMobile = useIsMobile();
@@ -63,7 +63,7 @@ export function MeetingsDialog({
 
       toast.success(data.message || "AI bot is joining the meeting to record!");
       onOpenChange(false);
-      setMeetingUrl(DEFAULT_MEETING_URL);
+      setMeetingUrl("");
       setMeetingTitle("");
     } catch (error) {
       console.error("Join meeting error:", error);
@@ -146,11 +146,6 @@ export function MeetingsDialog({
                 </div>
               )}
             </div>
-            {meetingUrl === DEFAULT_MEETING_URL && (
-              <p className="text-xs text-primary font-medium">
-                ✓ Using PeachHaus permanent meeting room
-              </p>
-            )}
             <p className="text-xs text-muted-foreground">
               Supports Zoom, Google Meet, Microsoft Teams, and WebEx
             </p>
