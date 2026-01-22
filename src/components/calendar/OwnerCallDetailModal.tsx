@@ -21,8 +21,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyPhotos } from "@/components/ui/property-photos";
 import { CallDialog } from "@/components/communications/CallDialog";
+import { OwnerCallPreparationTips } from "./OwnerCallPreparationTips";
+import { OwnerCallCommunicationHistory } from "./OwnerCallCommunicationHistory";
 import { toast } from "sonner";
 import { formatInESTWithLabel } from "@/lib/timezone-utils";
 import { cn } from "@/lib/utils";
@@ -47,6 +50,11 @@ import {
   BedDouble,
   CheckCircle2,
   XCircle,
+  FileText,
+  Send,
+  Eye,
+  ClipboardList,
+  MessageCircle,
 } from "lucide-react";
 
 interface OwnerCall {
@@ -375,7 +383,7 @@ export function OwnerCallDetailModal({
   return (
     <>
       <Dialog open={!!ownerCall} onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0">
           {/* Header with gradient */}
           <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4">
             <DialogHeader className="space-y-1">
@@ -412,57 +420,77 @@ export function OwnerCallDetailModal({
             </DialogHeader>
           </div>
 
-          <ScrollArea className="max-h-[calc(90vh-180px)]">
-            <div className="p-4 space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                {/* Left Column - Property & Context */}
-                <div className="lg:col-span-3 space-y-4">
-                  {/* Property Photo & Address */}
-                  {primaryProperty ? (
-                    <div className="rounded-xl border overflow-hidden bg-card">
-                      <PropertyPhotos
-                        address={primaryProperty.address}
-                        height="200px"
-                        className="rounded-none"
-                      />
-                      <div className="p-3 border-t bg-muted/30">
-                        <div className="flex items-start gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{primaryProperty.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {primaryProperty.address}
-                            </p>
+          {/* Tabs for organized content */}
+          <Tabs defaultValue="overview" className="flex-1">
+            <div className="px-4 pt-2 border-b">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="overview" className="text-xs">
+                  <Home className="h-3.5 w-3.5 mr-1.5" />
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="preparation" className="text-xs">
+                  <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
+                  Preparation
+                </TabsTrigger>
+                <TabsTrigger value="history" className="text-xs">
+                  <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                  History
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <ScrollArea className="max-h-[calc(90vh-200px)]">
+              {/* Overview Tab */}
+              <TabsContent value="overview" className="m-0 p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                  {/* Left Column - Property & Context */}
+                  <div className="lg:col-span-3 space-y-4">
+                    {/* Property Photo & Address */}
+                    {primaryProperty ? (
+                      <div className="rounded-xl border overflow-hidden bg-card">
+                        <PropertyPhotos
+                          address={primaryProperty.address}
+                          height="180px"
+                          className="rounded-none"
+                        />
+                        <div className="p-3 border-t bg-muted/30">
+                          <div className="flex items-start gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{primaryProperty.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {primaryProperty.address}
+                              </p>
+                            </div>
+                            <Button variant="ghost" size="sm" className="shrink-0 h-7 px-2" asChild>
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                  primaryProperty.address
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </Button>
                           </div>
-                          <Button variant="ghost" size="sm" className="shrink-0 h-7 px-2" asChild>
-                            <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                                primaryProperty.address
-                              )}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </Button>
+                          {context && context.properties.length > 1 && (
+                            <Badge variant="secondary" className="mt-2 text-xs">
+                              +{context.properties.length - 1} more properties
+                            </Badge>
+                          )}
                         </div>
-                        {context && context.properties.length > 1 && (
-                          <Badge variant="secondary" className="mt-2 text-xs">
-                            +{context.properties.length - 1} more properties
-                          </Badge>
-                        )}
                       </div>
-                    </div>
-                  ) : isLoadingContext ? (
-                    <Skeleton className="h-[250px] rounded-xl" />
-                  ) : (
-                    <div className="h-[200px] bg-muted rounded-xl flex items-center justify-center border">
-                      <div className="text-center text-muted-foreground">
-                        <Home className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No property linked</p>
+                    ) : isLoadingContext ? (
+                      <Skeleton className="h-[220px] rounded-xl" />
+                    ) : (
+                      <div className="h-[180px] bg-muted rounded-xl flex items-center justify-center border">
+                        <div className="text-center text-muted-foreground">
+                          <Home className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No property linked</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* Revenue Summary */}
                   <div className="grid grid-cols-3 gap-3">
@@ -721,8 +749,31 @@ export function OwnerCallDetailModal({
                   </Button>
                 </div>
               </div>
-            </div>
+            </TabsContent>
+
+            {/* Preparation Tab */}
+            <TabsContent value="preparation" className="m-0 p-4">
+              <OwnerCallPreparationTips
+                topic={ownerCall.topic}
+                topicDetails={ownerCall.topic_details}
+                pendingMaintenanceCount={context?.pendingMaintenance?.length || 0}
+                thisMonthRevenue={context?.recentRevenue.thisMonth || 0}
+                lastMonthRevenue={context?.recentRevenue.lastMonth || 0}
+                upcomingBookingsCount={context?.upcomingBookings?.length || 0}
+                recentGuestsCount={context?.recentGuests?.length || 0}
+              />
+            </TabsContent>
+
+            {/* History Tab */}
+            <TabsContent value="history" className="m-0 p-4">
+              <OwnerCallCommunicationHistory
+                ownerId={ownerId}
+                ownerEmail={ownerEmail}
+                ownerPhone={ownerPhone}
+              />
+            </TabsContent>
           </ScrollArea>
+        </Tabs>
         </DialogContent>
       </Dialog>
 

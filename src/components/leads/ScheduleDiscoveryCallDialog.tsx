@@ -35,7 +35,7 @@ interface ScheduleDiscoveryCallDialogProps {
   onScheduled?: () => void;
 }
 
-const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
+// Google Meet links are now created dynamically via calendar sync
 const CALL_DURATION = 30; // 30 minute discovery calls
 
 // Generate time slots from 9 AM to 5 PM in 30-minute increments
@@ -142,7 +142,7 @@ export function ScheduleDiscoveryCallDialog({
         throw new Error("Please log in to schedule a call");
       }
 
-      // Insert discovery call with new fields
+      // Insert discovery call - Meet link will be created by calendar sync
       const { data: newCall, error } = await supabase.from("discovery_calls").insert({
         lead_id: leadId,
         scheduled_by: user.user?.id,
@@ -154,7 +154,7 @@ export function ScheduleDiscoveryCallDialog({
         current_situation: currentSituation || null,
         existing_listing_url: existingListingUrl || null,
         start_timeline: startTimeline || null,
-        google_meet_link: meetingType === "video" ? GOOGLE_MEET_LINK : null,
+        // google_meet_link is now created dynamically by calendar sync
       }).select().single();
 
       if (error) throw error;
@@ -208,7 +208,7 @@ export function ScheduleDiscoveryCallDialog({
     },
     onSuccess: ({ scheduledAt, meetingType }) => {
       const meetingInfo = meetingType === "video" 
-        ? ` (Video call: ${GOOGLE_MEET_LINK})` 
+        ? " (Video call - Meet link will be sent via email)" 
         : " (Phone call)";
       toast.success(`Discovery call scheduled for ${format(scheduledAt, "MMM d 'at' h:mm a")}${meetingInfo}`);
       queryClient.invalidateQueries({ queryKey: ["discovery-calls"] });
@@ -313,7 +313,7 @@ export function ScheduleDiscoveryCallDialog({
                   Video calls allow for a better property presentation with screen sharing!
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  Meeting link: {GOOGLE_MEET_LINK}
+                  A unique Google Meet link will be created and sent via email confirmation.
                 </p>
               </div>
             )}

@@ -214,7 +214,7 @@ export function DiscoveryCallCalendar() {
     },
   });
 
-  // Fetch owner calls
+  // Fetch owner calls - exclude cancelled/deleted/completed
   const { data: ownerCalls = [], isLoading: isLoadingOwnerCalls } = useQuery({
     queryKey: ["owner-calls-calendar", format(currentMonth, "yyyy-MM")],
     queryFn: async () => {
@@ -229,6 +229,7 @@ export function DiscoveryCallCalendar() {
         `)
         .gte("scheduled_at", monthStart.toISOString())
         .lte("scheduled_at", monthEnd.toISOString())
+        .not("status", "in", '("cancelled","completed")')
         .order("scheduled_at", { ascending: true });
 
       if (error) throw error;
