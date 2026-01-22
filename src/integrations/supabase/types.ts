@@ -7540,6 +7540,7 @@ export type Database = {
           email: string
           has_payment_method: boolean | null
           id: string
+          is_archived: boolean | null
           name: string
           our_w9_sent_at: string | null
           owner_ein_last4: string | null
@@ -7572,6 +7573,7 @@ export type Database = {
           email: string
           has_payment_method?: boolean | null
           id?: string
+          is_archived?: boolean | null
           name: string
           our_w9_sent_at?: string | null
           owner_ein_last4?: string | null
@@ -7604,6 +7606,7 @@ export type Database = {
           email?: string
           has_payment_method?: boolean | null
           id?: string
+          is_archived?: boolean | null
           name?: string
           our_w9_sent_at?: string | null
           owner_ein_last4?: string | null
