@@ -26,6 +26,7 @@ const OWNER_PORTAL_URL = "https://propertycentral.lovable.app/owner";
 interface RequestW9EmailRequest {
   ownerId: string;
   testEmail?: string;
+  specialReason?: "temporary_housing_payments";
 }
 
 // Generate secure upload token
@@ -90,12 +91,49 @@ function buildRequestW9EmailHtml(
   firstName: string, 
   uploadUrl: string, 
   paymentsYtd: number,
-  taxYear: number
+  taxYear: number,
+  isSpecialRequest: boolean = false
 ): string {
   const formattedPayments = new Intl.NumberFormat('en-US', { 
     style: 'currency', 
     currency: 'USD' 
   }).format(paymentsYtd);
+  
+  // Special intro section for temporary housing payments
+  const specialIntro = isSpecialRequest ? `
+    <tr>
+      <td style="padding: 0 32px 16px 32px;">
+        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #f59e0b; border-radius: 12px; padding: 20px 24px;">
+          <div style="font-size: 12px; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">⚠️ Special Notice</div>
+          <div style="font-size: 14px; color: #78350f; line-height: 1.6;">
+            <strong>Why are we requesting your W-9?</strong><br/><br/>
+            During ${taxYear}, we received payments on your behalf from <strong>temporary housing agencies, insurance placements, and/or corporate housing clients</strong>. 
+            Unlike our standard co-hosting arrangement where you typically pay us a management fee, these placements resulted in us paying funds directly to you.
+            <br/><br/>
+            <strong>As a result, the IRS requires us to issue you a 1099-NEC for these payments.</strong>
+            <br/><br/>
+            These payments may include:
+            <ul style="margin: 8px 0 0 16px; padding: 0;">
+              <li>Temporary housing agency placements (corporate relocations)</li>
+              <li>Insurance company placements (displaced families)</li>
+              <li>Mid-term rental corporate clients</li>
+              <li>Any third-party bookings we collected and remitted to you</li>
+            </ul>
+          </div>
+        </div>
+      </td>
+    </tr>
+  ` : '';
+  
+  const whySection = isSpecialRequest ? `
+    <div style="font-size: 14px; color: #374151; line-height: 1.7;">
+      To complete your 1099, we need your completed W-9 form on file. This is required by the IRS for all payments exceeding $600.
+    </div>
+  ` : `
+    <div style="font-size: 14px; color: #374151; line-height: 1.7;">
+      As your property management partner, we need your completed W-9 form to issue your 1099 for ${taxYear} tax reporting. This is required by the IRS for all property owners receiving rental income through our management services.
+    </div>
+  `;
   
   return `
     <!DOCTYPE html>
@@ -273,10 +311,11 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const { ownerId, testEmail }: RequestW9EmailRequest = await req.json();
+    const { ownerId, testEmail, specialReason }: RequestW9EmailRequest = await req.json();
     
     const isTestMode = !!testEmail;
-    console.log("Processing W-9 request for owner:", ownerId, "test mode:", isTestMode);
+    const isSpecialRequest = specialReason === "temporary_housing_payments";
+    console.log("Processing W-9 request for owner:", ownerId, "test mode:", isTestMode, "special:", isSpecialRequest);
 
     if (!ownerId) {
       throw new Error("Owner ID is required");
@@ -294,13 +333,14 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Owner not found");
     }
 
-    // Only request W-9 from full-service clients (they need to give us their W-9)
-    if (owner.service_type === "cohosting") {
-      console.log(`Owner ${owner.name} is a cohosting client - use send-w9-email instead`);
+    // Only request W-9 from full-service clients UNLESS it's a special request
+    // Special request = co-hosting client who received temporary housing/insurance payments from us
+    if (owner.service_type === "cohosting" && !isSpecialRequest) {
+      console.log(`Owner ${owner.name} is a cohosting client - use send-w9-email instead or special request`);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Co-hosting clients should receive our W-9, not be requested for theirs",
+          message: "Co-hosting clients should receive our W-9, not be requested for theirs. Use 'specialReason' for temporary housing payments.",
           skipped: true,
           useFunction: "send-w9-email"
         }),
@@ -326,9 +366,10 @@ const handler = async (req: Request): Promise<Response> => {
     const taxYear = new Date().getFullYear();
     const paymentsYtd = owner.payments_ytd || 0;
 
-    // Build email HTML
-    const emailHtml = buildRequestW9EmailHtml(firstName, uploadUrl, paymentsYtd, taxYear);
+    // Build email HTML (with special messaging if applicable)
+    const emailHtml = buildRequestW9EmailHtml(firstName, uploadUrl, paymentsYtd, taxYear, isSpecialRequest);
 
+    const emailSubjectPrefix = isSpecialRequest ? "Important: " : "";
     // Build recipient list
     const recipients: string[] = [];
     if (isTestMode) {
@@ -341,8 +382,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const emailSubject = isTestMode
-      ? `[TEST] PeachHaus Group - W-9 Request for ${taxYear} Tax Filing`
-      : `PeachHaus Group - W-9 Request for ${taxYear} Tax Filing`;
+      ? `[TEST] ${emailSubjectPrefix}PeachHaus Group - W-9 Request for ${taxYear} Tax Filing`
+      : `${emailSubjectPrefix}PeachHaus Group - W-9 Request for ${taxYear} Tax Filing${isSpecialRequest ? ' (Temporary Housing Payments)' : ''}`;
 
     // Send email
     const emailResponse = await resend.emails.send({

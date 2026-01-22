@@ -657,7 +657,7 @@ const PropertyOwners = () => {
                       </CardDescription>
                     </div>
                     <div className="flex gap-2 items-center">
-                      {/* Desktop buttons */}
+                      {/* Desktop: Use simplified actions dropdown */}
                       <div className="hidden md:flex gap-2 items-center">
                         {/* Service Type Badge */}
                         <Badge 
@@ -668,80 +668,30 @@ const PropertyOwners = () => {
                           {owner.service_type === 'cohosting' ? 'Co-Hosting' : 'Full Service'}
                         </Badge>
                         
-                        {/* W-9 Button - Dual direction based on service type */}
-                        {owner.service_type === 'cohosting' ? (
-                          // Co-hosting: Send OUR W-9 TO them (they issue 1099 to us)
+                        {/* W-9 Status indicator */}
+                        {owner.owner_w9_uploaded_at ? (
                           <Button
-                            variant={owner.our_w9_sent_at ? "ghost" : "outline"}
+                            variant="ghost"
                             size="sm"
-                            onClick={() => handleSendOurW9(owner)}
-                            disabled={sendingW9 === owner.id}
-                            title={owner.our_w9_sent_at ? `Our W-9 sent ${new Date(owner.our_w9_sent_at).toLocaleDateString()}` : "Send our W-9 to owner"}
-                            className={owner.our_w9_sent_at ? "text-green-600" : ""}
+                            onClick={() => handleViewOwnerW9(owner)}
+                            className="text-green-600 gap-1"
                           >
-                            {sendingW9 === owner.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : owner.our_w9_sent_at ? (
-                              <>
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                Our W-9 Sent
-                              </>
-                            ) : (
-                              <>
-                                <FileText className="w-4 h-4 mr-1" />
-                                Send Our W-9
-                              </>
-                            )}
+                            <CheckCircle className="w-4 h-4" />
+                            W-9 Received
                           </Button>
-                        ) : (
-                          // Full-service: Request THEIR W-9 FROM them (we issue 1099 to them)
-                          <Button
-                            variant={owner.owner_w9_uploaded_at ? "ghost" : owner.owner_w9_requested_at ? "ghost" : "outline"}
-                            size="sm"
-                            onClick={() => handleRequestOwnerW9(owner)}
-                            disabled={requestingW9 === owner.id}
-                            title={
-                              owner.owner_w9_uploaded_at 
-                                ? `W-9 received ${new Date(owner.owner_w9_uploaded_at).toLocaleDateString()}` 
-                                : owner.owner_w9_requested_at 
-                                  ? `W-9 requested ${new Date(owner.owner_w9_requested_at).toLocaleDateString()}`
-                                  : "Request W-9 from owner"
-                            }
-                            className={owner.owner_w9_uploaded_at ? "text-green-600" : owner.owner_w9_requested_at ? "text-amber-600" : ""}
-                          >
-                            {requestingW9 === owner.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : owner.owner_w9_uploaded_at ? (
-                              <>
-                                <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
-                                W-9 Received
-                              </>
-                            ) : owner.owner_w9_requested_at ? (
-                              <>
-                                <FileText className="w-4 h-4 mr-1" />
-                                W-9 Requested
-                              </>
-                            ) : (
-                              <>
-                                <FileText className="w-4 h-4 mr-1" />
-                                Request W-9
-                              </>
-                            )}
-                          </Button>
-                        )}
-                        
-                        <SendOwnerPaymentRequestButton
-                          ownerId={owner.id}
-                          email={owner.email}
-                          name={owner.name}
-                          stripeCustomerId={owner.stripe_customer_id}
-                        />
+                        ) : owner.owner_w9_requested_at ? (
+                          <Badge variant="outline" className="border-amber-500 text-amber-600">
+                            <FileText className="w-3 h-3 mr-1" />
+                            W-9 Pending
+                          </Badge>
+                        ) : null}
+
+                        {/* Portal Invite - Primary CTA */}
                         <Button
                           variant="default"
                           size="sm"
                           onClick={() => handleSendPortalInvite(owner)}
                           disabled={sendingInvite === owner.id}
-                          title="Send portal invite to owner"
                           className="gap-2"
                         >
                           {sendingInvite === owner.id ? (
@@ -751,46 +701,104 @@ const PropertyOwners = () => {
                           )}
                           Invite to Portal
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(`/owner?owner=${owner.id}`, '_blank')}
-                          title="View owner portal"
-                          className="gap-2"
-                        >
-                          <Eye className="w-4 h-4" />
-                          View Portal
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedOwnerForComms(owner)}
-                          title="View all communications"
-                          className="gap-2"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          Messages
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditOwner(owner)}
-                          title="Edit owner details"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
+
+                        {/* Actions Dropdown */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56 bg-popover">
+                            <DropdownMenuItem onClick={() => window.open(`/owner?owner=${owner.id}`, '_blank')}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Portal
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSelectedOwnerForComms(owner)}>
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              View Messages
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditOwner(owner)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Details
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            {/* W-9 Actions */}
+                            {owner.service_type === 'cohosting' ? (
+                              <>
+                                <DropdownMenuItem 
+                                  onClick={() => handleSendOurW9(owner)}
+                                  disabled={sendingW9 === owner.id}
+                                >
+                                  <FileText className="w-4 h-4 mr-2" />
+                                  {owner.our_w9_sent_at ? 'Resend Our W-9' : 'Send Our W-9'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={async () => {
+                                    setRequestingW9(owner.id);
+                                    try {
+                                      const { error } = await supabase.functions.invoke("request-owner-w9", {
+                                        body: { ownerId: owner.id, specialReason: "temporary_housing_payments" },
+                                      });
+                                      if (error) throw error;
+                                      toast.success(`Special W-9 request sent to ${owner.email}!`, {
+                                        description: "Email explains temporary housing payments."
+                                      });
+                                      loadData();
+                                    } catch (error: any) {
+                                      toast.error("Failed: " + (error.message || "Unknown error"));
+                                    } finally {
+                                      setRequestingW9(null);
+                                    }
+                                  }}
+                                  disabled={requestingW9 === owner.id}
+                                >
+                                  <FileText className="w-4 h-4 mr-2 text-amber-600" />
+                                  Request W-9 (Special)
+                                </DropdownMenuItem>
+                              </>
+                            ) : (
+                              <DropdownMenuItem 
+                                onClick={() => handleRequestOwnerW9(owner)}
+                                disabled={requestingW9 === owner.id}
+                              >
+                                <FileText className="w-4 h-4 mr-2" />
+                                {owner.owner_w9_uploaded_at ? 'View W-9' : owner.owner_w9_requested_at ? 'Resend W-9 Request' : 'Request W-9'}
+                              </DropdownMenuItem>
+                            )}
+                            
+                            {owner.owner_w9_uploaded_at && (
+                              <DropdownMenuItem onClick={() => handleViewOwnerW9(owner)}>
+                                <Eye className="w-4 h-4 mr-2 text-green-600" />
+                                View Uploaded W-9
+                              </DropdownMenuItem>
+                            )}
+                            
+                            <DropdownMenuSeparator />
+                            
+                            <DropdownMenuItem onClick={() => setAddingPaymentFor(owner)}>
+                              <Wallet className="w-4 h-4 mr-2" />
+                              Add Payment Method
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteOwner(owner.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Owner
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        
                         <Badge variant={owner.payment_method === "ach" ? "default" : "secondary"}>
                           <CreditCard className="w-3 h-3 mr-1" />
                           {owner.payment_method === "ach" ? "ACH" : "Card"}
                         </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteOwner(owner.id)}
-                          title="Delete owner"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
                       </div>
                       
                       {/* Mobile dropdown menu */}
