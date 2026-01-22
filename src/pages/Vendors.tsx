@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, MessageSquare, PhoneCall, Trash2, ClipboardList, Mic, Video, Camera } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, MessageSquare, PhoneCall, Trash2, ClipboardList, Mic, Video, Camera, Download } from "lucide-react";
 import { SendVoicemailButton } from "@/components/communications/SendVoicemailButton";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
@@ -43,6 +43,7 @@ const Vendors = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showStartWorkOrder, setShowStartWorkOrder] = useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
+  const [isImportingFromBillcom, setIsImportingFromBillcom] = useState(false);
   const queryClient = useQueryClient();
   const { isAdmin } = useAdminCheck();
 
@@ -61,6 +62,27 @@ const Vendors = () => {
       toast.error(error.message || 'Failed to extract vendors from emails');
     } finally {
       setIsExtracting(false);
+    }
+  };
+
+  const importFromBillcom = async () => {
+    setIsImportingFromBillcom(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('billcom-import-vendors');
+      if (error) throw error;
+      if (data.success) {
+        toast.success(data.message);
+        if (data.importedNames?.length > 0) {
+          console.log("Imported vendors:", data.importedNames);
+        }
+        queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      } else {
+        toast.error(data.error || 'Failed to import vendors from Bill.com');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to import vendors from Bill.com');
+    } finally {
+      setIsImportingFromBillcom(false);
     }
   };
 
@@ -149,6 +171,10 @@ const Vendors = () => {
             <Button onClick={() => setShowStartWorkOrder(true)} className="gap-2">
               <ClipboardList className="h-4 w-4" />
               Start Work Order
+            </Button>
+            <Button variant="outline" onClick={importFromBillcom} disabled={isImportingFromBillcom} className="gap-2">
+              {isImportingFromBillcom ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {isImportingFromBillcom ? 'Importing...' : 'Import from Bill.com'}
             </Button>
             <Button variant="outline" onClick={extractVendorsFromEmails} disabled={isExtracting} className="gap-2">
               {isExtracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
