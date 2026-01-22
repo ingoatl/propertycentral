@@ -547,4 +547,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.owner-call-notifications]
-verify_jwt = true
+verify_jwt = false
+
+[functions.owner-call-reminder-cron]
+verify_jwt = false
