@@ -86,10 +86,32 @@ interface DiscoveryCall {
   } | null;
 }
 
+interface OwnerCall {
+  id: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  status: string;
+  meeting_type: string | null;
+  topic: string;
+  topic_details?: string | null;
+  meeting_notes?: string | null;
+  google_meet_link: string | null;
+  google_calendar_event_id: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  property_owners: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+  } | null;
+}
+
 // Unified calendar event type
 interface CalendarEvent {
   id: string;
-  type: "discovery" | "ghl" | "inspection";
+  type: "discovery" | "ghl" | "inspection" | "owner_call";
   scheduled_at: string;
   end_time?: string;
   title: string;
@@ -160,6 +182,7 @@ function getServiceLabel(service: string | null): string {
 export function DiscoveryCallCalendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedCall, setSelectedCall] = useState<DiscoveryCall | null>(null);
+  const [selectedOwnerCall, setSelectedOwnerCall] = useState<OwnerCall | null>(null);
   const [selectedGhlEvent, setSelectedGhlEvent] = useState<GhlAppointment | null>(null);
   // Local state for optimistic deletion
   const [deletedCallIds, setDeletedCallIds] = useState<Set<string>>(new Set());
@@ -185,6 +208,28 @@ export function DiscoveryCallCalendar() {
 
       if (error) throw error;
       return data as DiscoveryCall[];
+    },
+  });
+
+  // Fetch owner calls
+  const { data: ownerCalls = [], isLoading: isLoadingOwnerCalls } = useQuery({
+    queryKey: ["owner-calls-calendar", format(currentMonth, "yyyy-MM")],
+    queryFn: async () => {
+      const monthStart = startOfMonth(currentMonth);
+      const monthEnd = endOfMonth(currentMonth);
+
+      const { data, error } = await supabase
+        .from("owner_calls")
+        .select(`
+          *,
+          property_owners (id, name, email, phone)
+        `)
+        .gte("scheduled_at", monthStart.toISOString())
+        .lte("scheduled_at", monthEnd.toISOString())
+        .order("scheduled_at", { ascending: true });
+
+      if (error) throw error;
+      return data as OwnerCall[];
     },
   });
 
@@ -215,7 +260,8 @@ export function DiscoveryCallCalendar() {
     return !isWebsiteBooking;
   });
 
-  const isLoading = isLoadingCalls || isLoadingGhl;
+
+  const isLoading = isLoadingCalls || isLoadingGhl || isLoadingOwnerCalls;
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -251,11 +297,18 @@ export function DiscoveryCallCalendar() {
     return filteredGhlAppointments.filter((apt) => isSameDay(new Date(apt.scheduled_at), date));
   };
 
+  const getOwnerCallsForDay = (date: Date) => {
+    return ownerCalls.filter((call) => 
+      isSameDay(new Date(call.scheduled_at), date) && call.status === 'scheduled'
+    );
+  };
+
   const getAllEventsForDay = (date: Date) => {
     const dayCalls = getCallsForDay(date).map(call => ({ type: 'discovery' as const, data: call, time: new Date(call.scheduled_at) }));
     const dayInspections = getInspectionsForDay(date).map(call => ({ type: 'inspection' as const, data: call, time: new Date(call.scheduled_at) }));
     const dayGhl = getGhlEventsForDay(date).map(apt => ({ type: 'ghl' as const, data: apt, time: new Date(apt.scheduled_at) }));
-    return [...dayCalls, ...dayInspections, ...dayGhl].sort((a, b) => a.time.getTime() - b.time.getTime());
+    const dayOwnerCalls = getOwnerCallsForDay(date).map(call => ({ type: 'owner_call' as const, data: call, time: new Date(call.scheduled_at) }));
+    return [...dayCalls, ...dayInspections, ...dayGhl, ...dayOwnerCalls].sort((a, b) => a.time.getTime() - b.time.getTime());
   };
 
   const upcomingCalls = regularCalls
@@ -270,11 +323,16 @@ export function DiscoveryCallCalendar() {
     .filter((apt) => new Date(apt.scheduled_at) >= new Date() && apt.status !== "cancelled")
     .slice(0, 5);
 
+  const upcomingOwnerCalls = ownerCalls
+    .filter((call) => new Date(call.scheduled_at) >= new Date() && call.status === "scheduled")
+    .slice(0, 5);
+
   // Combined upcoming events
   const allUpcomingEvents = [
     ...upcomingCalls.map(call => ({ type: 'discovery' as const, data: call, time: new Date(call.scheduled_at) })),
     ...upcomingInspections.map(call => ({ type: 'inspection' as const, data: call, time: new Date(call.scheduled_at) })),
     ...upcomingGhlEvents.map(apt => ({ type: 'ghl' as const, data: apt, time: new Date(apt.scheduled_at) })),
+    ...upcomingOwnerCalls.map(call => ({ type: 'owner_call' as const, data: call, time: new Date(call.scheduled_at) })),
   ].sort((a, b) => a.time.getTime() - b.time.getTime()).slice(0, 8);
 
   return (
@@ -297,6 +355,10 @@ export function DiscoveryCallCalendar() {
               <Badge variant="outline" className="text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
                 <CalendarCheck className="h-3 w-3 mr-1" />
                 GHL
+              </Badge>
+              <Badge variant="outline" className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
+                <User className="h-3 w-3 mr-1" />
+                Owner
               </Badge>
             </div>
           </CardTitle>
@@ -427,7 +489,7 @@ export function DiscoveryCallCalendar() {
                       </div>
                     </button>
                   );
-                } else {
+                } else if (event.type === 'ghl') {
                   const apt = event.data as GhlAppointment;
                   return (
                     <button
@@ -461,6 +523,50 @@ export function DiscoveryCallCalendar() {
                       </div>
                     </button>
                   );
+                } else if (event.type === 'owner_call') {
+                  const ownerCall = event.data as OwnerCall;
+                  const ownerName = ownerCall.property_owners?.name || ownerCall.contact_name || "Unknown Owner";
+                  const topicLabels: Record<string, string> = {
+                    monthly_statement: "Monthly Statement",
+                    maintenance: "Maintenance",
+                    guest_concerns: "Guest Concerns",
+                    pricing: "Pricing",
+                    general_checkin: "Check-in",
+                    property_update: "Property Update",
+                    other: "Other"
+                  };
+                  return (
+                    <button
+                      key={ownerCall.id}
+                      onClick={() => setSelectedOwnerCall(ownerCall)}
+                      className="flex-shrink-0 w-[280px] snap-start text-left p-3 rounded-lg border border-purple-200 dark:border-purple-800 hover:border-primary active:bg-muted/50 transition-colors bg-purple-50/50 dark:bg-purple-900/10"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm truncate max-w-[180px]">
+                          {ownerName}
+                        </span>
+                        <Badge variant="outline" className="text-xs flex-shrink-0 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
+                          Owner
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 flex-shrink-0" />
+                          {formatInESTWithLabel(event.time, "MMM d, h:mm a")}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {ownerCall.meeting_type === "video" ? (
+                            <Video className="h-3 w-3 text-purple-600 flex-shrink-0" />
+                          ) : (
+                            <Phone className="h-3 w-3 text-purple-600 flex-shrink-0" />
+                          )}
+                          <span className="truncate">{topicLabels[ownerCall.topic] || ownerCall.topic}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                } else {
+                  return null;
                 }
               })}
             </div>
@@ -494,6 +600,7 @@ export function DiscoveryCallCalendar() {
                 const hasDiscovery = dayEvents.some(e => e.type === 'discovery');
                 const hasInspection = dayEvents.some(e => e.type === 'inspection');
                 const hasGhl = dayEvents.some(e => e.type === 'ghl');
+                const hasOwnerCall = dayEvents.some(e => e.type === 'owner_call');
 
                 return (
                   <button
@@ -503,6 +610,8 @@ export function DiscoveryCallCalendar() {
                         const first = dayEvents[0];
                         if (first.type === 'discovery' || first.type === 'inspection') {
                           setSelectedCall(first.data as DiscoveryCall);
+                        } else if (first.type === 'owner_call') {
+                          setSelectedOwnerCall(first.data as OwnerCall);
                         } else {
                           setSelectedGhlEvent(first.data as GhlAppointment);
                         }
@@ -522,7 +631,8 @@ export function DiscoveryCallCalendar() {
                       isCurrentDay && "bg-primary text-primary-foreground font-bold",
                       hasInspection && !isCurrentDay && "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 font-medium",
                       hasDiscovery && !hasInspection && !isCurrentDay && "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-medium",
-                      hasGhl && !hasDiscovery && !hasInspection && !isCurrentDay && "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 font-medium"
+                      hasOwnerCall && !hasDiscovery && !hasInspection && !isCurrentDay && "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 font-medium",
+                      hasGhl && !hasDiscovery && !hasInspection && !hasOwnerCall && !isCurrentDay && "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 font-medium"
                     )}>
                       {format(day, "d")}
                     </span>
@@ -644,7 +754,7 @@ export function DiscoveryCallCalendar() {
                               </div>
                             </button>
                           );
-                        } else {
+                        } else if (event.type === 'ghl') {
                           const apt = event.data as GhlAppointment;
                           return (
                             <button
@@ -668,6 +778,34 @@ export function DiscoveryCallCalendar() {
                               )}
                             </button>
                           );
+                        } else if (event.type === 'owner_call') {
+                          const ownerCall = event.data as OwnerCall;
+                          return (
+                            <button
+                              key={ownerCall.id}
+                              onClick={() => setSelectedOwnerCall(ownerCall)}
+                              className="w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02] bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200"
+                            >
+                              <div className="flex items-center gap-1">
+                                {ownerCall.meeting_type === "video" ? (
+                                  <Video className="h-3 w-3 shrink-0" />
+                                ) : (
+                                  <Phone className="h-3 w-3 shrink-0" />
+                                )}
+                                <span className="truncate font-medium">
+                                  {formatInEST(ownerCall.scheduled_at, "h:mm a")}
+                                </span>
+                              </div>
+                              <div className="truncate opacity-80">
+                                {ownerCall.property_owners?.name || ownerCall.contact_name || "Owner"}
+                              </div>
+                              <div className="truncate text-[10px] opacity-70">
+                                Owner Call
+                              </div>
+                            </button>
+                          );
+                        } else {
+                          return null;
                         }
                       })}
                       {dayEvents.length > 4 && (
@@ -701,6 +839,58 @@ export function DiscoveryCallCalendar() {
         appointment={selectedGhlEvent}
         onClose={() => setSelectedGhlEvent(null)}
       />
+
+      {/* Owner Call Detail Modal */}
+      <Dialog open={!!selectedOwnerCall} onOpenChange={() => setSelectedOwnerCall(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5 text-purple-600" />
+              Owner Call
+            </DialogTitle>
+          </DialogHeader>
+          {selectedOwnerCall && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">
+                    {selectedOwnerCall.property_owners?.name || selectedOwnerCall.contact_name || "Unknown Owner"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>{formatInESTWithLabel(new Date(selectedOwnerCall.scheduled_at), "EEEE, MMMM d, yyyy 'at' h:mm a")}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedOwnerCall.meeting_type === "video" ? (
+                    <Video className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span>{selectedOwnerCall.meeting_type === "video" ? "Video Call" : "Phone Call"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-muted-foreground" />
+                  <Badge variant="outline" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
+                    {selectedOwnerCall.topic.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </Badge>
+                </div>
+                {selectedOwnerCall.google_meet_link && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => window.open(selectedOwnerCall.google_meet_link!, '_blank')}
+                  >
+                    <Video className="h-4 w-4 mr-2" />
+                    Join Video Call
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
