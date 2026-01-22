@@ -539,3 +539,12 @@ verify_jwt = true
 
 [functions.request-vendor-w9]
 verify_jwt = true
+
+[functions.get-owner-call-slots]
+verify_jwt = false
+
+[functions.owner-call-webhook]
+verify_jwt = false
+
+[functions.owner-call-notifications]
+verify_jwt = true

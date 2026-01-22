@@ -57,6 +57,7 @@ const VendorW9Upload = lazy(() => import("./pages/VendorW9Upload"));
 const TeamHub = lazy(() => import("./pages/TeamHub"));
 const TeamHubInvite = lazy(() => import("./pages/TeamHubInvite"));
 const Tax1099 = lazy(() => import("./pages/Tax1099"));
+const BookOwnerCall = lazy(() => import("./pages/BookOwnerCall"));
 
 // QueryClient configured with optimized caching and stale time settings
 const queryClient = new QueryClient({
@@ -114,6 +115,7 @@ const App = () => (
             {/* Public job application page */}
             <Route path="/careers/property-inspector" element={<JobApplication />} />
             <Route path="/book-discovery-call" element={<BookDiscoveryCall />} />
+            <Route path="/book-owner-call" element={<BookOwnerCall />} />
             <Route path="/book-inspection" element={<BookInspection />} />
             <Route path="/payment-setup" element={<PaymentSetup />} />
             <Route path="/payment-success" element={<PaymentSetup />} />

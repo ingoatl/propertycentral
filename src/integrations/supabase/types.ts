@@ -519,6 +519,7 @@ export type Database = {
       }
       availability_slots: {
         Row: {
+          calendar_type: string
           created_at: string | null
           day_of_week: number
           end_time: string
@@ -529,6 +530,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          calendar_type?: string
           created_at?: string | null
           day_of_week: number
           end_time: string
@@ -539,6 +541,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          calendar_type?: string
           created_at?: string | null
           day_of_week?: number
           end_time?: string
@@ -4949,6 +4952,89 @@ export type Database = {
             columns: ["work_order_id"]
             isOneToOne: false
             referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_calls: {
+        Row: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          confirmation_sent: boolean | null
+          contact_email: string
+          contact_name: string
+          contact_phone: string | null
+          created_at: string
+          duration_minutes: number
+          google_calendar_event_id: string | null
+          google_meet_link: string | null
+          id: string
+          meeting_notes: string | null
+          owner_id: string | null
+          reminder_1h_sent: boolean | null
+          reminder_24h_sent: boolean | null
+          reschedule_count: number | null
+          rescheduled_at: string | null
+          scheduled_at: string
+          status: string
+          topic: string | null
+          topic_details: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          confirmation_sent?: boolean | null
+          contact_email: string
+          contact_name: string
+          contact_phone?: string | null
+          created_at?: string
+          duration_minutes?: number
+          google_calendar_event_id?: string | null
+          google_meet_link?: string | null
+          id?: string
+          meeting_notes?: string | null
+          owner_id?: string | null
+          reminder_1h_sent?: boolean | null
+          reminder_24h_sent?: boolean | null
+          reschedule_count?: number | null
+          rescheduled_at?: string | null
+          scheduled_at: string
+          status?: string
+          topic?: string | null
+          topic_details?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          confirmation_sent?: boolean | null
+          contact_email?: string
+          contact_name?: string
+          contact_phone?: string | null
+          created_at?: string
+          duration_minutes?: number
+          google_calendar_event_id?: string | null
+          google_meet_link?: string | null
+          id?: string
+          meeting_notes?: string | null
+          owner_id?: string | null
+          reminder_1h_sent?: boolean | null
+          reminder_24h_sent?: boolean | null
+          reschedule_count?: number | null
+          rescheduled_at?: string | null
+          scheduled_at?: string
+          status?: string
+          topic?: string | null
+          topic_details?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_calls_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
         ]
