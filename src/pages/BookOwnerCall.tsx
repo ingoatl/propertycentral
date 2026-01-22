@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, Clock, ArrowRight, Check, ChevronLeft, ChevronRight, Loader2, Building2, MapPin } from "lucide-react";
+import { Calendar, Clock, ArrowRight, Check, ChevronLeft, ChevronRight, Loader2, Building2, MapPin, Video, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isBefore, startOfDay, parseISO } from "date-fns";
@@ -29,6 +30,7 @@ interface FormData {
   phone: string;
   topic: string;
   topicDetails: string;
+  meetingType: 'video' | 'phone';
 }
 
 interface PropertyInfo {
@@ -38,6 +40,18 @@ interface PropertyInfo {
   image_path?: string;
 }
 
+const getPropertyImageUrl = (imagePath: string | undefined): string | null => {
+  if (!imagePath) return null;
+  
+  // If it's already a full URL, use it
+  if (imagePath.startsWith('http')) {
+    return imagePath;
+  }
+  
+  // Build the Supabase storage URL
+  return `https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/${imagePath}`;
+};
+
 export default function BookOwnerCall() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
@@ -46,6 +60,7 @@ export default function BookOwnerCall() {
     phone: "",
     topic: "",
     topicDetails: "",
+    meetingType: "video",
   });
   const [propertyInfo, setPropertyInfo] = useState<PropertyInfo | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -56,6 +71,7 @@ export default function BookOwnerCall() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isLoadingProperty, setIsLoadingProperty] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   // Pre-fill from URL params (magic link support)
   useEffect(() => {
@@ -65,14 +81,16 @@ export default function BookOwnerCall() {
     const phone = params.get("phone");
     const propertyId = params.get("propertyId");
     const topic = params.get("topic");
+    const meetingType = params.get("meetingType");
     
-    if (email || name || phone || topic) {
+    if (email || name || phone || topic || meetingType) {
       setFormData(prev => ({
         ...prev,
         email: email || prev.email,
         name: name || prev.name,
         phone: phone || prev.phone,
         topic: topic || prev.topic,
+        meetingType: (meetingType === 'phone' ? 'phone' : 'video') as 'video' | 'phone',
       }));
     }
 
@@ -100,7 +118,7 @@ export default function BookOwnerCall() {
           .from('properties')
           .select('id, name, address, image_path')
           .eq('owner_id', owner.id)
-          .limit(1);
+          .limit(5);
 
         if (properties && properties.length > 0) {
           const prop = propertyId 
@@ -194,6 +212,11 @@ export default function BookOwnerCall() {
       return;
     }
 
+    if (formData.meetingType === 'phone' && !formData.phone) {
+      toast.error("Please provide a phone number for phone calls");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("owner-call-webhook", {
@@ -205,6 +228,7 @@ export default function BookOwnerCall() {
           topicDetails: formData.topicDetails,
           scheduledAt: selectedTime,
           propertyId: propertyInfo?.id,
+          meetingType: formData.meetingType,
         }
       });
 
@@ -229,28 +253,62 @@ export default function BookOwnerCall() {
     }
   };
 
-  const isStep1Valid = formData.name && formData.email && formData.topic;
+  const isStep1Valid = formData.name && formData.email && formData.topic && 
+    (formData.meetingType === 'video' || (formData.meetingType === 'phone' && formData.phone));
   const isStep2Valid = selectedDate && selectedTime;
+
+  const propertyImageUrl = getPropertyImageUrl(propertyInfo?.image_path);
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-secondary via-background to-accent/30 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center shadow-lg border-primary/10">
-          <CardContent className="pt-8 pb-6">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check className="h-8 w-8 text-green-600" />
+      <div className="min-h-screen bg-gradient-to-br from-secondary via-background to-accent/20 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center shadow-xl border-0 bg-card/95 backdrop-blur">
+          <CardContent className="pt-10 pb-8 px-6">
+            <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <Check className="h-10 w-10 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Call Scheduled!</h2>
-            <p className="text-muted-foreground mb-4">
-              Your owner call has been booked. You'll receive a confirmation email shortly with the meeting details.
+            <h2 className="text-2xl font-bold text-foreground mb-3">Call Scheduled!</h2>
+            <p className="text-muted-foreground mb-6 leading-relaxed">
+              Your owner call has been booked. You'll receive a confirmation email shortly with all the details.
             </p>
             {selectedTime && (
-              <div className="bg-secondary rounded-xl p-4 text-sm">
-                <p className="font-semibold text-foreground">{formatInTimeZone(parseISO(selectedTime), EST_TIMEZONE, "EEEE, MMMM d, yyyy")}</p>
-                <p className="text-muted-foreground">{formatTimeSlot(selectedTime)} EST</p>
-                <p className="text-muted-foreground mt-2">Topic: {CALL_TOPICS.find(t => t.value === formData.topic)?.label}</p>
+              <div className="bg-gradient-to-br from-secondary to-accent/30 rounded-2xl p-5 text-left space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Calendar className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">{formatInTimeZone(parseISO(selectedTime), EST_TIMEZONE, "EEEE, MMMM d, yyyy")}</p>
+                    <p className="text-sm text-muted-foreground">{formatTimeSlot(selectedTime)} EST • 30 min</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    {formData.meetingType === 'video' ? (
+                      <Video className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Phone className="h-5 w-5 text-primary" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {formData.meetingType === 'video' ? 'Video Call' : 'Phone Call'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {formData.meetingType === 'video' ? 'Google Meet link in email' : `We'll call ${formData.phone}`}
+                    </p>
+                  </div>
+                </div>
                 {propertyInfo && (
-                  <p className="text-primary font-medium mt-2">{propertyInfo.name}</p>
+                  <div className="flex items-center gap-3 pt-2 border-t border-border/50">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">{propertyInfo.name}</p>
+                      <p className="text-sm text-muted-foreground">{CALL_TOPICS.find(t => t.value === formData.topic)?.label}</p>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -261,12 +319,12 @@ export default function BookOwnerCall() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-secondary via-background to-accent/30">
+    <div className="min-h-screen bg-gradient-to-br from-secondary via-background to-accent/20">
       {/* Header */}
-      <div className="bg-card border-b border-border/50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      <div className="bg-card/80 backdrop-blur-sm border-b border-border/40 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-md">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-primary/70 rounded-xl flex items-center justify-center shadow-lg">
               <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
             </div>
             <div>
@@ -278,17 +336,17 @@ export default function BookOwnerCall() {
       </div>
 
       {/* Progress Steps */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
         <div className="flex items-center justify-center gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div className={`flex items-center gap-2 ${step >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>
-            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${step >= 1 ? 'bg-primary text-primary-foreground shadow-md' : 'bg-muted'}`}>
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${step >= 1 ? 'bg-primary text-primary-foreground shadow-lg' : 'bg-muted'}`}>
               {step > 1 ? <Check className="h-4 w-4" /> : "1"}
             </div>
             <span className="text-sm font-medium hidden sm:inline">Your Info</span>
           </div>
-          <div className="w-8 sm:w-12 h-0.5 bg-border rounded-full" />
+          <div className={`w-10 sm:w-16 h-0.5 rounded-full transition-colors ${step > 1 ? 'bg-primary' : 'bg-border'}`} />
           <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
-            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${step >= 2 ? 'bg-primary text-primary-foreground shadow-md' : 'bg-muted'}`}>
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${step >= 2 ? 'bg-primary text-primary-foreground shadow-lg' : 'bg-muted'}`}>
               2
             </div>
             <span className="text-sm font-medium hidden sm:inline">Schedule</span>
@@ -297,38 +355,39 @@ export default function BookOwnerCall() {
 
         {/* Step 1: Contact Info & Topic */}
         {step === 1 && (
-          <Card className="max-w-xl mx-auto shadow-lg border-primary/10">
+          <Card className="max-w-xl mx-auto shadow-xl border-0 bg-card/95 backdrop-blur overflow-hidden">
             {/* Property Card - Show if we have property info */}
             {propertyInfo && (
-              <div className="bg-gradient-to-br from-secondary via-accent/30 to-secondary rounded-t-xl">
+              <div className="bg-gradient-to-br from-primary/5 via-secondary to-accent/20 border-b border-border/30">
                 <div className="p-5 sm:p-6">
                   <div className="flex gap-4 sm:gap-5 items-center">
                     {/* Property Image */}
-                    {propertyInfo.image_path ? (
+                    {propertyImageUrl && !imageError ? (
                       <div className="relative flex-shrink-0">
                         <img 
-                          src={`https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/${propertyInfo.image_path}`}
+                          src={propertyImageUrl}
                           alt={propertyInfo.name}
-                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover shadow-lg ring-2 ring-background"
+                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover shadow-xl ring-3 ring-background"
+                          onError={() => setImageError(true)}
                         />
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-md">
-                          <Check className="h-3.5 w-3.5 text-primary-foreground" />
+                        <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center shadow-md ring-2 ring-background">
+                          <Check className="h-4 w-4 text-primary-foreground" />
                         </div>
                       </div>
                     ) : (
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-primary/25 to-primary/10 flex items-center justify-center flex-shrink-0 shadow-lg ring-2 ring-background">
-                        <Building2 className="h-8 w-8 sm:h-10 sm:w-10 text-primary/70" />
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 shadow-xl ring-3 ring-background">
+                        <Building2 className="h-9 w-9 sm:h-11 sm:w-11 text-primary/60" />
                       </div>
                     )}
                     
                     {/* Property Details */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] sm:text-xs text-primary font-semibold uppercase tracking-widest mb-1.5">Your Property</p>
+                      <p className="text-[10px] sm:text-xs text-primary font-bold uppercase tracking-widest mb-1.5">Your Property</p>
                       <h3 className="font-bold text-foreground text-lg sm:text-xl leading-tight truncate">{propertyInfo.name}</h3>
                       {propertyInfo.address && (
                         <div className="flex items-start gap-2 mt-2 text-muted-foreground">
-                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary/60" />
-                          <span className="text-sm sm:text-base leading-snug">{propertyInfo.address}</span>
+                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary/50" />
+                          <span className="text-sm leading-snug line-clamp-2">{propertyInfo.address}</span>
                         </div>
                       )}
                     </div>
@@ -338,23 +397,23 @@ export default function BookOwnerCall() {
             )}
 
             {isLoadingProperty && (
-              <div className="bg-gradient-to-br from-secondary via-accent/30 to-secondary rounded-t-xl p-5 sm:p-6">
+              <div className="bg-gradient-to-br from-primary/5 via-secondary to-accent/20 border-b border-border/30 p-5 sm:p-6">
                 <div className="flex items-center gap-4 sm:gap-5">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-muted/60 animate-pulse" />
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-muted/50 animate-pulse" />
                   <div className="flex-1 space-y-3">
-                    <div className="h-2.5 w-20 bg-muted/60 animate-pulse rounded-full" />
-                    <div className="h-5 w-44 bg-muted/60 animate-pulse rounded" />
-                    <div className="h-4 w-56 bg-muted/60 animate-pulse rounded" />
+                    <div className="h-2.5 w-20 bg-muted/50 animate-pulse rounded-full" />
+                    <div className="h-5 w-44 bg-muted/50 animate-pulse rounded" />
+                    <div className="h-4 w-56 bg-muted/50 animate-pulse rounded" />
                   </div>
                 </div>
               </div>
             )}
 
-            <CardHeader className="pb-2 sm:pb-4">
+            <CardHeader className="pb-3 sm:pb-4 pt-5 sm:pt-6">
               <CardTitle className="text-lg sm:text-xl">Your Information</CardTitle>
               <CardDescription className="text-sm">Tell us about yourself and what you'd like to discuss</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 sm:space-y-5">
+            <CardContent className="space-y-5 pb-6">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-medium">Full Name <span className="text-destructive">*</span></Label>
                 <Input
@@ -362,7 +421,7 @@ export default function BookOwnerCall() {
                   placeholder="John Smith"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="h-11 sm:h-12 text-base"
+                  className="h-11 sm:h-12 text-base bg-background/50"
                   autoComplete="name"
                 />
               </div>
@@ -375,28 +434,87 @@ export default function BookOwnerCall() {
                   placeholder="john@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  className="h-11 sm:h-12 text-base"
+                  className="h-11 sm:h-12 text-base bg-background/50"
                   autoComplete="email"
                 />
               </div>
 
+              {/* Meeting Type Selection */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">How would you like to meet? <span className="text-destructive">*</span></Label>
+                <RadioGroup 
+                  value={formData.meetingType} 
+                  onValueChange={(value: 'video' | 'phone') => setFormData(prev => ({ ...prev, meetingType: value }))}
+                  className="grid grid-cols-2 gap-3"
+                >
+                  <Label
+                    htmlFor="video"
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      formData.meetingType === 'video' 
+                        ? 'border-primary bg-primary/5 shadow-md' 
+                        : 'border-border hover:border-primary/40 hover:bg-muted/30'
+                    }`}
+                  >
+                    <RadioGroupItem value="video" id="video" className="sr-only" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      formData.meetingType === 'video' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                    }`}>
+                      <Video className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Video Call</p>
+                      <p className="text-xs text-muted-foreground">Google Meet</p>
+                    </div>
+                  </Label>
+                  <Label
+                    htmlFor="phone"
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      formData.meetingType === 'phone' 
+                        ? 'border-primary bg-primary/5 shadow-md' 
+                        : 'border-border hover:border-primary/40 hover:bg-muted/30'
+                    }`}
+                  >
+                    <RadioGroupItem value="phone" id="phone" className="sr-only" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      formData.meetingType === 'phone' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                    }`}>
+                      <Phone className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Phone Call</p>
+                      <p className="text-xs text-muted-foreground">We'll call you</p>
+                    </div>
+                  </Label>
+                </RadioGroup>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-medium">Phone Number <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Label htmlFor="phone" className="text-sm font-medium">
+                  Phone Number 
+                  {formData.meetingType === 'phone' ? (
+                    <span className="text-destructive ml-1">*</span>
+                  ) : (
+                    <span className="text-muted-foreground text-xs ml-1">(optional)</span>
+                  )}
+                </Label>
                 <Input
                   id="phone"
                   type="tel"
                   placeholder="(404) 555-1234"
                   value={formData.phone}
                   onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  className="h-11 sm:h-12 text-base"
+                  className="h-11 sm:h-12 text-base bg-background/50"
                   autoComplete="tel"
                 />
+                {formData.meetingType === 'phone' && !formData.phone && (
+                  <p className="text-xs text-amber-600">Phone number required for phone calls</p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="topic" className="text-sm font-medium">What would you like to discuss? <span className="text-destructive">*</span></Label>
                 <Select value={formData.topic} onValueChange={(value) => setFormData(prev => ({ ...prev, topic: value }))}>
-                  <SelectTrigger className="h-11 sm:h-12 text-base">
+                  <SelectTrigger className="h-11 sm:h-12 text-base bg-background/50">
                     <SelectValue placeholder="Select a topic" />
                   </SelectTrigger>
                   <SelectContent>
@@ -421,7 +539,7 @@ export default function BookOwnerCall() {
                     value={formData.topicDetails}
                     onChange={(e) => setFormData(prev => ({ ...prev, topicDetails: e.target.value }))}
                     rows={3}
-                    className="text-base resize-none"
+                    className="text-base resize-none bg-background/50"
                   />
                 </div>
               )}
@@ -429,7 +547,7 @@ export default function BookOwnerCall() {
               <Button 
                 onClick={() => setStep(2)} 
                 disabled={!isStep1Valid || (formData.topic === "other" && !formData.topicDetails)}
-                className="w-full h-12 sm:h-14 text-base font-semibold bg-primary hover:bg-primary/90 shadow-md"
+                className="w-full h-12 sm:h-14 text-base font-semibold bg-primary hover:bg-primary/90 shadow-lg"
               >
                 Continue to Scheduling
                 <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" />
@@ -442,7 +560,7 @@ export default function BookOwnerCall() {
         {step === 2 && (
           <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 max-w-4xl mx-auto">
             {/* Calendar */}
-            <Card className="shadow-lg border-primary/10">
+            <Card className="shadow-xl border-0 bg-card/95 backdrop-blur">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base sm:text-lg">Select a Date</CardTitle>
@@ -485,7 +603,7 @@ export default function BookOwnerCall() {
                         className={`
                           h-9 sm:h-10 rounded-lg text-sm font-medium transition-all touch-target-lg
                           ${!available ? 'text-muted-foreground/30 cursor-not-allowed' : 'hover:bg-primary/10 active:scale-95'}
-                          ${selected ? 'bg-primary text-primary-foreground shadow-md hover:bg-primary/90' : ''}
+                          ${selected ? 'bg-primary text-primary-foreground shadow-lg hover:bg-primary/90' : ''}
                           ${today && !selected ? 'ring-2 ring-primary/40' : ''}
                         `}
                       >
@@ -501,7 +619,7 @@ export default function BookOwnerCall() {
             </Card>
 
             {/* Time Slots */}
-            <Card className="shadow-lg border-primary/10">
+            <Card className="shadow-xl border-0 bg-card/95 backdrop-blur">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                   <Clock className="h-4 w-4 text-primary" />
@@ -538,7 +656,7 @@ export default function BookOwnerCall() {
                         className={`
                           px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm font-medium transition-all touch-target-lg active:scale-95
                           ${selectedTime === slot 
-                            ? 'bg-primary text-primary-foreground shadow-md' 
+                            ? 'bg-primary text-primary-foreground shadow-lg' 
                             : 'bg-muted hover:bg-primary/10'}
                         `}
                       >
@@ -550,12 +668,23 @@ export default function BookOwnerCall() {
 
                 {/* Summary */}
                 {selectedTime && (
-                  <div className="mt-4 p-3 sm:p-4 bg-secondary rounded-xl border border-primary/10">
-                    <p className="text-sm font-semibold text-foreground">Your Selection:</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatInTimeZone(parseISO(selectedTime), EST_TIMEZONE, "EEEE, MMMM d 'at' h:mm a")} EST
-                    </p>
-                    <p className="text-xs text-primary font-medium mt-1">30-minute call</p>
+                  <div className="mt-4 p-4 bg-gradient-to-br from-secondary to-accent/30 rounded-xl border border-primary/10">
+                    <p className="text-sm font-semibold text-foreground mb-2">Your Selection:</p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-foreground flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        {formatInTimeZone(parseISO(selectedTime), EST_TIMEZONE, "EEEE, MMMM d 'at' h:mm a")} EST
+                      </p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        {formData.meetingType === 'video' ? (
+                          <Video className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Phone className="h-4 w-4 text-primary" />
+                        )}
+                        {formData.meetingType === 'video' ? 'Video Call (Google Meet)' : `Phone Call to ${formData.phone}`}
+                      </p>
+                    </div>
+                    <p className="text-xs text-primary font-medium mt-2">30-minute call</p>
                   </div>
                 )}
               </CardContent>
@@ -574,7 +703,7 @@ export default function BookOwnerCall() {
               <Button 
                 onClick={handleSubmit} 
                 disabled={!isStep2Valid || isSubmitting}
-                className="h-12 sm:h-11 bg-primary hover:bg-primary/90 shadow-md order-1 sm:order-2"
+                className="h-12 sm:h-11 bg-primary hover:bg-primary/90 shadow-lg order-1 sm:order-2"
               >
                 {isSubmitting ? (
                   <>

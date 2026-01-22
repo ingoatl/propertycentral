@@ -12,12 +12,20 @@ serve(async (req) => {
   }
 
   try {
-    const { name, email, phone, topic, topicDetails, scheduledAt } = await req.json();
+    const { name, email, phone, topic, topicDetails, scheduledAt, propertyId, meetingType } = await req.json();
 
     // Validate required fields
     if (!name || !email || !topic || !scheduledAt) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: name, email, topic, and scheduledAt are required" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate phone for phone calls
+    if (meetingType === 'phone' && !phone) {
+      return new Response(
+        JSON.stringify({ error: "Phone number required for phone calls" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -33,6 +41,17 @@ serve(async (req) => {
       .ilike('email', email)
       .maybeSingle();
 
+    // Get property info if provided
+    let propertyInfo = null;
+    if (propertyId) {
+      const { data: prop } = await supabase
+        .from('properties')
+        .select('id, name, address')
+        .eq('id', propertyId)
+        .maybeSingle();
+      propertyInfo = prop;
+    }
+
     // Create the owner call record
     const { data: ownerCall, error: callError } = await supabase
       .from('owner_calls')
@@ -46,6 +65,7 @@ serve(async (req) => {
         scheduled_at: scheduledAt,
         status: 'scheduled',
         duration_minutes: 30,
+        meeting_type: meetingType || 'video',
       })
       .select()
       .single();
@@ -55,7 +75,65 @@ serve(async (req) => {
       throw callError;
     }
 
-    console.log('Owner call created:', ownerCall.id);
+    console.log('Owner call created:', ownerCall.id, 'Meeting type:', meetingType);
+
+    // Create Google Calendar event (only add Meet link for video calls)
+    let calendarResult = null;
+    try {
+      const topicLabels: Record<string, string> = {
+        monthly_statement: "Monthly Statement Questions",
+        maintenance: "Maintenance & Repairs",
+        guest_concerns: "Guest Concerns",
+        pricing: "Pricing Discussion",
+        general_checkin: "General Check-in",
+        property_update: "Property Updates",
+        other: "Other"
+      };
+
+      const isVideoCall = meetingType !== 'phone';
+      const eventTitle = `Owner Call: ${name}${existingOwner ? '' : ' (New)'}${isVideoCall ? '' : ' 📞'}`;
+      const eventDescription = `
+📋 Topic: ${topicLabels[topic] || topic}
+${topicDetails ? `\n📝 Details: ${topicDetails}` : ''}
+
+👤 Contact: ${name}
+📧 Email: ${email}
+${phone ? `📱 Phone: ${phone}` : ''}
+${isVideoCall ? '🎥 Meeting Type: Video Call' : `📞 Meeting Type: Phone Call - Call ${phone}`}
+${propertyInfo ? `\n🏠 Property: ${propertyInfo.name}\n📍 Address: ${propertyInfo.address}` : ''}
+${existingOwner ? `\n✅ Existing Owner ID: ${existingOwner.id}` : '\n⚠️ Owner not found in system - may be a new inquiry'}
+      `.trim();
+
+      const { data: calResult } = await supabase.functions.invoke('sync-calendar-event', {
+        body: {
+          action: 'create',
+          event: {
+            summary: eventTitle,
+            description: eventDescription,
+            start: scheduledAt,
+            durationMinutes: 30,
+            attendees: [{ email }],
+            colorId: '3', // Purple for owner calls
+            addMeetLink: isVideoCall, // Only add Meet link for video calls
+          }
+        }
+      });
+      calendarResult = calResult;
+
+      if (calendarResult?.eventId) {
+        // Update the owner call with the calendar event ID
+        await supabase
+          .from('owner_calls')
+          .update({
+            google_calendar_event_id: calendarResult.eventId,
+            google_meet_link: isVideoCall ? (calendarResult.meetLink || null) : null
+          })
+          .eq('id', ownerCall.id);
+      }
+    } catch (calendarError) {
+      console.error('Failed to create calendar event:', calendarError);
+      // Don't fail the booking if calendar sync fails
+    }
 
     // Trigger notification function
     try {
@@ -70,63 +148,13 @@ serve(async (req) => {
       // Don't fail the booking if notification fails
     }
 
-    // Create Google Calendar event if we have credentials
-    try {
-      const topicLabels: Record<string, string> = {
-        monthly_statement: "Monthly Statement Questions",
-        maintenance: "Maintenance & Repairs",
-        guest_concerns: "Guest Concerns",
-        pricing: "Pricing Discussion",
-        general_checkin: "General Check-in",
-        property_update: "Property Updates",
-        other: "Other"
-      };
-
-      const eventTitle = `Owner Call: ${name}${existingOwner ? '' : ' (New)'}`;
-      const eventDescription = `
-Topic: ${topicLabels[topic] || topic}
-${topicDetails ? `\nDetails: ${topicDetails}` : ''}
-
-Contact: ${name}
-Email: ${email}
-${phone ? `Phone: ${phone}` : ''}
-${existingOwner ? `\nExisting Owner ID: ${existingOwner.id}` : '\n⚠️ Owner not found in system - may be a new inquiry'}
-      `.trim();
-
-      const { data: calendarResult } = await supabase.functions.invoke('sync-calendar-event', {
-        body: {
-          action: 'create',
-          event: {
-            summary: eventTitle,
-            description: eventDescription,
-            start: scheduledAt,
-            durationMinutes: 30,
-            attendees: [{ email }],
-            colorId: '3' // Purple for owner calls
-          }
-        }
-      });
-
-      if (calendarResult?.eventId) {
-        // Update the owner call with the calendar event ID
-        await supabase
-          .from('owner_calls')
-          .update({
-            google_calendar_event_id: calendarResult.eventId,
-            google_meet_link: calendarResult.meetLink || null
-          })
-          .eq('id', ownerCall.id);
-      }
-    } catch (calendarError) {
-      console.error('Failed to create calendar event:', calendarError);
-      // Don't fail the booking if calendar sync fails
-    }
-
     return new Response(
       JSON.stringify({ 
         success: true, 
         ownerCallId: ownerCall.id,
-        isExistingOwner: !!existingOwner
+        isExistingOwner: !!existingOwner,
+        meetingType: meetingType || 'video',
+        googleMeetLink: calendarResult?.meetLink || null
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

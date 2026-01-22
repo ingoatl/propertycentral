@@ -4970,9 +4970,11 @@ export type Database = {
           google_meet_link: string | null
           id: string
           meeting_notes: string | null
+          meeting_type: string | null
           owner_id: string | null
           reminder_1h_sent: boolean | null
           reminder_24h_sent: boolean | null
+          reminder_48h_sent: boolean | null
           reschedule_count: number | null
           rescheduled_at: string | null
           scheduled_at: string
@@ -4994,9 +4996,11 @@ export type Database = {
           google_meet_link?: string | null
           id?: string
           meeting_notes?: string | null
+          meeting_type?: string | null
           owner_id?: string | null
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
+          reminder_48h_sent?: boolean | null
           reschedule_count?: number | null
           rescheduled_at?: string | null
           scheduled_at: string
@@ -5018,9 +5022,11 @@ export type Database = {
           google_meet_link?: string | null
           id?: string
           meeting_notes?: string | null
+          meeting_type?: string | null
           owner_id?: string | null
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
+          reminder_48h_sent?: boolean | null
           reschedule_count?: number | null
           rescheduled_at?: string | null
           scheduled_at?: string
