@@ -30,6 +30,7 @@ import { OwnerPortalAdmin } from "@/components/admin/OwnerPortalAdmin";
 import { ToneProfilesManager } from "@/components/admin/ToneProfilesManager";
 import { CompanyKnowledgeManager } from "@/components/admin/CompanyKnowledgeManager";
 import { TeamHubAdmin } from "@/components/team-hub/TeamHubAdmin";
+import { OwnerCallsCalendar } from "@/components/dashboard/OwnerCallsCalendar";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -460,7 +461,11 @@ const Admin = () => {
           </TabsTrigger>
           <TabsTrigger value="calendar">
             <Calendar className="w-4 h-4 mr-2" />
-            Calendar
+            Calls
+          </TabsTrigger>
+          <TabsTrigger value="owner-calls">
+            <Users className="w-4 h-4 mr-2" />
+            Owner Calls
           </TabsTrigger>
           <TabsTrigger value="phones">
             <Phone className="w-4 h-4 mr-2" />
@@ -826,6 +831,10 @@ const Admin = () => {
 
         <TabsContent value="calendar" className="mt-8">
           <CalendarAdminPanel />
+        </TabsContent>
+
+        <TabsContent value="owner-calls" className="mt-8">
+          <OwnerCallsCalendar />
         </TabsContent>
 
         <TabsContent value="phones" className="mt-8">

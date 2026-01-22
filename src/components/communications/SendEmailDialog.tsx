@@ -21,6 +21,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { VoiceDictationButton } from "./VoiceDictationButton";
+import { InsertCalendarLinkButton } from "./InsertCalendarLinkButton";
 import { formatReplySubject } from "@/lib/email-utils";
 
 interface SendEmailDialogProps {
@@ -305,41 +306,45 @@ export function SendEmailDialog({
 
           {/* Body input */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <label className="text-sm font-medium">Message</label>
-              <div className="flex items-center gap-2 flex-wrap">
-                <VoiceDictationButton
-                  onResult={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}
-                  messageType="email"
-                  contactName={contactName}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => fetchAISuggestion()}
-                  disabled={isLoadingAI}
-                  className="h-9 text-sm"
-                >
-                  {isLoadingAI ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 mr-1" />
-                  )}
-                  {isLoadingAI ? "Generating..." : "AI Suggest"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowContextInput(!showContextInput)}
-                  disabled={isLoadingAI}
-                  className="h-9 text-sm gap-1"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  <span className="hidden sm:inline">Reply with Context</span>
-                  <span className="sm:hidden">Context</span>
-                </Button>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <label className="text-sm font-medium">Message</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <InsertCalendarLinkButton
+                    onInsert={(link) => setBody(prev => prev + link)}
+                    contactType={contactType}
+                  />
+                  <VoiceDictationButton
+                    onResult={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}
+                    messageType="email"
+                    contactName={contactName}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchAISuggestion()}
+                    disabled={isLoadingAI}
+                    className="h-9 text-sm"
+                  >
+                    {isLoadingAI ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-1" />
+                    )}
+                    {isLoadingAI ? "Generating..." : "AI Suggest"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowContextInput(!showContextInput)}
+                    disabled={isLoadingAI}
+                    className="h-9 text-sm gap-1"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    <span className="hidden sm:inline">Reply with Context</span>
+                    <span className="sm:hidden">Context</span>
+                  </Button>
+                </div>
               </div>
-            </div>
             {isLoadingAI ? (
               <div className="flex items-center justify-center h-40 md:h-48 border rounded-md bg-muted/30">
                 <div className="text-center text-muted-foreground">

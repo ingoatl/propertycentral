@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { VoiceDictationButton } from "./VoiceDictationButton";
+import { InsertCalendarLinkButton } from "./InsertCalendarLinkButton";
 
 interface ComposeEmailDialogProps {
   open: boolean;
@@ -283,15 +284,20 @@ export function ComposeEmailDialog({
                 />
               </div>
 
-              {/* Body input */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Message</label>
-                  <VoiceDictationButton
-                    onResult={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}
-                    messageType="email"
-                    contactName={selectedContact?.name}
-                  />
+                  <div className="flex items-center gap-2">
+                    <InsertCalendarLinkButton
+                      onInsert={(link) => setBody(prev => prev + link)}
+                      contactType={selectedContact?.type}
+                    />
+                    <VoiceDictationButton
+                      onResult={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}
+                      messageType="email"
+                      contactName={selectedContact?.name}
+                    />
+                  </div>
                 </div>
                 <Textarea
                   placeholder="Type your email message..."
