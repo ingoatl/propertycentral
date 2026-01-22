@@ -5886,6 +5886,7 @@ export type Database = {
           id: string
           owner_id: string
           token: string
+          used_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -5893,6 +5894,7 @@ export type Database = {
           id?: string
           owner_id: string
           token: string
+          used_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -5900,6 +5902,7 @@ export type Database = {
           id?: string
           owner_id?: string
           token?: string
+          used_at?: string | null
         }
         Relationships: [
           {

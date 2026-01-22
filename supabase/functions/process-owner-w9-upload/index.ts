@@ -244,10 +244,10 @@ const handler = async (req: Request): Promise<Response> => {
       .update(updateData)
       .eq("id", ownerId);
 
-    // Invalidate the token (one-time use)
+    // Mark the token as used (one-time use)
     await supabase
       .from("owner_w9_tokens")
-      .update({ expires_at: new Date().toISOString() })
+      .update({ used_at: new Date().toISOString() })
       .eq("token", token);
 
     // Log communication
