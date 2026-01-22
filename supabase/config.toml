@@ -530,3 +530,9 @@ verify_jwt = false
 
 [functions.send-w9-voice-reminder]
 verify_jwt = true
+
+[functions.send-w9-reminder]
+verify_jwt = true
+
+[functions.request-vendor-w9]
+verify_jwt = true
