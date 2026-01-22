@@ -564,7 +564,8 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
 function buildPhotosWalkthroughEmailHtml(recipientName: string, currentStage: string): string {
   const PHOTOGRAPHER_URL = "https://www.fivepointsmediaco.com/";
   const LOOM_VIDEO_URL = "https://www.loom.com/share/52c1e4be2fe740cba4743cc6d4f2fd21";
-  const LOOM_THUMBNAIL = "https://cdn.loom.com/sessions/thumbnails/52c1e4be2fe740cba4743cc6d4f2fd21-with-play.gif";
+  // Use Loom's embed thumbnail format which is more reliable in emails
+  const LOOM_EMBED_THUMBNAIL = "https://cdn.loom.com/sessions/thumbnails/52c1e4be2fe740cba4743cc6d4f2fd21-1715789608612.jpg";
   
   return buildBrandedEmailHtml(recipientName, "Professional Photography & Virtual Tour", [
     {
@@ -575,8 +576,11 @@ function buildPhotosWalkthroughEmailHtml(recipientName: string, currentStage: st
       title: "📹 Watch: How to Book Your Photo Session",
       content: `
         <div style="margin: 16px 0; text-align: center;">
-          <a href="${LOOM_VIDEO_URL}" style="display: inline-block;">
-            <img src="${LOOM_THUMBNAIL}" alt="Watch Tutorial Video" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+          <a href="${LOOM_VIDEO_URL}" style="display: inline-block; position: relative;">
+            <img src="${LOOM_EMBED_THUMBNAIL}" alt="Watch Tutorial Video" style="max-width: 100%; width: 480px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <div style="width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 20px solid white; margin-left: 4px;"></div>
+            </div>
           </a>
           <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">Click to watch the 6-minute walkthrough</p>
         </div>
@@ -1318,12 +1322,33 @@ serve(async (req) => {
         // No admin copy - admin gets notified when lead actually books
         console.log(`Sending direct inspection scheduling email for stage ${newStage}`);
       } else if (newStage === 'photos_walkthrough') {
-        // PHOTOS_WALKTHROUGH: Send professional photography booking email
-        directEmailHtml = buildPhotosWalkthroughEmailHtml(recipientFirstName, newStage);
-        directEmailSubject = "Book Your Professional Property Photos - PeachHaus";
-        sendAdminCopy = true;
-        adminEmailSubject = `📸 Photo Booking Email Sent: ${lead.name}`;
-        console.log(`Sending direct photos/walkthrough email for stage ${newStage}`);
+        // PHOTOS_WALKTHROUGH: Only send for NEW STRs (not existing STRs that already have photos)
+        // Check discovery_calls.current_situation to determine if this is a new property
+        const { data: discoveryCall } = await supabase
+          .from("discovery_calls")
+          .select("current_situation, existing_listing_url")
+          .eq("lead_id", leadId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        const isNewSTR = discoveryCall?.current_situation === 'new_property' || 
+                         (!discoveryCall?.current_situation && !discoveryCall?.existing_listing_url);
+        const isExistingSTR = discoveryCall?.current_situation === 'self_managing' || 
+                              discoveryCall?.current_situation === 'unhappy_pm' ||
+                              discoveryCall?.existing_listing_url;
+        
+        if (isExistingSTR) {
+          console.log(`Skipping photos email for ${leadId} - existing STR (situation: ${discoveryCall?.current_situation})`);
+          // Don't send the photography email for existing STRs - they already have photos
+        } else {
+          // New STR or unknown - send the photography booking email
+          directEmailHtml = buildPhotosWalkthroughEmailHtml(recipientFirstName, newStage);
+          directEmailSubject = "Book Your Professional Property Photos - PeachHaus";
+          sendAdminCopy = true;
+          adminEmailSubject = `📸 Photo Booking Email Sent: ${lead.name}`;
+          console.log(`Sending direct photos/walkthrough email for NEW STR stage ${newStage}`);
+        }
       } else if (newStage === 'contract_signed') {
         // CONTRACT_SIGNED: Send welcome onboarding email FIRST (W9 and payment setup come later)
         directEmailHtml = buildWelcomeOnboardingEmailHtml(recipientFirstName, lead.property_address || "");
