@@ -41,7 +41,7 @@ const LeadKanbanBoard = ({ leads, onSelectLead, onRefresh }: LeadKanbanBoardProp
       // Update stage immediately in DB
       const { error } = await supabase
         .from("leads")
-        .update({ stage: newStage, stage_changed_at: new Date().toISOString() })
+        .update({ stage: newStage as any, stage_changed_at: new Date().toISOString() })
         .eq("id", leadId);
 
       if (error) throw error;
@@ -54,10 +54,10 @@ const LeadKanbanBoard = ({ leads, onSelectLead, onRefresh }: LeadKanbanBoardProp
           action: "stage_changed",
           performed_by_user_id: userData?.user?.id,
           performed_by_name: userData?.user?.email,
-          previous_stage: previousStage,
-          new_stage: newStage,
+          previous_stage: previousStage as any,
+          new_stage: newStage as any,
           metadata: { source: "kanban_drag" },
-        });
+        } as any);
 
         // Trigger automation with previousStage
         await supabase.functions.invoke("process-lead-stage-change", {

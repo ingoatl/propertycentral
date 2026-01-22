@@ -33,12 +33,13 @@ const corsHeaders = {
 
 const LOGO_URL = "https://propertycentral.lovable.app/images/peachhaus-logo.png";
 
-// Owner-facing onboarding timeline steps (5 steps including payment)
+// Owner-facing onboarding timeline steps (6 steps including payment and photos)
 const OWNER_TIMELINE_STEPS = [
   { key: 'payment', label: 'Setup Payment', icon: '💳' },
   { key: 'onboarding_form', label: 'Complete Onboarding Form', icon: '📋' },
   { key: 'insurance', label: 'Submit Insurance', icon: '🛡️' },
   { key: 'inspection', label: 'Schedule Inspection', icon: '🏠' },
+  { key: 'photos', label: 'Book Photos & Tour', icon: '📸' },
   { key: 'onboarded', label: 'Onboarded', icon: '🎉' },
 ];
 
@@ -55,8 +56,10 @@ function getTimelineStep(stage: string): number {
       return 3; // Current step: Schedule Inspection (this is the CURRENT step, not completed)
     case 'inspection_scheduled': 
       return 3; // Still on Schedule Inspection (inspection booked but not yet done)
+    case 'photos_walkthrough':
+      return 4; // Current step: Book Photos & Tour
     case 'ops_handoff': 
-      return 5; // All done (beyond timeline - all checkmarks)
+      return 6; // All done (beyond timeline - all checkmarks)
     default: 
       return -1; // Pre-onboarding stages (don't show timeline)
   }
@@ -553,6 +556,115 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
     },
     {
       content: "Once your inspection is complete, we'll finalize your listing and you'll be ready to welcome guests!"
+    }
+  ], currentStage);
+}
+
+// Build professional photos and walkthrough email HTML
+function buildPhotosWalkthroughEmailHtml(recipientName: string, currentStage: string): string {
+  const PHOTOGRAPHER_URL = "https://www.fivepointsmediaco.com/";
+  const LOOM_VIDEO_URL = "https://www.loom.com/share/52c1e4be2fe740cba4743cc6d4f2fd21";
+  const LOOM_THUMBNAIL = "https://cdn.loom.com/sessions/thumbnails/52c1e4be2fe740cba4743cc6d4f2fd21-with-play.gif";
+  
+  return buildBrandedEmailHtml(recipientName, "Professional Photography & Virtual Tour", [
+    {
+      isIntro: true,
+      content: `Your property is almost ready to go live! 🎉 The final step is booking professional photography and a virtual tour. <strong>Great marketing materials are one of the biggest factors in attracting quality guests and maximizing your rental income.</strong>`
+    },
+    {
+      title: "📹 Watch: How to Book Your Photo Session",
+      content: `
+        <div style="margin: 16px 0; text-align: center;">
+          <a href="${LOOM_VIDEO_URL}" style="display: inline-block;">
+            <img src="${LOOM_THUMBNAIL}" alt="Watch Tutorial Video" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+          </a>
+          <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">Click to watch the 6-minute walkthrough</p>
+        </div>
+      `
+    },
+    {
+      title: "📸 Meet Ramon - Your Photography Partner",
+      content: `
+        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+          <div style="font-weight: 700; color: #92400e; font-size: 15px; margin-bottom: 8px;">Five Points Media Co</div>
+          <div style="font-size: 14px; color: #78350f; line-height: 1.6;">
+            <strong>⭐ 5.0 Rating</strong> · 67+ Google Reviews<br>
+            Trusted by Keller Williams, EXP Realty, and top property managers<br>
+            Specializing in Airbnb & short-term rental photography
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #6b7280; font-style: italic;">"We've been working with Ramon for a long time. He's been doing a really good job. He's specialized in Airbnb photography - floor plans, virtual tours, everything. Very professional."</p>
+      `,
+      highlight: true
+    },
+    {
+      title: "✨ What's Included (SocialOS Package)",
+      content: `
+        <table style="width: 100%; font-size: 14px;">
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+              <strong style="color: #f59e0b;">📷 25 Professional Photos</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Showcase every room with perfect lighting & angles</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+              <strong style="color: #f59e0b;">🎬 Showcase Reel</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Social media ready video for Instagram & marketing</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+              <strong style="color: #f59e0b;">🗺️ 2D Floor Plans (Add-On)</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Highly recommended - helps guests understand the layout</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; vertical-align: top;">
+              <strong style="color: #f59e0b;">🏠 Virtual Tour</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Let guests walk through before booking - we've rented properties sight-unseen with this!</p>
+            </td>
+          </tr>
+        </table>
+      `
+    },
+    {
+      title: "📋 Step-by-Step Booking Guide",
+      content: `
+        <table style="width: 100%; font-size: 14px;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>1.</strong> Visit fivepointsmediaco.com (link below)</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>2.</strong> Click "Book Now" → "Book an Appointment"</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>3.</strong> Select "Short Term Rentals" category</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>4.</strong> Enter your property address & confirm details</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>5.</strong> Choose the <strong>SocialOS Package</strong> (25 photos + showcase reel)</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>6.</strong> Add <strong>2D Floor Plans</strong> (highly recommended!)</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>7.</strong> Pick a date & time - aim for <strong>11am-noon</strong> (best lighting + less traffic)</td></tr>
+          <tr><td style="padding: 8px 0;"><strong>8.</strong> Enter "<strong>Ingo at PeachHaus Group</strong>" as the contact</td></tr>
+        </table>
+      `
+    },
+    {
+      cta: { text: "Book Your Photo Session →", url: PHOTOGRAPHER_URL }
+    },
+    {
+      warning: true,
+      content: `<strong>⚡ Quick Turnaround:</strong> Ramon typically delivers photos next-day! Once we receive them, your listing goes live and you can start welcoming guests.`
+    },
+    {
+      title: "💡 Why Professional Photos Matter",
+      content: `
+        <p style="margin: 0 0 12px 0;">Your photos are your <strong>#1 marketing asset</strong> after the property itself. Professional imagery can:</p>
+        <ul style="margin: 0; padding-left: 20px; color: #374151;">
+          <li style="margin-bottom: 8px;">Increase booking rates by <strong>up to 40%</strong></li>
+          <li style="margin-bottom: 8px;">Justify <strong>higher nightly rates</strong></li>
+          <li style="margin-bottom: 8px;">Stand out from amateur listings</li>
+          <li>The virtual tour alone has helped us rent properties <strong>sight-unseen!</strong></li>
+        </ul>
+      `,
+      highlight: true
+    },
+    {
+      content: `Please reply to this email with your confirmed booking date. We'll plan to meet you at the property for the photo shoot!<br><br><strong>Note:</strong> Drone photos are available as a separate add-on if you'd like aerial shots of the property and neighborhood.`
     }
   ], currentStage);
 }
@@ -1801,6 +1913,9 @@ serve(async (req) => {
               const bookingUrl = `https://propertycentral.lovable.app/book-inspection?${bookingParams.toString()}`;
               finalHtmlBody = buildInspectionSchedulingEmailHtml(recipientFirstName, bookingUrl, newStage);
               emailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
+            } else if (newStage === 'photos_walkthrough') {
+              finalHtmlBody = buildPhotosWalkthroughEmailHtml(recipientFirstName, newStage);
+              emailSubject = "Book Your Professional Property Photos - PeachHaus";
             } else if (newStage === 'ach_form_signed') {
               finalHtmlBody = buildOnboardingEmailHtml(recipientFirstName, newStage);
             } else if (newStage === 'new_lead') {

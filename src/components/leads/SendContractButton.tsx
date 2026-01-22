@@ -200,8 +200,8 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         action: `Contract sent: ${template.name}`,
         performed_by_user_id: user?.id,
         performed_by_name: user?.email,
-        previous_stage: lead.stage,
-        new_stage: "contract_out",
+        previous_stage: lead.stage as any,
+        new_stage: "contract_out" as any,
         metadata: {
           contract_type: template.contract_type,
           template_name: template.name,
