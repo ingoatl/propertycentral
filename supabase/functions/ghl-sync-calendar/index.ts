@@ -161,7 +161,7 @@ serve(async (req) => {
       // First try by GHL contact ID
       const { data: leadByGhlId } = await supabase
         .from("leads")
-        .select("id, name, email, phone, property_address, property_type, stage, source, notes, ghl_contact_id")
+        .select("id, name, email, phone, property_address, property_type, stage, opportunity_source, notes, ghl_contact_id")
         .eq("ghl_contact_id", contactId)
         .single();
 
@@ -175,7 +175,7 @@ serve(async (req) => {
       if (!matchedLeadId && normalizedPhone && normalizedPhone.length >= 10) {
         const { data: leads } = await supabase
           .from("leads")
-          .select("id, name, email, phone, property_address, property_type, stage, source, notes")
+          .select("id, name, email, phone, property_address, property_type, stage, opportunity_source, notes")
           .ilike("phone", `%${normalizedPhone.slice(-7)}%`)
           .limit(10);
 
@@ -196,7 +196,7 @@ serve(async (req) => {
       if (!matchedLeadId && email) {
         const { data: leadByEmail } = await supabase
           .from("leads")
-          .select("id, name, email, phone, property_address, property_type, stage, source, notes")
+          .select("id, name, email, phone, property_address, property_type, stage, opportunity_source, notes")
           .ilike("email", email)
           .limit(1);
 
