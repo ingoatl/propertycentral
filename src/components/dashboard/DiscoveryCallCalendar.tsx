@@ -180,12 +180,14 @@ function getServiceLabel(service: string | null): string {
 }
 
 export function DiscoveryCallCalendar() {
+  const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedCall, setSelectedCall] = useState<DiscoveryCall | null>(null);
   const [selectedOwnerCall, setSelectedOwnerCall] = useState<OwnerCall | null>(null);
   const [selectedGhlEvent, setSelectedGhlEvent] = useState<GhlAppointment | null>(null);
   // Local state for optimistic deletion
   const [deletedCallIds, setDeletedCallIds] = useState<Set<string>>(new Set());
+  const [deletedOwnerCallIds, setDeletedOwnerCallIds] = useState<Set<string>>(new Set());
 
   // Fetch discovery calls
   const { data: calls = [], isLoading: isLoadingCalls } = useQuery({
@@ -238,17 +240,17 @@ export function DiscoveryCallCalendar() {
 
   // Filter GHL appointments: ONLY show appointments that were booked directly through GHL
   // (not website bookings that sync to GHL). We identify GHL-native bookings by checking
-  // if they have a matching discovery_call - if they do, they came from our website.
+  // if they have a matching discovery_call or owner_call - if they do, they came from our website.
   const filteredGhlAppointments = ghlAppointments.filter((apt) => {
     const aptDate = new Date(apt.scheduled_at);
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
     if (aptDate < monthStart || aptDate > monthEnd) return false;
     
-    // EXCLUDE if this appointment matches any discovery_call (means it's a website booking)
-    // Check by time proximity AND contact name/email match
     const aptTime = aptDate.getTime();
-    const isWebsiteBooking = calls.some((call) => {
+    
+    // EXCLUDE if this appointment matches any discovery_call (means it's a website booking)
+    const isDiscoveryBooking = calls.some((call) => {
       const callTime = new Date(call.scheduled_at).getTime();
       const timesMatch = Math.abs(aptTime - callTime) < 30 * 60 * 1000; // 30 min window
       const nameMatches = call.leads?.name?.toLowerCase() === apt.contact_name?.toLowerCase();
@@ -256,8 +258,17 @@ export function DiscoveryCallCalendar() {
       return timesMatch && (nameMatches || emailMatches);
     });
     
-    // Only include if NOT a website booking (i.e., was booked directly in GHL)
-    return !isWebsiteBooking;
+    // EXCLUDE if this appointment matches any owner_call (means it's an owner booking)
+    const isOwnerBooking = ownerCalls.some((call) => {
+      const callTime = new Date(call.scheduled_at).getTime();
+      const timesMatch = Math.abs(aptTime - callTime) < 30 * 60 * 1000; // 30 min window
+      const nameMatches = (call.property_owners?.name || call.contact_name)?.toLowerCase() === apt.contact_name?.toLowerCase();
+      const emailMatches = (call.property_owners?.email || call.contact_email)?.toLowerCase() === apt.contact_email?.toLowerCase();
+      return timesMatch && (nameMatches || emailMatches);
+    });
+    
+    // Only include if NOT a website/owner booking (i.e., was booked directly in GHL)
+    return !isDiscoveryBooking && !isOwnerBooking;
   });
 
 
@@ -271,6 +282,7 @@ export function DiscoveryCallCalendar() {
 
   // Filter out optimistically deleted calls
   const filteredCalls = calls.filter(call => !deletedCallIds.has(call.id));
+  const filteredOwnerCalls = ownerCalls.filter(call => !deletedOwnerCallIds.has(call.id));
 
   // Separate inspections from regular discovery calls
   const inspections = filteredCalls.filter(call => 
@@ -298,7 +310,7 @@ export function DiscoveryCallCalendar() {
   };
 
   const getOwnerCallsForDay = (date: Date) => {
-    return ownerCalls.filter((call) => 
+    return filteredOwnerCalls.filter((call) => 
       isSameDay(new Date(call.scheduled_at), date) && call.status === 'scheduled'
     );
   };
@@ -323,7 +335,7 @@ export function DiscoveryCallCalendar() {
     .filter((apt) => new Date(apt.scheduled_at) >= new Date() && apt.status !== "cancelled")
     .slice(0, 5);
 
-  const upcomingOwnerCalls = ownerCalls
+  const upcomingOwnerCalls = filteredOwnerCalls
     .filter((call) => new Date(call.scheduled_at) >= new Date() && call.status === "scheduled")
     .slice(0, 5);
 
@@ -841,56 +853,19 @@ export function DiscoveryCallCalendar() {
       />
 
       {/* Owner Call Detail Modal */}
-      <Dialog open={!!selectedOwnerCall} onOpenChange={() => setSelectedOwnerCall(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <User className="h-5 w-5 text-purple-600" />
-              Owner Call
-            </DialogTitle>
-          </DialogHeader>
-          {selectedOwnerCall && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">
-                    {selectedOwnerCall.property_owners?.name || selectedOwnerCall.contact_name || "Unknown Owner"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>{formatInESTWithLabel(new Date(selectedOwnerCall.scheduled_at), "EEEE, MMMM d, yyyy 'at' h:mm a")}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedOwnerCall.meeting_type === "video" ? (
-                    <Video className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span>{selectedOwnerCall.meeting_type === "video" ? "Video Call" : "Phone Call"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-muted-foreground" />
-                  <Badge variant="outline" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
-                    {selectedOwnerCall.topic.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </Badge>
-                </div>
-                {selectedOwnerCall.google_meet_link && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-4"
-                    onClick={() => window.open(selectedOwnerCall.google_meet_link!, '_blank')}
-                  >
-                    <Video className="h-4 w-4 mr-2" />
-                    Join Video Call
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <OwnerCallDetailModal
+        ownerCall={selectedOwnerCall}
+        onClose={() => setSelectedOwnerCall(null)}
+        onOptimisticDelete={(callId) => setDeletedOwnerCallIds(prev => new Set(prev).add(callId))}
+        onRevertDelete={(callId) => setDeletedOwnerCallIds(prev => {
+          const updated = new Set(prev);
+          updated.delete(callId);
+          return updated;
+        })}
+        onDeleted={() => {
+          queryClient.invalidateQueries({ queryKey: ["owner-calls-calendar"] });
+        }}
+      />
     </Card>
   );
 }
@@ -1392,6 +1367,20 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
         }
       }
       
+      // Delete all scheduled follow-ups for this lead
+      if (call.leads?.id) {
+        console.log("Deleting follow-up schedules for lead:", call.leads.id);
+        const { error: followUpError } = await supabase
+          .from("lead_follow_up_schedules")
+          .delete()
+          .eq("lead_id", call.leads.id)
+          .eq("status", "scheduled");
+        
+        if (followUpError) {
+          console.warn("Failed to delete follow-up schedules:", followUpError);
+        }
+      }
+      
       // Then delete from database
       const { error } = await supabase
         .from("discovery_calls")
@@ -1401,7 +1390,7 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
       if (error) throw error;
 
       toast.success("Call deleted", {
-        description: `Discovery call with ${call.leads?.name || "Unknown"} removed`,
+        description: `Discovery call with ${call.leads?.name || "Unknown"} removed along with scheduled follow-ups`,
       });
       
       // Invalidate queries to refresh calendar
@@ -1759,6 +1748,189 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
           onClose();
         }}
       />
+    </>
+  );
+}
+
+// Owner Call Detail Modal
+interface OwnerCallDetailModalProps {
+  ownerCall: OwnerCall | null;
+  onClose: () => void;
+  onOptimisticDelete: (callId: string) => void;
+  onRevertDelete: (callId: string) => void;
+  onDeleted: () => void;
+}
+
+function OwnerCallDetailModal({ ownerCall, onClose, onOptimisticDelete, onRevertDelete, onDeleted }: OwnerCallDetailModalProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  if (!ownerCall) return null;
+
+  const handleDeleteOwnerCall = async () => {
+    setIsDeleting(true);
+    
+    // Optimistic update
+    onOptimisticDelete(ownerCall.id);
+    
+    try {
+      // Delete the Google Calendar event if it exists
+      if (ownerCall.google_calendar_event_id) {
+        console.log("Deleting Google Calendar event:", ownerCall.google_calendar_event_id);
+        const { error: calendarError } = await supabase.functions.invoke("delete-calendar-event", {
+          body: { eventId: ownerCall.google_calendar_event_id },
+        });
+        
+        if (calendarError) {
+          console.warn("Failed to delete calendar event:", calendarError);
+        }
+      }
+      
+      // Delete from database
+      const { error } = await supabase
+        .from("owner_calls")
+        .delete()
+        .eq("id", ownerCall.id);
+
+      if (error) throw error;
+
+      toast.success("Owner call deleted", {
+        description: `Call with ${ownerCall.property_owners?.name || ownerCall.contact_name || "owner"} removed`,
+      });
+      
+      onDeleted();
+      onClose();
+    } catch (error: any) {
+      console.error("Error deleting owner call:", error);
+      // Revert optimistic update on error
+      onRevertDelete(ownerCall.id);
+      toast.error("Failed to delete call", {
+        description: error.message,
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const topicLabels: Record<string, string> = {
+    monthly_statement: "Monthly Statement",
+    maintenance: "Maintenance",
+    guest_concerns: "Guest Concerns",
+    pricing: "Pricing",
+    general_checkin: "Check-in",
+    property_update: "Property Update",
+    other: "Other"
+  };
+
+  return (
+    <>
+      <Dialog open={!!ownerCall} onOpenChange={() => onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5 text-purple-600" />
+              Owner Call
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">
+                  {ownerCall.property_owners?.name || ownerCall.contact_name || "Unknown Owner"}
+                </span>
+              </div>
+              {(ownerCall.property_owners?.email || ownerCall.contact_email) && (
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{ownerCall.property_owners?.email || ownerCall.contact_email}</span>
+                </div>
+              )}
+              {(ownerCall.property_owners?.phone || ownerCall.contact_phone) && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{ownerCall.property_owners?.phone || ownerCall.contact_phone}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span>{formatInESTWithLabel(new Date(ownerCall.scheduled_at), "EEEE, MMMM d, yyyy 'at' h:mm a")}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {ownerCall.meeting_type === "video" ? (
+                  <Video className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span>{ownerCall.meeting_type === "video" ? "Video Call" : "Phone Call"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                <Badge variant="outline" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
+                  {topicLabels[ownerCall.topic] || ownerCall.topic}
+                </Badge>
+              </div>
+              {ownerCall.topic_details && (
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground">{ownerCall.topic_details}</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-2 pt-4 border-t">
+              {ownerCall.google_meet_link && (
+                <Button
+                  variant="default"
+                  className="flex-1"
+                  onClick={() => window.open(ownerCall.google_meet_link!, '_blank')}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  Join Call
+                </Button>
+              )}
+              <Button
+                variant="destructive"
+                size="icon"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Owner Call?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this owner call and remove it from the calendar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOwnerCall}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
