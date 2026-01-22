@@ -10126,6 +10126,7 @@ export type Database = {
           company_name: string | null
           created_at: string | null
           created_by: string | null
+          ein_last4: string | null
           email: string | null
           emergency_available: boolean | null
           emergency_rate: number | null
@@ -10136,14 +10137,22 @@ export type Database = {
           license_number: string | null
           name: string
           notes: string | null
+          payments_ytd: number | null
           phone: string | null
           preferred_payment_method: string | null
           service_area: string[] | null
           specialty: string[]
           status: Database["public"]["Enums"]["vendor_status"] | null
+          tax_classification: string | null
+          tax_year_1099_generated: boolean | null
+          tax_year_1099_generated_at: string | null
+          taxpayer_address: string | null
+          taxpayer_name: string | null
           total_jobs_completed: number | null
           updated_at: string | null
+          w9_file_path: string | null
           w9_on_file: boolean | null
+          w9_received_at: string | null
         }
         Insert: {
           average_rating?: number | null
@@ -10154,6 +10163,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string | null
           created_by?: string | null
+          ein_last4?: string | null
           email?: string | null
           emergency_available?: boolean | null
           emergency_rate?: number | null
@@ -10164,14 +10174,22 @@ export type Database = {
           license_number?: string | null
           name: string
           notes?: string | null
+          payments_ytd?: number | null
           phone?: string | null
           preferred_payment_method?: string | null
           service_area?: string[] | null
           specialty?: string[]
           status?: Database["public"]["Enums"]["vendor_status"] | null
+          tax_classification?: string | null
+          tax_year_1099_generated?: boolean | null
+          tax_year_1099_generated_at?: string | null
+          taxpayer_address?: string | null
+          taxpayer_name?: string | null
           total_jobs_completed?: number | null
           updated_at?: string | null
+          w9_file_path?: string | null
           w9_on_file?: boolean | null
+          w9_received_at?: string | null
         }
         Update: {
           average_rating?: number | null
@@ -10182,6 +10200,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string | null
           created_by?: string | null
+          ein_last4?: string | null
           email?: string | null
           emergency_available?: boolean | null
           emergency_rate?: number | null
@@ -10192,14 +10211,22 @@ export type Database = {
           license_number?: string | null
           name?: string
           notes?: string | null
+          payments_ytd?: number | null
           phone?: string | null
           preferred_payment_method?: string | null
           service_area?: string[] | null
           specialty?: string[]
           status?: Database["public"]["Enums"]["vendor_status"] | null
+          tax_classification?: string | null
+          tax_year_1099_generated?: boolean | null
+          tax_year_1099_generated_at?: string | null
+          taxpayer_address?: string | null
+          taxpayer_name?: string | null
           total_jobs_completed?: number | null
           updated_at?: string | null
+          w9_file_path?: string | null
           w9_on_file?: boolean | null
+          w9_received_at?: string | null
         }
         Relationships: []
       }

@@ -34,21 +34,24 @@ import {
   Eye,
   Calendar,
   AlertTriangle,
+  Building2,
+  Wrench,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 
-interface OwnerTaxInfo {
+interface TaxEntity {
   id: string;
   name: string;
   email: string;
-  service_type: string;
+  type: "owner" | "vendor";
+  service_type?: string;
+  specialty?: string[];
   payments_ytd: number;
-  w9_sent_at: string | null;
-  owner_w9_requested_at: string | null;
-  owner_w9_uploaded_at: string | null;
-  owner_w9_file_path: string | null;
+  w9_status: "received" | "requested" | "sent" | "missing";
+  w9_date: string | null;
+  w9_file_path: string | null;
   tax_year_1099_generated: boolean;
   tax_year_1099_generated_at: string | null;
   tax_classification: string | null;
@@ -59,77 +62,163 @@ interface OwnerTaxInfo {
 }
 
 const TAX_THRESHOLD = 600;
-const IRS_DEADLINE = new Date(new Date().getFullYear() + 1, 0, 31); // Jan 31 next year
+const IRS_DEADLINE = new Date(new Date().getFullYear() + 1, 0, 31);
 
 export function Tax1099Dashboard() {
-  const [owners, setOwners] = useState<OwnerTaxInfo[]>([]);
+  const [entities, setEntities] = useState<TaxEntity[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [entityTypeFilter, setEntityTypeFilter] = useState<"all" | "owner" | "vendor">("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"all" | "owners" | "vendors">("all");
 
-  const loadOwnerTaxData = async () => {
+  const loadTaxData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch all active owners
-      const { data: ownersData, error } = await supabase
+      const allEntities: TaxEntity[] = [];
+
+      // Fetch owners
+      const { data: ownersData, error: ownersError } = await supabase
         .from("property_owners")
         .select(`
-          id,
-          name,
-          email,
-          service_type,
-          payments_ytd,
-          w9_sent_at,
-          owner_w9_requested_at,
-          owner_w9_uploaded_at,
-          owner_w9_file_path,
-          tax_year_1099_generated,
-          tax_year_1099_generated_at,
-          tax_classification,
-          taxpayer_name,
-          taxpayer_address
+          id, name, email, service_type, payments_ytd,
+          w9_sent_at, owner_w9_requested_at, owner_w9_uploaded_at, owner_w9_file_path,
+          tax_year_1099_generated, tax_year_1099_generated_at,
+          tax_classification, taxpayer_name, taxpayer_address
         `)
         .order("name");
 
-      if (error) throw error;
+      if (ownersError) throw ownersError;
 
-      // Calculate YTD payments from distributions for the selected year
+      // Fetch vendors
+      const { data: vendorsData, error: vendorsError } = await supabase
+        .from("vendors")
+        .select(`
+          id, name, company_name, email, specialty, payments_ytd,
+          w9_on_file, w9_received_at, w9_file_path,
+          tax_year_1099_generated, tax_year_1099_generated_at,
+          tax_classification, taxpayer_name, taxpayer_address
+        `)
+        .eq("status", "active")
+        .order("name");
+
+      if (vendorsError) throw vendorsError;
+
+      // Calculate YTD payments from distributions for owners
       const startOfYear = `${yearFilter}-01-01`;
       const endOfYear = `${yearFilter}-12-31`;
-      
-      const { data: distributions } = await supabase
+
+      const { data: ownerDistributions } = await supabase
         .from("owner_distributions")
         .select("owner_id, amount")
         .gte("distribution_date", startOfYear)
         .lte("distribution_date", endOfYear)
         .eq("status", "confirmed");
 
-      // Aggregate payments by owner
-      const paymentsByOwner: Record<string, number> = {};
-      distributions?.forEach((d) => {
-        paymentsByOwner[d.owner_id] = (paymentsByOwner[d.owner_id] || 0) + (d.amount || 0);
+      const ownerPayments: Record<string, number> = {};
+      ownerDistributions?.forEach((d) => {
+        ownerPayments[d.owner_id] = (ownerPayments[d.owner_id] || 0) + (d.amount || 0);
       });
 
-      // Process owners with tax info
-      const processedOwners: OwnerTaxInfo[] = (ownersData || []).map((owner) => {
-        const ytdPayments = paymentsByOwner[owner.id] || owner.payments_ytd || 0;
-        const requiresW9 = owner.service_type === "full-service"; // Full-service owners send W-9 TO us
-        const hasW9 = owner.service_type === "co-hosting" 
-          ? !!owner.w9_sent_at // We sent W-9 to co-hosting
-          : !!owner.owner_w9_uploaded_at; // Full-service uploaded their W-9
-        
-        return {
-          ...owner,
+      // Calculate YTD payments from expenses for vendors
+      const { data: vendorExpenses } = await supabase
+        .from("expenses")
+        .select("vendor, amount")
+        .gte("date", startOfYear)
+        .lte("date", endOfYear)
+        .not("vendor", "is", null);
+
+      const vendorPayments: Record<string, number> = {};
+      vendorExpenses?.forEach((e) => {
+        if (e.vendor) {
+          // Match by vendor name
+          vendorPayments[e.vendor.toLowerCase()] = (vendorPayments[e.vendor.toLowerCase()] || 0) + (e.amount || 0);
+        }
+      });
+
+      // Process owners
+      (ownersData || []).forEach((owner) => {
+        const ytdPayments = ownerPayments[owner.id] || owner.payments_ytd || 0;
+        let w9Status: TaxEntity["w9_status"] = "missing";
+        let w9Date: string | null = null;
+
+        if (owner.service_type === "co-hosting") {
+          // We send W-9 TO co-hosting owners
+          if (owner.w9_sent_at) {
+            w9Status = "sent";
+            w9Date = owner.w9_sent_at;
+          }
+        } else {
+          // Full-service owners send W-9 TO us
+          if (owner.owner_w9_uploaded_at) {
+            w9Status = "received";
+            w9Date = owner.owner_w9_uploaded_at;
+          } else if (owner.owner_w9_requested_at) {
+            w9Status = "requested";
+            w9Date = owner.owner_w9_requested_at;
+          }
+        }
+
+        const hasW9 = w9Status === "received" || w9Status === "sent";
+
+        allEntities.push({
+          id: owner.id,
+          name: owner.name,
+          email: owner.email || "",
+          type: "owner",
+          service_type: owner.service_type,
           payments_ytd: ytdPayments,
+          w9_status: w9Status,
+          w9_date: w9Date,
+          w9_file_path: owner.owner_w9_file_path,
+          tax_year_1099_generated: owner.tax_year_1099_generated || false,
+          tax_year_1099_generated_at: owner.tax_year_1099_generated_at,
+          tax_classification: owner.tax_classification,
+          taxpayer_name: owner.taxpayer_name,
+          taxpayer_address: owner.taxpayer_address,
           requires_1099: ytdPayments >= TAX_THRESHOLD,
           is_1099_ready: ytdPayments >= TAX_THRESHOLD && hasW9 && !!owner.taxpayer_name,
-        };
+        });
       });
 
-      setOwners(processedOwners);
+      // Process vendors
+      (vendorsData || []).forEach((vendor) => {
+        const vendorName = vendor.company_name || vendor.name;
+        const ytdPayments = vendorPayments[vendorName.toLowerCase()] || vendor.payments_ytd || 0;
+        
+        let w9Status: TaxEntity["w9_status"] = "missing";
+        let w9Date: string | null = null;
+
+        if (vendor.w9_received_at || vendor.w9_on_file) {
+          w9Status = "received";
+          w9Date = vendor.w9_received_at;
+        }
+
+        const hasW9 = w9Status === "received";
+
+        allEntities.push({
+          id: vendor.id,
+          name: vendorName,
+          email: vendor.email || "",
+          type: "vendor",
+          specialty: vendor.specialty,
+          payments_ytd: ytdPayments,
+          w9_status: w9Status,
+          w9_date: w9Date,
+          w9_file_path: vendor.w9_file_path,
+          tax_year_1099_generated: vendor.tax_year_1099_generated || false,
+          tax_year_1099_generated_at: vendor.tax_year_1099_generated_at,
+          tax_classification: vendor.tax_classification,
+          taxpayer_name: vendor.taxpayer_name,
+          taxpayer_address: vendor.taxpayer_address,
+          requires_1099: ytdPayments >= TAX_THRESHOLD,
+          is_1099_ready: ytdPayments >= TAX_THRESHOLD && hasW9,
+        });
+      });
+
+      setEntities(allEntities);
     } catch (error) {
       console.error("Error loading tax data:", error);
       toast.error("Failed to load tax data");
@@ -139,56 +228,74 @@ export function Tax1099Dashboard() {
   };
 
   useEffect(() => {
-    loadOwnerTaxData();
+    loadTaxData();
   }, [yearFilter]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadOwnerTaxData();
+    await loadTaxData();
     setRefreshing(false);
     toast.success("Tax data refreshed");
   };
 
-  const handleRequestW9 = async (ownerId: string) => {
+  const handleRequestW9 = async (entityId: string, entityType: "owner" | "vendor") => {
     try {
-      const { error } = await supabase.functions.invoke("request-owner-w9", {
-        body: { ownerId },
-      });
-      if (error) throw error;
+      if (entityType === "owner") {
+        const { error } = await supabase.functions.invoke("request-owner-w9", {
+          body: { ownerId: entityId },
+        });
+        if (error) throw error;
+      } else {
+        // For vendors, update the request status
+        await supabase
+          .from("vendors")
+          .update({ w9_on_file: false })
+          .eq("id", entityId);
+      }
       toast.success("W-9 request sent");
-      await loadOwnerTaxData();
+      await loadTaxData();
     } catch (error) {
       console.error("Error requesting W-9:", error);
       toast.error("Failed to send W-9 request");
     }
   };
 
-  const exportTo1099CSV = () => {
-    const eligibleOwners = owners.filter((o) => o.requires_1099 && o.is_1099_ready);
+  const exportTo1099CSV = (type: "all" | "owners" | "vendors") => {
+    let eligibleEntities = entities.filter((e) => e.requires_1099);
     
-    if (eligibleOwners.length === 0) {
-      toast.error("No owners ready for 1099 export");
+    if (type === "owners") {
+      eligibleEntities = eligibleEntities.filter((e) => e.type === "owner");
+    } else if (type === "vendors") {
+      eligibleEntities = eligibleEntities.filter((e) => e.type === "vendor");
+    }
+
+    if (eligibleEntities.length === 0) {
+      toast.error("No entities ready for 1099 export");
       return;
     }
 
     const headers = [
+      "Type",
       "Payee Name",
       "Taxpayer Name",
       "Tax Classification",
       "Address",
       "Email",
       "Total Payments",
-      "W-9 Received",
+      "W-9 Status",
+      "1099 Ready",
     ];
 
-    const rows = eligibleOwners.map((owner) => [
-      owner.name,
-      owner.taxpayer_name || owner.name,
-      owner.tax_classification || "Individual",
-      owner.taxpayer_address || "",
-      owner.email,
-      owner.payments_ytd.toFixed(2),
-      owner.owner_w9_uploaded_at ? format(new Date(owner.owner_w9_uploaded_at), "MM/dd/yyyy") : "N/A",
+    const rows = eligibleEntities.map((entity) => [
+      entity.type === "owner" ? "Owner" : "Vendor",
+      entity.name,
+      entity.taxpayer_name || entity.name,
+      entity.tax_classification || "Individual",
+      entity.taxpayer_address || "",
+      entity.email,
+      entity.payments_ytd.toFixed(2),
+      entity.w9_status,
+      entity.is_1099_ready ? "Yes" : "No",
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n");
@@ -197,48 +304,58 @@ export function Tax1099Dashboard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `1099-NEC-data-${yearFilter}.csv`;
+    a.download = `1099-NEC-${type}-${yearFilter}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    
-    toast.success(`Exported ${eligibleOwners.length} owners for 1099 filing`);
+
+    toast.success(`Exported ${eligibleEntities.length} ${type} for 1099 filing`);
   };
 
-  // Filter owners based on search and status
-  const filteredOwners = useMemo(() => {
-    return owners.filter((owner) => {
-      const matchesSearch = 
-        owner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        owner.email.toLowerCase().includes(searchTerm.toLowerCase());
+  // Filter entities based on search, status, and type
+  const filteredEntities = useMemo(() => {
+    return entities.filter((entity) => {
+      const matchesSearch =
+        entity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entity.email.toLowerCase().includes(searchTerm.toLowerCase());
 
       if (!matchesSearch) return false;
 
+      // Filter by active tab
+      if (activeTab === "owners" && entity.type !== "owner") return false;
+      if (activeTab === "vendors" && entity.type !== "vendor") return false;
+
       switch (statusFilter) {
         case "needs-w9":
-          return owner.requires_1099 && !owner.owner_w9_uploaded_at;
+          return entity.requires_1099 && entity.w9_status === "missing";
         case "above-threshold":
-          return owner.requires_1099;
+          return entity.requires_1099;
         case "ready":
-          return owner.is_1099_ready;
+          return entity.is_1099_ready;
         case "generated":
-          return owner.tax_year_1099_generated;
+          return entity.tax_year_1099_generated;
         default:
           return true;
       }
     });
-  }, [owners, searchTerm, statusFilter]);
+  }, [entities, searchTerm, statusFilter, activeTab]);
 
   // Calculate stats
   const stats = useMemo(() => {
-    const aboveThreshold = owners.filter((o) => o.requires_1099);
-    const needsW9 = aboveThreshold.filter((o) => !o.owner_w9_uploaded_at);
-    const ready = owners.filter((o) => o.is_1099_ready);
-    const generated = owners.filter((o) => o.tax_year_1099_generated);
-    const totalPayments = owners.reduce((sum, o) => sum + o.payments_ytd, 0);
+    const currentEntities = activeTab === "all" 
+      ? entities 
+      : entities.filter((e) => e.type === activeTab.slice(0, -1) as "owner" | "vendor");
+    
+    const aboveThreshold = currentEntities.filter((e) => e.requires_1099);
+    const needsW9 = aboveThreshold.filter((e) => e.w9_status === "missing");
+    const ready = currentEntities.filter((e) => e.is_1099_ready);
+    const generated = currentEntities.filter((e) => e.tax_year_1099_generated);
+    const totalPayments = currentEntities.reduce((sum, e) => sum + e.payments_ytd, 0);
     const daysToDeadline = differenceInDays(IRS_DEADLINE, new Date());
 
     return {
-      totalOwners: owners.length,
+      totalEntities: currentEntities.length,
+      owners: entities.filter((e) => e.type === "owner").length,
+      vendors: entities.filter((e) => e.type === "vendor").length,
       aboveThreshold: aboveThreshold.length,
       needsW9: needsW9.length,
       ready: ready.length,
@@ -246,7 +363,7 @@ export function Tax1099Dashboard() {
       totalPayments,
       daysToDeadline,
     };
-  }, [owners]);
+  }, [entities, activeTab]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -257,64 +374,57 @@ export function Tax1099Dashboard() {
     }).format(amount);
   };
 
-  const getW9Status = (owner: OwnerTaxInfo) => {
-    if (owner.service_type === "co-hosting") {
-      // For co-hosting, we send W-9 to them
-      return owner.w9_sent_at ? (
-        <Badge variant="outline" className="text-green-600 border-green-600">
-          <CheckCircle2 className="w-3 h-3 mr-1" />
-          Sent to Owner
-        </Badge>
-      ) : (
-        <Badge variant="outline" className="text-muted-foreground">
-          Not Sent
-        </Badge>
-      );
+  const getW9StatusBadge = (entity: TaxEntity) => {
+    switch (entity.w9_status) {
+      case "received":
+        return (
+          <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            Received
+          </Badge>
+        );
+      case "sent":
+        return (
+          <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            Sent
+          </Badge>
+        );
+      case "requested":
+        return (
+          <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50">
+            <Clock className="w-3 h-3 mr-1" />
+            Requested
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Missing
+          </Badge>
+        );
     }
-    
-    // For full-service, they send W-9 to us
-    if (owner.owner_w9_uploaded_at) {
-      return (
-        <Badge variant="outline" className="text-green-600 border-green-600">
-          <CheckCircle2 className="w-3 h-3 mr-1" />
-          Received
-        </Badge>
-      );
-    }
-    if (owner.owner_w9_requested_at) {
-      return (
-        <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-          <Clock className="w-3 h-3 mr-1" />
-          Requested
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="text-red-600 border-red-600">
-        <AlertCircle className="w-3 h-3 mr-1" />
-        Missing
-      </Badge>
-    );
   };
 
-  const get1099Status = (owner: OwnerTaxInfo) => {
-    if (owner.tax_year_1099_generated) {
+  const get1099StatusBadge = (entity: TaxEntity) => {
+    if (entity.tax_year_1099_generated) {
       return (
-        <Badge className="bg-green-100 text-green-800">
+        <Badge className="bg-green-100 text-green-800 border-green-200">
           <CheckCircle2 className="w-3 h-3 mr-1" />
           Generated
         </Badge>
       );
     }
-    if (owner.is_1099_ready) {
+    if (entity.is_1099_ready) {
       return (
-        <Badge className="bg-blue-100 text-blue-800">
+        <Badge className="bg-blue-100 text-blue-800 border-blue-200">
           <FileCheck className="w-3 h-3 mr-1" />
           Ready
         </Badge>
       );
     }
-    if (owner.requires_1099) {
+    if (entity.requires_1099) {
       return (
         <Badge variant="destructive">
           <AlertCircle className="w-3 h-3 mr-1" />
@@ -324,7 +434,7 @@ export function Tax1099Dashboard() {
     }
     return (
       <Badge variant="secondary">
-        Below Threshold
+        Below $600
       </Badge>
     );
   };
@@ -341,7 +451,7 @@ export function Tax1099Dashboard() {
     <div className="space-y-6">
       {/* Deadline Alert */}
       {stats.daysToDeadline <= 30 && stats.daysToDeadline > 0 && (
-        <Card className="border-yellow-500 bg-yellow-50">
+        <Card className="border-yellow-400 bg-yellow-50/50">
           <CardContent className="flex items-center gap-3 py-4">
             <AlertTriangle className="w-5 h-5 text-yellow-600" />
             <div>
@@ -349,7 +459,7 @@ export function Tax1099Dashboard() {
                 IRS 1099-NEC Deadline Approaching
               </p>
               <p className="text-sm text-yellow-700">
-                {stats.daysToDeadline} days until January 31st deadline. {stats.needsW9} owners still need W-9 collection.
+                {stats.daysToDeadline} days until January 31st deadline. {stats.needsW9} payees still need W-9 collection.
               </p>
             </div>
           </CardContent>
@@ -360,22 +470,32 @@ export function Tax1099Dashboard() {
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Owners
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Owners
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
-              <span className="text-2xl font-bold">{stats.totalOwners}</span>
-            </div>
+            <span className="text-2xl font-bold">{stats.owners}</span>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Wrench className="w-4 h-4" />
+              Vendors
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <span className="text-2xl font-bold">{stats.vendors}</span>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Above $600 Threshold
+              Above $600
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -394,7 +514,7 @@ export function Tax1099Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500" />
+              <AlertCircle className="w-5 h-5 text-destructive" />
               <span className="text-2xl font-bold">{stats.needsW9}</span>
             </div>
           </CardContent>
@@ -408,28 +528,14 @@ export function Tax1099Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <FileCheck className="w-5 h-5 text-green-500" />
+              <FileCheck className="w-5 h-5 text-green-600" />
               <span className="text-2xl font-bold">{stats.ready}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              YTD Payments
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-primary" />
-              <span className="text-2xl font-bold">{formatCurrency(stats.totalPayments)}</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters and Actions */}
+      {/* Main Card with Tabs */}
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -444,7 +550,7 @@ export function Tax1099Dashboard() {
                 <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
-              <Button size="sm" onClick={exportTo1099CSV}>
+              <Button size="sm" onClick={() => exportTo1099CSV(activeTab)}>
                 <Download className="w-4 h-4 mr-2" />
                 Export 1099 Data
               </Button>
@@ -452,116 +558,186 @@ export function Tax1099Dashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-4 mb-6 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search owners..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={yearFilter} onValueChange={setYearFilter}>
-              <SelectTrigger className="w-32">
-                <Calendar className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={(new Date().getFullYear()).toString()}>
-                  {new Date().getFullYear()}
-                </SelectItem>
-                <SelectItem value={(new Date().getFullYear() - 1).toString()}>
-                  {new Date().getFullYear() - 1}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Owners</SelectItem>
-                <SelectItem value="needs-w9">Needs W-9</SelectItem>
-                <SelectItem value="above-threshold">Above $600</SelectItem>
-                <SelectItem value="ready">1099 Ready</SelectItem>
-                <SelectItem value="generated">1099 Generated</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="space-y-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <TabsList>
+                <TabsTrigger value="all" className="gap-2">
+                  <Users className="w-4 h-4" />
+                  All ({entities.length})
+                </TabsTrigger>
+                <TabsTrigger value="owners" className="gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Owners ({entities.filter((e) => e.type === "owner").length})
+                </TabsTrigger>
+                <TabsTrigger value="vendors" className="gap-2">
+                  <Wrench className="w-4 h-4" />
+                  Vendors ({entities.filter((e) => e.type === "vendor").length})
+                </TabsTrigger>
+              </TabsList>
 
-          {/* Owners Table */}
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Service Type</TableHead>
-                  <TableHead className="text-right">YTD Payments</TableHead>
-                  <TableHead>W-9 Status</TableHead>
-                  <TableHead>1099 Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOwners.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No owners found matching your criteria
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredOwners.map((owner) => (
-                    <TableRow key={owner.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{owner.name}</p>
-                          <p className="text-sm text-muted-foreground">{owner.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {owner.service_type?.replace("-", " ") || "Unknown"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        <span className={owner.requires_1099 ? "font-semibold text-yellow-700" : ""}>
-                          {formatCurrency(owner.payments_ytd)}
-                        </span>
-                      </TableCell>
-                      <TableCell>{getW9Status(owner)}</TableCell>
-                      <TableCell>{get1099Status(owner)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {owner.service_type === "full-service" && !owner.owner_w9_uploaded_at && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRequestW9(owner.id)}
-                              title="Request W-9"
-                            >
-                              <Send className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {owner.owner_w9_file_path && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              title="View W-9"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1 md:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={yearFilter} onValueChange={setYearFilter}>
+                  <SelectTrigger className="w-28">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={(new Date().getFullYear()).toString()}>
+                      {new Date().getFullYear()}
+                    </SelectItem>
+                    <SelectItem value={(new Date().getFullYear() - 1).toString()}>
+                      {new Date().getFullYear() - 1}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="needs-w9">Needs W-9</SelectItem>
+                    <SelectItem value="above-threshold">Above $600</SelectItem>
+                    <SelectItem value="ready">1099 Ready</SelectItem>
+                    <SelectItem value="generated">Generated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <TabsContent value="all" className="m-0">
+              <EntityTable
+                entities={filteredEntities}
+                formatCurrency={formatCurrency}
+                getW9StatusBadge={getW9StatusBadge}
+                get1099StatusBadge={get1099StatusBadge}
+                onRequestW9={handleRequestW9}
+              />
+            </TabsContent>
+            <TabsContent value="owners" className="m-0">
+              <EntityTable
+                entities={filteredEntities}
+                formatCurrency={formatCurrency}
+                getW9StatusBadge={getW9StatusBadge}
+                get1099StatusBadge={get1099StatusBadge}
+                onRequestW9={handleRequestW9}
+              />
+            </TabsContent>
+            <TabsContent value="vendors" className="m-0">
+              <EntityTable
+                entities={filteredEntities}
+                formatCurrency={formatCurrency}
+                getW9StatusBadge={getW9StatusBadge}
+                get1099StatusBadge={get1099StatusBadge}
+                onRequestW9={handleRequestW9}
+              />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+interface EntityTableProps {
+  entities: TaxEntity[];
+  formatCurrency: (amount: number) => string;
+  getW9StatusBadge: (entity: TaxEntity) => React.ReactNode;
+  get1099StatusBadge: (entity: TaxEntity) => React.ReactNode;
+  onRequestW9: (id: string, type: "owner" | "vendor") => void;
+}
+
+function EntityTable({
+  entities,
+  formatCurrency,
+  getW9StatusBadge,
+  get1099StatusBadge,
+  onRequestW9,
+}: EntityTableProps) {
+  return (
+    <div className="border rounded-lg">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead className="text-right">YTD Payments</TableHead>
+            <TableHead>W-9 Status</TableHead>
+            <TableHead>1099 Status</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {entities.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                No records found
+              </TableCell>
+            </TableRow>
+          ) : (
+            entities.map((entity) => (
+              <TableRow key={`${entity.type}-${entity.id}`}>
+                <TableCell>
+                  <div>
+                    <p className="font-medium">{entity.name}</p>
+                    <p className="text-sm text-muted-foreground">{entity.email}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="capitalize">
+                    {entity.type === "owner" ? (
+                      <>
+                        <Building2 className="w-3 h-3 mr-1" />
+                        {entity.service_type?.replace("-", " ") || "Owner"}
+                      </>
+                    ) : (
+                      <>
+                        <Wrench className="w-3 h-3 mr-1" />
+                        Vendor
+                      </>
+                    )}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  <span className={entity.requires_1099 ? "font-semibold text-yellow-700" : ""}>
+                    {formatCurrency(entity.payments_ytd)}
+                  </span>
+                </TableCell>
+                <TableCell>{getW9StatusBadge(entity)}</TableCell>
+                <TableCell>{get1099StatusBadge(entity)}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    {entity.w9_status === "missing" && entity.requires_1099 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRequestW9(entity.id, entity.type)}
+                        title="Request W-9"
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {entity.w9_file_path && (
+                      <Button variant="ghost" size="sm" title="View W-9">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 }
