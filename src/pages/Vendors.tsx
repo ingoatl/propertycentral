@@ -116,13 +116,21 @@ const Vendors = () => {
     },
   });
 
-  const filteredVendors = vendors.filter((vendor) => {
-    const matchesSearch = (vendor.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (vendor.company_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (vendor.phone || '').includes(searchQuery);
-    const matchesSpecialty = !selectedSpecialty || (vendor.specialty || []).includes(selectedSpecialty);
-    return matchesSearch && matchesSpecialty;
-  });
+  const filteredVendors = vendors
+    .filter((vendor) => {
+      const matchesSearch = (vendor.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (vendor.company_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (vendor.phone || '').includes(searchQuery);
+      const matchesSpecialty = !selectedSpecialty || (vendor.specialty || []).includes(selectedSpecialty);
+      return matchesSearch && matchesSpecialty;
+    })
+    .sort((a, b) => {
+      // Preferred vendors first
+      if (a.status === 'preferred' && b.status !== 'preferred') return -1;
+      if (b.status === 'preferred' && a.status !== 'preferred') return 1;
+      // Then by name
+      return (a.name || '').localeCompare(b.name || '');
+    });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -150,6 +158,22 @@ const Vendors = () => {
       toast.error("Failed to delete vendor: " + error.message);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const togglePreferredStatus = async (vendor: Vendor, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newStatus = vendor.status === 'preferred' ? 'active' : 'preferred';
+    try {
+      const { error } = await supabase
+        .from("vendors")
+        .update({ status: newStatus })
+        .eq("id", vendor.id);
+      if (error) throw error;
+      toast.success(newStatus === 'preferred' ? 'Vendor marked as preferred' : 'Vendor unmarked as preferred');
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+    } catch (error: any) {
+      toast.error("Failed to update vendor status: " + error.message);
     }
   };
 
@@ -244,12 +268,23 @@ const Vendors = () => {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredVendors.map((vendor) => (
-              <Card key={vendor.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedVendor(vendor)}>
+              <Card key={vendor.id} className={`cursor-pointer hover:shadow-md transition-shadow ${vendor.status === 'preferred' ? 'ring-2 ring-primary/50 bg-primary/5' : ''}`} onClick={() => setSelectedVendor(vendor)}>
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{vendor.name}</CardTitle>
-                      {vendor.company_name && <p className="text-sm text-muted-foreground">{vendor.company_name}</p>}
+                    <div className="flex items-start gap-2">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className={`h-6 w-6 p-0 ${vendor.status === 'preferred' ? 'text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`}
+                        onClick={(e) => togglePreferredStatus(vendor, e)}
+                        title={vendor.status === 'preferred' ? 'Remove from preferred' : 'Mark as preferred'}
+                      >
+                        <Star className={`h-4 w-4 ${vendor.status === 'preferred' ? 'fill-yellow-500' : ''}`} />
+                      </Button>
+                      <div>
+                        <CardTitle className="text-lg">{vendor.name}</CardTitle>
+                        {vendor.company_name && <p className="text-sm text-muted-foreground">{vendor.company_name}</p>}
+                      </div>
                     </div>
                     <Badge className={getStatusColor(vendor.status)}>{vendor.status}</Badge>
                   </div>

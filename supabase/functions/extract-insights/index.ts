@@ -243,7 +243,7 @@ serve(async (req) => {
     // Detect verification emails from Truvi, Authenticate, Superhog, Autohost
     // ENHANCED: Added "verification completed", "completed for", "guest passed" patterns
     const screeningProviders = [
-      { name: 'truvi', senderPatterns: ['@truvi.com', 'noreply@truvi'], subjectPatterns: ['verification complete', 'verification completed', 'completed for', 'guest verified', 'guest passed', 'id verified', 'truvi'] },
+      { name: 'truvi', senderPatterns: ['@truvi.com', 'noreply@truvi', 'truvi.id'], subjectPatterns: ['guest verification completed for', 'verification complete', 'verification completed', 'completed for', 'guest verified', 'guest passed', 'id verified', 'truvi'] },
       { name: 'authenticate', senderPatterns: ['@authenticate.com', '@autohost.ai'], subjectPatterns: ['screening result', 'verification status', 'verification completed', 'guest approved', 'background check'] },
       { name: 'superhog', senderPatterns: ['@superhog.com'], subjectPatterns: ['superhog', 'guest protection', 'verification complete', 'verification completed'] },
       { name: 'autohost', senderPatterns: ['@autohost.ai', '@autohost.com'], subjectPatterns: ['autohost', 'guest screening', 'verification', 'verification completed'] },
@@ -925,28 +925,38 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       const backgroundPassed = bodyLower.includes('background check') && (bodyLower.includes('passed') || bodyLower.includes('clear'));
       const watchlistClear = bodyLower.includes('watchlist') && (bodyLower.includes('clear') || bodyLower.includes('no matches'));
       
-      // Extract guest name from email if possible - ENHANCED PATTERNS
+      // Extract guest name from email if possible - ENHANCED PATTERNS FOR TRUVI
       let guestName = 'Unknown Guest';
       const guestNamePatterns = [
-        // Highest priority: Subject line patterns
-        /verification completed for ([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        /completed for ([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        /guest verified[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        /guest passed[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        // Body patterns
-        /guest[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        /name[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        /for\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        /verified\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        /reservation by ([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-        /booking for ([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+        // Truvi specific: "Guest verification completed for Samantha Angulo"
+        /guest verification completed for\s+([A-Za-z]+\s+[A-Za-z]+)/i,
+        /verification completed for\s+([A-Za-z]+\s+[A-Za-z]+)/i,
+        // Allow names with middle names or hyphens
+        /completed for\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/i,
+        /guest verified[:\s]+([A-Za-z]+\s+[A-Za-z]+)/i,
+        /guest passed[:\s]+([A-Za-z]+\s+[A-Za-z]+)/i,
+        // Body patterns - look for specific Truvi format
+        /verified guest[:\s]*([A-Za-z]+\s+[A-Za-z]+)/i,
+        /guest name[:\s]*([A-Za-z]+\s+[A-Za-z]+)/i,
+        /guest[:\s]+([A-Za-z]+\s+[A-Za-z]+)/i,
+        /name[:\s]+([A-Za-z]+\s+[A-Za-z]+)/i,
+        /for\s+([A-Za-z]+\s+[A-Za-z]+)/i,
+        /verified\s+([A-Za-z]+\s+[A-Za-z]+)/i,
+        /reservation by\s+([A-Za-z]+\s+[A-Za-z]+)/i,
+        /booking for\s+([A-Za-z]+\s+[A-Za-z]+)/i,
       ];
-      // Try subject first, then body
+      // Try subject first (most reliable for Truvi), then body
       for (const pattern of guestNamePatterns) {
-        const match = safeSubject.match(pattern) || safeBody.match(pattern);
-        if (match) {
-          guestName = match[1].trim();
-          console.log(`Extracted guest name: ${guestName} from pattern: ${pattern}`);
+        const subjectMatch = safeSubject.match(pattern);
+        if (subjectMatch) {
+          guestName = subjectMatch[1].trim();
+          console.log(`Extracted guest name from subject: ${guestName}`);
+          break;
+        }
+        const bodyMatch = safeBody.match(pattern);
+        if (bodyMatch) {
+          guestName = bodyMatch[1].trim();
+          console.log(`Extracted guest name from body: ${guestName}`);
           break;
         }
       }
