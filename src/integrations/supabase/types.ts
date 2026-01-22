@@ -2478,6 +2478,94 @@ export type Database = {
           },
         ]
       }
+      guest_screenings: {
+        Row: {
+          background_passed: boolean | null
+          booking_id: string | null
+          created_at: string | null
+          gmail_message_id: string | null
+          guest_email: string | null
+          guest_name: string
+          id: string
+          id_verified: boolean | null
+          notes: string | null
+          owner_notified: boolean | null
+          property_id: string | null
+          raw_result: Json | null
+          risk_score: string | null
+          screening_date: string | null
+          screening_provider: string | null
+          screening_status: string | null
+          updated_at: string | null
+          verification_type: string | null
+          watchlist_clear: boolean | null
+        }
+        Insert: {
+          background_passed?: boolean | null
+          booking_id?: string | null
+          created_at?: string | null
+          gmail_message_id?: string | null
+          guest_email?: string | null
+          guest_name: string
+          id?: string
+          id_verified?: boolean | null
+          notes?: string | null
+          owner_notified?: boolean | null
+          property_id?: string | null
+          raw_result?: Json | null
+          risk_score?: string | null
+          screening_date?: string | null
+          screening_provider?: string | null
+          screening_status?: string | null
+          updated_at?: string | null
+          verification_type?: string | null
+          watchlist_clear?: boolean | null
+        }
+        Update: {
+          background_passed?: boolean | null
+          booking_id?: string | null
+          created_at?: string | null
+          gmail_message_id?: string | null
+          guest_email?: string | null
+          guest_name?: string
+          id?: string
+          id_verified?: boolean | null
+          notes?: string | null
+          owner_notified?: boolean | null
+          property_id?: string | null
+          raw_result?: Json | null
+          risk_score?: string | null
+          screening_date?: string | null
+          screening_provider?: string | null
+          screening_status?: string | null
+          updated_at?: string | null
+          verification_type?: string | null
+          watchlist_clear?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_screenings_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "ownerrez_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_screenings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_screenings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holiday_email_logs: {
         Row: {
           created_at: string
@@ -5794,10 +5882,12 @@ export type Database = {
       ownerrez_bookings: {
         Row: {
           accommodation_revenue: number | null
+          adults: number | null
           booking_id: string | null
           booking_status: string | null
           check_in: string | null
           check_out: string | null
+          children: number | null
           cleaning_fee: number | null
           created_at: string
           guest_email: string | null
@@ -5809,6 +5899,7 @@ export type Database = {
           ownerrez_listing_id: string
           ownerrez_listing_name: string
           pet_fee: number | null
+          pets: number | null
           promotions_discount: number | null
           property_id: string | null
           sync_date: string
@@ -5817,10 +5908,12 @@ export type Database = {
         }
         Insert: {
           accommodation_revenue?: number | null
+          adults?: number | null
           booking_id?: string | null
           booking_status?: string | null
           check_in?: string | null
           check_out?: string | null
+          children?: number | null
           cleaning_fee?: number | null
           created_at?: string
           guest_email?: string | null
@@ -5832,6 +5925,7 @@ export type Database = {
           ownerrez_listing_id: string
           ownerrez_listing_name: string
           pet_fee?: number | null
+          pets?: number | null
           promotions_discount?: number | null
           property_id?: string | null
           sync_date?: string
@@ -5840,10 +5934,12 @@ export type Database = {
         }
         Update: {
           accommodation_revenue?: number | null
+          adults?: number | null
           booking_id?: string | null
           booking_status?: string | null
           check_in?: string | null
           check_out?: string | null
+          children?: number | null
           cleaning_fee?: number | null
           created_at?: string
           guest_email?: string | null
@@ -5855,6 +5951,7 @@ export type Database = {
           ownerrez_listing_id?: string
           ownerrez_listing_name?: string
           pet_fee?: number | null
+          pets?: number | null
           promotions_discount?: number | null
           property_id?: string | null
           sync_date?: string

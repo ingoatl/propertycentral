@@ -518,3 +518,6 @@ verify_jwt = false
 
 [functions.recall-calendar-sync]
 verify_jwt = false
+
+[functions.notify-owner-screening]
+verify_jwt = true

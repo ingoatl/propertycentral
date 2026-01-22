@@ -31,6 +31,7 @@ import {
   CheckCircle2,
   MessageCircle,
   Wrench,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -48,6 +49,7 @@ import { OwnerOnboardingTimeline } from "./components/OwnerOnboardingTimeline";
 import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfButton";
 import { OwnerMessagesTab } from "./components/OwnerMessagesTab";
 import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
+import { OwnerGuestScreeningsTab } from "./components/OwnerGuestScreeningsTab";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
@@ -159,6 +161,7 @@ export default function OwnerDashboard() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [bookings, setBookings] = useState<{ str: any[]; mtr: any[] } | null>(null);
+  const [guestScreenings, setGuestScreenings] = useState<any[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [monthlyRevenueData, setMonthlyRevenueData] = useState<any[]>([]);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
@@ -215,6 +218,7 @@ export default function OwnerDashboard() {
       setExpenses(data.expenses || []);
       setCredentials(data.credentials || []);
       setBookings(data.bookings || null);
+      setGuestScreenings(data.guestScreenings || []);
       setReviews(data.reviews || []);
       setMonthlyRevenueData(data.monthlyRevenue || []);
       setPerformanceMetrics(data.performance || performanceMetrics);
@@ -377,6 +381,7 @@ export default function OwnerDashboard() {
       setExpenses(data.expenses || []);
       setCredentials(data.credentials || []);
       setBookings(data.bookings || null);
+      setGuestScreenings(data.guestScreenings || []);
       setReviews(data.reviews || []);
       setMonthlyRevenueData(data.monthlyRevenue || []);
       setPerformanceMetrics(data.performance || {
@@ -450,6 +455,7 @@ export default function OwnerDashboard() {
       setExpenses(data.expenses || []);
       setCredentials(data.credentials || []);
       setBookings(data.bookings || null);
+      setGuestScreenings(data.guestScreenings || []);
       setReviews(data.reviews || []);
       setMonthlyRevenueData(data.monthlyRevenue || []);
       setPerformanceMetrics(data.performance || {
@@ -907,6 +913,10 @@ export default function OwnerDashboard() {
               <Wrench className="h-4 w-4" />
               <span className="hidden sm:inline">Maintenance</span>
             </TabsTrigger>
+            <TabsTrigger value="screenings" className="gap-2">
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">Guest Screenings</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Show onboarding timeline if property is in onboarding */}
@@ -1172,6 +1182,15 @@ export default function OwnerDashboard() {
               <OwnerMaintenanceTab 
                 ownerId={session.ownerId} 
                 propertyId={property?.id}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="screenings">
+            {property && (
+              <OwnerGuestScreeningsTab 
+                propertyId={property.id} 
+                screenings={guestScreenings}
               />
             )}
           </TabsContent>
