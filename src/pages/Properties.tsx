@@ -93,12 +93,25 @@ const Properties = () => {
       setDeletingProperty(property.id);
       
       // Delete in order due to foreign key constraints
+      // First, unlink leads from this property (set property_id to null instead of deleting)
+      await supabase.from('leads').update({ property_id: null }).eq('property_id', property.id);
+      
+      // Unlink or delete related records
+      await supabase.from('work_orders').update({ property_id: null }).eq('property_id', property.id);
+      await supabase.from('email_insights').update({ property_id: null }).eq('property_id', property.id);
+      await supabase.from('booking_documents').update({ property_id: null }).eq('property_id', property.id);
+      await supabase.from('guest_screenings').update({ property_id: null }).eq('property_id', property.id);
+      
+      // Delete related records
       await supabase.from('expenses').delete().eq('property_id', property.id);
       await supabase.from('visits').delete().eq('property_id', property.id);
       await supabase.from('mid_term_bookings').delete().eq('property_id', property.id);
       await supabase.from('inspection_issues').delete().eq('property_id', property.id);
       await supabase.from('inspections').delete().eq('property_id', property.id);
       await supabase.from('conversation_notes').delete().eq('property_id', property.id);
+      await supabase.from('appliance_warranties').delete().eq('property_id', property.id);
+      await supabase.from('utility_accounts').delete().eq('property_id', property.id);
+      await supabase.from('ownerrez_bookings').delete().eq('property_id', property.id);
       
       // Get all owner_onboarding_submissions for this property to delete their child records first
       const { data: submissions } = await supabase
