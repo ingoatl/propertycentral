@@ -36,10 +36,13 @@ import {
   AlertTriangle,
   Building2,
   Wrench,
+  Phone,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
+import { PDFViewerDialog } from "@/components/documents/PDFViewerDialog";
 
 interface TaxEntity {
   id: string;
@@ -73,7 +76,12 @@ export function Tax1099Dashboard() {
   const [entityTypeFilter, setEntityTypeFilter] = useState<"all" | "owner" | "vendor">("all");
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "owners" | "vendors">("all");
-
+  
+  // W-9 Viewing state
+  const [viewingW9, setViewingW9] = useState<{ filePath: string; name: string; type: string } | null>(null);
+  
+  // Voice reminder state
+  const [sendingVoiceReminder, setSendingVoiceReminder] = useState<string | null>(null);
   const loadTaxData = async () => {
     try {
       setLoading(true);
@@ -257,6 +265,26 @@ export function Tax1099Dashboard() {
     } catch (error) {
       console.error("Error requesting W-9:", error);
       toast.error("Failed to send W-9 request");
+    }
+  };
+
+  const handleViewW9 = (filePath: string, type: string, name: string) => {
+    setViewingW9({ filePath, name, type });
+  };
+
+  const handleVoiceReminder = async (entityId: string, entityType: "owner" | "vendor", entityName: string) => {
+    try {
+      setSendingVoiceReminder(entityId);
+      const { error } = await supabase.functions.invoke("send-w9-voice-reminder", {
+        body: { type: entityType, id: entityId },
+      });
+      if (error) throw error;
+      toast.success(`Voice reminder sent to ${entityName}`);
+    } catch (error) {
+      console.error("Error sending voice reminder:", error);
+      toast.error("Failed to send voice reminder");
+    } finally {
+      setSendingVoiceReminder(null);
     }
   };
 
@@ -621,6 +649,9 @@ export function Tax1099Dashboard() {
                 getW9StatusBadge={getW9StatusBadge}
                 get1099StatusBadge={get1099StatusBadge}
                 onRequestW9={handleRequestW9}
+                onViewW9={handleViewW9}
+                onVoiceReminder={handleVoiceReminder}
+                sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
             <TabsContent value="owners" className="m-0">
@@ -630,6 +661,9 @@ export function Tax1099Dashboard() {
                 getW9StatusBadge={getW9StatusBadge}
                 get1099StatusBadge={get1099StatusBadge}
                 onRequestW9={handleRequestW9}
+                onViewW9={handleViewW9}
+                onVoiceReminder={handleVoiceReminder}
+                sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
             <TabsContent value="vendors" className="m-0">
@@ -639,11 +673,23 @@ export function Tax1099Dashboard() {
                 getW9StatusBadge={getW9StatusBadge}
                 get1099StatusBadge={get1099StatusBadge}
                 onRequestW9={handleRequestW9}
+                onViewW9={handleViewW9}
+                onVoiceReminder={handleVoiceReminder}
+                sendingVoiceReminder={sendingVoiceReminder}
               />
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* W-9 Viewer Dialog */}
+      <PDFViewerDialog
+        open={!!viewingW9}
+        onOpenChange={() => setViewingW9(null)}
+        filePath={viewingW9?.filePath || ""}
+        title={`W-9 - ${viewingW9?.name}`}
+        bucketName="onboarding-documents"
+      />
     </div>
   );
 }
@@ -654,6 +700,9 @@ interface EntityTableProps {
   getW9StatusBadge: (entity: TaxEntity) => React.ReactNode;
   get1099StatusBadge: (entity: TaxEntity) => React.ReactNode;
   onRequestW9: (id: string, type: "owner" | "vendor", name: string) => void;
+  onViewW9: (filePath: string, type: string, name: string) => void;
+  onVoiceReminder: (id: string, type: "owner" | "vendor", name: string) => void;
+  sendingVoiceReminder: string | null;
 }
 
 function EntityTable({
@@ -662,6 +711,9 @@ function EntityTable({
   getW9StatusBadge,
   get1099StatusBadge,
   onRequestW9,
+  onViewW9,
+  onVoiceReminder,
+  sendingVoiceReminder,
 }: EntityTableProps) {
   return (
     <div className="border rounded-lg">
@@ -729,19 +781,40 @@ function EntityTable({
                       </Button>
                     )}
                     {entity.w9_status === "requested" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onRequestW9(entity.id, entity.type, entity.name)}
-                        title="Resend W-9 Request"
-                        className="gap-1 text-muted-foreground"
-                      >
-                        <Send className="w-4 h-4" />
-                        Resend
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onRequestW9(entity.id, entity.type, entity.name)}
+                          title="Resend W-9 Request"
+                          className="gap-1 text-muted-foreground"
+                        >
+                          <Send className="w-4 h-4" />
+                          Resend
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onVoiceReminder(entity.id, entity.type, entity.name)}
+                          title="Send Voice Reminder"
+                          disabled={sendingVoiceReminder === entity.id}
+                          className="gap-1 text-muted-foreground"
+                        >
+                          {sendingVoiceReminder === entity.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Phone className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </>
                     )}
                     {entity.w9_file_path && (
-                      <Button variant="ghost" size="sm" title="View W-9">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        title="View W-9"
+                        onClick={() => onViewW9(entity.w9_file_path!, entity.type, entity.name)}
+                      >
                         <Eye className="w-4 h-4" />
                       </Button>
                     )}
