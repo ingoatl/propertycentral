@@ -521,3 +521,9 @@ verify_jwt = false
 
 [functions.notify-owner-screening]
 verify_jwt = true
+
+[functions.request-owner-w9]
+verify_jwt = true
+
+[functions.process-owner-w9-upload]
+verify_jwt = false
