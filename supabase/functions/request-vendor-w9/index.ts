@@ -89,8 +89,7 @@ async function sendSMS(phone: string, message: string): Promise<boolean> {
 function buildVendorW9EmailHtml(
   vendorName: string, 
   uploadUrl: string, 
-  paymentsYtd: number,
-  taxYear: number
+  paymentsYtd: number
 ): string {
   const formattedPayments = new Intl.NumberFormat('en-US', { 
     style: 'currency', 
@@ -113,7 +112,7 @@ function buildVendorW9EmailHtml(
               <tr>
                 <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 32px; text-align: center;">
                   <img src="${LOGO_URL}" alt="PeachHaus" style="height: 48px; margin-bottom: 16px;" />
-                  <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">W-9 Request for ${taxYear} Tax Filing</div>
+                  <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">W-9 Request for Tax Filing</div>
                 </td>
               </tr>
               
@@ -128,12 +127,14 @@ function buildVendorW9EmailHtml(
               <tr>
                 <td style="padding: 0 32px 16px 32px;">
                   <div style="font-size: 14px; color: #374151; line-height: 1.7;">
-                    Thank you for your continued partnership with PeachHaus Group. As we prepare for ${taxYear} tax reporting, we need your completed W-9 form to issue your 1099-NEC for payments received through our services.
+                    Thank you for your continued partnership with PeachHaus Group. As we prepare for tax reporting, we need your completed W-9 form to issue your 1099-NEC for payments received through our services.
+                  </div>
+                </td>
+              </tr>
                   </div>
                 </td>
               </tr>
 
-              <!-- Why This Matters Card -->
               <tr>
                 <td style="padding: 0 32px 24px 32px;">
                   <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px; padding: 20px 24px;">
@@ -141,9 +142,9 @@ function buildVendorW9EmailHtml(
                     <div style="font-size: 14px; color: #166534; line-height: 1.6;">
                       The IRS requires us to issue a <strong>1099-NEC</strong> to all vendors receiving $600 or more in payments during the tax year. Your W-9 provides the tax identification information we need to prepare this form accurately.
                     </div>
-                    ${paymentsYtd >= 600 ? `
-                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #86efac;">
-                      <div style="font-size: 12px; color: #166534;">Your ${taxYear} payments to date:</div>
+                  </div>
+                </td>
+              </tr>
                       <div style="font-size: 20px; font-weight: 700; color: #166534;">${formattedPayments}</div>
                     </div>
                     ` : ''}
@@ -193,7 +194,11 @@ function buildVendorW9EmailHtml(
                 <td style="padding: 0 32px 24px 32px;">
                   <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px 20px; text-align: center;">
                     <div style="font-size: 14px; color: #991b1b; font-weight: 500;">
-                      ⏰ <strong>Deadline:</strong> Please submit by <strong>December 15th, ${taxYear}</strong> to ensure timely 1099 delivery.
+                      ⏰ <strong>Deadline:</strong> Please submit by <strong>December 15th</strong> to ensure timely 1099 delivery.
+                    </div>
+                  </div>
+                </td>
+              </tr>
                     </div>
                   </div>
                 </td>
@@ -314,18 +319,17 @@ const handler = async (req: Request): Promise<Response> => {
     const uploadUrl = `${VENDOR_UPLOAD_URL}?token=${uploadToken}`;
     const vendorName = vendor.company_name || vendor.name;
     const firstName = vendor.name.split(" ")[0];
-    const taxYear = new Date().getFullYear();
     const paymentsYtd = vendor.payments_ytd || 0;
 
     // Build email HTML
-    const emailHtml = buildVendorW9EmailHtml(vendorName, uploadUrl, paymentsYtd, taxYear);
+    const emailHtml = buildVendorW9EmailHtml(vendorName, uploadUrl, paymentsYtd);
 
     // Determine recipient
     const recipient = isTestMode ? testEmail! : vendor.email;
 
     const emailSubject = isTestMode
-      ? `[TEST] PeachHaus Group - W-9 Request for ${taxYear} Tax Filing`
-      : `PeachHaus Group - W-9 Request for ${taxYear} Tax Filing`;
+      ? `[TEST] PeachHaus Group - W-9 Request for Tax Filing`
+      : `PeachHaus Group - W-9 Request for Tax Filing`;
 
     // Send email
     const emailResponse = await resend.emails.send({
@@ -344,8 +348,9 @@ const handler = async (req: Request): Promise<Response> => {
     // Send SMS if phone exists and not test mode
     let smsSent = false;
     if (!isTestMode && vendor.phone) {
-      const smsMessage = `Hi ${firstName}! PeachHaus needs your W-9 form for ${taxYear} tax filing.\n\n📤 Upload here: ${uploadUrl}\n\n⏰ Deadline: Dec 15th\n📞 Questions? Call (404) 800-5932\n\n- Ingo, PeachHaus`;
+      const smsMessage = `Hi ${firstName}! PeachHaus needs your W-9 form for tax filing.\n\n📤 Upload here: ${uploadUrl}\n\n⏰ Deadline: Dec 15th\n📞 Questions? Call (404) 800-5932\n\n- Ingo, PeachHaus`;
       smsSent = await sendSMS(vendor.phone, smsMessage);
+    }
     }
 
     // Update vendor record if not test mode
@@ -363,14 +368,13 @@ const handler = async (req: Request): Promise<Response> => {
         communication_type: "email",
         direction: "outbound",
         subject: emailSubject,
-        body: `Vendor W-9 form requested for ${taxYear} tax filing${smsSent ? ' (SMS also sent)' : ''}`,
+        body: `Vendor W-9 form requested for tax filing${smsSent ? ' (SMS also sent)' : ''}`,
         recipient_email: vendor.email,
         vendor_id: vendorId,
         status: "sent",
         metadata: {
           email_type: "vendor_w9_request",
           message_id: emailResponse.data?.id,
-          tax_year: taxYear,
           upload_url: uploadUrl,
           sms_sent: smsSent,
         },

@@ -306,15 +306,6 @@ export default function OwnerW9Upload() {
                   <p className="font-semibold text-lg">{owner.name}</p>
                   <p className="text-sm text-muted-foreground">{owner.email}</p>
                 </div>
-                {owner.payments_ytd > 0 && (
-                  <div className="text-right">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <DollarSign className="w-4 h-4" />
-                      <span>YTD Payments</span>
-                    </div>
-                    <p className="font-bold text-xl text-primary">{formatCurrency(owner.payments_ytd)}</p>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>

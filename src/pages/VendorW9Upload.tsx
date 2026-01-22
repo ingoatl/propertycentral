@@ -241,7 +241,7 @@ export default function VendorW9Upload() {
           />
           <CardTitle>Upload Your W-9</CardTitle>
           <CardDescription>
-            Securely submit your W-9 form for {new Date().getFullYear()} tax reporting
+            Securely submit your W-9 form for tax reporting
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6 space-y-6">

@@ -93,7 +93,6 @@ function buildRequestW9EmailHtml(
   firstName: string, 
   uploadUrl: string, 
   paymentsYtd: number,
-  taxYear: number,
   isSpecialRequest: boolean = false
 ): string {
   const formattedPayments = new Intl.NumberFormat('en-US', { 
@@ -109,7 +108,7 @@ function buildRequestW9EmailHtml(
           <div style="font-size: 12px; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">⚠️ Special Notice</div>
           <div style="font-size: 14px; color: #78350f; line-height: 1.6;">
             <strong>Why are we requesting your W-9?</strong><br/><br/>
-            During ${taxYear}, we received payments on your behalf from <strong>temporary housing agencies, insurance placements, and/or corporate housing clients</strong>. 
+            We received payments on your behalf from <strong>temporary housing agencies, insurance placements, and/or corporate housing clients</strong>. 
             Unlike our standard co-hosting arrangement where you typically pay us a management fee, these placements resulted in us paying funds directly to you.
             <br/><br/>
             <strong>As a result, the IRS requires us to issue you a 1099-NEC for these payments.</strong>
@@ -133,7 +132,7 @@ function buildRequestW9EmailHtml(
     </div>
   ` : `
     <div style="font-size: 14px; color: #374151; line-height: 1.7;">
-      As your property management partner, we need your completed W-9 form to issue your 1099 for ${taxYear} tax reporting. This is required by the IRS for all property owners receiving rental income through our management services.
+      As your property management partner, we need your completed W-9 form to issue your 1099 for tax reporting. This is required by the IRS for all property owners receiving rental income through our management services.
     </div>
   `;
   
@@ -153,7 +152,7 @@ function buildRequestW9EmailHtml(
               <tr>
                 <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 32px; text-align: center;">
                   <img src="${LOGO_URL}" alt="PeachHaus" style="height: 48px; margin-bottom: 16px;" />
-                  <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">W-9 Request for ${taxYear} Tax Filing</div>
+                  <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">W-9 Request for Tax Filing</div>
                 </td>
               </tr>
               
@@ -168,7 +167,10 @@ function buildRequestW9EmailHtml(
               <tr>
                 <td style="padding: 0 32px 16px 32px;">
                   <div style="font-size: 14px; color: #374151; line-height: 1.7;">
-                    As your property management partner, we need your completed W-9 form to issue your 1099 for ${taxYear} tax reporting. This is required by the IRS for all property owners receiving rental income through our management services.
+                    As your property management partner, we need your completed W-9 form to issue your 1099 for tax reporting. This is required by the IRS for all property owners receiving rental income through our management services.
+                  </div>
+                </td>
+              </tr>
                   </div>
                 </td>
               </tr>
@@ -181,12 +183,6 @@ function buildRequestW9EmailHtml(
                     <div style="font-size: 14px; color: #166534; line-height: 1.6;">
                       PeachHaus manages your rental property and remits your rental income to you. The IRS requires us to issue you a <strong>1099-MISC</strong> documenting these payments. Your W-9 provides us with the tax identification information we need to prepare this form accurately.
                     </div>
-                    ${paymentsYtd > 0 ? `
-                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #86efac;">
-                      <div style="font-size: 12px; color: #166534;">Your ${taxYear} rental payments to date:</div>
-                      <div style="font-size: 20px; font-weight: 700; color: #166534;">${formattedPayments}</div>
-                    </div>
-                    ` : ''}
                   </div>
                 </td>
               </tr>
@@ -233,7 +229,7 @@ function buildRequestW9EmailHtml(
                 <td style="padding: 0 32px 24px 32px;">
                   <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px 20px; text-align: center;">
                     <div style="font-size: 14px; color: #991b1b; font-weight: 500;">
-                      ⏰ <strong>Deadline:</strong> Please submit by <strong>December 15th, ${taxYear}</strong> to ensure timely 1099 delivery.
+                      ⏰ <strong>Deadline:</strong> Please submit by <strong>December 15th</strong> to ensure timely 1099 delivery.
                     </div>
                   </div>
                 </td>
@@ -365,11 +361,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     const uploadUrl = `${APP_BASE_URL}/owner/w9-upload?token=${uploadToken}`;
     const firstName = owner.name.split(" ")[0];
-    const taxYear = new Date().getFullYear();
     const paymentsYtd = owner.payments_ytd || 0;
 
     // Build email HTML (with special messaging if applicable)
-    const emailHtml = buildRequestW9EmailHtml(firstName, uploadUrl, paymentsYtd, taxYear, isSpecialRequest);
+    const emailHtml = buildRequestW9EmailHtml(firstName, uploadUrl, paymentsYtd, isSpecialRequest);
 
     const emailSubjectPrefix = isSpecialRequest ? "Important: " : "";
     // Build recipient list
@@ -384,8 +379,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const emailSubject = isTestMode
-      ? `[TEST] ${emailSubjectPrefix}PeachHaus Group - W-9 Request for ${taxYear} Tax Filing`
-      : `${emailSubjectPrefix}PeachHaus Group - W-9 Request for ${taxYear} Tax Filing${isSpecialRequest ? ' (Temporary Housing Payments)' : ''}`;
+      ? `[TEST] ${emailSubjectPrefix}PeachHaus Group - W-9 Request for Tax Filing`
+      : `${emailSubjectPrefix}PeachHaus Group - W-9 Request for Tax Filing${isSpecialRequest ? ' (Temporary Housing Payments)' : ''}`;
 
     // Send email
     const emailResponse = await resend.emails.send({
@@ -404,7 +399,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Send SMS if phone exists and not test mode
     let smsSent = false;
     if (!isTestMode && owner.phone) {
-      const smsMessage = `Hi ${firstName}! PeachHaus needs your W-9 form for ${taxYear} tax filing.\n\n📤 Upload here: ${uploadUrl}\n\n⏰ Deadline: Dec 15th\n📞 Questions? Call (404) 800-5932\n\n- Ingo, PeachHaus`;
+      const smsMessage = `Hi ${firstName}! PeachHaus needs your W-9 form for tax filing.\n\n📤 Upload here: ${uploadUrl}\n\n⏰ Deadline: Dec 15th\n📞 Questions? Call (404) 800-5932\n\n- Ingo, PeachHaus`;
       smsSent = await sendSMS(owner.phone, smsMessage);
     }
 
@@ -415,14 +410,13 @@ const handler = async (req: Request): Promise<Response> => {
         communication_type: "email",
         direction: "outbound",
         subject: emailSubject,
-        body: `W-9 form requested for ${taxYear} tax filing${smsSent ? ' (SMS also sent)' : ''}`,
+        body: `W-9 form requested for tax filing${smsSent ? ' (SMS also sent)' : ''}`,
         recipient_email: owner.email,
         owner_id: ownerId,
         status: "sent",
         metadata: {
           email_type: "w9_request",
           message_id: emailResponse.data?.id,
-          tax_year: taxYear,
           upload_url: uploadUrl,
           sms_sent: smsSent,
         },
