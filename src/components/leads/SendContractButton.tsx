@@ -183,8 +183,10 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         throw new Error(signingResult?.error || "Failed to create signing session");
       }
 
-      // Update lead and advance stage
+      // Update lead and advance/reset stage to contract_out
       const { data: { user } } = await supabase.auth.getUser();
+      const previousStage = lead.stage;
+      const isReplacementContract = ["contract_signed", "ops_handoff", "photos_walkthrough"].includes(previousStage);
       
       await supabase
         .from("leads")
@@ -194,13 +196,15 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         })
         .eq("id", lead.id);
 
-      // Add timeline entry
+      // Add timeline entry with replacement info if applicable
       await supabase.from("lead_timeline").insert({
         lead_id: lead.id,
-        action: `Contract sent: ${template.name}`,
+        action: isReplacementContract 
+          ? `New contract sent (agreement change): ${template.name}` 
+          : `Contract sent: ${template.name}`,
         performed_by_user_id: user?.id,
         performed_by_name: user?.email,
-        previous_stage: lead.stage as any,
+        previous_stage: previousStage as any,
         new_stage: "contract_out" as any,
         metadata: {
           contract_type: template.contract_type,
@@ -208,6 +212,8 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
           document_id: signingResult.documentId,
           signing_url: signingResult.guestSigningUrl,
           pre_filled_fields: Object.keys(preFillData).length,
+          is_replacement: isReplacementContract,
+          previous_stage: previousStage,
         },
       });
 
@@ -225,9 +231,12 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
     },
   });
 
-  // Show button for most stages except completed ones
-  const hideForStages = ["contract_signed", "ops_handoff", "lost"];
+  // Only hide for terminal lost stage - allow new contracts at any other stage
+  const hideForStages = ["lost"];
   const showButton = !hideForStages.includes(lead.stage);
+  
+  // Late stages show "Send New Contract" to indicate this is a replacement/change
+  const isLateStage = ["contract_signed", "ops_handoff", "photos_walkthrough"].includes(lead.stage);
 
   if (!showButton) {
     return null;
@@ -252,20 +261,35 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        className="bg-primary/10 text-primary hover:bg-primary/20"
+        className={isLateStage 
+          ? "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/30" 
+          : "bg-primary/10 text-primary hover:bg-primary/20"}
       >
         <FileSignature className="h-4 w-4 mr-2" />
-        Send Contract
+        {isLateStage ? "Send New Contract" : "Send Contract"}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Send Contract to {lead.name}</DialogTitle>
+            <DialogTitle>
+              {isLateStage ? "Send New Contract" : "Send Contract"} to {lead.name}
+            </DialogTitle>
             <DialogDescription>
-              Select the contract template and confirm recipient details. Standard lease terms will be pre-filled automatically.
+              {isLateStage 
+                ? "This lead has previously signed a contract. The new contract will be tracked separately and the lead will return to 'Contract Out' stage."
+                : "Select the contract template and confirm recipient details. Standard lease terms will be pre-filled automatically."}
             </DialogDescription>
           </DialogHeader>
+          
+          {isLateStage && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm">
+              <p className="font-medium text-amber-700 dark:text-amber-400 mb-1">⚠️ Agreement Change</p>
+              <p className="text-amber-600 dark:text-amber-300">
+                This will send a new contract for signing. The previous agreement will remain in the timeline history.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
