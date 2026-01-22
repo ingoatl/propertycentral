@@ -29,6 +29,9 @@ function getCurrentESTHour(): number {
 // Max nudges per run to avoid rate limiting
 const MAX_NUDGES_PER_RUN = 10;
 
+// Delay between SMS sends (5 seconds for better deliverability)
+const SMS_DELAY_MS = 5000;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -55,9 +58,6 @@ serve(async (req) => {
     const currentESTHour = getCurrentESTHour();
     console.log(`=== Google Review Nudge Cron Started ===`);
     console.log(`Current EST hour: ${currentESTHour}`);
-    console.log(`This function runs on schedule - cron controls timing (1pm EST daily)`);
-
-    console.log("Starting Google Review nudge cron...");
 
     // Find requests that need nudging:
     // - Permission asked at least 48 hours ago
@@ -69,6 +69,7 @@ serve(async (req) => {
     twoDaysAgo.setHours(twoDaysAgo.getHours() - 48);
     const twoDaysAgoStr = twoDaysAgo.toISOString();
 
+    // DEDUPLICATION: Use raw SQL to get DISTINCT phones with proper priority
     const { data: needsNudge, error: fetchError } = await supabase
       .from("google_review_requests")
       .select("*, ownerrez_reviews(*)")
@@ -76,17 +77,55 @@ serve(async (req) => {
       .eq("opted_out", false)
       .lt("nudge_count", 2)
       .lt("permission_asked_at", twoDaysAgoStr)
-      .or(`last_nudge_at.is.null,last_nudge_at.lt.${twoDaysAgoStr}`);
+      .or(`last_nudge_at.is.null,last_nudge_at.lt.${twoDaysAgoStr}`)
+      .order("nudge_count", { ascending: true }) // Prioritize those never nudged
+      .order("permission_asked_at", { ascending: true }); // Then oldest first
 
     if (fetchError) {
       console.error("Error fetching nudge candidates:", fetchError);
       throw fetchError;
     }
 
-    console.log(`Found ${needsNudge?.length || 0} requests needing nudge`);
+    console.log(`Found ${needsNudge?.length || 0} total nudge candidates`);
+
+    // PHONE-BASED DEDUPLICATION: Only process one request per unique phone
+    const processedPhones = new Set<string>();
+    const deduplicatedRequests: typeof needsNudge = [];
+    
+    for (const request of needsNudge || []) {
+      const normalizedPhone = formatPhoneE164(request.guest_phone);
+      if (!processedPhones.has(normalizedPhone)) {
+        processedPhones.add(normalizedPhone);
+        deduplicatedRequests.push(request);
+      }
+    }
+
+    console.log(`After phone deduplication: ${deduplicatedRequests.length} unique phones to nudge`);
+
+    // Check for recent SMS to prevent rapid-fire duplicates
+    const oneDayAgo = new Date();
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+    
+    const { data: recentSms } = await supabase
+      .from("sms_log")
+      .select("phone_number")
+      .in("message_type", ["nudge", "final_reminder"])
+      .eq("status", "sent")
+      .gte("created_at", oneDayAgo.toISOString());
+    
+    const recentlyNudgedPhones = new Set(
+      (recentSms || []).map(s => formatPhoneE164(s.phone_number))
+    );
+    
+    // Filter out phones that were successfully nudged in the last 24 hours
+    const toNudge = deduplicatedRequests.filter(r => 
+      !recentlyNudgedPhones.has(formatPhoneE164(r.guest_phone))
+    );
+    
+    console.log(`After 24h dedup: ${toNudge.length} phones to nudge (skipped ${deduplicatedRequests.length - toNudge.length} recently nudged)`);
 
     let nudgesSent = 0;
-    const results: { requestId: string; success: boolean; error?: string }[] = [];
+    const results: { requestId: string; phone: string; success: boolean; error?: string }[] = [];
 
     // Helper to send SMS via GHL - creates contact if not found
     const sendNudgeSms = async (phone: string, message: string, guestName?: string): Promise<{ success: boolean; messageId?: string; error?: string }> => {
@@ -111,7 +150,7 @@ serve(async (req) => {
           ghlContactId = searchData.contact?.id;
         }
 
-        // If contact not found, create one (same as batch sender does)
+        // If contact not found, create one
         if (!ghlContactId) {
           console.log(`Contact not found for ${formattedPhone}, creating new GHL contact...`);
           const createResponse = await fetch(
@@ -178,15 +217,24 @@ serve(async (req) => {
       }
     };
 
-    for (const request of needsNudge || []) {
+    // Process nudges with rate limiting
+    const requestsToProcess = toNudge.slice(0, MAX_NUDGES_PER_RUN);
+    
+    for (let i = 0; i < requestsToProcess.length; i++) {
+      const request = requestsToProcess[i];
+      
       try {
         // Get guest name from ownerrez_reviews if available
         const guestName = request.ownerrez_reviews?.guest_name || "there";
+        const firstName = guestName.split(' ')[0];
         
+        // IMPROVED MESSAGES with host identity
         const nudgeMessage = request.nudge_count === 0
-          ? `Just checking in real quick — no pressure at all. Happy to send the Google link + your review text if you'd like. Just reply and I'll send it over.`
-          : `Just a friendly bump in case life got busy — if you're still open to it, here's the Google link again: ${googleReviewUrl}. We appreciate you!`;
+          ? `Hi ${firstName}! It's Ingo & Anja from PeachHaus Group, your Airbnb hosts. Just checking in real quick — no pressure at all. Happy to send the Google link + your review text if you'd like. Just reply and I'll send it over!`
+          : `Hey ${firstName}, it's Ingo & Anja again from PeachHaus Group! Just a friendly bump in case life got busy. If you're still open to sharing a quick Google review, here's the link: ${googleReviewUrl}. We'd really appreciate it!`;
 
+        console.log(`[${i + 1}/${requestsToProcess.length}] Sending nudge to ${request.guest_phone} (nudge_count: ${request.nudge_count})`);
+        
         const result = await sendNudgeSms(request.guest_phone, nudgeMessage, guestName);
 
         // Log the SMS
@@ -212,25 +260,36 @@ serve(async (req) => {
             .eq("id", request.id);
 
           nudgesSent++;
-          results.push({ requestId: request.id, success: true });
-          console.log(`Nudge sent to ${request.guest_phone}`);
+          results.push({ requestId: request.id, phone: request.guest_phone, success: true });
+          console.log(`✓ Nudge sent to ${request.guest_phone}`);
         } else {
-          results.push({ requestId: request.id, success: false, error: result.error });
-          console.log(`Nudge failed for ${request.guest_phone}: ${result.error}`);
+          results.push({ requestId: request.id, phone: request.guest_phone, success: false, error: result.error });
+          console.log(`✗ Nudge failed for ${request.guest_phone}: ${result.error}`);
         }
 
-        // Small delay between messages to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Delay between messages (5 seconds) for better deliverability
+        if (i < requestsToProcess.length - 1) {
+          console.log(`Waiting ${SMS_DELAY_MS / 1000}s before next SMS...`);
+          await new Promise(resolve => setTimeout(resolve, SMS_DELAY_MS));
+        }
       } catch (error) {
         console.error(`Error processing nudge for ${request.id}:`, error);
-        results.push({ requestId: request.id, success: false, error: String(error) });
+        results.push({ requestId: request.id, phone: request.guest_phone, success: false, error: String(error) });
       }
     }
 
-    console.log(`Nudge cron complete. Sent ${nudgesSent} nudges.`);
+    console.log(`=== Nudge cron complete. Sent ${nudgesSent}/${requestsToProcess.length} nudges ===`);
 
     return new Response(
-      JSON.stringify({ success: true, nudgesSent, total: needsNudge?.length || 0, results }),
+      JSON.stringify({ 
+        success: true, 
+        nudgesSent, 
+        total: toNudge.length,
+        processed: requestsToProcess.length,
+        skippedDuplicates: (needsNudge?.length || 0) - deduplicatedRequests.length,
+        skippedRecentlyNudged: deduplicatedRequests.length - toNudge.length,
+        results 
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
