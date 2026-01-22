@@ -1317,6 +1317,13 @@ serve(async (req) => {
         directEmailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
         // No admin copy - admin gets notified when lead actually books
         console.log(`Sending direct inspection scheduling email for stage ${newStage}`);
+      } else if (newStage === 'photos_walkthrough') {
+        // PHOTOS_WALKTHROUGH: Send professional photography booking email
+        directEmailHtml = buildPhotosWalkthroughEmailHtml(recipientFirstName, newStage);
+        directEmailSubject = "Book Your Professional Property Photos - PeachHaus";
+        sendAdminCopy = true;
+        adminEmailSubject = `📸 Photo Booking Email Sent: ${lead.name}`;
+        console.log(`Sending direct photos/walkthrough email for stage ${newStage}`);
       } else if (newStage === 'contract_signed') {
         // CONTRACT_SIGNED: Send welcome onboarding email FIRST (W9 and payment setup come later)
         directEmailHtml = buildWelcomeOnboardingEmailHtml(recipientFirstName, lead.property_address || "");
@@ -1433,7 +1440,7 @@ serve(async (req) => {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              from: "Ingo Schaer | PeachHaus <ingo@peachhausgroup.com>",
+              from: "PeachHaus Property Management <info@peachhausgroup.com>",
               reply_to: "info@peachhausgroup.com",
               to: [lead.email],
               subject: directEmailSubject,
