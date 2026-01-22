@@ -11121,6 +11121,7 @@ export type Database = {
         | "onboarding_form_requested"
         | "insurance_requested"
         | "inspection_scheduled"
+        | "photos_walkthrough"
         | "ops_handoff"
       message_sender_type: "owner" | "pm" | "vendor" | "guest" | "ai" | "system"
       property_type: "Client-Managed" | "Company-Owned" | "Inactive"
@@ -11295,6 +11296,7 @@ export const Constants = {
         "onboarding_form_requested",
         "insurance_requested",
         "inspection_scheduled",
+        "photos_walkthrough",
         "ops_handoff",
       ],
       message_sender_type: ["owner", "pm", "vendor", "guest", "ai", "system"],
