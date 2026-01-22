@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, Clock, User, Mail, Phone, MessageSquare, ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Calendar, Clock, ArrowRight, Check, ChevronLeft, ChevronRight, Loader2, Building2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isBefore, startOfDay, parseISO, addMinutes } from "date-fns";
-import { toZonedTime, formatInTimeZone } from "date-fns-tz";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isBefore, startOfDay, parseISO } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 const EST_TIMEZONE = 'America/New_York';
 
@@ -31,6 +31,12 @@ interface FormData {
   topicDetails: string;
 }
 
+interface PropertyInfo {
+  id: string;
+  name: string;
+  address: string;
+}
+
 export default function BookOwnerCall() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
@@ -40,6 +46,7 @@ export default function BookOwnerCall() {
     topic: "",
     topicDetails: "",
   });
+  const [propertyInfo, setPropertyInfo] = useState<PropertyInfo | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -47,6 +54,7 @@ export default function BookOwnerCall() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isLoadingProperty, setIsLoadingProperty] = useState(false);
 
   // Pre-fill from URL params (magic link support)
   useEffect(() => {
@@ -54,16 +62,85 @@ export default function BookOwnerCall() {
     const email = params.get("email");
     const name = params.get("name");
     const phone = params.get("phone");
+    const propertyId = params.get("propertyId");
+    const topic = params.get("topic");
     
-    if (email || name || phone) {
+    if (email || name || phone || topic) {
       setFormData(prev => ({
         ...prev,
         email: email || prev.email,
         name: name || prev.name,
         phone: phone || prev.phone,
+        topic: topic || prev.topic,
       }));
     }
+
+    // Fetch owner info to get property
+    if (email) {
+      fetchOwnerProperty(email, propertyId || undefined);
+    } else if (propertyId) {
+      fetchPropertyById(propertyId);
+    }
   }, []);
+
+  const fetchOwnerProperty = async (email: string, propertyId?: string) => {
+    setIsLoadingProperty(true);
+    try {
+      // First try to find owner by email
+      const { data: owner } = await supabase
+        .from('property_owners')
+        .select('id, name')
+        .ilike('email', email)
+        .maybeSingle();
+
+      if (owner) {
+        // Get owner's properties
+        const { data: properties } = await supabase
+          .from('properties')
+          .select('id, name, address')
+          .eq('owner_id', owner.id)
+          .limit(1);
+
+        if (properties && properties.length > 0) {
+          const prop = propertyId 
+            ? properties.find(p => p.id === propertyId) || properties[0]
+            : properties[0];
+          setPropertyInfo({
+            id: prop.id,
+            name: prop.name,
+            address: prop.address || '',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching owner property:', error);
+    } finally {
+      setIsLoadingProperty(false);
+    }
+  };
+
+  const fetchPropertyById = async (propertyId: string) => {
+    setIsLoadingProperty(true);
+    try {
+      const { data: prop } = await supabase
+        .from('properties')
+        .select('id, name, address')
+        .eq('id', propertyId)
+        .maybeSingle();
+
+      if (prop) {
+        setPropertyInfo({
+          id: prop.id,
+          name: prop.name,
+          address: prop.address || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching property:', error);
+    } finally {
+      setIsLoadingProperty(false);
+    }
+  };
 
   const fetchAvailableSlots = useCallback(async () => {
     if (!selectedDate) return;
@@ -103,7 +180,6 @@ export default function BookOwnerCall() {
 
   const isDateAvailable = (date: Date) => {
     const dayOfWeek = date.getDay();
-    // Owner calls: Mon-Fri only
     if (dayOfWeek === 0 || dayOfWeek === 6) return false;
     if (isBefore(startOfDay(date), startOfDay(new Date()))) return false;
     return true;
@@ -125,6 +201,7 @@ export default function BookOwnerCall() {
           topic: formData.topic,
           topicDetails: formData.topicDetails,
           scheduledAt: selectedTime,
+          propertyId: propertyInfo?.id,
         }
       });
 
@@ -154,8 +231,8 @@ export default function BookOwnerCall() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-background to-purple-50/30 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center">
+      <div className="min-h-screen bg-gradient-to-br from-secondary via-background to-accent/30 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center shadow-lg border-primary/10">
           <CardContent className="pt-8 pb-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="h-8 w-8 text-green-600" />
@@ -165,10 +242,13 @@ export default function BookOwnerCall() {
               Your owner call has been booked. You'll receive a confirmation email shortly with the meeting details.
             </p>
             {selectedTime && (
-              <div className="bg-muted/50 rounded-lg p-4 text-sm">
-                <p className="font-medium">{formatInTimeZone(parseISO(selectedTime), EST_TIMEZONE, "EEEE, MMMM d, yyyy")}</p>
+              <div className="bg-secondary rounded-xl p-4 text-sm">
+                <p className="font-semibold text-foreground">{formatInTimeZone(parseISO(selectedTime), EST_TIMEZONE, "EEEE, MMMM d, yyyy")}</p>
                 <p className="text-muted-foreground">{formatTimeSlot(selectedTime)} EST</p>
                 <p className="text-muted-foreground mt-2">Topic: {CALL_TOPICS.find(t => t.value === formData.topic)?.label}</p>
+                {propertyInfo && (
+                  <p className="text-primary font-medium mt-2">{propertyInfo.name}</p>
+                )}
               </div>
             )}
           </CardContent>
@@ -178,34 +258,34 @@ export default function BookOwnerCall() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-background to-purple-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-secondary via-background to-accent/30">
       {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-              <Calendar className="h-5 w-5 text-white" />
+      <div className="bg-card border-b border-border/50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-md">
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">PeachHaus Owner Call</h1>
-              <p className="text-sm text-muted-foreground">Schedule a call with your property manager</p>
+              <h1 className="text-lg sm:text-xl font-bold text-foreground">PeachHaus Owner Call</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">Schedule a call with your property manager</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Progress Steps */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-center gap-4 mb-8">
-          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-purple-600' : 'text-muted-foreground'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 1 ? 'bg-purple-600 text-white' : 'bg-muted'}`}>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <div className="flex items-center justify-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${step >= 1 ? 'bg-primary text-primary-foreground shadow-md' : 'bg-muted'}`}>
               {step > 1 ? <Check className="h-4 w-4" /> : "1"}
             </div>
             <span className="text-sm font-medium hidden sm:inline">Your Info</span>
           </div>
-          <div className="w-12 h-px bg-border" />
-          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-purple-600' : 'text-muted-foreground'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 2 ? 'bg-purple-600 text-white' : 'bg-muted'}`}>
+          <div className="w-8 sm:w-12 h-0.5 bg-border rounded-full" />
+          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${step >= 2 ? 'bg-primary text-primary-foreground shadow-md' : 'bg-muted'}`}>
               2
             </div>
             <span className="text-sm font-medium hidden sm:inline">Schedule</span>
@@ -214,65 +294,95 @@ export default function BookOwnerCall() {
 
         {/* Step 1: Contact Info & Topic */}
         {step === 1 && (
-          <Card className="max-w-xl mx-auto">
-            <CardHeader>
-              <CardTitle>Your Information</CardTitle>
-              <CardDescription>Tell us about yourself and what you'd like to discuss</CardDescription>
+          <Card className="max-w-xl mx-auto shadow-lg border-primary/10">
+            {/* Property Card - Show if we have property info */}
+            {propertyInfo && (
+              <div className="border-b border-border/50">
+                <div className="p-4 sm:p-6">
+                  <div className="flex gap-4">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="h-7 w-7 sm:h-8 sm:w-8 text-primary/60" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-primary font-medium uppercase tracking-wide mb-1">Your Property</p>
+                      <h3 className="font-semibold text-foreground text-base sm:text-lg truncate">{propertyInfo.name}</h3>
+                      {propertyInfo.address && (
+                        <div className="flex items-start gap-1.5 mt-1.5 text-muted-foreground">
+                          <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                          <span className="text-xs sm:text-sm leading-tight">{propertyInfo.address}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isLoadingProperty && (
+              <div className="border-b border-border/50 p-4 sm:p-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-20 h-20 rounded-xl bg-muted animate-pulse" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+                    <div className="h-5 w-40 bg-muted animate-pulse rounded" />
+                    <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <CardHeader className="pb-2 sm:pb-4">
+              <CardTitle className="text-lg sm:text-xl">Your Information</CardTitle>
+              <CardDescription className="text-sm">Tell us about yourself and what you'd like to discuss</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 sm:space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    placeholder="John Smith"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    className="pl-10"
-                  />
-                </div>
+                <Label htmlFor="name" className="text-sm font-medium">Full Name <span className="text-destructive">*</span></Label>
+                <Input
+                  id="name"
+                  placeholder="John Smith"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="h-11 sm:h-12 text-base"
+                  autoComplete="name"
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="john@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className="pl-10"
-                  />
-                </div>
+                <Label htmlFor="email" className="text-sm font-medium">Email Address <span className="text-destructive">*</span></Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="john@example.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="h-11 sm:h-12 text-base"
+                  autoComplete="email"
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number (optional)</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="(404) 555-1234"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    className="pl-10"
-                  />
-                </div>
+                <Label htmlFor="phone" className="text-sm font-medium">Phone Number <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="(404) 555-1234"
+                  value={formData.phone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  className="h-11 sm:h-12 text-base"
+                  autoComplete="tel"
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="topic">What would you like to discuss? *</Label>
+                <Label htmlFor="topic" className="text-sm font-medium">What would you like to discuss? <span className="text-destructive">*</span></Label>
                 <Select value={formData.topic} onValueChange={(value) => setFormData(prev => ({ ...prev, topic: value }))}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11 sm:h-12 text-base">
                     <SelectValue placeholder="Select a topic" />
                   </SelectTrigger>
                   <SelectContent>
                     {CALL_TOPICS.map((topic) => (
-                      <SelectItem key={topic.value} value={topic.value}>
+                      <SelectItem key={topic.value} value={topic.value} className="text-base">
                         {topic.label}
                       </SelectItem>
                     ))}
@@ -282,9 +392,9 @@ export default function BookOwnerCall() {
 
               {formData.topic && (
                 <div className="space-y-2">
-                  <Label htmlFor="topicDetails">
-                    <MessageSquare className="inline h-4 w-4 mr-1" />
-                    {formData.topic === "other" ? "Please describe your topic *" : "Any additional details? (optional)"}
+                  <Label htmlFor="topicDetails" className="text-sm font-medium">
+                    {formData.topic === "other" ? "Please describe your topic *" : "Any additional details?"} 
+                    {formData.topic !== "other" && <span className="text-muted-foreground text-xs ml-1">(optional)</span>}
                   </Label>
                   <Textarea
                     id="topicDetails"
@@ -292,6 +402,7 @@ export default function BookOwnerCall() {
                     value={formData.topicDetails}
                     onChange={(e) => setFormData(prev => ({ ...prev, topicDetails: e.target.value }))}
                     rows={3}
+                    className="text-base resize-none"
                   />
                 </div>
               )}
@@ -299,10 +410,10 @@ export default function BookOwnerCall() {
               <Button 
                 onClick={() => setStep(2)} 
                 disabled={!isStep1Valid || (formData.topic === "other" && !formData.topicDetails)}
-                className="w-full bg-purple-600 hover:bg-purple-700"
+                className="w-full h-12 sm:h-14 text-base font-semibold bg-primary hover:bg-primary/90 shadow-md"
               >
                 Continue to Scheduling
-                <ArrowRight className="h-4 w-4 ml-2" />
+                <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" />
               </Button>
             </CardContent>
           </Card>
@@ -310,20 +421,20 @@ export default function BookOwnerCall() {
 
         {/* Step 2: Calendar */}
         {step === 2 && (
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 max-w-4xl mx-auto">
             {/* Calendar */}
-            <Card>
+            <Card className="shadow-lg border-primary/10">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Select a Date</CardTitle>
+                  <CardTitle className="text-base sm:text-lg">Select a Date</CardTitle>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <span className="text-sm font-medium w-32 text-center">
+                    <span className="text-xs sm:text-sm font-medium w-28 sm:w-32 text-center">
                       {format(currentMonth, "MMMM yyyy")}
                     </span>
-                    <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
@@ -331,8 +442,8 @@ export default function BookOwnerCall() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                    <div key={day} className="text-xs font-medium text-muted-foreground py-2">
+                  {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
+                    <div key={`${day}-${i}`} className="text-xs font-medium text-muted-foreground py-2">
                       {day}
                     </div>
                   ))}
@@ -340,7 +451,7 @@ export default function BookOwnerCall() {
                 <div className="grid grid-cols-7 gap-1">
                   {generateCalendarDays().map((day, index) => {
                     if (!day) {
-                      return <div key={`empty-${index}`} className="h-10" />;
+                      return <div key={`empty-${index}`} className="h-9 sm:h-10" />;
                     }
                     
                     const available = isDateAvailable(day);
@@ -353,10 +464,10 @@ export default function BookOwnerCall() {
                         onClick={() => available && setSelectedDate(day)}
                         disabled={!available}
                         className={`
-                          h-10 rounded-lg text-sm font-medium transition-colors
-                          ${!available ? 'text-muted-foreground/40 cursor-not-allowed' : 'hover:bg-purple-100'}
-                          ${selected ? 'bg-purple-600 text-white hover:bg-purple-700' : ''}
-                          ${today && !selected ? 'ring-1 ring-purple-400' : ''}
+                          h-9 sm:h-10 rounded-lg text-sm font-medium transition-all touch-target-lg
+                          ${!available ? 'text-muted-foreground/30 cursor-not-allowed' : 'hover:bg-primary/10 active:scale-95'}
+                          ${selected ? 'bg-primary text-primary-foreground shadow-md hover:bg-primary/90' : ''}
+                          ${today && !selected ? 'ring-2 ring-primary/40' : ''}
                         `}
                       >
                         {format(day, "d")}
@@ -371,38 +482,45 @@ export default function BookOwnerCall() {
             </Card>
 
             {/* Time Slots */}
-            <Card>
+            <Card className="shadow-lg border-primary/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "EEEE, MMM d") : "Select a date first"}
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  {selectedDate ? format(selectedDate, "EEE, MMM d") : "Select a date first"}
                 </CardTitle>
-                <CardDescription>All times shown in EST</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">All times shown in EST</CardDescription>
               </CardHeader>
               <CardContent>
                 {!selectedDate ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    Please select a date to see available times
-                  </p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Please select a date to see available times
+                    </p>
+                  </div>
                 ) : isLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
                   </div>
                 ) : availableSlots.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    No available times for this date. Please try another day.
-                  </p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <p className="text-muted-foreground text-sm">
+                      No available times for this date. Please try another day.
+                    </p>
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-2 max-h-[280px] sm:max-h-[300px] overflow-y-auto scrollbar-hide">
                     {availableSlots.map((slot) => (
                       <button
                         key={slot}
                         onClick={() => setSelectedTime(slot)}
                         className={`
-                          px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                          px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm font-medium transition-all touch-target-lg active:scale-95
                           ${selectedTime === slot 
-                            ? 'bg-purple-600 text-white' 
-                            : 'bg-muted hover:bg-purple-100'}
+                            ? 'bg-primary text-primary-foreground shadow-md' 
+                            : 'bg-muted hover:bg-primary/10'}
                         `}
                       >
                         {formatTimeSlot(slot)}
@@ -413,27 +531,31 @@ export default function BookOwnerCall() {
 
                 {/* Summary */}
                 {selectedTime && (
-                  <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-100">
-                    <p className="text-sm font-medium text-purple-900">Your Selection:</p>
-                    <p className="text-sm text-purple-700">
+                  <div className="mt-4 p-3 sm:p-4 bg-secondary rounded-xl border border-primary/10">
+                    <p className="text-sm font-semibold text-foreground">Your Selection:</p>
+                    <p className="text-sm text-muted-foreground">
                       {formatInTimeZone(parseISO(selectedTime), EST_TIMEZONE, "EEEE, MMMM d 'at' h:mm a")} EST
                     </p>
-                    <p className="text-xs text-purple-600 mt-1">30-minute call</p>
+                    <p className="text-xs text-primary font-medium mt-1">30-minute call</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Navigation */}
-            <div className="md:col-span-2 flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
+            {/* Navigation & Submit */}
+            <div className="sm:col-span-2 flex flex-col sm:flex-row gap-3 sm:justify-between mt-2 sm:mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setStep(1)}
+                className="h-12 sm:h-11 order-2 sm:order-1"
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
               <Button 
-                onClick={handleSubmit}
+                onClick={handleSubmit} 
                 disabled={!isStep2Valid || isSubmitting}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="h-12 sm:h-11 bg-primary hover:bg-primary/90 shadow-md order-1 sm:order-2"
               >
                 {isSubmitting ? (
                   <>
@@ -442,8 +564,8 @@ export default function BookOwnerCall() {
                   </>
                 ) : (
                   <>
-                    <Check className="h-4 w-4 mr-2" />
                     Confirm Booking
+                    <Check className="h-4 w-4 ml-2" />
                   </>
                 )}
               </Button>
