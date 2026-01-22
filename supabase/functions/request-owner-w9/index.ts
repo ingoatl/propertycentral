@@ -20,8 +20,10 @@ const INGO_HEADSHOT_URL = `${supabaseUrl}/storage/v1/object/public/property-imag
 // IRS W-9 fillable PDF URL
 const IRS_W9_URL = "https://www.irs.gov/pub/irs-pdf/fw9.pdf";
 
-// Owner portal base URL
-const OWNER_PORTAL_URL = "https://propertycentral.lovable.app/owner";
+// Owner portal base URL - use the published URL for production access
+const APP_BASE_URL = Deno.env.get("SUPABASE_URL")?.includes("ijsxcaaqphaciaenlegl") 
+  ? "https://propertycentral.lovable.app" 
+  : "https://id-preview--9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovable.app";
 
 interface RequestW9EmailRequest {
   ownerId: string;
@@ -361,7 +363,7 @@ const handler = async (req: Request): Promise<Response> => {
       created_at: new Date().toISOString(),
     }, { onConflict: 'owner_id' });
 
-    const uploadUrl = `${OWNER_PORTAL_URL}/w9-upload?token=${uploadToken}`;
+    const uploadUrl = `${APP_BASE_URL}/owner/w9-upload?token=${uploadToken}`;
     const firstName = owner.name.split(" ")[0];
     const taxYear = new Date().getFullYear();
     const paymentsYtd = owner.payments_ytd || 0;
