@@ -50,6 +50,7 @@ import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfBut
 import { OwnerMessagesTab } from "./components/OwnerMessagesTab";
 import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
 import { OwnerGuestScreeningsTab } from "./components/OwnerGuestScreeningsTab";
+import { OwnerUpcomingCalls } from "./components/OwnerUpcomingCalls";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
@@ -924,6 +925,9 @@ export default function OwnerDashboard() {
 
           <TabsContent value="overview">
             <div className="space-y-8">
+              {/* Upcoming Calls */}
+              <OwnerUpcomingCalls ownerEmail={session.email} ownerName={session.ownerName} />
+
               {/* Performance Overview */}
               <OwnerPerformanceOverview 
                 metrics={performanceMetrics}

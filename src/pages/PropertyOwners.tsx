@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare, Eye, FileText, CheckCircle, Users } from "lucide-react";
+import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare, Eye, FileText, CheckCircle, Users, Calendar } from "lucide-react";
 import { z } from "zod";
 import { AddPaymentMethod } from "@/components/AddPaymentMethod";
 import { SendOwnerPaymentRequestButton } from "@/components/owners/SendOwnerPaymentRequestButton";
+import { OwnerMagicLinkButton } from "@/components/owners/OwnerMagicLinkButton";
 import {
   Dialog,
   DialogContent,
@@ -734,6 +735,13 @@ const PropertyOwners = () => {
                           )}
                           Invite to Portal
                         </Button>
+
+                        {/* Magic Link for Scheduling */}
+                        <OwnerMagicLinkButton
+                          ownerName={owner.name}
+                          ownerEmail={owner.email}
+                          ownerPhone={owner.phone}
+                        />
 
                         {/* Actions Dropdown */}
                         <DropdownMenu>
