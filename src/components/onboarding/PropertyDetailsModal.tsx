@@ -1130,8 +1130,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
 
                 {/* Mapped Data from Documents - Show completed tasks with values */}
                 {(() => {
+                  // Show all tasks that have values - don't require completed status
                   const mappedTasks = tasks.filter(t => 
-                    t.status === 'completed' && 
                     t.field_value && 
                     t.field_value.trim() !== '' &&
                     // Exclude listing URLs as they're shown above
