@@ -36,6 +36,7 @@ import {
   Copy,
   ExternalLink,
   Building2,
+  Check,
 } from "lucide-react";
 import {
   format,
@@ -66,6 +67,8 @@ interface OwnerCall {
   contact_email: string;
   contact_phone: string | null;
   google_meet_link: string | null;
+  google_calendar_event_id: string | null;
+  meeting_type: string | null;
   meeting_notes: string | null;
   owner_id: string | null;
   property_owners?: {
@@ -112,7 +115,20 @@ export function OwnerCallsCalendar() {
       const { data, error } = await supabase
         .from("owner_calls")
         .select(`
-          *,
+          id,
+          scheduled_at,
+          duration_minutes,
+          status,
+          topic,
+          topic_details,
+          contact_name,
+          contact_email,
+          contact_phone,
+          google_meet_link,
+          google_calendar_event_id,
+          meeting_type,
+          meeting_notes,
+          owner_id,
           property_owners (name, email)
         `)
         .gte("scheduled_at", monthStart.toISOString())
@@ -243,8 +259,15 @@ export function OwnerCallsCalendar() {
                       {formatInESTWithLabel(new Date(call.scheduled_at), "MMM d, h:mm a")}
                     </div>
                     <div className="flex items-center gap-1">
-                      <User className="h-3 w-3 text-purple-600" />
-                      Owner Call
+                      {call.meeting_type === 'phone' ? (
+                        <Phone className="h-3 w-3 text-amber-600" />
+                      ) : (
+                        <Video className="h-3 w-3 text-purple-600" />
+                      )}
+                      {call.meeting_type === 'phone' ? 'Phone Call' : 'Video Call'}
+                      {call.google_calendar_event_id && (
+                        <span className="ml-1 text-green-600">✓</span>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -329,6 +352,20 @@ export function OwnerCallsCalendar() {
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   {selectedCall.duration_minutes} minutes
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedCall.meeting_type === 'phone' ? (
+                    <Phone className="h-4 w-4 text-amber-600" />
+                  ) : (
+                    <Video className="h-4 w-4 text-purple-600" />
+                  )}
+                  <span>{selectedCall.meeting_type === 'phone' ? 'Phone Call' : 'Video Call'}</span>
+                  {selectedCall.google_calendar_event_id && (
+                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                      <Check className="h-3 w-3 mr-1" />
+                      In Calendar
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />

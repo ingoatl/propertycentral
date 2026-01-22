@@ -907,7 +907,7 @@ serve(async (req) => {
         }
       );
 
-      console.log("MCP create-event-direct result:", JSON.stringify(result).substring(0, 1000));
+      console.log("MCP create-event-direct result:", JSON.stringify(result).substring(0, 2000));
 
       // Extract event ID and meet link from result
       let eventId = `mcp-event-${Date.now()}`;
@@ -915,23 +915,31 @@ serve(async (req) => {
       
       try {
         const content = result?.result?.content?.[0]?.text || result?.content?.[0]?.text;
+        console.log("MCP content text:", content?.substring(0, 1500));
+        
         if (content) {
           try {
             const parsed = JSON.parse(content);
+            console.log("Parsed event data keys:", Object.keys(parsed));
             eventId = parsed.id || parsed.eventId || eventId;
-            // Extract Google Meet link
+            // Extract Google Meet link from various possible locations
             meetLink = parsed.hangoutLink || 
                       parsed.conferenceData?.entryPoints?.[0]?.uri ||
                       parsed.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri ||
                       null;
+            
+            // Also try htmlLink for calendar link
+            if (!meetLink && parsed.htmlLink) {
+              console.log("Calendar event link:", parsed.htmlLink);
+            }
           } catch {
             // Not JSON, check if it contains an event ID pattern
             const idMatch = content.match(/[a-z0-9]{26}/);
             if (idMatch) {
               eventId = idMatch[0];
             }
-            // Try to find meet link in text
-            const meetMatch = content.match(/https:\/\/meet\.google\.com\/[a-z-]+/);
+            // Try to find meet link in text - broader regex
+            const meetMatch = content.match(/https:\/\/meet\.google\.com\/[a-z]+-[a-z]+-[a-z]+/i);
             if (meetMatch) {
               meetLink = meetMatch[0];
             }

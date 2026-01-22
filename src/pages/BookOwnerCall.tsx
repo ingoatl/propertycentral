@@ -72,7 +72,7 @@ export default function BookOwnerCall() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isLoadingProperty, setIsLoadingProperty] = useState(false);
   const [imageError, setImageError] = useState(false);
-
+  const [googleMeetLink, setGoogleMeetLink] = useState<string | null>(null);
   // Pre-fill from URL params (magic link support)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -235,6 +235,11 @@ export default function BookOwnerCall() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
+      // Store the Google Meet link if returned
+      if (data?.googleMeetLink) {
+        setGoogleMeetLink(data.googleMeetLink);
+      }
+
       setIsSuccess(true);
       toast.success("Call scheduled successfully!");
     } catch (error: any) {
@@ -290,15 +295,29 @@ export default function BookOwnerCall() {
                       <Phone className="h-5 w-5 text-primary" />
                     )}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="font-semibold text-foreground">
                       {formData.meetingType === 'video' ? 'Video Call' : 'Phone Call'}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {formData.meetingType === 'video' ? 'Google Meet link in email' : `We'll call ${formData.phone}`}
+                      {formData.meetingType === 'video' 
+                        ? (googleMeetLink ? 'Click below to join' : 'Google Meet link in email') 
+                        : `We'll call ${formData.phone}`}
                     </p>
                   </div>
                 </div>
+                {/* Join Video Call Button */}
+                {formData.meetingType === 'video' && googleMeetLink && (
+                  <a
+                    href={googleMeetLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold transition-colors shadow-lg"
+                  >
+                    <Video className="h-5 w-5" />
+                    Join Video Call
+                  </a>
+                )}
                 {propertyInfo && (
                   <div className="flex items-center gap-3 pt-2 border-t border-border/50">
                     <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">

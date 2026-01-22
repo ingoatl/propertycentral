@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const CALENDAR_SYNC_USER_ID = Deno.env.get('CALENDAR_SYNC_USER_ID');
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -77,19 +79,22 @@ serve(async (req) => {
 
     console.log('Owner call created:', ownerCall.id, 'Meeting type:', meetingType);
 
-    // Create Google Calendar event (only add Meet link for video calls)
-    let calendarResult = null;
-    try {
-      const topicLabels: Record<string, string> = {
-        monthly_statement: "Monthly Statement Questions",
-        maintenance: "Maintenance & Repairs",
-        guest_concerns: "Guest Concerns",
-        pricing: "Pricing Discussion",
-        general_checkin: "General Check-in",
-        property_update: "Property Updates",
-        other: "Other"
-      };
+    // Topic labels for calendar event
+    const topicLabels: Record<string, string> = {
+      monthly_statement: "Monthly Statement Questions",
+      maintenance: "Maintenance & Repairs",
+      guest_concerns: "Guest Concerns",
+      pricing: "Pricing Discussion",
+      general_checkin: "General Check-in",
+      property_update: "Property Updates",
+      other: "Other"
+    };
 
+    // Create Google Calendar event using google-calendar-sync
+    let calendarEventId: string | null = null;
+    let googleMeetLink: string | null = null;
+    
+    try {
       const isVideoCall = meetingType !== 'phone';
       const eventTitle = `Owner Call: ${name}${existingOwner ? '' : ' (New)'}${isVideoCall ? '' : ' 📞'}`;
       const eventDescription = `
@@ -104,38 +109,55 @@ ${propertyInfo ? `\n🏠 Property: ${propertyInfo.name}\n📍 Address: ${propert
 ${existingOwner ? `\n✅ Existing Owner ID: ${existingOwner.id}` : '\n⚠️ Owner not found in system - may be a new inquiry'}
       `.trim();
 
-      const { data: calResult } = await supabase.functions.invoke('sync-calendar-event', {
-        body: {
-          action: 'create',
-          event: {
+      const startTime = new Date(scheduledAt);
+      const endTime = new Date(startTime.getTime() + 30 * 60000); // 30 minutes
+
+      // Use the admin user ID for calendar sync
+      if (CALENDAR_SYNC_USER_ID) {
+        console.log('Creating calendar event via google-calendar-sync...');
+        
+        const { data: calResult, error: calError } = await supabase.functions.invoke('google-calendar-sync', {
+          body: {
+            action: 'create-event-direct',
+            userId: CALENDAR_SYNC_USER_ID,
             summary: eventTitle,
             description: eventDescription,
-            start: scheduledAt,
-            durationMinutes: 30,
-            attendees: [{ email }],
-            colorId: '3', // Purple for owner calls
-            addMeetLink: isVideoCall, // Only add Meet link for video calls
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            attendeeEmail: email,
+            addConferenceData: isVideoCall, // Only add Meet link for video calls
+          }
+        });
+
+        if (calError) {
+          console.error('Calendar sync error:', calError);
+        } else if (calResult) {
+          console.log('Calendar sync result:', JSON.stringify(calResult));
+          calendarEventId = calResult.eventId || null;
+          googleMeetLink = calResult.meetLink || null;
+          
+          // Update the owner call with the calendar event ID and meet link
+          if (calendarEventId || googleMeetLink) {
+            await supabase
+              .from('owner_calls')
+              .update({
+                google_calendar_event_id: calendarEventId,
+                google_meet_link: isVideoCall ? googleMeetLink : null
+              })
+              .eq('id', ownerCall.id);
+            
+            console.log('Updated owner call with calendar event ID:', calendarEventId, 'Meet link:', googleMeetLink);
           }
         }
-      });
-      calendarResult = calResult;
-
-      if (calendarResult?.eventId) {
-        // Update the owner call with the calendar event ID
-        await supabase
-          .from('owner_calls')
-          .update({
-            google_calendar_event_id: calendarResult.eventId,
-            google_meet_link: isVideoCall ? (calendarResult.meetLink || null) : null
-          })
-          .eq('id', ownerCall.id);
+      } else {
+        console.warn('CALENDAR_SYNC_USER_ID not configured - skipping calendar sync');
       }
     } catch (calendarError) {
       console.error('Failed to create calendar event:', calendarError);
       // Don't fail the booking if calendar sync fails
     }
 
-    // Trigger notification function
+    // Trigger notification function (it will fetch the updated record with meet link)
     try {
       await supabase.functions.invoke('owner-call-notifications', {
         body: {
@@ -154,7 +176,8 @@ ${existingOwner ? `\n✅ Existing Owner ID: ${existingOwner.id}` : '\n⚠️ Own
         ownerCallId: ownerCall.id,
         isExistingOwner: !!existingOwner,
         meetingType: meetingType || 'video',
-        googleMeetLink: calendarResult?.meetLink || null
+        googleMeetLink: googleMeetLink,
+        calendarEventId: calendarEventId,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
