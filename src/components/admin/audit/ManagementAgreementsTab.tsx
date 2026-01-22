@@ -120,6 +120,20 @@ export function ManagementAgreementsTab() {
   };
 
   const handleAddAgreement = async () => {
+    // Validate required fields
+    if (!newAgreement.property_id) {
+      toast({ title: "Error", description: "Property is required", variant: "destructive" });
+      return;
+    }
+    if (!newAgreement.owner_id) {
+      toast({ title: "Error", description: "Owner is required", variant: "destructive" });
+      return;
+    }
+    if (!newAgreement.effective_date) {
+      toast({ title: "Error", description: "Effective date is required", variant: "destructive" });
+      return;
+    }
+
     try {
       const { error } = await supabase.from("management_agreements").insert({
         ...newAgreement,
@@ -283,11 +297,12 @@ export function ManagementAgreementsTab() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Effective Date</Label>
+                  <Label>Effective Date <span className="text-destructive">*</span></Label>
                   <Input
                     type="date"
                     value={newAgreement.effective_date}
                     onChange={(e) => setNewAgreement({ ...newAgreement, effective_date: e.target.value })}
+                    required
                   />
                 </div>
               </div>

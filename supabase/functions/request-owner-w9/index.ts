@@ -163,27 +163,28 @@ function buildRequestW9EmailHtml(
                 </td>
               </tr>
 
+              ${specialIntro}
+
               <!-- Intro Text -->
               <tr>
-                <td style="padding: 0 32px 16px 32px;">
-                  <div style="font-size: 14px; color: #374151; line-height: 1.7;">
-                    As your property management partner, we need your completed W-9 form to issue your 1099 for tax reporting. This is required by the IRS for all property owners receiving rental income through our management services.
-                  </div>
-                </td>
-              </tr>
-                  </div>
+                <td style="padding: 0 32px 24px 32px;">
+                  ${whySection}
                 </td>
               </tr>
 
               <!-- Why This Matters Card -->
               <tr>
                 <td style="padding: 0 32px 24px 32px;">
-                  <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px; padding: 20px 24px;">
-                    <div style="font-size: 12px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">📋 Why We Need Your W-9</div>
-                    <div style="font-size: 14px; color: #166534; line-height: 1.6;">
-                      PeachHaus manages your rental property and remits your rental income to you. The IRS requires us to issue you a <strong>1099-MISC</strong> documenting these payments. Your W-9 provides us with the tax identification information we need to prepare this form accurately.
-                    </div>
-                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <div style="font-size: 12px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">📋 Why We Need Your W-9</div>
+                        <div style="font-size: 14px; color: #166534; line-height: 1.6;">
+                          PeachHaus manages your rental property and remits your rental income to you. The IRS requires us to issue you a <strong>1099-MISC</strong> documenting these payments. Your W-9 provides us with the tax identification information we need to prepare this form accurately.
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
                 </td>
               </tr>
 
@@ -195,61 +196,85 @@ function buildRequestW9EmailHtml(
                   </div>
                   
                   <!-- Option 1: IRS Website -->
-                  <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
-                    <div style="display: flex; align-items: flex-start;">
-                      <div style="background: #f59e0b; color: white; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; margin-right: 12px; flex-shrink: 0;">1</div>
-                      <div style="flex: 1;">
-                        <div style="font-weight: 600; color: #111827; margin-bottom: 4px;">Fill Out on IRS.gov</div>
-                        <div style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Download the official fillable PDF from the IRS website, complete it, and save a copy.</div>
-                        <a href="${IRS_W9_URL}" style="display: inline-block; padding: 10px 20px; background: #1e40af; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 13px;">
-                          📄 Download IRS W-9 Form
-                        </a>
-                      </div>
-                    </div>
-                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px;">
+                    <tr>
+                      <td style="padding: 20px;">
+                        <table cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="vertical-align: top; padding-right: 12px;">
+                              <div style="background: #f59e0b; color: white; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px;">1</div>
+                            </td>
+                            <td style="vertical-align: top;">
+                              <div style="font-weight: 600; color: #111827; margin-bottom: 4px;">Fill Out on IRS.gov</div>
+                              <div style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Download the official fillable PDF from the IRS website, complete it, and save a copy.</div>
+                              <a href="${IRS_W9_URL}" style="display: inline-block; padding: 10px 20px; background: #1e40af; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 13px;">
+                                📄 Download IRS W-9 Form
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
                   
                   <!-- Option 2: Upload to Portal -->
-                  <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1px solid #fcd34d; border-radius: 12px; padding: 20px;">
-                    <div style="display: flex; align-items: flex-start;">
-                      <div style="background: #f59e0b; color: white; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; margin-right: 12px; flex-shrink: 0;">2</div>
-                      <div style="flex: 1;">
-                        <div style="font-weight: 600; color: #111827; margin-bottom: 4px;">Upload to Your Owner Portal</div>
-                        <div style="font-size: 13px; color: #78716c; margin-bottom: 12px;">Once completed, securely upload your W-9 using the button below. This is the fastest way to ensure we receive it.</div>
-                        <a href="${uploadUrl}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
-                          📤 Upload W-9 to Portal
-                        </a>
-                      </div>
-                    </div>
-                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1px solid #fcd34d; border-radius: 12px;">
+                    <tr>
+                      <td style="padding: 20px;">
+                        <table cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="vertical-align: top; padding-right: 12px;">
+                              <div style="background: #f59e0b; color: white; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px;">2</div>
+                            </td>
+                            <td style="vertical-align: top;">
+                              <div style="font-weight: 600; color: #111827; margin-bottom: 4px;">Upload to Your Owner Portal</div>
+                              <div style="font-size: 13px; color: #78716c; margin-bottom: 12px;">Once completed, securely upload your W-9 using the button below. This is the fastest way to ensure we receive it.</div>
+                              <a href="${uploadUrl}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                                📤 Upload W-9 to Portal
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
                 </td>
               </tr>
 
               <!-- Deadline Notice -->
               <tr>
                 <td style="padding: 0 32px 24px 32px;">
-                  <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px 20px; text-align: center;">
-                    <div style="font-size: 14px; color: #991b1b; font-weight: 500;">
-                      ⏰ <strong>Deadline:</strong> Please submit by <strong>December 15th</strong> to ensure timely 1099 delivery.
-                    </div>
-                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
+                    <tr>
+                      <td style="padding: 16px 20px; text-align: center;">
+                        <div style="font-size: 14px; color: #991b1b; font-weight: 500;">
+                          ⏰ <strong>Deadline:</strong> Please submit by <strong>December 15th</strong> to ensure timely 1099 delivery.
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
                 </td>
               </tr>
 
               <!-- What We Need -->
               <tr>
                 <td style="padding: 0 32px 24px 32px;">
-                  <div style="margin: 20px 0; padding: 16px 20px; background: #f8fafc; border-left: 4px solid #64748b; border-radius: 0 8px 8px 0;">
-                    <div style="font-size: 14px; color: #475569; font-weight: 500;">
-                      <strong>What we need on your W-9:</strong>
-                    </div>
-                    <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #64748b; font-size: 13px;">
-                      <li>Your legal name (or business name)</li>
-                      <li>Federal tax classification</li>
-                      <li>Address</li>
-                      <li>Taxpayer Identification Number (SSN or EIN)</li>
-                      <li>Your signature and date</li>
-                    </ul>
-                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border-left: 4px solid #64748b; border-radius: 0 8px 8px 0;">
+                    <tr>
+                      <td style="padding: 16px 20px;">
+                        <div style="font-size: 14px; color: #475569; font-weight: 500; margin-bottom: 8px;">
+                          <strong>What we need on your W-9:</strong>
+                        </div>
+                        <ul style="margin: 0; padding-left: 20px; color: #64748b; font-size: 13px; line-height: 1.8;">
+                          <li>Your legal name (or business name)</li>
+                          <li>Federal tax classification</li>
+                          <li>Address</li>
+                          <li>Taxpayer Identification Number (SSN or EIN)</li>
+                          <li>Your signature and date</li>
+                        </ul>
+                      </td>
+                    </tr>
+                  </table>
                 </td>
               </tr>
 
