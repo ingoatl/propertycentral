@@ -336,6 +336,7 @@ serve(async (req: Request): Promise<Response> => {
       emailInsightsResult,
       propertyDetailsResult,
       leadOnboardingResult,
+      guestScreeningsResult,
     ] = await Promise.all([
       // Monthly reconciliations (statements) - fetch all historical data (24 months)
       supabase
@@ -366,9 +367,10 @@ serve(async (req: Request): Promise<Response> => {
         .order("service_name"),
       
       // STR bookings (OwnerRez) - exclude canceled and zero-amount - ALL historical data
+      // Include guest composition (adults, children, pets)
       supabase
         .from("ownerrez_bookings")
-        .select("id, booking_id, guest_name, check_in, check_out, total_amount, management_fee, booking_status, ownerrez_listing_name")
+        .select("id, booking_id, guest_name, guest_email, check_in, check_out, total_amount, management_fee, booking_status, ownerrez_listing_name, adults, children, pets")
         .eq("property_id", property.id)
         .not("booking_status", "eq", "canceled")
         .not("booking_status", "eq", "Canceled")
@@ -425,6 +427,18 @@ serve(async (req: Request): Promise<Response> => {
         .eq("property_id", property.id)
         .in("stage", ['contract_signed', 'ach_form_signed', 'onboarding_form_requested', 'insurance_requested', 'inspection_scheduled'])
         .maybeSingle(),
+      
+      // Guest screenings - verified guests for this property
+      supabase
+        .from("guest_screenings")
+        .select(`
+          id, booking_id, guest_name, screening_provider, screening_status, 
+          id_verified, background_passed, watchlist_clear, risk_score, 
+          screening_date, owner_notified, created_at
+        `)
+        .eq("property_id", property.id)
+        .order("screening_date", { ascending: false })
+        .limit(50),
     ]);
 
     const rawStatements = statementsResult.data || [];
@@ -434,6 +448,9 @@ serve(async (req: Request): Promise<Response> => {
     const mtrBookings = mtrBookingsResult.data || [];
     const emailInsights = emailInsightsResult.data || [];
     const propertyDetails = propertyDetailsResult.data;
+    const guestScreenings = guestScreeningsResult.data || [];
+    
+    console.log("Guest screenings fetched:", guestScreenings.length);
     const leadOnboarding = leadOnboardingResult.data;
     
     // Process statements to calculate correct net owner earnings based on service type

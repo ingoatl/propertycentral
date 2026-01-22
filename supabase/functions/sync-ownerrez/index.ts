@@ -34,6 +34,7 @@ interface OwnerRezBooking {
     first_name?: string;
     last_name?: string;
     name?: string;
+    email?: string;
   };
   arrival: string;
   departure: string;
@@ -41,6 +42,13 @@ interface OwnerRezBooking {
   status: string;
   type?: string;
   charges?: OwnerRezCharge[];
+  // Guest composition fields
+  adults?: number;
+  children?: number;
+  pets?: number;
+  num_adults?: number;
+  num_children?: number;
+  num_pets?: number;
 }
 
 interface OwnerRezGuest {
@@ -515,7 +523,15 @@ serve(async (req) => {
             }
           }
 
-          // Upsert booking data with fee breakdown
+          // Extract guest counts from booking data
+          const adults = booking.adults ?? booking.num_adults ?? null;
+          const children = booking.children ?? booking.num_children ?? null;
+          const pets = booking.pets ?? booking.num_pets ?? null;
+          
+          // Get guest email if available
+          const guestEmail = booking.guest?.email ?? null;
+
+          // Upsert booking data with fee breakdown and guest composition
           const { error } = await supabase
             .from('ownerrez_bookings')
             .upsert({
@@ -524,6 +540,7 @@ serve(async (req) => {
               ownerrez_listing_name: propertyName,
               booking_id: booking.id.toString(),
               guest_name: guestName,
+              guest_email: guestEmail,
               check_in: booking.arrival,
               check_out: booking.departure,
               total_amount: totalAmount,
@@ -534,6 +551,9 @@ serve(async (req) => {
               promotions_discount: feeBreakdown.promotionsDiscount,
               management_fee: managementFee,
               booking_status: booking.status,
+              adults: adults,
+              children: children,
+              pets: pets,
               sync_date: new Date().toISOString(),
             }, {
               onConflict: 'booking_id',
