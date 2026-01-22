@@ -35,6 +35,7 @@ interface PropertyInfo {
   id: string;
   name: string;
   address: string;
+  image_path?: string;
 }
 
 export default function BookOwnerCall() {
@@ -97,7 +98,7 @@ export default function BookOwnerCall() {
         // Get owner's properties
         const { data: properties } = await supabase
           .from('properties')
-          .select('id, name, address')
+          .select('id, name, address, image_path')
           .eq('owner_id', owner.id)
           .limit(1);
 
@@ -109,6 +110,7 @@ export default function BookOwnerCall() {
             id: prop.id,
             name: prop.name,
             address: prop.address || '',
+            image_path: prop.image_path || undefined,
           });
         }
       }
@@ -124,7 +126,7 @@ export default function BookOwnerCall() {
     try {
       const { data: prop } = await supabase
         .from('properties')
-        .select('id, name, address')
+        .select('id, name, address, image_path')
         .eq('id', propertyId)
         .maybeSingle();
 
@@ -133,6 +135,7 @@ export default function BookOwnerCall() {
           id: prop.id,
           name: prop.name,
           address: prop.address || '',
+          image_path: prop.image_path || undefined,
         });
       }
     } catch (error) {
@@ -297,19 +300,35 @@ export default function BookOwnerCall() {
           <Card className="max-w-xl mx-auto shadow-lg border-primary/10">
             {/* Property Card - Show if we have property info */}
             {propertyInfo && (
-              <div className="border-b border-border/50">
-                <div className="p-4 sm:p-6">
-                  <div className="flex gap-4">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Building2 className="h-7 w-7 sm:h-8 sm:w-8 text-primary/60" />
-                    </div>
+              <div className="bg-gradient-to-br from-secondary via-accent/30 to-secondary rounded-t-xl">
+                <div className="p-5 sm:p-6">
+                  <div className="flex gap-4 sm:gap-5 items-center">
+                    {/* Property Image */}
+                    {propertyInfo.image_path ? (
+                      <div className="relative flex-shrink-0">
+                        <img 
+                          src={`https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/${propertyInfo.image_path}`}
+                          alt={propertyInfo.name}
+                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover shadow-lg ring-2 ring-background"
+                        />
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-md">
+                          <Check className="h-3.5 w-3.5 text-primary-foreground" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-primary/25 to-primary/10 flex items-center justify-center flex-shrink-0 shadow-lg ring-2 ring-background">
+                        <Building2 className="h-8 w-8 sm:h-10 sm:w-10 text-primary/70" />
+                      </div>
+                    )}
+                    
+                    {/* Property Details */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-primary font-medium uppercase tracking-wide mb-1">Your Property</p>
-                      <h3 className="font-semibold text-foreground text-base sm:text-lg truncate">{propertyInfo.name}</h3>
+                      <p className="text-[10px] sm:text-xs text-primary font-semibold uppercase tracking-widest mb-1.5">Your Property</p>
+                      <h3 className="font-bold text-foreground text-lg sm:text-xl leading-tight truncate">{propertyInfo.name}</h3>
                       {propertyInfo.address && (
-                        <div className="flex items-start gap-1.5 mt-1.5 text-muted-foreground">
-                          <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                          <span className="text-xs sm:text-sm leading-tight">{propertyInfo.address}</span>
+                        <div className="flex items-start gap-2 mt-2 text-muted-foreground">
+                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary/60" />
+                          <span className="text-sm sm:text-base leading-snug">{propertyInfo.address}</span>
                         </div>
                       )}
                     </div>
@@ -319,13 +338,13 @@ export default function BookOwnerCall() {
             )}
 
             {isLoadingProperty && (
-              <div className="border-b border-border/50 p-4 sm:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-20 h-20 rounded-xl bg-muted animate-pulse" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 w-20 bg-muted animate-pulse rounded" />
-                    <div className="h-5 w-40 bg-muted animate-pulse rounded" />
-                    <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+              <div className="bg-gradient-to-br from-secondary via-accent/30 to-secondary rounded-t-xl p-5 sm:p-6">
+                <div className="flex items-center gap-4 sm:gap-5">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-muted/60 animate-pulse" />
+                  <div className="flex-1 space-y-3">
+                    <div className="h-2.5 w-20 bg-muted/60 animate-pulse rounded-full" />
+                    <div className="h-5 w-44 bg-muted/60 animate-pulse rounded" />
+                    <div className="h-4 w-56 bg-muted/60 animate-pulse rounded" />
                   </div>
                 </div>
               </div>
