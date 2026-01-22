@@ -51,6 +51,7 @@ interface PropertyOwner {
   our_w9_sent_at: string | null;
   owner_w9_requested_at: string | null;
   owner_w9_uploaded_at: string | null;
+  owner_w9_file_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -106,6 +107,39 @@ const PropertyOwners = () => {
   const [selectedOwnerForComms, setSelectedOwnerForComms] = useState<PropertyOwner | null>(null);
   const [sendingW9, setSendingW9] = useState<string | null>(null);
   const [requestingW9, setRequestingW9] = useState<string | null>(null);
+
+  // Format date helper
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  // View owner's uploaded W-9
+  const handleViewOwnerW9 = async (owner: PropertyOwner) => {
+    if (!owner.owner_w9_file_path) {
+      toast.error("No W-9 file found for this owner");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.storage
+        .from("onboarding-documents")
+        .createSignedUrl(owner.owner_w9_file_path, 3600); // 1 hour expiry
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      }
+    } catch (error: any) {
+      console.error("Error getting W-9 URL:", error);
+      toast.error("Failed to open W-9: " + (error.message || "Unknown error"));
+    }
+  };
 
   // Send OUR W-9 to co-hosting clients (they issue 1099 to us)
   const handleSendOurW9 = async (owner: PropertyOwner) => {
@@ -867,6 +901,86 @@ const PropertyOwners = () => {
                         No payment method on file yet. Click "Add {owner.payment_method === "ach" ? "Bank Account" : "Credit Card"}" to securely add one.
                       </div>
                     )}
+                  </div>
+
+                  {/* Tax Documents Section */}
+                  <div className="space-y-3 pt-4 border-t">
+                    <Label className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Tax Documents
+                    </Label>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Our W-9 (Send TO owner) */}
+                      <div className="p-3 border rounded-lg bg-muted/20">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">Our W-9</p>
+                            <p className="text-xs text-muted-foreground">
+                              {owner.our_w9_sent_at 
+                                ? `Sent ${formatDate(owner.our_w9_sent_at)}` 
+                                : "Not sent yet"}
+                            </p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleSendOurW9(owner)}
+                            disabled={sendingW9 === owner.id}
+                          >
+                            {sendingW9 === owner.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : owner.our_w9_sent_at ? (
+                              "Resend"
+                            ) : (
+                              "Send"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Their W-9 (Request FROM owner) */}
+                      <div className="p-3 border rounded-lg bg-muted/20">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">Their W-9</p>
+                            <p className="text-xs text-muted-foreground">
+                              {owner.owner_w9_uploaded_at 
+                                ? `Received ${formatDate(owner.owner_w9_uploaded_at)}`
+                                : owner.owner_w9_requested_at 
+                                  ? `Requested ${formatDate(owner.owner_w9_requested_at)}`
+                                  : "Not requested"}
+                            </p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant={owner.owner_w9_uploaded_at ? "ghost" : "outline"}
+                            onClick={() => owner.owner_w9_uploaded_at ? handleViewOwnerW9(owner) : handleRequestOwnerW9(owner)}
+                            disabled={requestingW9 === owner.id}
+                          >
+                            {requestingW9 === owner.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : owner.owner_w9_uploaded_at ? (
+                              <>
+                                <Eye className="w-4 h-4 mr-1" />
+                                View
+                              </>
+                            ) : owner.owner_w9_requested_at ? (
+                              "Resend"
+                            ) : (
+                              "Request"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Contextual help */}
+                    <p className="text-xs text-muted-foreground">
+                      {owner.service_type === "cohosting" 
+                        ? "💡 Co-hosting: They issue 1099 to you. Send Our W-9 is the primary action."
+                        : "💡 Full-service: You issue 1099 to them. Request Their W-9 is the primary action."}
+                    </p>
                   </div>
 
                   <div className="space-y-2">
