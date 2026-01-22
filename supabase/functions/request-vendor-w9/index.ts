@@ -88,14 +88,8 @@ async function sendSMS(phone: string, message: string): Promise<boolean> {
 // Build professional W-9 request email HTML for vendors
 function buildVendorW9EmailHtml(
   vendorName: string, 
-  uploadUrl: string, 
-  paymentsYtd: number
+  uploadUrl: string
 ): string {
-  const formattedPayments = new Intl.NumberFormat('en-US', { 
-    style: 'currency', 
-    currency: 'USD' 
-  }).format(paymentsYtd);
-  
   return `
     <!DOCTYPE html>
     <html>
@@ -131,10 +125,8 @@ function buildVendorW9EmailHtml(
                   </div>
                 </td>
               </tr>
-                  </div>
-                </td>
-              </tr>
 
+              <!-- Why We Need Section -->
               <tr>
                 <td style="padding: 0 32px 24px 32px;">
                   <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px; padding: 20px 24px;">
@@ -142,12 +134,6 @@ function buildVendorW9EmailHtml(
                     <div style="font-size: 14px; color: #166534; line-height: 1.6;">
                       The IRS requires us to issue a <strong>1099-NEC</strong> to all vendors receiving $600 or more in payments during the tax year. Your W-9 provides the tax identification information we need to prepare this form accurately.
                     </div>
-                  </div>
-                </td>
-              </tr>
-                      <div style="font-size: 20px; font-weight: 700; color: #166534;">${formattedPayments}</div>
-                    </div>
-                    ` : ''}
                   </div>
                 </td>
               </tr>
@@ -195,10 +181,6 @@ function buildVendorW9EmailHtml(
                   <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px 20px; text-align: center;">
                     <div style="font-size: 14px; color: #991b1b; font-weight: 500;">
                       ⏰ <strong>Deadline:</strong> Please submit by <strong>December 15th</strong> to ensure timely 1099 delivery.
-                    </div>
-                  </div>
-                </td>
-              </tr>
                     </div>
                   </div>
                 </td>
@@ -319,10 +301,9 @@ const handler = async (req: Request): Promise<Response> => {
     const uploadUrl = `${VENDOR_UPLOAD_URL}?token=${uploadToken}`;
     const vendorName = vendor.company_name || vendor.name;
     const firstName = vendor.name.split(" ")[0];
-    const paymentsYtd = vendor.payments_ytd || 0;
 
-    // Build email HTML
-    const emailHtml = buildVendorW9EmailHtml(vendorName, uploadUrl, paymentsYtd);
+    // Build email HTML (no YTD payments shown)
+    const emailHtml = buildVendorW9EmailHtml(vendorName, uploadUrl);
 
     // Determine recipient
     const recipient = isTestMode ? testEmail! : vendor.email;
@@ -350,7 +331,6 @@ const handler = async (req: Request): Promise<Response> => {
     if (!isTestMode && vendor.phone) {
       const smsMessage = `Hi ${firstName}! PeachHaus needs your W-9 form for tax filing.\n\n📤 Upload here: ${uploadUrl}\n\n⏰ Deadline: Dec 15th\n📞 Questions? Call (404) 800-5932\n\n- Ingo, PeachHaus`;
       smsSent = await sendSMS(vendor.phone, smsMessage);
-    }
     }
 
     // Update vendor record if not test mode

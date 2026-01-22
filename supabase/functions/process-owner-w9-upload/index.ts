@@ -22,7 +22,7 @@ interface ProcessW9UploadRequest {
   einLast4?: string;
 }
 
-// Build confirmation email HTML
+// Build confirmation email HTML for owner
 function buildConfirmationEmailHtml(firstName: string): string {
   return `
     <!DOCTYPE html>
@@ -156,6 +156,46 @@ function buildConfirmationEmailHtml(firstName: string): string {
   `;
 }
 
+// Build internal notification email for Anja
+function buildInternalNotificationHtml(ownerName: string, ownerEmail: string, taxName?: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px;">
+      <div style="max-width: 500px; margin: 0 auto; background: #f8fafc; border-radius: 12px; padding: 24px;">
+        <h2 style="color: #166534; margin-top: 0;">📄 New W-9 Received</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Owner Name:</td>
+            <td style="padding: 8px 0; font-weight: 600; color: #111827;">${ownerName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Email:</td>
+            <td style="padding: 8px 0; color: #111827;">${ownerEmail}</td>
+          </tr>
+          ${taxName ? `
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Tax Name on W-9:</td>
+            <td style="padding: 8px 0; color: #111827;">${taxName}</td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Received:</td>
+            <td style="padding: 8px 0; color: #111827;">${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} ET</td>
+          </tr>
+        </table>
+        <div style="margin-top: 16px; padding: 12px; background: #dcfce7; border-radius: 8px; text-align: center;">
+          <span style="color: #166534; font-weight: 500;">✅ Ready for 1099 processing</span>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -266,7 +306,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
 
-    // Send confirmation email
+    // Send confirmation email to owner
     const firstName = owner.name.split(" ")[0];
     const emailHtml = buildConfirmationEmailHtml(firstName);
 
@@ -283,6 +323,20 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     console.log("Confirmation email sent to:", recipients);
+
+    // Send internal notification to Anja
+    try {
+      const internalNotificationHtml = buildInternalNotificationHtml(owner.name, owner.email, taxName);
+      await resend.emails.send({
+        from: "PeachHaus System <info@peachhausgroup.com>",
+        to: ["anja@peachhausgroup.com"],
+        subject: `W-9 Received: ${owner.name}`,
+        html: internalNotificationHtml,
+      });
+      console.log("Internal notification sent to anja@peachhausgroup.com");
+    } catch (notifyError) {
+      console.error("Failed to send internal notification (non-critical):", notifyError);
+    }
 
     // Send Slack notification to team
     const slackWebhook = Deno.env.get("SLACK_BOT_TOKEN");
