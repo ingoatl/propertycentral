@@ -276,7 +276,7 @@ const WorkOrderDetailModal = ({
         .from("work_orders")
         .update({ 
           vendor_access_token: newToken,
-          vendor_token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+          vendor_access_token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
         })
         .eq("id", workOrder.id);
 
