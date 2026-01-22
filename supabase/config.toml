@@ -527,3 +527,6 @@ verify_jwt = true
 
 [functions.process-owner-w9-upload]
 verify_jwt = false
+
+[functions.send-w9-voice-reminder]
+verify_jwt = true
