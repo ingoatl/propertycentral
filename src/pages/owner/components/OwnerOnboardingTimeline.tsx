@@ -8,6 +8,7 @@ const ONBOARDING_STEPS = [
   { key: 'onboarding_form', label: 'Onboarding Form', shortLabel: 'Form' },
   { key: 'insurance', label: 'Insurance', shortLabel: 'Insurance' },
   { key: 'inspection', label: 'Inspection', shortLabel: 'Inspect' },
+  { key: 'photos', label: 'Photos & Tour', shortLabel: 'Photos' },
   { key: 'onboarded', label: 'Go Live', shortLabel: 'Live' },
 ];
 
@@ -30,8 +31,10 @@ function getTimelineStep(stage: string | null): number {
       return 2; // Current step: Insurance (requested = waiting for it)
     case 'inspection_scheduled': 
       return 3; // Current step: Inspection
+    case 'photos_walkthrough':
+      return 4; // Current step: Photos & Tour
     case 'ops_handoff': 
-      return 5; // All done
+      return 6; // All done
     default: 
       return 0; // Default to first step
   }
@@ -43,7 +46,8 @@ function getStepDescription(step: number): string {
     case 1: return "Please complete your onboarding form";
     case 2: return "Please submit your insurance documentation";
     case 3: return "Scheduling your property inspection";
-    case 4: return "Final preparations before going live!";
+    case 4: return "Book your professional photos & virtual tour";
+    case 5: return "Final preparations before going live!";
     default: return "Getting started";
   }
 }

@@ -97,9 +97,9 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
           opportunity_value: formData.opportunity_value ? parseFloat(formData.opportunity_value) : 0,
           property_address: formData.property_address.trim() || null,
           property_type: formData.property_type || null,
-          stage: formData.stage,
+          stage: formData.stage as any,
           notes: formData.notes?.trim() || null,
-        })
+        } as any)
         .select()
         .single();
 
@@ -111,8 +111,8 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
         action: "Lead created",
         performed_by_user_id: user?.id,
         performed_by_name: user?.email,
-        new_stage: formData.stage,
-      });
+        new_stage: formData.stage as any,
+      } as any);
 
       // Trigger automation for new lead
       if (formData.stage === 'new_lead') {

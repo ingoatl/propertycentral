@@ -43,7 +43,7 @@ const LeadKanban = ({ leads, onSelectLead, onRefresh }: LeadKanbanProps) => {
       const { error } = await supabase
         .from("leads")
         .update({ 
-          stage: newStage,
+          stage: newStage as any,
           stage_changed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -57,9 +57,9 @@ const LeadKanban = ({ leads, onSelectLead, onRefresh }: LeadKanbanProps) => {
         action: `Stage changed from ${STAGE_CONFIG[previousStage].label} to ${STAGE_CONFIG[newStage].label}`,
         performed_by_user_id: user?.id,
         performed_by_name: user?.email,
-        previous_stage: previousStage,
-        new_stage: newStage,
-      });
+        previous_stage: previousStage as any,
+        new_stage: newStage as any,
+      } as any);
 
       // Trigger automation processing
       try {

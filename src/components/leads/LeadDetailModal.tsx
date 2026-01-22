@@ -147,7 +147,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
       const { error } = await supabase
         .from("leads")
         .update({ 
-          stage: newStage,
+          stage: newStage as any,
           stage_changed_at: new Date().toISOString()
         })
         .eq("id", lead.id);
@@ -159,9 +159,9 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         action: `Stage changed to ${STAGE_CONFIG[newStage].label}`,
         performed_by_user_id: user?.id,
         performed_by_name: user?.email,
-        previous_stage: lead.stage,
-        new_stage: newStage,
-      });
+        previous_stage: lead.stage as any,
+        new_stage: newStage as any,
+      } as any);
 
       // Trigger automation
       try {
