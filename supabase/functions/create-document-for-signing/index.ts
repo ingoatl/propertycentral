@@ -38,9 +38,17 @@ const buildSigningEmailHtml = (
   documentName: string,
   signingUrl: string,
   expiresIn: string,
-  propertyAddress?: string
+  propertyAddress?: string,
+  hasPdfAttachment?: boolean
 ): string => {
   const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  
+  const attachmentNote = hasPdfAttachment 
+    ? `<p style="font-size: 13px; line-height: 1.6; color: #444444; margin: 12px 0 0 0;">
+        📎 We've attached a copy of the document for your review. When you're ready, 
+        click below to add your electronic signature.
+      </p>`
+    : '';
   
   return `
 <!DOCTYPE html>
@@ -95,6 +103,7 @@ const buildSigningEmailHtml = (
           : 'Your document is ready for signature.'
         } Please review and sign at your convenience.
       </p>
+      ${attachmentNote}
     </div>
 
     <!-- CTA Button -->
@@ -141,6 +150,60 @@ const buildSigningEmailHtml = (
 </html>
 `;
 };
+
+// Fetch PDF and convert to base64 for email attachment
+async function fetchPdfAsBase64(supabase: any, filePath: string): Promise<{ content: string; filename: string } | null> {
+  try {
+    console.log("Fetching PDF for attachment:", filePath);
+    
+    // Helper to convert ArrayBuffer to base64
+    const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    };
+    
+    if (filePath.startsWith('http')) {
+      // External URL - fetch directly
+      const response = await fetch(filePath);
+      if (!response.ok) {
+        console.error("Failed to fetch external PDF:", response.status);
+        return null;
+      }
+      const buffer = await response.arrayBuffer();
+      const base64Content = arrayBufferToBase64(buffer);
+      const filename = filePath.split('/').pop()?.split('?')[0] || 'document.pdf';
+      return { content: base64Content, filename };
+    } else {
+      // Supabase storage path - get signed URL
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('onboarding-documents')
+        .createSignedUrl(filePath, 3600);
+      
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        console.error("Failed to create signed URL:", signedUrlError);
+        return null;
+      }
+      
+      const response = await fetch(signedUrlData.signedUrl);
+      if (!response.ok) {
+        console.error("Failed to fetch PDF from signed URL:", response.status);
+        return null;
+      }
+      
+      const buffer = await response.arrayBuffer();
+      const base64Content = arrayBufferToBase64(buffer);
+      const filename = filePath.split('/').pop() || 'document.pdf';
+      return { content: base64Content, filename };
+    }
+  } catch (error) {
+    console.error("Error fetching PDF:", error);
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -214,8 +277,9 @@ serve(async (req) => {
       { name: "PeachHaus Group", email: "info@peachhausgroup.com", type: "manager", order: 2 },
     ];
 
+    // Token expires in 360 days (approximately 1 year)
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 48);
+    expiresAt.setDate(expiresAt.getDate() + 360);
 
     const tokens: any[] = [];
 
@@ -282,25 +346,58 @@ serve(async (req) => {
       propertyAddress = property?.address || "";
     }
 
+    // Fetch PDF for attachment
+    let pdfAttachment: { content: string; filename: string } | null = null;
+    if (template.file_path) {
+      pdfAttachment = await fetchPdfAsBase64(supabase, template.file_path);
+      if (pdfAttachment) {
+        console.log("PDF attachment prepared:", pdfAttachment.filename);
+      } else {
+        console.warn("Could not prepare PDF attachment, sending email without it");
+      }
+    }
+
     // Send signing email to guest
     if (resend && guestSigningUrl) {
       const emailHtml = buildSigningEmailHtml(
         recipientName,
         documentName,
         guestSigningUrl,
-        "48 hours",
-        propertyAddress
+        "360 days",
+        propertyAddress,
+        !!pdfAttachment
       );
 
       try {
-        const emailResult = await resend.emails.send({
+        const emailPayload: any = {
           from: "PeachHaus Group <info@peachhausgroup.com>",
           to: [recipientEmail],
           subject: `📝 Document Ready for Signature - ${documentName}`,
           html: emailHtml,
-        });
+        };
 
-        console.log("Signing email sent:", emailResult);
+        // Add PDF attachment if available
+        if (pdfAttachment) {
+          emailPayload.attachments = [{
+            filename: `${documentName.replace(/[^a-zA-Z0-9\s-]/g, '')}.pdf`,
+            content: pdfAttachment.content,
+          }];
+        }
+
+        const emailResult = await resend.emails.send(emailPayload);
+
+        console.log("Signing email sent with attachment:", !!pdfAttachment, emailResult);
+        
+        // Log that PDF was attached
+        await supabase.from("document_audit_log").insert({
+          document_id: documentId,
+          action: "signing_email_sent",
+          metadata: {
+            recipient: recipientEmail,
+            pdf_attached: !!pdfAttachment,
+            expires_in: "360 days",
+          },
+        });
       } catch (emailError) {
         console.error("Failed to send email:", emailError);
         // Don't fail the whole operation if email fails
@@ -313,6 +410,8 @@ serve(async (req) => {
         documentId,
         guestSigningUrl,
         hostSigningUrl,
+        pdfAttached: !!pdfAttachment,
+        expiresAt: expiresAt.toISOString(),
         message: "Document created and signing invitation sent!",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
