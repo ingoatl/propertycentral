@@ -25,7 +25,8 @@ interface CreateDocumentRequest {
 }
 
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
-const APP_URL = "https://id-preview--9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovable.app";
+// IMPORTANT: Use production URL so signing links work reliably for external users
+const APP_URL = "https://propertycentral.lovable.app";
 
 const generateSecureToken = (): string => {
   const array = new Uint8Array(32);
@@ -117,6 +118,10 @@ const buildSigningEmailHtml = (
           </td>
         </tr>
       </table>
+      <p style="font-size: 11px; color: #888888; margin: 12px 0 0 0; word-break: break-all;">
+        If the button doesn't work, copy and paste this link into your browser:<br/>
+        <a href="${signingUrl}" style="color: #2754C5; text-decoration: underline;">${signingUrl}</a>
+      </p>
     </div>
 
     <!-- What to expect -->
@@ -335,9 +340,10 @@ serve(async (req) => {
       },
     });
 
-    // Get property address for email
-    let propertyAddress = preFillData.property_address || "";
-    if (!propertyAddress && propertyId) {
+    // Get property address for email - ONLY from database, never from preFillData
+    // This prevents hardcoded defaults from appearing in emails
+    let propertyAddress = "";
+    if (propertyId) {
       const { data: property } = await supabase
         .from("properties")
         .select("address")
@@ -345,6 +351,8 @@ serve(async (req) => {
         .single();
       propertyAddress = property?.address || "";
     }
+    // For lead pipeline contracts without propertyId, propertyAddress stays empty
+    // The email template will handle this gracefully
 
     // Fetch PDF for attachment
     let pdfAttachment: { content: string; filename: string } | null = null;
