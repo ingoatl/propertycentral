@@ -241,21 +241,42 @@ serve(async (req) => {
 
     // ========== GUEST SCREENING EMAIL DETECTION ==========
     // Detect verification emails from Truvi, Authenticate, Superhog, Autohost
-    // ENHANCED: Added "verification completed", "completed for", "guest passed" patterns
+    // STRICT: Must match SENDER pattern - subject patterns are secondary confirmation only
+    // This prevents false positives from photographer emails like "Media Completed for..."
     const screeningProviders = [
-      { name: 'truvi', senderPatterns: ['@truvi.com', 'noreply@truvi', 'truvi.id'], subjectPatterns: ['guest verification completed for', 'verification complete', 'verification completed', 'completed for', 'guest verified', 'guest passed', 'id verified', 'truvi'] },
-      { name: 'authenticate', senderPatterns: ['@authenticate.com', '@autohost.ai'], subjectPatterns: ['screening result', 'verification status', 'verification completed', 'guest approved', 'background check'] },
-      { name: 'superhog', senderPatterns: ['@superhog.com'], subjectPatterns: ['superhog', 'guest protection', 'verification complete', 'verification completed'] },
-      { name: 'autohost', senderPatterns: ['@autohost.ai', '@autohost.com'], subjectPatterns: ['autohost', 'guest screening', 'verification', 'verification completed'] },
+      { 
+        name: 'truvi', 
+        senderPatterns: ['@truvi.com', 'noreply@truvi', 'truvi.id'], 
+        subjectPatterns: ['guest verification completed for', 'verification complete', 'guest verified', 'guest passed', 'id verified', 'booking action required'],
+        requireSender: true // MUST match sender to avoid false positives
+      },
+      { 
+        name: 'authenticate', 
+        senderPatterns: ['@authenticate.com'], 
+        subjectPatterns: ['screening result', 'verification status', 'guest approved', 'background check'],
+        requireSender: true
+      },
+      { 
+        name: 'superhog', 
+        senderPatterns: ['@superhog.com'], 
+        subjectPatterns: ['superhog', 'guest protection', 'verification complete'],
+        requireSender: true
+      },
+      { 
+        name: 'autohost', 
+        senderPatterns: ['@autohost.ai', '@autohost.com'], 
+        subjectPatterns: ['autohost', 'guest screening', 'guest verification'],
+        requireSender: true
+      },
     ];
     
     let detectedScreeningProvider: string | null = null;
     for (const provider of screeningProviders) {
       const senderMatch = provider.senderPatterns.some(p => safeSenderEmail.toLowerCase().includes(p));
-      const subjectMatch = provider.subjectPatterns.some(p => safeSubject.toLowerCase().includes(p));
-      if (senderMatch || subjectMatch) {
+      // Only match if sender matches (prevents photographer emails from matching)
+      if (senderMatch) {
         detectedScreeningProvider = provider.name;
-        console.log(`Detected guest screening email from provider: ${provider.name}, subject: ${safeSubject}`);
+        console.log(`Detected guest screening email from provider: ${provider.name}, sender: ${safeSenderEmail}, subject: ${safeSubject}`);
         break;
       }
     }
