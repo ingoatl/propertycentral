@@ -220,6 +220,69 @@ serve(async (req) => {
     
     console.log(`Lead communications: ${recentLeadComms?.length || 0} total, ${inboundComms.length} inbound`);
 
+    // ========== CHECK 8: Marketing Activity Sync ==========
+    console.log("Checking marketing activity sync...");
+    
+    const { data: recentMarketingActivities } = await supabase
+      .from("owner_marketing_activities")
+      .select("id, property_id, synced_at, source_project")
+      .gte("synced_at", twentyFourHoursAgo);
+
+    const { data: allProperties } = await supabase
+      .from("properties")
+      .select("id, name")
+      .is("offboarded_at", null);
+
+    const propertiesWithMarketing = new Set(
+      (recentMarketingActivities || []).map(a => a.property_id)
+    );
+
+    details.marketingSync = {
+      activitiesSynced: recentMarketingActivities?.length || 0,
+      propertiesWithActivities: propertiesWithMarketing.size,
+      totalProperties: allProperties?.length || 0,
+      sources: [...new Set((recentMarketingActivities || []).map(a => a.source_project))],
+    };
+
+    if (recentMarketingActivities?.length === 0) {
+      issues.push("No marketing activities synced in past 24 hours");
+      overallStatus = overallStatus === "error" ? "error" : "warning";
+    }
+
+    console.log(`Marketing sync: ${recentMarketingActivities?.length || 0} activities, ${propertiesWithMarketing.size} properties`);
+
+    // ========== CHECK 9: Guest Screening Health ==========
+    console.log("Checking guest screening health...");
+    
+    const { data: recentScreenings } = await supabase
+      .from("guest_screenings")
+      .select("id, property_id, screening_status, screening_provider")
+      .gte("created_at", twentyFourHoursAgo);
+
+    const { data: orphanedScreeningInsights } = await supabase
+      .from("email_insights")
+      .select("id")
+      .eq("category", "guest_screening")
+      .is("property_id", null)
+      .gte("created_at", twentyFourHoursAgo);
+
+    details.guestScreenings = {
+      total: recentScreenings?.length || 0,
+      byStatus: {
+        passed: (recentScreenings || []).filter(s => s.screening_status === "passed").length,
+        failed: (recentScreenings || []).filter(s => s.screening_status === "failed").length,
+        pending: (recentScreenings || []).filter(s => s.screening_status === "pending").length,
+      },
+      orphanedEmails: orphanedScreeningInsights?.length || 0,
+    };
+
+    if (orphanedScreeningInsights && orphanedScreeningInsights.length > 0) {
+      issues.push(`${orphanedScreeningInsights.length} screening emails without property match`);
+      overallStatus = overallStatus === "error" ? "error" : "warning";
+    }
+
+    console.log(`Guest screenings: ${recentScreenings?.length || 0} total, ${orphanedScreeningInsights?.length || 0} orphaned`);
+
     // ========== Auto-approve Expired Confirmations ==========
     if (expiredConfirmations.length > 0) {
       console.log(`Auto-approving ${expiredConfirmations.length} expired confirmations...`);

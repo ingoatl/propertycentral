@@ -557,3 +557,6 @@ verify_jwt = false
 
 [functions.owner-call-reminder-cron]
 verify_jwt = false
+
+[functions.screening-watchdog]
+verify_jwt = false
