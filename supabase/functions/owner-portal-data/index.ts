@@ -428,15 +428,16 @@ serve(async (req: Request): Promise<Response> => {
         .in("stage", ['contract_signed', 'ach_form_signed', 'onboarding_form_requested', 'insurance_requested', 'inspection_scheduled'])
         .maybeSingle(),
       
-      // Guest screenings - verified guests for this property
+      // Guest screenings - only show COMPLETED (passed) verifications to owners
       supabase
         .from("guest_screenings")
         .select(`
-          id, booking_id, guest_name, screening_provider, screening_status, 
+          id, booking_id, guest_name, guest_email, screening_provider, screening_status, 
           id_verified, background_passed, watchlist_clear, risk_score, 
-          screening_date, owner_notified, created_at
+          screening_date, owner_notified, raw_result, notes, created_at
         `)
         .eq("property_id", property.id)
+        .eq("screening_status", "passed")
         .order("screening_date", { ascending: false })
         .limit(50),
     ]);

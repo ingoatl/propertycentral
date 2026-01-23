@@ -61,24 +61,30 @@ const INDUSTRY_STATS = {
 };
 
 export function OwnerGuestScreeningsTab({ propertyId, screenings = [] }: OwnerGuestScreeningsTabProps) {
+  // Default to showing all since we only fetch passed verifications from the API
   const [activeTab, setActiveTab] = useState("all");
 
-  // Filter screenings based on tab
-  const filteredScreenings = useMemo(() => {
-    if (activeTab === "all") return screenings;
-    if (activeTab === "passed") return screenings.filter(s => s.screening_status === "passed");
-    if (activeTab === "flagged") return screenings.filter(s => s.screening_status === "flagged" || s.screening_status === "failed");
-    return screenings;
-  }, [screenings, activeTab]);
+  // Only show completed (passed) verifications - filter out any pending/flagged that might slip through
+  const completedScreenings = useMemo(() => {
+    return screenings.filter(s => s.screening_status === "passed" && s.guest_name && s.guest_name !== "Guest" && s.guest_name !== "Unknown");
+  }, [screenings]);
 
-  // Calculate stats
+  // Filter screenings based on tab (now working with completed screenings only)
+  const filteredScreenings = useMemo(() => {
+    if (activeTab === "all") return completedScreenings;
+    if (activeTab === "passed") return completedScreenings.filter(s => s.screening_status === "passed");
+    if (activeTab === "flagged") return completedScreenings.filter(s => s.screening_status === "flagged" || s.screening_status === "failed");
+    return completedScreenings;
+  }, [completedScreenings, activeTab]);
+
+  // Calculate stats based on completed screenings
   const stats = useMemo(() => {
-    const total = screenings.length;
-    const passed = screenings.filter(s => s.screening_status === "passed").length;
-    const flagged = screenings.filter(s => s.screening_status === "flagged" || s.screening_status === "failed").length;
-    const pending = screenings.filter(s => s.screening_status === "pending").length;
-    const idVerified = screenings.filter(s => s.id_verified).length;
-    const verificationRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+    const total = completedScreenings.length;
+    const passed = completedScreenings.filter(s => s.screening_status === "passed").length;
+    const flagged = completedScreenings.filter(s => s.screening_status === "flagged" || s.screening_status === "failed").length;
+    const pending = 0; // We don't show pending to owners
+    const idVerified = completedScreenings.filter(s => s.id_verified).length;
+    const verificationRate = total > 0 ? 100 : 0; // All shown are verified
 
     return {
       total,
@@ -88,7 +94,7 @@ export function OwnerGuestScreeningsTab({ propertyId, screenings = [] }: OwnerGu
       idVerified,
       verificationRate,
     };
-  }, [screenings]);
+  }, [completedScreenings]);
 
   const getStatusIcon = (status: string | null) => {
     switch (status) {
