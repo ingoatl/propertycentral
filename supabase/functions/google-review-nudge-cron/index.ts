@@ -59,6 +59,25 @@ serve(async (req) => {
     console.log(`=== Google Review Nudge Cron Started ===`);
     console.log(`Current EST hour: ${currentESTHour}`);
 
+    // TIME WINDOW ENFORCEMENT: Only send SMS between 10am-8pm EST
+    const SEND_WINDOW_START = 10; // 10am EST
+    const SEND_WINDOW_END = 20;   // 8pm EST
+    
+    if (!forceRun && (currentESTHour < SEND_WINDOW_START || currentESTHour >= SEND_WINDOW_END)) {
+      console.log(`Outside send window (${SEND_WINDOW_START}am-${SEND_WINDOW_END > 12 ? SEND_WINDOW_END - 12 : SEND_WINDOW_END}pm EST). Current hour: ${currentESTHour}. Skipping.`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: `Outside send window. SMS only sent between ${SEND_WINDOW_START}am-${SEND_WINDOW_END > 12 ? SEND_WINDOW_END - 12 : SEND_WINDOW_END}pm EST.`,
+          currentESTHour,
+          nudgesSent: 0 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    console.log(`Within send window (${SEND_WINDOW_START}am-${SEND_WINDOW_END > 12 ? SEND_WINDOW_END - 12 : SEND_WINDOW_END}pm EST). Proceeding...`);
+
     // Find requests that need nudging:
     // - Permission asked at least 48 hours ago
     // - No response received (still in permission_asked status)
