@@ -102,6 +102,7 @@ interface PropertyData {
   max_guests?: number;
   amenities?: string[];
   onboarding_stage?: string | null;
+  website_url?: string | null;
 }
 
 interface Credential {
