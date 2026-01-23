@@ -5343,6 +5343,79 @@ export type Database = {
           },
         ]
       }
+      owner_marketing_activities: {
+        Row: {
+          activity_date: string
+          activity_type: string
+          activity_url: string | null
+          created_at: string | null
+          description: string | null
+          external_id: string | null
+          id: string
+          metrics: Json | null
+          owner_id: string | null
+          platform: string | null
+          property_id: string
+          source_project: string | null
+          synced_at: string | null
+          title: string
+        }
+        Insert: {
+          activity_date: string
+          activity_type: string
+          activity_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          external_id?: string | null
+          id?: string
+          metrics?: Json | null
+          owner_id?: string | null
+          platform?: string | null
+          property_id: string
+          source_project?: string | null
+          synced_at?: string | null
+          title: string
+        }
+        Update: {
+          activity_date?: string
+          activity_type?: string
+          activity_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          external_id?: string | null
+          id?: string
+          metrics?: Json | null
+          owner_id?: string | null
+          platform?: string | null
+          property_id?: string
+          source_project?: string | null
+          synced_at?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_marketing_activities_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_marketing_activities_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_marketing_activities_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_notifications: {
         Row: {
           created_at: string

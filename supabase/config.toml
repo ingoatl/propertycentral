@@ -1,5 +1,11 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.export-owner-property-data]
+verify_jwt = true
+
+[functions.receive-marketing-sync]
+verify_jwt = false
+
 [functions.import-website-knowledge]
 verify_jwt = true
 
