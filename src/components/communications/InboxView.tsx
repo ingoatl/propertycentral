@@ -2395,10 +2395,30 @@ export function InboxView() {
       } else if (comm.contact_type === "owner" && comm.owner_id) {
         key = `owner:${comm.owner_id}`;
       } else if (comm.contact_phone) {
-        key = normalizePhone(comm.contact_phone);
+        // CRITICAL: Use normalized phone as primary key
+        const normalizedPhone = normalizePhone(comm.contact_phone);
+        key = `phone:${normalizedPhone}`;
+      } else if (comm.contact_email) {
+        // CRITICAL: Normalize email - extract just the email address, lowercase
+        // This handles cases where name varies but email is the same
+        const emailMatch = comm.contact_email.match(/[\w.-]+@[\w.-]+\.\w+/i);
+        const normalizedEmail = emailMatch ? emailMatch[0].toLowerCase() : comm.contact_email.toLowerCase();
+        key = `email:${normalizedEmail}`;
       } else {
-        key = comm.contact_email || comm.contact_id;
+        key = `id:${comm.contact_id}`;
       }
+      
+      // IMPORTANT: Cross-reference check - if we have both phone and email,
+      // check if the phone already exists in the map under a different key
+      // This helps merge items that have both identifiers
+      if (comm.contact_phone && key.startsWith('email:')) {
+        const phoneKey = `phone:${normalizePhone(comm.contact_phone)}`;
+        if (contactMap.has(phoneKey)) {
+          // Merge into the existing phone-based group
+          key = phoneKey;
+        }
+      }
+      
       const existing = contactMap.get(key) || [];
       existing.push(comm);
       contactMap.set(key, existing);
@@ -2529,6 +2549,7 @@ export function InboxView() {
   }, [enhancedCommunications, activeFilter, activeTab, filteredGmailEmails, doneGmailIds, readGmailIds, selectedEmailInboxView, currentUserId, userPhoneAssignments, emailInsightsMap]);
 
   // Group "All" tab contacts by date for date separators
+  // CRITICAL: Apply smart sorting WITHIN each date group
   const groupedByContactWithDates = useMemo(() => {
     if (!groupedByContact) return null;
     
@@ -2540,6 +2561,10 @@ export function InboxView() {
       dateGroups.set(dateKey, existing);
     }
     
+    // Priority and status order for smart sorting
+    const priorityOrder: Record<ConversationPriority, number> = { urgent: 0, important: 1, normal: 2, low: 4 };
+    const statusOrder: Record<string, number> = { open: 0, awaiting: 1, snoozed: 2, done: 3, archived: 4 };
+    
     return Array.from(dateGroups.entries())
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([date, comms]) => ({
@@ -2547,7 +2572,38 @@ export function InboxView() {
         label: isToday(parseISO(date)) ? "Today" : 
                isYesterday(parseISO(date)) ? "Yesterday" : 
                format(parseISO(date), "EEEE, MMM d"),
-        communications: comms,
+        // SMART SORTING within each date group:
+        // 1. Unanswered inbound messages FIRST
+        // 2. Then by resolved status
+        // 3. Then by conversation status
+        // 4. Then by priority
+        // 5. Finally by time (newest first)
+        communications: [...comms].sort((a, b) => {
+          // First: Unanswered inbound messages at the very top
+          const aIsUnansweredInbound = a.direction === "inbound" && !a.is_resolved;
+          const bIsUnansweredInbound = b.direction === "inbound" && !b.is_resolved;
+          if (aIsUnansweredInbound && !bIsUnansweredInbound) return -1;
+          if (!aIsUnansweredInbound && bIsUnansweredInbound) return 1;
+          
+          // Second: Sort by resolved status (unresolved before resolved)
+          const aIsResolved = a.is_resolved === true;
+          const bIsResolved = b.is_resolved === true;
+          if (!aIsResolved && bIsResolved) return -1;
+          if (aIsResolved && !bIsResolved) return 1;
+          
+          // Third: Sort by conversation status (open/awaiting at top, snoozed/done at bottom)
+          const aStatus = statusOrder[a.conversation_status || "open"] ?? 2;
+          const bStatus = statusOrder[b.conversation_status || "open"] ?? 2;
+          if (aStatus !== bStatus) return aStatus - bStatus;
+          
+          // Fourth: Sort by priority (urgent at top, low at bottom)
+          const aPriority = priorityOrder[a.priority || "normal"];
+          const bPriority = priorityOrder[b.priority || "normal"];
+          if (aPriority !== bPriority) return aPriority - bPriority;
+          
+          // Finally: Sort by time (newest first)
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }),
       }));
   }, [groupedByContact]);
 
@@ -2868,6 +2924,26 @@ export function InboxView() {
             <SentMessagesList
               messages={sentMessages}
               isLoading={isLoadingSent}
+              onSelectMessage={(sentMsg) => {
+                // Convert SentMessage to CommunicationItem format for display
+                const commItem: CommunicationItem = {
+                  id: sentMsg.id,
+                  type: sentMsg.communication_type as "sms" | "email",
+                  direction: "outbound",
+                  body: sentMsg.body || "",
+                  subject: sentMsg.subject || undefined,
+                  created_at: sentMsg.created_at,
+                  contact_name: sentMsg.recipient_name,
+                  contact_email: sentMsg.recipient_email || undefined,
+                  contact_phone: sentMsg.recipient_phone || undefined,
+                  contact_type: sentMsg.contact_type,
+                  contact_id: sentMsg.id,
+                };
+                setSelectedMessage(commItem);
+                setSelectedGmailEmail(null);
+                setShowMobileDetail(true);
+              }}
+              selectedMessageId={selectedMessage?.id}
             />
           ) : activeTab === "saved" || selectedFolder === "archived" ? (
             // My Archive - Archived Messages List
