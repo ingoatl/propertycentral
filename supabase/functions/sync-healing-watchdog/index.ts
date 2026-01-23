@@ -223,6 +223,97 @@ serve(async (req) => {
 
     details.screeningsCreated = screeningsCreated;
 
+    // ========== HEAL 4.5: Fix Guest Screenings with Missing/Invalid Names ==========
+    console.log("Checking for guest screenings with missing or invalid names...");
+    
+    const { data: screeningsWithBadNames } = await supabase
+      .from("guest_screenings")
+      .select("id, guest_name, property_id, screening_provider, raw_result, notes")
+      .or("guest_name.is.null,guest_name.eq.,guest_name.eq.Guest,guest_name.eq.Unknown,guest_name.eq.Unknown Guest");
+
+    let namesFixed = 0;
+    for (const screening of screeningsWithBadNames || []) {
+      // Try to extract name from raw_result
+      let newName: string | null = null;
+      const rawResult = screening.raw_result as any;
+      
+      if (rawResult?.guest_name) {
+        newName = rawResult.guest_name;
+      }
+      
+      // If still no name, check if we can find a matching booking
+      if (!newName && screening.property_id) {
+        // Check ownerrez_bookings for a guest around this time
+        const { data: recentBooking } = await supabase
+          .from("ownerrez_bookings")
+          .select("guest_name, check_in")
+          .eq("property_id", screening.property_id)
+          .not("guest_name", "is", null)
+          .order("check_in", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (recentBooking?.guest_name) {
+          newName = recentBooking.guest_name;
+        }
+      }
+
+      // If still no name, check mid_term_bookings
+      if (!newName && screening.property_id) {
+        const { data: mtrBooking } = await supabase
+          .from("mid_term_bookings")
+          .select("tenant_name")
+          .eq("property_id", screening.property_id)
+          .not("tenant_name", "is", null)
+          .order("start_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (mtrBooking?.tenant_name) {
+          newName = mtrBooking.tenant_name;
+        }
+      }
+
+      if (newName && newName !== screening.guest_name) {
+        const { error } = await supabase
+          .from("guest_screenings")
+          .update({ guest_name: newName })
+          .eq("id", screening.id);
+        
+        if (!error) {
+          namesFixed++;
+          console.log(`Fixed guest name: "${screening.guest_name}" -> "${newName}"`);
+        }
+      }
+    }
+
+    if (namesFixed > 0) {
+      healingActions.push(`Fixed ${namesFixed} guest screening names`);
+    }
+
+    details.screeningNamesFixed = namesFixed;
+
+    // ========== HEAL 4.6: Ensure All Properties Have Screening Monitoring ==========
+    console.log("Checking properties for screening coverage...");
+    
+    const propertiesWithScreenings = new Set<string>();
+    const { data: allScreenings } = await supabase
+      .from("guest_screenings")
+      .select("property_id")
+      .eq("screening_status", "passed");
+
+    for (const s of allScreenings || []) {
+      if (s.property_id) propertiesWithScreenings.add(s.property_id);
+    }
+
+    const propertiesWithoutScreenings = safeProperties.filter(p => !propertiesWithScreenings.has(p.id));
+    
+    details.screeningCoverage = {
+      propertiesWithScreenings: propertiesWithScreenings.size,
+      propertiesWithoutScreenings: propertiesWithoutScreenings.length,
+      propertiesNeedingScreenings: propertiesWithoutScreenings.slice(0, 10).map(p => p.name),
+    };
+
     // ========== HEAL 5: Orphaned Marketing Activities (No Property Match) ==========
     console.log("Checking for marketing activities that need property matching...");
     
