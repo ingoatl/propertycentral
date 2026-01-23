@@ -43,16 +43,61 @@ serve(async (req) => {
     console.log(`Found ${orphanedBookings?.length || 0} orphaned bookings`);
 
     for (const booking of orphanedBookings || []) {
-      // Try to match by listing name
+      // Try to match by listing name with improved matching logic
+      const listingName = booking.ownerrez_listing_name?.toLowerCase() || "";
+      
       const matchedProperty = properties?.find(p => {
-        const listingName = booking.ownerrez_listing_name?.toLowerCase() || "";
         const propName = p.name?.toLowerCase() || "";
         const propAddress = p.address?.toLowerCase() || "";
         
-        return listingName.includes(propName) || 
-               propName.includes(listingName) ||
-               listingName.includes(propAddress.split(",")[0]) ||
-               propAddress.includes(listingName);
+        // Direct name matching
+        if (listingName.includes(propName) || propName.includes(listingName)) {
+          return true;
+        }
+        
+        // Address-based matching
+        if (listingName.includes(propAddress.split(",")[0]) || propAddress.includes(listingName)) {
+          return true;
+        }
+        
+        // Keyword-based matching for known properties
+        // Whispering Oaks Farmhouse / Grady Smith
+        if ((listingName.includes('whispering oaks') || listingName.includes('grady smith') || listingName.includes('4241')) &&
+            (propAddress.includes('grady smith') || propName.includes('whispering oaks'))) {
+          return true;
+        }
+        
+        // Boho Lux Theme
+        if ((listingName.includes('boho lux') || listingName.includes('14 villa')) &&
+            (propAddress.includes('14 villa') || propName.includes('boho lux'))) {
+          return true;
+        }
+        
+        // House of Blues / Blues & Boho Haven
+        if ((listingName.includes('house of blues') || listingName.includes('blues & boho') || listingName.includes('15 villa')) &&
+            (propAddress.includes('15 villa') || propName.includes('house of blues') || propName.includes('blues'))) {
+          return true;
+        }
+        
+        // Smoke Hollow Retreat
+        if ((listingName.includes('smoke hollow') || listingName.includes('3419')) &&
+            (propAddress.includes('smoke hollow') || propName.includes('smoke hollow'))) {
+          return true;
+        }
+        
+        // Mableton Meadows
+        if ((listingName.includes('mableton') || listingName.includes('woodland') || listingName.includes('184')) &&
+            (propAddress.includes('woodland') || propName.includes('mableton'))) {
+          return true;
+        }
+        
+        // Canadian Way Haven / Peaceful 4BR
+        if ((listingName.includes('canadian way') || listingName.includes('peaceful 4br') || listingName.includes('nearemory') || listingName.includes('3708')) &&
+            (propAddress.includes('canadian way') || propName.includes('canadian way'))) {
+          return true;
+        }
+        
+        return false;
       });
 
       if (matchedProperty) {
@@ -63,7 +108,10 @@ serve(async (req) => {
 
         if (!error) {
           bookingsLinked++;
+          console.log(`Linked booking ${booking.booking_id} (${listingName}) to property ${matchedProperty.name}`);
         }
+      } else {
+        console.log(`No match found for booking: ${listingName}`);
       }
     }
 

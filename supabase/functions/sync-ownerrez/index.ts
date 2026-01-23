@@ -217,6 +217,16 @@ serve(async (req) => {
         propertyMapping['nearemory'] = prop.id;
         console.log(`Mapped Canadian Way Haven / Peaceful 4BR to ${prop.id}`);
       }
+      
+      // Whispering Oaks Farmhouse / 4241 Grady Smith (Eric Ha's property) - 20%
+      if (addressLower.includes('grady smith') || addressLower.includes('4241') || 
+          addressLower.includes('loganville') || propNameLower.includes('whispering oaks')) {
+        propertyMapping['whispering oaks'] = prop.id;
+        propertyMapping['whispering oaks farmhouse'] = prop.id;
+        propertyMapping['4241 grady smith'] = prop.id;
+        propertyMapping['grady smith'] = prop.id;
+        console.log(`Mapped Whispering Oaks Farmhouse / Grady Smith to ${prop.id}`);
+      }
     }
 
     console.log('Property mapping:', propertyMapping);
@@ -251,6 +261,12 @@ serve(async (req) => {
       'peaceful 4br': 0.20,
       'fenced yard': 0.20,
       'nearemory': 0.20,
+      
+      // Whispering Oaks Farmhouse - 4241 Grady Smith, Loganville, GA (Eric Ha's property)
+      'whispering oaks': 0.20,
+      'whispering oaks farmhouse': 0.20,
+      '4241 grady smith': 0.20,
+      'grady smith': 0.20,
     };
 
     // Function to determine management fee rate based on property name

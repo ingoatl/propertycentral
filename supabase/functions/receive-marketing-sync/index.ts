@@ -75,10 +75,10 @@ serve(async (req) => {
 
     for (const activity of payload.activities || []) {
       try {
-        // Verify property exists
+        // Verify property exists and get owner_id directly from properties table
         const { data: property } = await supabase
           .from("properties")
-          .select("id")
+          .select("id, owner_id")
           .eq("id", activity.property_id)
           .single();
 
@@ -88,20 +88,15 @@ serve(async (req) => {
           continue;
         }
 
-        // Get owner_id for this property
-        const { data: ownerLink } = await supabase
-          .from("property_owner_links")
-          .select("owner_id")
-          .eq("property_id", activity.property_id)
-          .single();
+        console.log(`[receive-marketing-sync] Found property ${property.id} with owner_id: ${property.owner_id}`);
 
-        // Upsert the activity
+        // Upsert the activity - use owner_id directly from property
         const { error: upsertError } = await supabase
           .from("owner_marketing_activities")
           .upsert(
             {
               property_id: activity.property_id,
-              owner_id: ownerLink?.owner_id || null,
+              owner_id: property.owner_id || null,
               activity_type: activity.activity_type,
               platform: activity.platform || null,
               title: activity.title,
