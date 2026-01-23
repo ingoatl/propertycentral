@@ -126,10 +126,10 @@ serve(async (req) => {
         }
       } catch (err) {
         console.error("[receive-marketing-sync] Activity error:", err);
-        results.errors.push(`${activity.external_id}: ${err.message}`);
+        const errMessage = err instanceof Error ? err.message : "Unknown error";
+        results.errors.push(`${activity.external_id}: ${errMessage}`);
       }
     }
-
     // Log the sync
     await supabase.from("partner_sync_log").insert({
       sync_type: "incoming",
@@ -155,8 +155,9 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("[receive-marketing-sync] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
