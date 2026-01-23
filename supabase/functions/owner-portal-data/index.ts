@@ -324,6 +324,12 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log("Property found:", property.name);
 
+    // Get current and previous month for marketing stats
+    const marketingNow = new Date();
+    const currentMonth = `${marketingNow.getFullYear()}-${String(marketingNow.getMonth() + 1).padStart(2, '0')}`;
+    const prevMonthDate = new Date(marketingNow.getFullYear(), marketingNow.getMonth() - 1, 1);
+    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
     // Fetch all data in parallel using service role key (bypasses RLS)
     const [
       statementsResult,
@@ -338,6 +344,7 @@ serve(async (req: Request): Promise<Response> => {
       platformListingsResult,
       leadOnboardingResult,
       guestScreeningsResult,
+      marketingStatsResult,
     ] = await Promise.all([
       // Monthly reconciliations (statements) - fetch all historical data (24 months)
       supabase
@@ -455,6 +462,14 @@ serve(async (req: Request): Promise<Response> => {
         .eq("screening_status", "passed")
         .order("screening_date", { ascending: false })
         .limit(50),
+      
+      // Marketing stats for current and previous month
+      supabase
+        .from("property_marketing_stats")
+        .select("*")
+        .eq("property_id", property.id)
+        .in("report_month", [currentMonth, previousMonth])
+        .order("report_month", { ascending: false }),
     ]);
 
     const rawStatements = statementsResult.data || [];
@@ -466,8 +481,10 @@ serve(async (req: Request): Promise<Response> => {
     const propertyDetails = propertyDetailsResult.data;
     const platformListings = platformListingsResult.data || [];
     const guestScreenings = guestScreeningsResult.data || [];
+    const marketingStats = marketingStatsResult.data || [];
     
     console.log("Guest screenings fetched:", guestScreenings.length);
+    console.log("Marketing stats fetched:", marketingStats.length);
     const leadOnboarding = leadOnboardingResult.data;
     
     // Process statements to calculate correct net owner earnings based on service type
@@ -1042,6 +1059,7 @@ serve(async (req: Request): Promise<Response> => {
         booking: gs.booking,
       })),
       dataWarnings, // Include any data quality warnings for admin awareness
+      marketingStats, // Marketing stats from Marketing Hub
     };
 
     return new Response(

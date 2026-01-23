@@ -7698,6 +7698,60 @@ export type Database = {
           },
         ]
       }
+      property_marketing_stats: {
+        Row: {
+          created_at: string | null
+          executive_summary: string | null
+          id: string
+          outreach: Json | null
+          property_id: string | null
+          report_month: string
+          social_media: Json | null
+          synced_at: string | null
+          updated_at: string | null
+          visibility: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          executive_summary?: string | null
+          id?: string
+          outreach?: Json | null
+          property_id?: string | null
+          report_month: string
+          social_media?: Json | null
+          synced_at?: string | null
+          updated_at?: string | null
+          visibility?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          executive_summary?: string | null
+          id?: string
+          outreach?: Json | null
+          property_id?: string | null
+          report_month?: string
+          social_media?: Json | null
+          synced_at?: string | null
+          updated_at?: string | null
+          visibility?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_marketing_stats_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_marketing_stats_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_owners: {
         Row: {
           auth_user_id: string | null

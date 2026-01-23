@@ -563,3 +563,6 @@ verify_jwt = false
 
 [functions.sync-healing-watchdog]
 verify_jwt = false
+
+[functions.receive-owner-marketing-stats]
+verify_jwt = false
