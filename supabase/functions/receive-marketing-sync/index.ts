@@ -34,7 +34,8 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const expectedApiKey = Deno.env.get("PARTNER_SYNC_API_KEY");
+    // Use dedicated GuestConnect key, fallback to general partner key for backwards compatibility
+    const expectedApiKey = Deno.env.get("GUESTCONNECT_SYNC_API_KEY") || Deno.env.get("PARTNER_SYNC_API_KEY");
 
     // Validate API key
     const providedApiKey = req.headers.get("x-api-key");
