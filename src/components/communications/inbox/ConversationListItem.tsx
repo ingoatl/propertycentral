@@ -27,6 +27,8 @@ interface ConversationListItemProps {
   onReopen: () => void;
   onMarkAwaiting?: () => void;
   isUpdating?: boolean;
+  is_resolved?: boolean;
+  is_low_importance?: boolean;
 }
 
 export function ConversationListItem({
@@ -47,6 +49,8 @@ export function ConversationListItem({
   onReopen,
   onMarkAwaiting,
   isUpdating,
+  is_resolved,
+  is_low_importance,
 }: ConversationListItemProps) {
   const isVoiceAI = isVoiceAITranscript(body);
   const isDone = conversation_status === "done";
@@ -123,13 +127,17 @@ export function ConversationListItem({
         "transition-all duration-300 ease-out",
         isSelected && "bg-primary/5 border-l-2 border-l-primary",
         // Done status: green left border with fade effect
-        isDone && "border-l-2 border-l-green-500 opacity-50 bg-green-50/30 dark:bg-green-950/10",
+        isDone && "border-l-2 border-l-green-500 bg-green-50/30 dark:bg-green-950/10",
         // Snoozed status: amber left border with fade effect  
-        isSnoozed && "border-l-2 border-l-amber-500 opacity-50 bg-amber-50/30 dark:bg-amber-950/10",
+        isSnoozed && "border-l-2 border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/10",
         // Awaiting status: cyan left border
         isAwaiting && !isDone && !isSnoozed && "border-l-2 border-l-cyan-500",
         // Inbound messages: blue left border (lowest priority)
-        direction === "inbound" && !isDone && !isSnoozed && !isAwaiting && !isSelected && "border-l-2 border-l-blue-400"
+        direction === "inbound" && !isDone && !isSnoozed && !isAwaiting && !isSelected && "border-l-2 border-l-blue-400",
+        // Visual fading for resolved messages (responded)
+        is_resolved === true && "opacity-60",
+        // Visual fading for low importance items (promo/unimportant)
+        is_low_importance === true && "opacity-50"
       )}
     >
       {/* Type Icon */}
