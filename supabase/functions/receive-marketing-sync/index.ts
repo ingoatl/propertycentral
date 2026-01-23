@@ -199,35 +199,54 @@ serve(async (req) => {
 
         results.matched.push(`${activity.property_name || activity.external_id} -> ${property.name}`);
 
-        // Upsert the activity
-        const { error: upsertError } = await supabase
+        // Check if activity already exists
+        const { data: existing } = await supabase
           .from("owner_marketing_activities")
-          .upsert(
-            {
-              property_id: property.id,
-              owner_id: property.owner_id || null,
-              activity_type: activity.activity_type,
-              platform: activity.platform || null,
-              title: activity.title,
-              description: activity.description || null,
-              metrics: activity.metrics || {},
-              activity_url: activity.url || null,
-              external_id: activity.external_id,
-              source_project: payload.source_project,
-              activity_date: activity.created_at,
-              synced_at: new Date().toISOString(),
-            },
-            {
-              onConflict: "external_id,source_project",
-              ignoreDuplicates: false,
-            }
-          );
+          .select("id")
+          .eq("external_id", activity.external_id)
+          .eq("source_project", payload.source_project)
+          .maybeSingle();
 
-        if (upsertError) {
-          console.error("[receive-marketing-sync] Upsert error:", upsertError);
-          results.errors.push(`${activity.external_id}: ${upsertError.message}`);
+        const activityRecord = {
+          property_id: property.id,
+          owner_id: property.owner_id || null,
+          activity_type: activity.activity_type,
+          platform: activity.platform || null,
+          title: activity.title,
+          description: activity.description || null,
+          metrics: activity.metrics || {},
+          activity_url: activity.url || null,
+          external_id: activity.external_id,
+          source_project: payload.source_project,
+          activity_date: activity.created_at,
+          synced_at: new Date().toISOString(),
+        };
+
+        if (existing) {
+          // Update existing record
+          const { error: updateError } = await supabase
+            .from("owner_marketing_activities")
+            .update(activityRecord)
+            .eq("id", existing.id);
+
+          if (updateError) {
+            console.error("[receive-marketing-sync] Update error:", updateError);
+            results.errors.push(`${activity.external_id}: ${updateError.message}`);
+          } else {
+            results.updated++;
+          }
         } else {
-          results.inserted++;
+          // Insert new record
+          const { error: insertError } = await supabase
+            .from("owner_marketing_activities")
+            .insert(activityRecord);
+
+          if (insertError) {
+            console.error("[receive-marketing-sync] Insert error:", insertError);
+            results.errors.push(`${activity.external_id}: ${insertError.message}`);
+          } else {
+            results.inserted++;
+          }
         }
       } catch (err) {
         console.error("[receive-marketing-sync] Activity error:", err);
