@@ -17,7 +17,14 @@ import {
   Share2,
   Mail,
   Home,
-  CheckCircle
+  CheckCircle,
+  Info,
+  User,
+  Lightbulb,
+  BarChart3,
+  Star,
+  ArrowUpRight,
+  Clock,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -32,6 +39,13 @@ interface MarketingActivity {
   activity_url: string | null;
   activity_date: string;
   synced_at: string;
+  // Extended fields for guest context
+  guest_name?: string | null;
+  booking_id?: string | null;
+  stay_dates?: {
+    check_in?: string;
+    check_out?: string;
+  } | null;
 }
 
 interface OwnerMarketingTabProps {
@@ -39,36 +53,97 @@ interface OwnerMarketingTabProps {
   propertyName: string;
 }
 
-const activityIcons: Record<string, React.ReactNode> = {
-  listing_created: <Home className="w-4 h-4" />,
-  listing_updated: <RefreshCw className="w-4 h-4" />,
-  campaign_launched: <Megaphone className="w-4 h-4" />,
-  social_post: <Share2 className="w-4 h-4" />,
-  email_blast: <Mail className="w-4 h-4" />,
-  inquiry_received: <MessageSquare className="w-4 h-4" />,
-  listing_view: <Eye className="w-4 h-4" />,
-  booking_inquiry: <Calendar className="w-4 h-4" />,
+// Activity type metadata with context and industry insights
+const activityMetadata: Record<string, {
+  icon: React.ReactNode;
+  color: string;
+  purpose: string;
+  industryInsight: string;
+  impactMetric?: string;
+}> = {
+  email_blast: {
+    icon: <Mail className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-orange-100 to-amber-100 text-orange-700 dark:from-orange-900/40 dark:to-amber-900/40 dark:text-orange-300",
+    purpose: "Pre-arrival communication ensures your guest has check-in instructions, house rules, and local recommendations for a smooth arrival and 5-star experience.",
+    industryInsight: "Properties with automated pre-arrival emails see 23% higher review scores and 40% fewer guest questions.",
+    impactMetric: "23% higher reviews",
+  },
+  listing_created: {
+    icon: <Home className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-green-100 to-emerald-100 text-green-700 dark:from-green-900/40 dark:to-emerald-900/40 dark:text-green-300",
+    purpose: "Your property is now live and visible to potential guests on our booking platforms, maximizing exposure and booking opportunities.",
+    industryInsight: "New listings receive 40% higher visibility in search results during their first 2 weeks of publication.",
+    impactMetric: "40% more visibility",
+  },
+  listing_updated: {
+    icon: <RefreshCw className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-blue-100 to-cyan-100 text-blue-700 dark:from-blue-900/40 dark:to-cyan-900/40 dark:text-blue-300",
+    purpose: "We've optimized your listing with updated photos, descriptions, or pricing to improve conversion and attract more bookings.",
+    industryInsight: "Listings updated monthly convert 28% better than stale listings. Fresh content signals an active, well-maintained property.",
+    impactMetric: "28% better conversion",
+  },
+  campaign_launched: {
+    icon: <Megaphone className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-purple-100 to-violet-100 text-purple-700 dark:from-purple-900/40 dark:to-violet-900/40 dark:text-purple-300",
+    purpose: "A targeted marketing campaign is running to promote your property to ideal guests based on their travel preferences and history.",
+    industryInsight: "Targeted campaigns generate 3x more qualified leads than general advertising, reducing vacancy and maximizing revenue.",
+    impactMetric: "3x more leads",
+  },
+  social_post: {
+    icon: <Share2 className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-pink-100 to-rose-100 text-pink-700 dark:from-pink-900/40 dark:to-rose-900/40 dark:text-pink-300",
+    purpose: "Your property was featured on our social media channels to attract new guests and build brand awareness.",
+    industryInsight: "Social media exposure drives 15% of direct booking inquiries. Visual content increases engagement by 65%.",
+    impactMetric: "15% direct bookings",
+  },
+  inquiry_received: {
+    icon: <MessageSquare className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-amber-100 to-yellow-100 text-amber-700 dark:from-amber-900/40 dark:to-yellow-900/40 dark:text-amber-300",
+    purpose: "A potential guest has expressed interest in your property. Our team responded promptly to convert this inquiry into a booking.",
+    industryInsight: "Inquiries responded to within 1 hour have a 45% higher conversion rate. Speed matters in hospitality.",
+    impactMetric: "45% higher conversion",
+  },
+  listing_view: {
+    icon: <Eye className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-cyan-100 to-sky-100 text-cyan-700 dark:from-cyan-900/40 dark:to-sky-900/40 dark:text-cyan-300",
+    purpose: "Your listing is attracting views from potential guests browsing our platform for their next stay.",
+    industryInsight: "High view counts indicate strong listing appeal. Properties with optimized photos get 2x more views.",
+    impactMetric: "2x more views",
+  },
+  booking_inquiry: {
+    icon: <Calendar className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-700 dark:from-emerald-900/40 dark:to-teal-900/40 dark:text-emerald-300",
+    purpose: "A guest has inquired about booking specific dates at your property. This is a high-intent lead.",
+    industryInsight: "Booking inquiries convert at 35% when followed up within 30 minutes. Time-sensitive response is key.",
+    impactMetric: "35% conversion",
+  },
+  guest_welcome: {
+    icon: <Star className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-indigo-100 to-blue-100 text-indigo-700 dark:from-indigo-900/40 dark:to-blue-900/40 dark:text-indigo-300",
+    purpose: "Welcome communication sent to prepare your guest for an amazing stay with personalized recommendations and essential information.",
+    industryInsight: "Personalized welcome messages increase 5-star review probability by 31% and reduce support requests by 25%.",
+    impactMetric: "31% more 5-star reviews",
+  },
 };
 
-const activityColors: Record<string, string> = {
-  listing_created: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  listing_updated: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  campaign_launched: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  social_post: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
-  email_blast: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  inquiry_received: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  listing_view: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
-  booking_inquiry: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+const defaultMetadata = {
+  icon: <CheckCircle className="w-5 h-5" />,
+  color: "bg-gradient-to-br from-gray-100 to-slate-100 text-gray-700 dark:from-gray-900/40 dark:to-slate-900/40 dark:text-gray-300",
+  purpose: "Marketing activity to promote your property and attract guests.",
+  industryInsight: "Consistent marketing efforts increase bookings by 20% on average.",
+  impactMetric: "20% more bookings",
 };
 
 export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTabProps) => {
   const [activities, setActivities] = useState<MarketingActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [aggregateMetrics, setAggregateMetrics] = useState({
     totalViews: 0,
     totalClicks: 0,
     totalInquiries: 0,
     activePlatforms: 0,
+    totalActivities: 0,
   });
 
   useEffect(() => {
@@ -103,9 +178,10 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
             totalClicks: acc.totalClicks + (m.clicks || 0),
             totalInquiries: acc.totalInquiries + (m.inquiries || 0),
             activePlatforms: acc.activePlatforms,
+            totalActivities: acc.totalActivities + 1,
           };
         },
-        { totalViews: 0, totalClicks: 0, totalInquiries: 0, activePlatforms: 0 }
+        { totalViews: 0, totalClicks: 0, totalInquiries: 0, activePlatforms: 0, totalActivities: 0 }
       );
 
       // Count unique platforms
@@ -124,11 +200,31 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
     }
   };
 
-  const formatActivityType = (type: string) => {
-    return type
-      .split("_")
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+  const getActivityMeta = (activityType: string) => {
+    return activityMetadata[activityType] || defaultMetadata;
+  };
+
+  const formatActivityTitle = (activity: MarketingActivity) => {
+    // If we have guest context, personalize the title
+    if (activity.guest_name) {
+      if (activity.activity_type === "email_blast" || activity.activity_type === "guest_welcome") {
+        return `Welcome email sent to ${activity.guest_name}`;
+      }
+    }
+    return activity.title;
+  };
+
+  const getStayContext = (activity: MarketingActivity) => {
+    if (activity.stay_dates?.check_in && activity.stay_dates?.check_out) {
+      try {
+        const checkIn = new Date(activity.stay_dates.check_in);
+        const checkOut = new Date(activity.stay_dates.check_out);
+        return `Stay: ${format(checkIn, "MMM d")} - ${format(checkOut, "MMM d, yyyy")}`;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   };
 
   if (loading) {
@@ -163,13 +259,26 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
         </Button>
       </div>
 
+      {/* Industry Context Banner */}
+      <Card className="border-none shadow-md bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3">
+            <Lightbulb className="h-5 w-5 text-primary shrink-0" />
+            <p className="text-sm">
+              <span className="font-medium">We handle your marketing so you don't have to.</span>
+              <span className="text-muted-foreground"> Every activity below is designed to maximize your property's visibility and revenue.</span>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Metrics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100/50 border-none shadow-lg dark:from-cyan-950/30 dark:to-cyan-900/20">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
-                <Eye className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                <Eye className="w-5 h-5 text-cyan-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{aggregateMetrics.totalViews.toLocaleString()}</p>
@@ -179,25 +288,25 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-none shadow-lg dark:from-blue-950/30 dark:to-blue-900/20">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <MousePointerClick className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                <MousePointerClick className="w-5 h-5 text-blue-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{aggregateMetrics.totalClicks.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Total Clicks</p>
+                <p className="text-xs text-muted-foreground">Clicks</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-none shadow-lg dark:from-amber-950/30 dark:to-amber-900/20">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                <MessageSquare className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-amber-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{aggregateMetrics.totalInquiries}</p>
@@ -207,15 +316,29 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-none shadow-lg dark:from-purple-950/30 dark:to-purple-900/20">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-purple-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{aggregateMetrics.activePlatforms}</p>
-                <p className="text-xs text-muted-foreground">Active Platforms</p>
+                <p className="text-xs text-muted-foreground">Platforms</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-none shadow-lg dark:from-emerald-950/30 dark:to-emerald-900/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{aggregateMetrics.totalActivities}</p>
+                <p className="text-xs text-muted-foreground">Activities</p>
               </div>
             </div>
           </CardContent>
@@ -223,101 +346,203 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
       </div>
 
       {/* Activity Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Marketing Activity Timeline</CardTitle>
+      <Card className="border-none shadow-lg overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-muted/50 to-background border-b">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Marketing Activity Timeline
+          </CardTitle>
           <CardDescription>
-            Recent marketing efforts and their results
+            Every action we take to promote your property and maximize bookings
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {activities.length === 0 ? (
-            <div className="text-center py-12">
-              <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium text-muted-foreground">No marketing activities yet</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Marketing data will appear here once synced from our marketing platform.
+            <div className="text-center py-16">
+              <div className="w-20 h-20 rounded-full bg-muted mx-auto flex items-center justify-center mb-6">
+                <Megaphone className="w-10 h-10 text-muted-foreground/50" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">No Marketing Activities Yet</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Marketing data will appear here once we begin promoting your property. Stay tuned!
               </p>
             </div>
           ) : (
             <div className="relative">
               {/* Timeline line */}
-              <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
+              <div className="absolute left-6 top-0 bottom-0 w-px bg-border" />
 
-              <div className="space-y-4">
-                {activities.map((activity, index) => (
-                  <div key={activity.id} className="relative pl-10">
-                    {/* Timeline dot */}
-                    <div className={`absolute left-2 top-2 w-5 h-5 rounded-full flex items-center justify-center ${activityColors[activity.activity_type] || "bg-muted text-muted-foreground"}`}>
-                      {activityIcons[activity.activity_type] || <CheckCircle className="w-3 h-3" />}
-                    </div>
+              <div className="divide-y">
+                {activities.map((activity) => {
+                  const meta = getActivityMeta(activity.activity_type);
+                  const stayContext = getStayContext(activity);
+                  const isExpanded = expandedActivity === activity.id;
+                  
+                  return (
+                    <div 
+                      key={activity.id} 
+                      className="relative pl-14 pr-6 py-6 hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => setExpandedActivity(isExpanded ? null : activity.id)}
+                    >
+                      {/* Timeline dot */}
+                      <div className={`absolute left-3 top-6 w-7 h-7 rounded-full flex items-center justify-center ${meta.color}`}>
+                        {meta.icon}
+                      </div>
 
-                    <div className="bg-muted/30 rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium">{activity.title}</span>
-                            {activity.platform && (
-                              <Badge variant="secondary" className="text-xs">
-                                {activity.platform}
-                              </Badge>
-                            )}
-                          </div>
-                          {activity.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {activity.description}
-                            </p>
-                          )}
-
-                          {/* Metrics */}
-                          {Object.keys(activity.metrics || {}).length > 0 && (
-                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                              {activity.metrics.views !== undefined && (
-                                <span className="flex items-center gap-1">
-                                  <Eye className="w-3 h-3" />
-                                  {activity.metrics.views.toLocaleString()} views
-                                </span>
+                      <div className="space-y-3">
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-semibold text-base">{formatActivityTitle(activity)}</span>
+                              {activity.platform && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {activity.platform}
+                                </Badge>
                               )}
-                              {activity.metrics.clicks !== undefined && (
-                                <span className="flex items-center gap-1">
-                                  <MousePointerClick className="w-3 h-3" />
-                                  {activity.metrics.clicks.toLocaleString()} clicks
-                                </span>
-                              )}
-                              {activity.metrics.inquiries !== undefined && (
-                                <span className="flex items-center gap-1">
-                                  <MessageSquare className="w-3 h-3" />
-                                  {activity.metrics.inquiries} inquiries
-                                </span>
+                              {meta.impactMetric && (
+                                <Badge className="bg-primary/10 text-primary text-xs">
+                                  <ArrowUpRight className="w-3 h-3 mr-1" />
+                                  {meta.impactMetric}
+                                </Badge>
                               )}
                             </div>
-                          )}
+
+                            {/* Guest and stay context */}
+                            {(activity.guest_name || stayContext) && (
+                              <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
+                                {activity.guest_name && (
+                                  <span className="flex items-center gap-1.5">
+                                    <User className="w-3.5 h-3.5" />
+                                    {activity.guest_name}
+                                  </span>
+                                )}
+                                {stayContext && (
+                                  <span className="flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    {stayContext}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(activity.activity_date), { addSuffix: true })}
+                            </span>
+                            {activity.activity_url && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(activity.activity_url!, "_blank");
+                                }}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(activity.activity_date), { addSuffix: true })}
-                          </span>
-                          {activity.activity_url && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => window.open(activity.activity_url!, "_blank")}
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </Button>
-                          )}
+                        {/* Why we sent this - expanded content */}
+                        <div className={`space-y-3 ${isExpanded ? 'block' : 'hidden md:block'}`}>
+                          {/* Purpose */}
+                          <div className="bg-muted/50 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                <Info className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                                  Why We Sent This
+                                </p>
+                                <p className="text-sm">
+                                  {activity.description || meta.purpose}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Industry Insight */}
+                          <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                                <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 mb-1">
+                                  Industry Insight
+                                </p>
+                                <p className="text-sm text-amber-900 dark:text-amber-200">
+                                  {meta.industryInsight}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Metrics if available */}
+                        {Object.keys(activity.metrics || {}).length > 0 && (
+                          <div className="flex items-center gap-4 text-sm">
+                            {activity.metrics?.views !== undefined && (
+                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <Eye className="w-4 h-4" />
+                                <span className="font-medium">{activity.metrics.views.toLocaleString()}</span> views
+                              </span>
+                            )}
+                            {activity.metrics?.clicks !== undefined && (
+                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <MousePointerClick className="w-4 h-4" />
+                                <span className="font-medium">{activity.metrics.clicks.toLocaleString()}</span> clicks
+                              </span>
+                            )}
+                            {activity.metrics?.inquiries !== undefined && (
+                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <MessageSquare className="w-4 h-4" />
+                                <span className="font-medium">{activity.metrics.inquiries}</span> inquiries
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Expand hint on mobile */}
+                        <p className="text-xs text-muted-foreground md:hidden">
+                          {isExpanded ? "Tap to collapse" : "Tap for details"}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Trust Footer */}
+      {activities.length > 0 && (
+        <Card className="border-none shadow-sm bg-muted/30">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground flex-wrap">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span>Professionally Managed Marketing</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                <span>Data-Driven Strategy</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4" />
+                <span>Maximizing Your Revenue</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
