@@ -11,6 +11,7 @@ interface GenerateDashboardPdfButtonProps {
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm" | "lg";
   className?: string;
+  onBeforeGenerate?: () => Promise<void>;
 }
 
 export function GenerateDashboardPdfButton({
@@ -20,6 +21,7 @@ export function GenerateDashboardPdfButton({
   variant = "default",
   size = "default",
   className = "",
+  onBeforeGenerate,
 }: GenerateDashboardPdfButtonProps) {
   const [generating, setGenerating] = useState(false);
 
@@ -32,6 +34,11 @@ export function GenerateDashboardPdfButton({
     setGenerating(true);
     
     try {
+      // Refresh data first if callback provided
+      if (onBeforeGenerate) {
+        await onBeforeGenerate();
+      }
+      
       const { data, error } = await supabase.functions.invoke(
         "generate-owner-dashboard-pdf",
         {
