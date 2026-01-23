@@ -32,6 +32,7 @@ import {
   MessageCircle,
   Wrench,
   Shield,
+  Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -51,6 +52,7 @@ import { OwnerMessagesTab } from "./components/OwnerMessagesTab";
 import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
 import { OwnerGuestScreeningsTab } from "./components/OwnerGuestScreeningsTab";
 import { OwnerUpcomingCalls } from "./components/OwnerUpcomingCalls";
+import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
@@ -918,6 +920,10 @@ export default function OwnerDashboard() {
               <Shield className="h-4 w-4" />
               <span className="hidden sm:inline">Guest Screenings</span>
             </TabsTrigger>
+            <TabsTrigger value="marketing" className="gap-2">
+              <Megaphone className="h-4 w-4" />
+              <span className="hidden sm:inline">Marketing</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Show onboarding timeline if property is in onboarding */}
@@ -1195,6 +1201,15 @@ export default function OwnerDashboard() {
               <OwnerGuestScreeningsTab 
                 propertyId={property.id} 
                 screenings={guestScreenings}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="marketing">
+            {property && (
+              <OwnerMarketingTab 
+                propertyId={property.id} 
+                propertyName={property.name}
               />
             )}
           </TabsContent>
