@@ -335,6 +335,7 @@ serve(async (req: Request): Promise<Response> => {
       reviewsByListingResult,
       emailInsightsResult,
       propertyDetailsResult,
+      platformListingsResult,
       leadOnboardingResult,
       guestScreeningsResult,
     ] = await Promise.all([
@@ -413,12 +414,26 @@ serve(async (req: Request): Promise<Response> => {
         .order("created_at", { ascending: false })
         .limit(20),
       
-      // Comprehensive property data for details
+      // Comprehensive property data for details - fetch all fields for property tab
       supabase
         .from("comprehensive_property_data")
-        .select("bedrooms, bathrooms, square_feet, max_guests, amenities")
+        .select(`
+          bedrooms, bathrooms, square_feet, max_guests, amenities, brand_name, property_type_detail,
+          stories, parking_type, parking_spaces, basement, fenced_yard, ada_compliant,
+          monthly_rent, nightly_rate, security_deposit, cleaning_fee, pet_fee,
+          monthly_pet_rent, pets_allowed, pet_rules, max_pets, max_pet_weight,
+          school_district, elementary_school, middle_school, high_school,
+          website_url
+        `)
         .eq("id", property.id)
         .maybeSingle(),
+      
+      // Platform listings for marketing display
+      supabase
+        .from("platform_listings")
+        .select("platform_name, listing_url, is_active")
+        .eq("property_id", property.id)
+        .eq("is_active", true),
       
       // Lead onboarding status for this property
       supabase
@@ -449,6 +464,7 @@ serve(async (req: Request): Promise<Response> => {
     const mtrBookings = mtrBookingsResult.data || [];
     const emailInsights = emailInsightsResult.data || [];
     const propertyDetails = propertyDetailsResult.data;
+    const platformListings = platformListingsResult.data || [];
     const guestScreenings = guestScreeningsResult.data || [];
     
     console.log("Guest screenings fetched:", guestScreenings.length);
@@ -953,12 +969,42 @@ serve(async (req: Request): Promise<Response> => {
         rental_type: property.rental_type,
         image_path: property.image_path,
         management_fee_percentage: property.management_fee_percentage,
+        nightly_rate: property.nightly_rate,
+        // Property specs
         bedrooms: propertyDetails?.bedrooms,
         bathrooms: propertyDetails?.bathrooms,
         square_feet: propertyDetails?.square_feet,
         max_guests: propertyDetails?.max_guests,
         amenities: propertyDetails?.amenities,
         onboarding_stage: leadOnboarding?.stage || null,
+        // Extended property details
+        brand_name: propertyDetails?.brand_name,
+        property_type_detail: propertyDetails?.property_type_detail,
+        stories: propertyDetails?.stories,
+        parking_type: propertyDetails?.parking_type,
+        parking_spaces: propertyDetails?.parking_spaces,
+        basement: propertyDetails?.basement,
+        fenced_yard: propertyDetails?.fenced_yard,
+        ada_compliant: propertyDetails?.ada_compliant,
+        // Pricing
+        monthly_rent: propertyDetails?.monthly_rent,
+        security_deposit: propertyDetails?.security_deposit,
+        cleaning_fee: propertyDetails?.cleaning_fee,
+        pet_fee: propertyDetails?.pet_fee,
+        monthly_pet_rent: propertyDetails?.monthly_pet_rent,
+        // Pet policies
+        pets_allowed: propertyDetails?.pets_allowed,
+        pet_rules: propertyDetails?.pet_rules,
+        max_pets: propertyDetails?.max_pets,
+        max_pet_weight: propertyDetails?.max_pet_weight,
+        // School info
+        school_district: propertyDetails?.school_district,
+        elementary_school: propertyDetails?.elementary_school,
+        middle_school: propertyDetails?.middle_school,
+        high_school: propertyDetails?.high_school,
+        // Marketing assets
+        website_url: propertyDetails?.website_url,
+        platforms: platformListings,
       },
       statements,
       expenses,
