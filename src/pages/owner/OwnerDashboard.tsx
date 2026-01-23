@@ -33,6 +33,7 @@ import {
   Wrench,
   Shield,
   Megaphone,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -51,8 +52,8 @@ import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfBut
 import { OwnerMessagesTab } from "./components/OwnerMessagesTab";
 import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
 import { OwnerGuestScreeningsTab } from "./components/OwnerGuestScreeningsTab";
-import { OwnerUpcomingCalls } from "./components/OwnerUpcomingCalls";
 import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
+import { ScheduleOwnerCallModal } from "./components/ScheduleOwnerCallModal";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
@@ -188,6 +189,7 @@ export default function OwnerDashboard() {
   const [insightsStep, setInsightsStep] = useState("Initializing...");
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [revenueBreakdown, setRevenueBreakdown] = useState<any>(null);
+  const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
   
   // Session stability & refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -805,6 +807,17 @@ export default function OwnerDashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {session && (
+                  <Button 
+                    variant={propertyImageUrl ? "outline" : "outline"} 
+                    size="sm" 
+                    onClick={() => setShowScheduleCallModal(true)}
+                    className="gap-2"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    <span className="hidden sm:inline">Schedule Call</span>
+                  </Button>
+                )}
                 {session && property && (
                   <GenerateDashboardPdfButton
                     ownerId={session.ownerId}
@@ -812,6 +825,7 @@ export default function OwnerDashboard() {
                     propertyName={property.name}
                     variant={propertyImageUrl ? "outline" : "outline"}
                     size="sm"
+                    onBeforeGenerate={() => refreshData(false)}
                   />
                 )}
                 <Button 
@@ -931,9 +945,6 @@ export default function OwnerDashboard() {
 
           <TabsContent value="overview">
             <div className="space-y-8">
-              {/* Upcoming Calls */}
-              <OwnerUpcomingCalls ownerEmail={session.email} ownerName={session.ownerName} />
-
               {/* Performance Overview */}
               <OwnerPerformanceOverview 
                 metrics={performanceMetrics}
@@ -1238,6 +1249,16 @@ export default function OwnerDashboard() {
         ownerName={session?.ownerName}
         propertyAddress={property?.address}
       />
+
+      {/* Schedule Call Modal */}
+      {session && (
+        <ScheduleOwnerCallModal
+          open={showScheduleCallModal}
+          onOpenChange={setShowScheduleCallModal}
+          ownerEmail={session.email}
+          ownerName={session.ownerName}
+        />
+      )}
     </div>
   );
 }
