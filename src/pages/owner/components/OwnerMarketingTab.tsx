@@ -25,8 +25,20 @@ import {
   Star,
   ArrowUpRight,
   Clock,
+  Users,
+  Baby,
+  PawPrint,
 } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, differenceInDays } from "date-fns";
+
+interface GuestInfo {
+  guest_name: string | null;
+  check_in: string | null;
+  check_out: string | null;
+  adults: number | null;
+  children: number | null;
+  pets: number | null;
+}
 
 interface MarketingActivity {
   id: string;
@@ -39,6 +51,8 @@ interface MarketingActivity {
   activity_url: string | null;
   activity_date: string;
   synced_at: string;
+  // Guest info from joined booking data
+  guest_info?: GuestInfo | null;
   // Extended fields for guest context
   guest_name?: string | null;
   booking_id?: string | null;
@@ -163,14 +177,46 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
 
       if (error) throw error;
 
-      const typedActivities = (activitiesData || []).map(a => ({
-        ...a,
-        metrics: (a.metrics as Record<string, number>) || {},
-      }));
-      setActivities(typedActivities);
+      // Fetch bookings for this property to match guest info
+      const { data: bookingsData } = await supabase
+        .from("ownerrez_bookings")
+        .select("guest_name, check_in, check_out, adults, children, pets")
+        .eq("property_id", propertyId)
+        .order("check_in", { ascending: false });
+
+      // Match activities with guest info from bookings
+      const enrichedActivities = (activitiesData || []).map(activity => {
+        const activityDate = new Date(activity.activity_date);
+        
+        // Find a booking that matches the activity date (email sent ~7 days before check-in)
+        const matchedBooking = bookingsData?.find(booking => {
+          if (!booking.check_in || !booking.guest_name) return false;
+          const checkIn = new Date(booking.check_in);
+          const checkOut = booking.check_out ? new Date(booking.check_out) : null;
+          const daysBefore = differenceInDays(checkIn, activityDate);
+          // Match if activity is 0-14 days before check-in OR during the stay
+          return (daysBefore >= 0 && daysBefore <= 14) || 
+                 (checkOut && activityDate >= checkIn && activityDate <= checkOut);
+        });
+
+        return {
+          ...activity,
+          metrics: (activity.metrics as Record<string, number>) || {},
+          guest_info: matchedBooking ? {
+            guest_name: matchedBooking.guest_name,
+            check_in: matchedBooking.check_in,
+            check_out: matchedBooking.check_out,
+            adults: matchedBooking.adults,
+            children: matchedBooking.children,
+            pets: matchedBooking.pets,
+          } : null,
+        };
+      });
+
+      setActivities(enrichedActivities);
 
       // Calculate aggregate metrics
-      const metrics = typedActivities.reduce(
+      const metrics = enrichedActivities.reduce(
         (acc, activity) => {
           const m = activity.metrics as Record<string, number> || {};
           return {
@@ -206,25 +252,51 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
 
   const formatActivityTitle = (activity: MarketingActivity) => {
     // If we have guest context, personalize the title
-    if (activity.guest_name) {
+    const guestName = activity.guest_info?.guest_name || activity.guest_name;
+    if (guestName) {
       if (activity.activity_type === "email_blast" || activity.activity_type === "guest_welcome") {
-        return `Welcome email sent to ${activity.guest_name}`;
+        return `Welcome Email to ${guestName}`;
       }
     }
     return activity.title;
   };
 
   const getStayContext = (activity: MarketingActivity) => {
-    if (activity.stay_dates?.check_in && activity.stay_dates?.check_out) {
+    // Use guest_info first, then fall back to stay_dates
+    const checkIn = activity.guest_info?.check_in || activity.stay_dates?.check_in;
+    const checkOut = activity.guest_info?.check_out || activity.stay_dates?.check_out;
+    
+    if (checkIn && checkOut) {
       try {
-        const checkIn = new Date(activity.stay_dates.check_in);
-        const checkOut = new Date(activity.stay_dates.check_out);
-        return `Stay: ${format(checkIn, "MMM d")} - ${format(checkOut, "MMM d, yyyy")}`;
+        const inDate = new Date(checkIn);
+        const outDate = new Date(checkOut);
+        const nights = differenceInDays(outDate, inDate);
+        return {
+          formatted: `${format(inDate, "MMM d")} - ${format(outDate, "MMM d, yyyy")}`,
+          nights: nights > 0 ? nights : null,
+        };
       } catch {
         return null;
       }
     }
     return null;
+  };
+
+  const getGuestPartyInfo = (activity: MarketingActivity) => {
+    const info = activity.guest_info;
+    if (!info) return null;
+    
+    const parts: string[] = [];
+    if (info.adults && info.adults > 0) {
+      parts.push(`${info.adults} adult${info.adults > 1 ? 's' : ''}`);
+    }
+    if (info.children && info.children > 0) {
+      parts.push(`${info.children} child${info.children > 1 ? 'ren' : ''}`);
+    }
+    if (info.pets && info.pets > 0) {
+      parts.push(`${info.pets} pet${info.pets > 1 ? 's' : ''}`);
+    }
+    return parts.length > 0 ? parts.join(', ') : null;
   };
 
   if (loading) {
@@ -409,20 +481,54 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
                             </div>
 
                             {/* Guest and stay context */}
-                            {(activity.guest_name || stayContext) && (
-                              <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
-                                {activity.guest_name && (
-                                  <span className="flex items-center gap-1.5">
-                                    <User className="w-3.5 h-3.5" />
-                                    {activity.guest_name}
-                                  </span>
-                                )}
-                                {stayContext && (
-                                  <span className="flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    {stayContext}
-                                  </span>
-                                )}
+                            {(activity.guest_info || stayContext) && (
+                              <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-lg p-3 mb-2">
+                                <div className="flex items-center gap-4 flex-wrap text-sm">
+                                  {activity.guest_info?.guest_name && (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                        <User className="w-4 h-4 text-primary" />
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-foreground">{activity.guest_info.guest_name}</span>
+                                        {getGuestPartyInfo(activity) && (
+                                          <span className="text-muted-foreground text-xs ml-2">
+                                            ({getGuestPartyInfo(activity)})
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {stayContext && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <Calendar className="w-4 h-4" />
+                                      <span>{stayContext.formatted}</span>
+                                      {stayContext.nights && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          {stayContext.nights} night{stayContext.nights > 1 ? 's' : ''}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  )}
+                                  {activity.guest_info?.adults && activity.guest_info.adults > 0 && (
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                      <Users className="w-3.5 h-3.5" />
+                                      <span className="text-xs">{activity.guest_info.adults} adults</span>
+                                    </div>
+                                  )}
+                                  {activity.guest_info?.children && activity.guest_info.children > 0 && (
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                      <Baby className="w-3.5 h-3.5" />
+                                      <span className="text-xs">{activity.guest_info.children} children</span>
+                                    </div>
+                                  )}
+                                  {activity.guest_info?.pets && activity.guest_info.pets > 0 && (
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                      <PawPrint className="w-3.5 h-3.5" />
+                                      <span className="text-xs">{activity.guest_info.pets} pets</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
