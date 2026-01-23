@@ -1221,6 +1221,7 @@ export default function OwnerDashboard() {
               <OwnerMarketingTab 
                 propertyId={property.id} 
                 propertyName={property.name}
+                directBookingUrl={property.website_url}
               />
             )}
           </TabsContent>

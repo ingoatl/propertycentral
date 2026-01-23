@@ -28,6 +28,11 @@ import {
   Users,
   Baby,
   PawPrint,
+  BookOpen,
+  QrCode,
+  Globe,
+  Package,
+  Repeat,
 } from "lucide-react";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 
@@ -65,15 +70,19 @@ interface MarketingActivity {
 interface OwnerMarketingTabProps {
   propertyId: string;
   propertyName: string;
+  directBookingUrl?: string | null;
+  guidebookUrl?: string | null;
+  qrCodeUrl?: string | null;
 }
 
-// Activity type metadata with context and industry insights
+// Activity type metadata with context, industry insights, and rebooking impact
 const activityMetadata: Record<string, {
   icon: React.ReactNode;
   color: string;
   purpose: string;
   industryInsight: string;
   impactMetric?: string;
+  rebookingImpact?: string;
 }> = {
   email_blast: {
     icon: <Mail className="w-5 h-5" />,
@@ -81,6 +90,7 @@ const activityMetadata: Record<string, {
     purpose: "Pre-arrival communication ensures your guest has check-in instructions, house rules, and local recommendations for a smooth arrival and 5-star experience.",
     industryInsight: "Properties with automated pre-arrival emails see 23% higher review scores and 40% fewer guest questions.",
     impactMetric: "23% higher reviews",
+    rebookingImpact: "Guests receiving pre-arrival emails are 35% more likely to book directly next time",
   },
   listing_created: {
     icon: <Home className="w-5 h-5" />,
@@ -88,6 +98,7 @@ const activityMetadata: Record<string, {
     purpose: "Your property is now live and visible to potential guests on our booking platforms, maximizing exposure and booking opportunities.",
     industryInsight: "New listings receive 40% higher visibility in search results during their first 2 weeks of publication.",
     impactMetric: "40% more visibility",
+    rebookingImpact: "More exposure means more first-time guests who can become repeat bookers",
   },
   listing_updated: {
     icon: <RefreshCw className="w-5 h-5" />,
@@ -95,6 +106,7 @@ const activityMetadata: Record<string, {
     purpose: "We've optimized your listing with updated photos, descriptions, or pricing to improve conversion and attract more bookings.",
     industryInsight: "Listings updated monthly convert 28% better than stale listings. Fresh content signals an active, well-maintained property.",
     impactMetric: "28% better conversion",
+    rebookingImpact: "Updated listings attract quality guests who are more likely to return",
   },
   campaign_launched: {
     icon: <Megaphone className="w-5 h-5" />,
@@ -102,6 +114,7 @@ const activityMetadata: Record<string, {
     purpose: "A targeted marketing campaign is running to promote your property to ideal guests based on their travel preferences and history.",
     industryInsight: "Targeted campaigns generate 3x more qualified leads than general advertising, reducing vacancy and maximizing revenue.",
     impactMetric: "3x more leads",
+    rebookingImpact: "Targeted guests are 2x more likely to become repeat customers",
   },
   social_post: {
     icon: <Share2 className="w-5 h-5" />,
@@ -109,6 +122,7 @@ const activityMetadata: Record<string, {
     purpose: "Your property was featured on our social media channels to attract new guests and build brand awareness.",
     industryInsight: "Social media exposure drives 15% of direct booking inquiries. Visual content increases engagement by 65%.",
     impactMetric: "15% direct bookings",
+    rebookingImpact: "Social followers often become loyal repeat bookers",
   },
   inquiry_received: {
     icon: <MessageSquare className="w-5 h-5" />,
@@ -137,6 +151,23 @@ const activityMetadata: Record<string, {
     purpose: "Welcome communication sent to prepare your guest for an amazing stay with personalized recommendations and essential information.",
     industryInsight: "Personalized welcome messages increase 5-star review probability by 31% and reduce support requests by 25%.",
     impactMetric: "31% more 5-star reviews",
+    rebookingImpact: "A great first impression leads to 40% more repeat bookings",
+  },
+  post_stay_thankyou: {
+    icon: <Mail className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 dark:from-rose-900/40 dark:to-pink-900/40 dark:text-rose-300",
+    purpose: "Sent 24 hours after checkout thanking the guest for their stay and gently requesting a review.",
+    industryInsight: "Post-stay thank you emails increase public reviews by 60%. More reviews = higher ranking = more bookings.",
+    impactMetric: "60% more reviews",
+    rebookingImpact: "Thank you emails with discount codes see 28% rebooking rate",
+  },
+  direct_booking_invite: {
+    icon: <Repeat className="w-5 h-5" />,
+    color: "bg-gradient-to-br from-emerald-100 to-green-100 text-emerald-700 dark:from-emerald-900/40 dark:to-green-900/40 dark:text-emerald-300",
+    purpose: "Sent 30 days post-stay with a special offer for direct booking on your property website, saving OTA fees.",
+    industryInsight: "Direct bookings save 15-20% in OTA fees and build a loyal guest database for your property.",
+    impactMetric: "15-20% fee savings",
+    rebookingImpact: "Direct booking invites convert at 12% for repeat stays",
   },
 };
 
@@ -148,7 +179,7 @@ const defaultMetadata = {
   impactMetric: "20% more bookings",
 };
 
-export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTabProps) => {
+export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl }: OwnerMarketingTabProps) => {
   const [activities, setActivities] = useState<MarketingActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
@@ -343,6 +374,73 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
           Refresh
         </Button>
       </div>
+
+      {/* Marketing Toolkit Section */}
+      {(directBookingUrl || guidebookUrl || qrCodeUrl) && (
+        <Card className="border-none shadow-lg bg-gradient-to-br from-primary/5 to-accent/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Your Marketing Toolkit
+            </CardTitle>
+            <CardDescription>
+              Tools we use to attract and delight your guests
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-4">
+              {guidebookUrl && (
+                <div className="p-4 bg-background rounded-xl border">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3">
+                    <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="font-semibold mb-1">Digital Guidebook</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Interactive guide with check-in instructions, WiFi info, house rules, and local recommendations.
+                  </p>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={guidebookUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View Guidebook
+                    </a>
+                  </Button>
+                </div>
+              )}
+
+              {qrCodeUrl && (
+                <div className="p-4 bg-background rounded-xl border">
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3">
+                    <QrCode className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h3 className="font-semibold mb-1">Property QR Code</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Guests scan this to access WiFi, guidebook, and emergency contacts instantly.
+                  </p>
+                  <img src={qrCodeUrl} alt="Property QR Code" className="w-20 h-20 mx-auto" />
+                </div>
+              )}
+
+              {directBookingUrl && (
+                <div className="p-4 bg-background rounded-xl border">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-3">
+                    <Globe className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <h3 className="font-semibold mb-1">Direct Booking Website</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Your branded booking page - saves 15-20% vs OTA fees!
+                  </p>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={directBookingUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Visit Site
+                    </a>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Industry Context Banner */}
       <Card className="border-none shadow-md bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5">
