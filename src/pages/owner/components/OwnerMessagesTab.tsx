@@ -103,15 +103,22 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
 
   const isLoading = voicemailsLoading || communicationsLoading || ownerCommsLoading;
 
-  // Helper to detect if a communication is a voicemail notification
+  // Helper to detect if a communication is a voicemail/video notification
   const isVoicemailNotification = (comm: Communication): boolean => {
     const body = comm.body?.toLowerCase() || "";
     return (
       body.includes("voice message") || 
+      body.includes("video message") ||
       body.includes("voicemail") ||
       body.includes("left you a voice") ||
       body.includes("/vm/")
     );
+  };
+
+  // Detect if the communication is a video message (not audio)
+  const isVideoMessage = (body: string | null): boolean => {
+    if (!body) return false;
+    return body.includes("🎬") || body.toLowerCase().includes("video message");
   };
 
   // Extract voicemail URL from body
@@ -226,13 +233,14 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
               item.type === 'voicemail' 
                 ? item.data.source === 'table'
                   ? <VoicemailCard key={`vm-${item.data.data.id}`} message={item.data.data} />
-                  : <VoicemailFromCommCard 
-                      key={`vm-comm-${item.data.data.id}`} 
-                      communication={item.data.data as Communication} 
-                      extractVoicemailUrl={extractVoicemailUrl}
-                      extractVoicemailTranscript={extractVoicemailTranscript}
-                    />
-                : <CommunicationCard key={`comm-${(item.data as Communication).id}`} communication={item.data as Communication} getChannelIcon={getChannelIcon} getDirectionIcon={getDirectionIcon} />
+                : <VoicemailFromCommCard 
+                    key={`vm-comm-${item.data.data.id}`} 
+                    communication={item.data.data as Communication} 
+                    extractVoicemailUrl={extractVoicemailUrl}
+                    extractVoicemailTranscript={extractVoicemailTranscript}
+                    isVideoMessage={isVideoMessage}
+                  />
+              : <CommunicationCard key={`comm-${(item.data as Communication).id}`} communication={item.data as Communication} getChannelIcon={getChannelIcon} getDirectionIcon={getDirectionIcon} />
             )}
         </TabsContent>
 
@@ -271,6 +279,7 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
                     communication={vm.data as Communication} 
                     extractVoicemailUrl={extractVoicemailUrl}
                     extractVoicemailTranscript={extractVoicemailTranscript}
+                    isVideoMessage={isVideoMessage}
                   />
             )
           )}
@@ -281,17 +290,32 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
 }
 
 function VoicemailCard({ message }: { message: any }) {
+  const isVideo = message.media_type === "video";
+  
+  // Determine the correct playback URL based on media type
+  const getPlaybackUrl = () => {
+    // If there's a direct audio/video URL stored, use that
+    if (isVideo && message.video_url) {
+      return message.video_url;
+    }
+    if (!isVideo && message.audio_url) {
+      return message.audio_url;
+    }
+    // Fall back to the token-based URL with proper query param for media type
+    return `/vm/${message.token}${isVideo ? '?type=video' : ''}`;
+  };
+
   return (
     <Card className="border shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <div className={cn(
             "h-12 w-12 rounded-xl flex items-center justify-center shrink-0",
-            message.media_type === "video" 
+            isVideo 
               ? "bg-accent" 
               : "bg-primary/10"
           )}>
-            {message.media_type === "video" ? (
+            {isVideo ? (
               <Video className="h-6 w-6 text-accent-foreground" />
             ) : (
               <Mic className="h-6 w-6 text-primary" />
@@ -301,17 +325,20 @@ function VoicemailCard({ message }: { message: any }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="font-medium">
-                {message.sender_name || "Property Manager"}
+                {message.sender_name || message.recipient_name || "Property Manager"}
               </span>
               <Badge variant="outline" className="text-xs">
-                {message.media_type === "video" ? "Video" : "Voice"}
+                {isVideo ? "Video" : "Voicemail"}
               </Badge>
               {message.status === "listened" && (
                 <Badge variant="secondary" className="text-xs">Played</Badge>
               )}
+              {message.direction === "outbound" && (
+                <Badge variant="secondary" className="text-xs text-emerald-600">Sent</Badge>
+              )}
             </div>
 
-            {message.message_text && message.message_text !== "(Voice recording)" && (
+            {message.message_text && message.message_text !== "(Voice recording)" && message.message_text !== "(Video message)" && (
               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                 "{message.message_text}"
               </p>
@@ -337,12 +364,12 @@ function VoicemailCard({ message }: { message: any }) {
             className="shrink-0 gap-2"
           >
             <a
-              href={`/vm/${message.token}`}
+              href={getPlaybackUrl()}
               target="_blank"
               rel="noopener noreferrer"
             >
               <Play className="h-4 w-4" />
-              {message.media_type === "video" ? "Watch" : "Listen"}
+              {isVideo ? "Watch" : "Listen"}
             </a>
           </Button>
         </div>
@@ -363,39 +390,60 @@ function VoicemailCard({ message }: { message: any }) {
   );
 }
 
-// New component for voicemails detected from lead_communications
+// New component for voicemails/videos detected from lead_communications
 function VoicemailFromCommCard({ 
   communication,
   extractVoicemailUrl,
-  extractVoicemailTranscript
+  extractVoicemailTranscript,
+  isVideoMessage
 }: { 
   communication: Communication;
   extractVoicemailUrl: (body: string | null) => string | null;
   extractVoicemailTranscript: (body: string | null) => string | null;
+  isVideoMessage: (body: string | null) => boolean;
 }) {
   const voicemailUrl = extractVoicemailUrl(communication.body);
   const transcript = extractVoicemailTranscript(communication.body);
+  const isVideo = isVideoMessage(communication.body);
   
   return (
     <Card className="border shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
-          <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0 bg-primary/10">
-            <Mic className="h-6 w-6 text-primary" />
+          <div className={cn(
+            "h-12 w-12 rounded-xl flex items-center justify-center shrink-0",
+            isVideo ? "bg-accent" : "bg-primary/10"
+          )}>
+            {isVideo ? (
+              <Video className="h-6 w-6 text-accent-foreground" />
+            ) : (
+              <Mic className="h-6 w-6 text-primary" />
+            )}
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="font-medium">Property Manager</span>
-              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                Voicemail
+              <Badge variant="outline" className={cn(
+                "text-xs",
+                isVideo 
+                  ? "bg-sky-50 text-sky-700 border-sky-200" 
+                  : "bg-amber-50 text-amber-700 border-amber-200"
+              )}>
+                {isVideo ? "Video" : "Voicemail"}
               </Badge>
               <Badge variant="secondary" className="text-xs">Sent</Badge>
             </div>
 
-            {transcript && (
+            {!isVideo && transcript && (
               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                 "{transcript}"
+              </p>
+            )}
+
+            {isVideo && (
+              <p className="text-sm text-muted-foreground mb-2">
+                "(Video message)"
               </p>
             )}
 
@@ -409,7 +457,7 @@ function VoicemailFromCommCard({
 
           {voicemailUrl && (
             <Button
-              variant="default"
+              variant={isVideo ? "outline" : "default"}
               size="sm"
               asChild
               className="shrink-0 gap-2"
@@ -420,7 +468,7 @@ function VoicemailFromCommCard({
                 rel="noopener noreferrer"
               >
                 <Play className="h-4 w-4" />
-                Listen
+                {isVideo ? "Watch" : "Listen"}
               </a>
             </Button>
           )}
