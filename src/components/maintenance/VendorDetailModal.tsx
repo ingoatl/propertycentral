@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -59,6 +59,11 @@ const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetai
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const { isAdmin } = useAdminCheck();
   const queryClient = useQueryClient();
+
+  // Sync formData when vendor prop changes (e.g., after save or when modal reopens)
+  useEffect(() => {
+    setFormData(vendor);
+  }, [vendor]);
 
   // Fetch work orders for this vendor
   const { data: workOrders = [] } = useQuery({
