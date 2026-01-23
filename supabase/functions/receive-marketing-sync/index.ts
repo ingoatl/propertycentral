@@ -199,14 +199,6 @@ serve(async (req) => {
 
         results.matched.push(`${activity.property_name || activity.external_id} -> ${property.name}`);
 
-        // Check if activity already exists
-        const { data: existing } = await supabase
-          .from("owner_marketing_activities")
-          .select("id")
-          .eq("external_id", activity.external_id)
-          .eq("source_project", payload.source_project)
-          .maybeSingle();
-
         const activityRecord = {
           property_id: property.id,
           owner_id: property.owner_id || null,
@@ -222,31 +214,19 @@ serve(async (req) => {
           synced_at: new Date().toISOString(),
         };
 
-        if (existing) {
-          // Update existing record
-          const { error: updateError } = await supabase
-            .from("owner_marketing_activities")
-            .update(activityRecord)
-            .eq("id", existing.id);
+        // Upsert using the new unique constraint on (external_id, source_project)
+        const { error: upsertError } = await supabase
+          .from("owner_marketing_activities")
+          .upsert(activityRecord, {
+            onConflict: "external_id,source_project",
+            ignoreDuplicates: false,
+          });
 
-          if (updateError) {
-            console.error("[receive-marketing-sync] Update error:", updateError);
-            results.errors.push(`${activity.external_id}: ${updateError.message}`);
-          } else {
-            results.updated++;
-          }
+        if (upsertError) {
+          console.error("[receive-marketing-sync] Upsert error:", upsertError);
+          results.errors.push(`${activity.external_id}: ${upsertError.message}`);
         } else {
-          // Insert new record
-          const { error: insertError } = await supabase
-            .from("owner_marketing_activities")
-            .insert(activityRecord);
-
-          if (insertError) {
-            console.error("[receive-marketing-sync] Insert error:", insertError);
-            results.errors.push(`${activity.external_id}: ${insertError.message}`);
-          } else {
-            results.inserted++;
-          }
+          results.inserted++;
         }
       } catch (err) {
         console.error("[receive-marketing-sync] Activity error:", err);

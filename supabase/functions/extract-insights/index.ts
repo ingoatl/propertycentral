@@ -876,22 +876,50 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
     if (detectedScreeningProvider && !property) {
       console.log('Screening email detected but no property matched - searching email content...');
       
-      // Try to find property by street address in email body
-      for (const prop of safeProperties) {
-        if (!prop.address) continue;
+      // ENHANCED: Extract address from "stay at [ADDRESS] from [DATES]" pattern (Truvi specific)
+      const stayAtPattern = /stay at\s+(\d+\s+[\w\s]+(?:ct|st|ave|rd|dr|ln|way|blvd|circle|court|terrace|place|drive))/i;
+      const stayAtMatch = safeBody.match(stayAtPattern);
+      
+      if (stayAtMatch) {
+        const extractedAddress = stayAtMatch[1].toLowerCase().trim();
+        console.log('Truvi: Extracted address from "stay at":', extractedAddress);
         
-        // Extract street address (first part before comma)
-        const streetAddress = prop.address.toLowerCase().split(',')[0].trim();
-        const streetParts = streetAddress.split(' ');
-        
-        // Look for street number + name combination
-        if (streetParts.length >= 2) {
-          const streetPattern = streetParts.slice(0, 3).join(' '); // e.g. "123 main st"
-          if (safeBody.toLowerCase().includes(streetPattern) || 
-              safeSubject.toLowerCase().includes(streetPattern)) {
+        for (const prop of safeProperties) {
+          if (!prop.address) continue;
+          const propAddressLower = prop.address.toLowerCase();
+          const propStreetAddress = propAddressLower.split(',')[0].trim();
+          
+          // Check if extracted address matches property street address
+          if (propStreetAddress.includes(extractedAddress) || 
+              extractedAddress.includes(propStreetAddress)) {
             property = prop;
-            console.log('Matched property from screening email body by address:', prop.name, streetPattern);
+            console.log('Matched property from Truvi "stay at" pattern:', prop.name);
             break;
+          }
+        }
+      }
+      
+      // Fallback: Try to find property by street address parts in email body
+      if (!property) {
+        for (const prop of safeProperties) {
+          if (!prop.address) continue;
+          
+          // Extract street address (first part before comma)
+          const streetAddress = prop.address.toLowerCase().split(',')[0].trim();
+          const streetParts = streetAddress.split(' ');
+          
+          // Look for street number + name combination
+          if (streetParts.length >= 2) {
+            const streetNumber = streetParts[0];
+            const streetName = streetParts.slice(1, 3).join(' '); // e.g. "main st"
+            
+            // Check if both street number and first word of street name appear
+            if (safeBody.toLowerCase().includes(streetNumber) && 
+                safeBody.toLowerCase().includes(streetName.split(' ')[0])) {
+              property = prop;
+              console.log('Matched property from screening email by street parts:', prop.name, streetNumber, streetName);
+              break;
+            }
           }
         }
       }
