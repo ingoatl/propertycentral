@@ -1,10 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, ZoomIn, ZoomOut, RefreshCw, X, FileText, Image, File } from "lucide-react";
+import { Download, ZoomIn, ZoomOut, RefreshCw, X, FileText, Image, File, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/esm/Page/AnnotationLayer.css";
+import "react-pdf/dist/esm/Page/TextLayer.css";
+
+// Set up PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface Expense {
   id: string;
@@ -33,6 +39,8 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [contentType, setContentType] = useState<ContentType>("unknown");
   const [zoom, setZoom] = useState(100);
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
 
   // Priority: email_screenshot_path (real email) > file_path (uploaded) > original_receipt_path (auto-generated)
   const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
@@ -180,6 +188,16 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
     }
   };
 
+  // PDF document load success handler
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+    setPageNumber(1);
+  };
+
+  // PDF navigation
+  const goToPrevPage = () => setPageNumber((prev) => Math.max(prev - 1, 1));
+  const goToNextPage = () => setPageNumber((prev) => Math.min(prev + 1, numPages || 1));
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0">
@@ -200,6 +218,7 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Zoom controls for images */}
               {contentType === "image" && blobUrl && (
                 <>
                   <Button
@@ -219,6 +238,51 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
                   >
                     <ZoomIn className="h-4 w-4" />
                   </Button>
+                </>
+              )}
+              {/* PDF zoom and page controls */}
+              {contentType === "pdf" && blobUrl && numPages && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setZoom(Math.max(50, zoom - 25))}
+                    disabled={zoom <= 50}
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground w-12 text-center">{zoom}%</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setZoom(Math.min(200, zoom + 25))}
+                    disabled={zoom >= 200}
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                  {numPages > 1 && (
+                    <div className="flex items-center gap-1 ml-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPrevPage}
+                        disabled={pageNumber <= 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm text-muted-foreground px-2">
+                        {pageNumber} / {numPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={pageNumber >= numPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
               <Button
@@ -254,19 +318,31 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
               </div>
             </div>
           ) : contentType === "pdf" && blobUrl ? (
-            // PDF: Use object with iframe fallback - better browser support
-            <object
-              data={blobUrl}
-              type="application/pdf"
-              className="w-full h-full min-h-[600px]"
-              title="Receipt PDF"
-            >
-              <iframe
-                src={blobUrl}
-                className="w-full h-full min-h-[600px] border-0"
-                title="Receipt PDF"
-              />
-            </object>
+            // PDF: Use react-pdf for proper rendering without iframe issues
+            <div className="flex flex-col items-center p-4 min-h-[600px]">
+              <Document
+                file={blobUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={(err) => {
+                  console.error("PDF load error:", err);
+                  setError("Failed to load PDF");
+                }}
+                loading={
+                  <div className="flex items-center justify-center py-20">
+                    <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                }
+                className="max-w-full"
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  scale={zoom / 100}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
+                  className="shadow-lg rounded-lg overflow-hidden"
+                />
+              </Document>
+            </div>
           ) : contentType === "html" && htmlContent ? (
             // HTML: Use srcdoc with sanitized content - never blocked by ad blockers
             <iframe
