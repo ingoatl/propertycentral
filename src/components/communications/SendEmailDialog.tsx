@@ -35,6 +35,7 @@ interface SendEmailDialogProps {
   replyToBody?: string;
   gmailMessageId?: string;
   onEmailSent?: () => void;
+  onMarkDone?: () => void;
 }
 
 const SENDERS = [
@@ -91,6 +92,7 @@ export function SendEmailDialog({
   replyToBody,
   gmailMessageId,
   onEmailSent,
+  onMarkDone,
 }: SendEmailDialogProps) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -174,6 +176,10 @@ export function SendEmailDialog({
       queryClient.invalidateQueries({ queryKey: ["sent-communications"] });
       queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
       queryClient.invalidateQueries({ queryKey: ["gmail-emails"] });
+      // Mark conversation as done when replying to an email
+      if (onMarkDone) {
+        onMarkDone();
+      }
       if (onEmailSent) {
         onEmailSent();
       }
