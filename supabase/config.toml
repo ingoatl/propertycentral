@@ -560,3 +560,6 @@ verify_jwt = false
 
 [functions.screening-watchdog]
 verify_jwt = false
+
+[functions.sync-healing-watchdog]
+verify_jwt = false
