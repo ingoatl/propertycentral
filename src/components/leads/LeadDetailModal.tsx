@@ -40,7 +40,8 @@ import {
   X,
   Trash2,
   MessageCircle,
-  Video
+  Video,
+  Copy
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
 import FollowUpManager from "./FollowUpManager";
@@ -103,6 +104,8 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
   const [editedEmail, setEditedEmail] = useState(lead?.email || "");
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [editedPhone, setEditedPhone] = useState(lead?.phone || "");
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [editedAddress, setEditedAddress] = useState(lead?.property_address || "");
 
   // Fetch timeline
   const { data: timeline } = useQuery({
@@ -265,6 +268,77 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
     },
   });
 
+  // Update address mutation
+  const updateAddress = useMutation({
+    mutationFn: async (newAddress: string) => {
+      if (!lead) return;
+      const { error } = await supabase
+        .from("leads")
+        .update({ property_address: newAddress.trim() || null })
+        .eq("id", lead.id);
+      if (error) throw error;
+      
+      await supabase.from("lead_timeline").insert({
+        lead_id: lead.id,
+        action: `Property address updated to "${newAddress.trim() || 'none'}"`,
+        metadata: { previousAddress: lead.property_address, newAddress: newAddress.trim() || null },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Address updated");
+      setIsEditingAddress(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      onRefresh();
+    },
+    onError: (error) => {
+      toast.error("Failed to update address: " + error.message);
+    },
+  });
+
+  // Duplicate lead mutation
+  const duplicateLead = useMutation({
+    mutationFn: async () => {
+      if (!lead) return;
+      
+      // Create a copy of the lead with new id
+      const { data, error } = await supabase
+        .from("leads")
+        .insert({
+          name: `${lead.name} (Copy)`,
+          email: lead.email,
+          phone: lead.phone,
+          opportunity_source: lead.opportunity_source,
+          opportunity_value: lead.opportunity_value,
+          property_address: lead.property_address,
+          property_type: lead.property_type,
+          stage: 'new_lead',
+          notes: lead.notes,
+          tags: lead.tags,
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Add timeline entry for the new lead
+      await supabase.from("lead_timeline").insert({
+        lead_id: data.id,
+        action: `Lead duplicated from ${lead.name} (#${lead.lead_number})`,
+        metadata: { original_lead_id: lead.id, original_lead_number: lead.lead_number },
+      });
+      
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success("Lead duplicated successfully");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      onRefresh();
+    },
+    onError: (error) => {
+      toast.error("Failed to duplicate lead: " + error.message);
+    },
+  });
+
   // Update notes mutation
   const updateNotes = useMutation({
     mutationFn: async () => {
@@ -405,6 +479,8 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
       setIsEditingEmail(false);
       setEditedPhone(lead.phone || "");
       setIsEditingPhone(false);
+      setEditedAddress(lead.property_address || "");
+      setIsEditingAddress(false);
       // Set default message type based on available contact info
       if (lead.phone) {
         setMessageType("sms");
@@ -412,7 +488,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         setMessageType("email");
       }
     }
-  }, [lead?.id, lead?.name, lead?.email, lead?.phone]);
+  }, [lead?.id, lead?.name, lead?.email, lead?.phone, lead?.property_address]);
 
   const handleSaveName = useCallback(() => {
     if (editedName.trim() && editedName.trim() !== lead?.name) {
@@ -489,6 +565,18 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               <Badge className={`${stageConfig.bgColor} ${stageConfig.color} border-0`}>
                 {stageConfig.label}
               </Badge>
+              
+              {/* Duplicate Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                onClick={() => duplicateLead.mutate()}
+                disabled={duplicateLead.isPending}
+                title="Duplicate lead"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
               
               {/* Delete Button */}
               <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
@@ -713,19 +801,71 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
           </div>
 
           {/* Other Info Row */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             {lead.opportunity_value > 0 && (
               <div className="flex items-center gap-2 text-green-600 font-medium">
                 <DollarSign className="h-4 w-4" />
                 ${lead.opportunity_value.toLocaleString()}
               </div>
             )}
-            {lead.property_address && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                {lead.property_address}
-              </div>
-            )}
+            
+            {/* Editable Address */}
+            <div className="flex items-center gap-2 group">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              {isEditingAddress ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Input
+                    type="text"
+                    value={editedAddress}
+                    onChange={(e) => setEditedAddress(e.target.value)}
+                    className="h-8 max-w-[300px]"
+                    autoFocus
+                    placeholder="123 Main St, City, State ZIP"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") updateAddress.mutate(editedAddress);
+                      if (e.key === "Escape") {
+                        setIsEditingAddress(false);
+                        setEditedAddress(lead.property_address || "");
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-50"
+                    onClick={() => updateAddress.mutate(editedAddress)}
+                    disabled={updateAddress.isPending}
+                  >
+                    <Check className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setIsEditingAddress(false);
+                      setEditedAddress(lead.property_address || "");
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <span className={`text-sm ${!lead.property_address ? 'text-muted-foreground italic' : ''}`}>
+                    {lead.property_address || "Add address"}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-6 w-6 transition-opacity ${!lead.property_address ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-100'}`}
+                    onClick={() => setIsEditingAddress(true)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
