@@ -36,11 +36,16 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     // Use dedicated GuestConnect key, fallback to general partner key for backwards compatibility
     const expectedApiKey = Deno.env.get("GUESTCONNECT_SYNC_API_KEY") || Deno.env.get("PARTNER_SYNC_API_KEY");
+    
+    console.log("[receive-marketing-sync] Expected API key configured:", !!expectedApiKey);
 
     // Validate API key
     const providedApiKey = req.headers.get("x-api-key");
+    console.log("[receive-marketing-sync] API key provided:", !!providedApiKey);
+    
     if (!providedApiKey || providedApiKey !== expectedApiKey) {
       console.error("[receive-marketing-sync] Invalid or missing API key");
+      console.error("[receive-marketing-sync] Key match:", providedApiKey === expectedApiKey);
       return new Response(
         JSON.stringify({ success: false, error: "Unauthorized" }),
         {
@@ -49,6 +54,8 @@ serve(async (req) => {
         }
       );
     }
+    
+    console.log("[receive-marketing-sync] API key validated successfully");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const payload: SyncPayload = await req.json();
