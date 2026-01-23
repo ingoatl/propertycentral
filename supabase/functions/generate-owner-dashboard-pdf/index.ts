@@ -534,7 +534,7 @@ async function generatePdf(data: DashboardData): Promise<Uint8Array> {
     color: gray,
   });
 
-  y -= 70;
+  y -= 75;
 
   // === MANAGEMENT FEE SUMMARY ===
   page.drawText("MANAGEMENT FEE (20%)", {
@@ -544,26 +544,28 @@ async function generatePdf(data: DashboardData): Promise<Uint8Array> {
     font: helveticaBold,
     color: black,
   });
-  y -= 4;
+  y -= 6;
   page.drawLine({
     start: { x: margin, y },
     end: { x: width - margin, y },
     thickness: 1,
     color: black,
   });
-  y -= 16;
+  y -= 20;
 
-  // Fee breakdown table
+  // Fee breakdown table - with proper spacing
   page.drawText("Gross Revenue:", { x: margin, y, size: 9, font: helvetica, color: gray });
-  page.drawText(formatCurrency(data.performance.totalRevenue), { x: margin + 150, y, size: 9, font: helveticaBold, color: black });
-  y -= 14;
+  page.drawText(formatCurrency(data.performance.totalRevenue), { x: margin + 160, y, size: 9, font: helveticaBold, color: black });
+  y -= 18;
   page.drawText(`Management Fee (${data.managementFeePercentage}%):`, { x: margin, y, size: 9, font: helvetica, color: gray });
-  page.drawText(`-${formatCurrency(data.managementFees)}`, { x: margin + 150, y, size: 9, font: helveticaBold, color: rgb(0.8, 0.2, 0.2) });
-  y -= 14;
-  page.drawRectangle({ x: margin, y: y + 2, width: 250, height: 18, color: lightGray });
-  page.drawText("Net to Owner:", { x: margin + 5, y: y + 6, size: 10, font: helveticaBold, color: black });
-  page.drawText(formatCurrency(data.netToOwner), { x: margin + 150, y: y + 6, size: 11, font: helveticaBold, color: emerald });
-  y -= 25;
+  page.drawText(`-${formatCurrency(data.managementFees)}`, { x: margin + 160, y, size: 9, font: helveticaBold, color: rgb(0.8, 0.2, 0.2) });
+  y -= 20;
+  
+  // Net to owner highlight box
+  page.drawRectangle({ x: margin, y: y - 2, width: 280, height: 22, color: lightGray });
+  page.drawText("Net to Owner:", { x: margin + 8, y: y + 4, size: 10, font: helveticaBold, color: black });
+  page.drawText(formatCurrency(data.netToOwner), { x: margin + 160, y: y + 4, size: 12, font: helveticaBold, color: emerald });
+  y -= 35;
 
   // === MONTHLY REVENUE TREND ===
   page.drawText("MONTHLY REVENUE TREND", {
@@ -573,52 +575,54 @@ async function generatePdf(data: DashboardData): Promise<Uint8Array> {
     font: helveticaBold,
     color: black,
   });
-  y -= 4;
+  y -= 6;
   page.drawLine({
     start: { x: margin, y },
     end: { x: width - margin, y },
     thickness: 1,
     color: black,
   });
-  y -= 16;
+  y -= 20;
 
   if (data.monthlyRevenue.length > 0) {
-    const barWidth = 60;
+    const barWidth = 65;
     const maxRevenue = Math.max(...data.monthlyRevenue.map((m) => m.revenue), 1);
-    const chartHeight = 60;
+    const chartHeight = 55;
 
     data.monthlyRevenue.slice(-6).forEach((month, idx) => {
-      const barHeight = (month.revenue / maxRevenue) * chartHeight;
-      const barX = margin + idx * (barWidth + 10);
+      const barHeight = Math.max((month.revenue / maxRevenue) * chartHeight, 5);
+      const barX = margin + idx * (barWidth + 8);
 
       page.drawRectangle({
         x: barX,
         y: y - chartHeight,
-        width: barWidth - 5,
+        width: barWidth - 8,
         height: barHeight,
         color: primaryColor,
       });
 
       page.drawText(month.month, {
-        x: barX + 10,
-        y: y - chartHeight - 12,
+        x: barX + 8,
+        y: y - chartHeight - 14,
         size: 7,
         font: helvetica,
         color: gray,
       });
 
-      page.drawText(formatCurrency(month.revenue), {
-        x: barX + 5,
-        y: y - chartHeight + barHeight + 3,
-        size: 6,
-        font: helveticaBold,
-        color: black,
-      });
+      if (month.revenue > 0) {
+        page.drawText(formatCurrency(month.revenue), {
+          x: barX + 2,
+          y: y - chartHeight + barHeight + 4,
+          size: 6,
+          font: helveticaBold,
+          color: black,
+        });
+      }
     });
   } else {
     page.drawText("No revenue data available yet", {
       x: margin,
-      y: y - 20,
+      y: y - 15,
       size: 9,
       font: helvetica,
       color: gray,
