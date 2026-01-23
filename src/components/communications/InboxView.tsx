@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { parseSearchTerms, getSearchScore, normalizeContactName, extractEmailAddress } from "@/utils/searchUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isYesterday, parseISO, addHours, addDays, isBefore } from "date-fns";
@@ -2324,8 +2325,12 @@ export function InboxView() {
   // Group communications by contact (for "All" tab - show only latest message per contact)
   // Then group those by date for date separators
   // Now includes Gmail emails merged with SMS/Calls, filtered by selectedEmailInboxView
+  // ENHANCED: Includes search filtering with relevance ranking
   const groupedByContact = useMemo(() => {
     if (activeTab !== "all") return null;
+    
+    // Parse search terms for filtering and ranking
+    const searchTerms = parseSearchTerms(search);
     
     const contactMap = new Map<string, CommunicationItem[]>();
     
@@ -2375,12 +2380,18 @@ export function InboxView() {
       // Filter by unread (inbound + not resolved)
       if (activeFilter === "unread" && (c.direction !== "inbound" || c.is_resolved)) return false;
       
-      // NOTE: SMS/call filtering is already done at the query level (lines 1046-1083)
-      // The enhancedCommunications array only contains messages for the selected user
-      // when a specific inbox is selected, so no additional filtering is needed here
+      // SEARCH FILTER: If searching, only include items that match
+      if (searchTerms.length > 0) {
+        const score = getSearchScore(c, searchTerms);
+        if (score === 0) return false;
+      }
       
       return true;
     });
+    
+    // Build a cross-reference map: normalized name -> first key used
+    // This helps merge "Chloe Greene and Eldren Keys" with "Chloe Greene"
+    const nameToKeyMap = new Map<string, string>();
     
     // Add SMS/Call communications
     for (const comm of filteredComms) {
@@ -2399,10 +2410,8 @@ export function InboxView() {
         const normalizedPhone = normalizePhone(comm.contact_phone);
         key = `phone:${normalizedPhone}`;
       } else if (comm.contact_email) {
-        // CRITICAL: Normalize email - extract just the email address, lowercase
-        // This handles cases where name varies but email is the same
-        const emailMatch = comm.contact_email.match(/[\w.-]+@[\w.-]+\.\w+/i);
-        const normalizedEmail = emailMatch ? emailMatch[0].toLowerCase() : comm.contact_email.toLowerCase();
+        // CRITICAL: Use extracted email address only
+        const normalizedEmail = extractEmailAddress(comm.contact_email);
         key = `email:${normalizedEmail}`;
       } else {
         key = `id:${comm.contact_id}`;
@@ -2419,6 +2428,18 @@ export function InboxView() {
         }
       }
       
+      // DEDUPLICATION: Check if normalized name maps to an existing key
+      // This handles "Chloe Greene and Eldren Keys" vs "Chloe Greene"
+      const normalizedName = normalizeContactName(comm.contact_name);
+      if (normalizedName && !key.startsWith('lead:') && !key.startsWith('owner:')) {
+        const existingKey = nameToKeyMap.get(normalizedName);
+        if (existingKey && contactMap.has(existingKey)) {
+          key = existingKey;
+        } else {
+          nameToKeyMap.set(normalizedName, key);
+        }
+      }
+      
       const existing = contactMap.get(key) || [];
       existing.push(comm);
       contactMap.set(key, existing);
@@ -2432,6 +2453,18 @@ export function InboxView() {
         if (activeFilter === "open" && doneGmailIds.has(email.id)) return false;
         // For unread filter, only show unread emails
         if (activeFilter === "unread" && (!email.labelIds?.includes('UNREAD') || readGmailIds.has(email.id))) return false;
+        
+        // SEARCH FILTER: If searching, only include emails that match
+        if (searchTerms.length > 0) {
+          const score = getSearchScore({
+            contact_name: email.fromName || email.from,
+            contact_email: email.from,
+            body: email.snippet || "",
+            subject: email.subject,
+          }, searchTerms);
+          if (score === 0) return false;
+        }
+        
         return true;
       });
       
@@ -2476,30 +2509,35 @@ export function InboxView() {
           gmail_email: email, // Store reference to original email for rendering
         };
         
-        // Use email address as key for grouping
-        const key = email.from?.toLowerCase() || email.id;
-        const existing = contactMap.get(key) || [];
+        // Use extracted email address as key for grouping
+        const emailKey = extractEmailAddress(email.from) || email.id;
+        const existing = contactMap.get(emailKey) || [];
         existing.push(emailAsComm);
-        contactMap.set(key, existing);
+        contactMap.set(emailKey, existing);
       }
     }
     
     // Return only the latest message per contact, with the best name selected
     // Select the best name: prefer properly cased names (mixed case) over all-caps or all-lowercase
+    // Also prefer SHORTER names to avoid "Name and OtherName" variants
     const selectBestName = (messages: CommunicationItem[]): string => {
       const names = messages.map(m => m.contact_name).filter(n => n && n !== "Unknown" && n !== "Contact");
       if (names.length === 0) return messages[0]?.contact_name || "Unknown";
       
+      // Filter out names with "and" or "&" (multi-person names)
+      const singlePersonNames = names.filter(n => !/(?: and | & )/i.test(n));
+      const candidateNames = singlePersonNames.length > 0 ? singlePersonNames : names;
+      
       // Prefer names with mixed case (proper names like "John Smith")
-      const mixedCase = names.find(n => n !== n.toUpperCase() && n !== n.toLowerCase() && n.includes(" "));
+      const mixedCase = candidateNames.find(n => n !== n.toUpperCase() && n !== n.toLowerCase() && n.includes(" "));
       if (mixedCase) return mixedCase;
       
       // Prefer names with space (full name)
-      const withSpace = names.find(n => n.includes(" "));
+      const withSpace = candidateNames.find(n => n.includes(" "));
       if (withSpace) return withSpace;
       
       // Return first non-generic name
-      return names[0];
+      return candidateNames[0];
     };
     
     const sorted = Array.from(contactMap.values())
@@ -2513,14 +2551,20 @@ export function InboxView() {
         return { ...latest, contact_name: bestName };
       });
     
-    // SMART SORTING:
-    // 1. Unanswered inbound messages appear FIRST
-    // 2. Then sort by priority (urgent > important > normal > low)
-    // 3. Resolved/responded messages move DOWN
-    // 4. Within each group, sort by date (newest first)
+    // SMART SORTING with SEARCH RELEVANCE:
+    // When searching: sort by relevance score first
+    // Otherwise: priority-based sorting
     const priorityOrder: Record<ConversationPriority, number> = { urgent: 0, important: 1, normal: 2, low: 4 };
     const statusOrder: Record<string, number> = { open: 0, awaiting: 1, snoozed: 2, done: 3, archived: 4 };
+    
     return sorted.sort((a, b) => {
+      // SEARCH MODE: Sort by relevance when searching
+      if (searchTerms.length > 0) {
+        const aScore = getSearchScore(a, searchTerms);
+        const bScore = getSearchScore(b, searchTerms);
+        if (aScore !== bScore) return bScore - aScore; // Higher score first
+      }
+      
       // First: Unanswered inbound messages at the very top
       const aIsUnansweredInbound = a.direction === "inbound" && !a.is_resolved;
       const bIsUnansweredInbound = b.direction === "inbound" && !b.is_resolved;
@@ -2546,7 +2590,7 @@ export function InboxView() {
       // Finally: Sort by date (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [enhancedCommunications, activeFilter, activeTab, filteredGmailEmails, doneGmailIds, readGmailIds, selectedEmailInboxView, currentUserId, userPhoneAssignments, emailInsightsMap]);
+  }, [enhancedCommunications, activeFilter, activeTab, filteredGmailEmails, doneGmailIds, readGmailIds, selectedEmailInboxView, currentUserId, userPhoneAssignments, emailInsightsMap, search, selectedFolder]);
 
   // Group "All" tab contacts by date for date separators
   // CRITICAL: Apply smart sorting WITHIN each date group
