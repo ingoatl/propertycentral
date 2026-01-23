@@ -225,7 +225,7 @@ export function InboxView() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("all");
-  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [activeFilter, setActiveFilter] = useState<FilterType>("urgent");
   const [selectedMessage, setSelectedMessage] = useState<CommunicationItem | null>(null);
   const [showSmsReply, setShowSmsReply] = useState(false);
   const [showEmailReply, setShowEmailReply] = useState(false);
@@ -2365,8 +2365,12 @@ export function InboxView() {
       if (activeFilter === "done" && c.conversation_status !== "done") return false;
       if (activeFilter === "awaiting" && c.conversation_status !== "awaiting") return false;
       
-      // Filter by priority
-      if (activeFilter === "urgent" && c.priority !== "urgent" && c.priority !== "important") return false;
+      // Filter by priority - EXCLUDE outbound messages from priority filter
+      // Priority filter should only show inbound messages that need attention
+      if (activeFilter === "urgent") {
+        if (c.direction === "outbound") return false;
+        if (c.priority !== "urgent" && c.priority !== "important") return false;
+      }
       
       // Filter by unread (inbound + not resolved)
       if (activeFilter === "unread" && (c.direction !== "inbound" || c.is_resolved)) return false;
@@ -2489,23 +2493,37 @@ export function InboxView() {
         return { ...latest, contact_name: bestName };
       });
     
-    // Sort: open/awaiting at top (unfaded), then snoozed/done at bottom (faded)
-    // Within each group, sort by priority then by date
-    // Promotional/low priority items sink to bottom within their status group
+    // SMART SORTING:
+    // 1. Unanswered inbound messages appear FIRST
+    // 2. Then sort by priority (urgent > important > normal > low)
+    // 3. Resolved/responded messages move DOWN
+    // 4. Within each group, sort by date (newest first)
     const priorityOrder: Record<ConversationPriority, number> = { urgent: 0, important: 1, normal: 2, low: 4 };
     const statusOrder: Record<string, number> = { open: 0, awaiting: 1, snoozed: 2, done: 3, archived: 4 };
     return sorted.sort((a, b) => {
-      // First sort by status (open/awaiting at top, snoozed/done at bottom)
+      // First: Unanswered inbound messages at the very top
+      const aIsUnansweredInbound = a.direction === "inbound" && !a.is_resolved;
+      const bIsUnansweredInbound = b.direction === "inbound" && !b.is_resolved;
+      if (aIsUnansweredInbound && !bIsUnansweredInbound) return -1;
+      if (!aIsUnansweredInbound && bIsUnansweredInbound) return 1;
+      
+      // Second: Sort by resolved status (unresolved before resolved)
+      const aIsResolved = a.is_resolved === true;
+      const bIsResolved = b.is_resolved === true;
+      if (!aIsResolved && bIsResolved) return -1;
+      if (aIsResolved && !bIsResolved) return 1;
+      
+      // Third: Sort by conversation status (open/awaiting at top, snoozed/done at bottom)
       const aStatus = statusOrder[a.conversation_status || "open"] ?? 2;
       const bStatus = statusOrder[b.conversation_status || "open"] ?? 2;
       if (aStatus !== bStatus) return aStatus - bStatus;
       
-      // Then by priority (urgent at top, low/promotional at bottom)
+      // Fourth: Sort by priority (urgent at top, low/promotional at bottom)
       const aPriority = priorityOrder[a.priority || "normal"];
       const bPriority = priorityOrder[b.priority || "normal"];
       if (aPriority !== bPriority) return aPriority - bPriority;
       
-      // Finally by date (newest first)
+      // Finally: Sort by date (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [enhancedCommunications, activeFilter, activeTab, filteredGmailEmails, doneGmailIds, readGmailIds, selectedEmailInboxView, currentUserId, userPhoneAssignments, emailInsightsMap]);
@@ -2947,6 +2965,8 @@ export function InboxView() {
                           isPromotional && !isDone && !isSnoozed && emailColors?.opacity,
                           // Low importance Voice AI calls - faded appearance
                           comm.is_low_importance && !isDone && !isSnoozed && "opacity-50 bg-muted/20",
+                          // Visual fading for resolved/responded messages
+                          comm.is_resolved && !isDone && !isSnoozed && !comm.is_low_importance && "opacity-60",
                           // Done status: green border + fade + pale green background
                           isDone && "border-l-4 border-l-green-500/70 opacity-50 bg-green-50/30 dark:bg-green-950/10",
                           // Snoozed status: amber border + fade + pale amber background
