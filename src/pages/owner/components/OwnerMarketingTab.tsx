@@ -251,11 +251,24 @@ export const OwnerMarketingTab = ({ propertyId, propertyName }: OwnerMarketingTa
   };
 
   const formatActivityTitle = (activity: MarketingActivity) => {
-    // If we have guest context, personalize the title
+    // If we have guest context, personalize the title with guest name and stay info
     const guestName = activity.guest_info?.guest_name || activity.guest_name;
+    const stayContext = getStayContext(activity);
+    
     if (guestName) {
       if (activity.activity_type === "email_blast" || activity.activity_type === "guest_welcome") {
+        // Include reservation dates for clarity
+        if (stayContext) {
+          return `Welcome Email to ${guestName} (${stayContext.formatted})`;
+        }
         return `Welcome Email to ${guestName}`;
+      }
+      // For other activity types, still show guest name if available
+      if (activity.title.toLowerCase().includes("email") || activity.title.toLowerCase().includes("message")) {
+        if (stayContext) {
+          return `${activity.title} - ${guestName} (${stayContext.formatted})`;
+        }
+        return `${activity.title} - ${guestName}`;
       }
     }
     return activity.title;
