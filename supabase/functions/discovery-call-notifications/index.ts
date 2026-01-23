@@ -661,75 +661,157 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // 48h Reminder - Email only (psychology: value reinforcement, reduce pre-call anxiety)
+    // 48h Reminder - Fortune 500 style
     if (notificationType === "reminder_48h") {
+      const callId = `CALL-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${discoveryCallId.slice(0, 6).toUpperCase()}`;
+      
       if (lead?.email) {
         await resend.emails.send({
           from: FROM_EMAIL,
           to: [lead.email],
-          subject: `📅 Your Discovery Call is in 2 Days - ${formattedDate}`,
+          subject: `Reminder: Your Discovery Call in 2 Days - ${formattedDate}`,
           html: `
             <!DOCTYPE html>
             <html>
               <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Call Reminder - 2 Days</title>
               </head>
-              <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: Georgia, 'Times New Roman', serif;">
-                <div style="max-width: 600px; margin: 0 auto; background: #fdfcfb;">
+              <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;">
+                <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
                   
-                  <!-- Header -->
-                  <div style="background: linear-gradient(135deg, #b8956a 0%, #c9a87a 50%, #d4b896 100%); padding: 32px; text-align: center;">
-                    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 400; letter-spacing: 1px;">📅 2 Days Until Your Call</h1>
+                  <!-- Header - Corporate Minimal with Logo -->
+                  <div style="padding: 24px 32px; border-bottom: 2px solid #111111;">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="vertical-align: middle;">
+                          <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                          <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
+                        </td>
+                        <td style="text-align: right; vertical-align: middle;">
+                          <div style="font-size: 16px; font-weight: 600; color: #111111; margin-bottom: 4px;">REMINDER • 2 DAYS</div>
+                          <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+                            ${callId}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
                   </div>
-                  
-                  <div style="padding: 32px;">
-                    <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 16px 0;">
-                      ${greeting},
+
+                  <!-- Call Summary Section -->
+                  <div style="padding: 20px 32px; background: #f9f9f9; border-bottom: 1px solid #e5e5e5;">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="vertical-align: top; width: 50%;">
+                          <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Scheduled For</div>
+                          <div style="font-size: 14px; font-weight: 600; color: #111111;">${formattedDate}</div>
+                          <div style="font-size: 12px; color: #666666; margin-top: 2px;">${formattedTime}</div>
+                        </td>
+                        <td style="vertical-align: top; text-align: right;">
+                          <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Meeting Type</div>
+                          <div style="font-size: 14px; font-weight: 600; color: #111111;">${isVideoCall ? '📹 Video Call' : '📞 Phone Call'}</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- Greeting -->
+                  <div style="padding: 24px 32px 16px 32px;">
+                    <p style="font-size: 14px; line-height: 1.6; color: #111111; margin: 0;">
+                      ${formalGreeting},
                     </p>
-                    
-                    <p style="font-size: 15px; line-height: 1.8; color: #4a4a4a; margin: 0 0 24px 0;">
-                      Just a friendly reminder that we're looking forward to speaking with you${propertyContext} in 2 days!
+                    <p style="font-size: 13px; line-height: 1.6; color: #444444; margin: 12px 0 0 0;">
+                      This is a friendly reminder about your upcoming discovery call with PeachHaus${propertyContext} in 2 days. We're looking forward to learning about your property and discussing how we can help maximize your investment.
                     </p>
-                    
-                    <!-- Call Details -->
-                    <div style="background: #fff8f0; padding: 20px; border-radius: 12px; margin: 0 0 24px 0; border-left: 4px solid #b8956a;">
-                      <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>📅 Date:</strong> ${formattedDate}</p>
-                      <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>🕐 Time:</strong> ${formattedTime}</p>
-                      <p style="margin: 0; font-size: 15px; color: #333;"><strong>${isVideoCall ? '📹' : '📞'} Type:</strong> ${isVideoCall ? 'Video Call' : 'Phone Call'}</p>
-                    </div>
-                    
-                    <!-- Pre-Call Preparation -->
-                    <div style="background: linear-gradient(135deg, #fef9e7 0%, #fff8e1 100%); padding: 24px; border-radius: 12px; margin: 0 0 24px 0; text-align: center;">
-                      <p style="margin: 0 0 8px 0; font-size: 14px; color: #7d6608; font-weight: 600;">📊 Before We Chat</p>
-                      <p style="margin: 0 0 16px 0; font-size: 14px; color: #9a7b0a; line-height: 1.6;">
-                        Take 5 minutes to see how we've helped other Atlanta property owners like you maximize their rental income.
+                  </div>
+
+                  <!-- Pre-Call Preparation Section - Owner Pitch Presentation -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="background: linear-gradient(135deg, #fef9e7 0%, #fff8e1 100%); border: 1px solid #f9e79f; border-radius: 8px; padding: 20px;">
+                      <p style="margin: 0; font-size: 14px; color: #7d6608; font-weight: 600;">
+                        📊 Prepare for Your Call
                       </p>
-                      <a href="${OWNER_PITCH_URL}" style="display: inline-block; background: linear-gradient(135deg, #f1c40f 0%, #d4ac0d 100%); color: #7d6608; padding: 14px 28px; text-decoration: none; font-size: 14px; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 8px rgba(241, 196, 15, 0.3);">
+                      <p style="margin: 10px 0 14px 0; font-size: 13px; color: #9a7b0a; line-height: 1.5;">
+                        Take 5 minutes to explore what PeachHaus can do for your property. See how we've helped other Atlanta property owners maximize their rental income.
+                      </p>
+                      <a href="${OWNER_PITCH_URL}" style="display: inline-block; background: linear-gradient(135deg, #f1c40f 0%, #d4ac0d 100%); color: #7d6608; padding: 12px 24px; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px; box-shadow: 0 2px 4px rgba(241, 196, 15, 0.3);">
                         View Owner Presentation →
                       </a>
                     </div>
-                    
-                    ${isVideoCall ? `
-                    <div style="text-align: center; margin: 0 0 24px 0;">
-                      <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">📹 Join Video Call</a>
-                      <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">${GOOGLE_MEET_LINK}</p>
-                    </div>
-                    ` : ''}
-                    
-                    <p style="font-size: 15px; line-height: 1.8; color: #4a4a4a; margin: 0;">
-                      We're excited to discuss your property's potential and answer any questions you have!
-                    </p>
                   </div>
-                  
-                  <!-- Signature -->
-                  <div style="padding: 24px 32px; text-align: center; border-top: 1px solid #e8e4de;">
-                    <p style="margin: 0 0 12px 0; font-size: 13px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
-                      SEE YOU SOON
-                    </p>
-                    <img src="${SIGNATURE_URL}" alt="Signature" style="height: 40px; margin-bottom: 8px;">
-                    <p style="margin: 0; font-size: 12px; color: #8a8a8a;">
-                      (404) 800-5932 | info@peachhausgroup.com
+
+                  <!-- Call Details Table -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="font-size: 11px; font-weight: 600; color: #111111; padding: 8px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Call Details
+                    </div>
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5; width: 140px;">Date & Time</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; font-weight: 600; border-bottom: 1px solid #e5e5e5;">${formattedDateTime}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Meeting Type</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+                          ${isVideoCall ? 'Video Call (Google Meet)' : `Phone Call to ${lead.phone || 'your number'}`}
+                        </td>
+                      </tr>
+                      ${lead.property_address ? `
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Property</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">${lead.property_address}</td>
+                      </tr>
+                      ` : ''}
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Duration</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">30 minutes</td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  ${isVideoCall ? `
+                  <!-- Video Call CTA -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="text-align: center; padding: 20px; background: #f0fdf4; border: 1px solid #bbf7d0;">
+                      <p style="font-size: 12px; color: #166534; margin: 0 0 12px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">JOIN VIDEO CALL</p>
+                      <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #16a34a; color: white; padding: 12px 32px; text-decoration: none; font-size: 13px; font-weight: 600; letter-spacing: 0.5px;">
+                        Open Google Meet
+                      </a>
+                      <p style="font-size: 11px; color: #666666; margin: 12px 0 0 0; font-family: 'SF Mono', Menlo, monospace;">${GOOGLE_MEET_LINK}</p>
+                    </div>
+                  </div>
+                  ` : ''}
+
+                  <!-- Reschedule Option -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="text-align: center; padding: 16px; background: #f5f5f5; border: 1px solid #e5e5e5; border-radius: 4px;">
+                      <p style="font-size: 12px; color: #666666; margin: 0 0 8px 0;">Need to reschedule?</p>
+                      <a href="${rescheduleUrl}" style="color: #2563eb; font-size: 13px; text-decoration: underline;">Click here to change your appointment</a>
+                    </div>
+                  </div>
+
+                  <!-- Signature Section -->
+                  <div style="padding: 24px 32px; border-top: 1px solid #e5e5e5;">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="vertical-align: middle; width: 70px;">
+                          <img src="${HOSTS_PHOTO_URL}" alt="Ingo Schaer" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #e5e5e5;">
+                        </td>
+                        <td style="vertical-align: middle; padding-left: 16px;">
+                          <p style="margin: 0; font-size: 13px; color: #111111; font-weight: 600;">Looking forward to speaking with you,</p>
+                          <img src="${SIGNATURE_URL}" alt="Signature" style="height: 32px; margin: 8px 0;">
+                          <p style="margin: 0; font-size: 12px; color: #666666;">PeachHaus Property Management</p>
+                          <p style="margin: 4px 0 0 0; font-size: 11px; color: #888888;">(404) 800-5932 · info@peachhausgroup.com</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- Footer -->
+                  <div style="padding: 16px 32px; background-color: #f9f9f9; border-top: 1px solid #e5e5e5; text-align: center;">
+                    <p style="margin: 0; font-size: 11px; color: #666666;">
+                      PeachHaus Property Management · Atlanta, Georgia
                     </p>
                   </div>
                 </div>
@@ -755,81 +837,154 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // 24h and 1h Reminders
+    // 24h and 1h Reminders - Fortune 500 style
     if (notificationType === "reminder_24h" || notificationType === "reminder_1h") {
       const reminderText = notificationType === "reminder_24h" ? "tomorrow" : "in 1 hour";
-      const urgencyEmoji = notificationType === "reminder_1h" ? "⏰" : "📅";
+      const is1Hour = notificationType === "reminder_1h";
+      const callId = `CALL-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${discoveryCallId.slice(0, 6).toUpperCase()}`;
       
       // Email reminder
       if (lead?.email) {
         await resend.emails.send({
           from: FROM_EMAIL,
           to: [lead.email],
-          subject: `${urgencyEmoji} Reminder: Discovery Call ${reminderText} - ${formattedTime}`,
+          subject: is1Hour ? `Starting Soon: Your Discovery Call in 1 Hour` : `Tomorrow: Your Discovery Call - ${formattedTime}`,
           html: `
             <!DOCTYPE html>
             <html>
               <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Call Reminder</title>
               </head>
-              <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: Georgia, 'Times New Roman', serif;">
-                <div style="max-width: 600px; margin: 0 auto; background: #fdfcfb;">
+              <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;">
+                <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
                   
-                  <!-- Header -->
-                  <div style="background: linear-gradient(135deg, #b8956a 0%, #c9a87a 50%, #d4b896 100%); padding: 32px; text-align: center;">
-                    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 400; letter-spacing: 1px;">${urgencyEmoji} Call Reminder</h1>
+                  <!-- Header - Corporate Minimal with Logo -->
+                  <div style="padding: 24px 32px; border-bottom: 2px solid #111111;">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="vertical-align: middle;">
+                          <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                          <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
+                        </td>
+                        <td style="text-align: right; vertical-align: middle;">
+                          <div style="font-size: 16px; font-weight: 600; color: ${is1Hour ? '#dc2626' : '#111111'}; margin-bottom: 4px;">${is1Hour ? 'STARTING SOON' : 'REMINDER • TOMORROW'}</div>
+                          <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+                            ${callId}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
                   </div>
-                  
-                  <div style="padding: 32px;">
-                    <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 16px 0;">
-                      ${greeting},
+
+                  <!-- Call Summary Section -->
+                  <div style="padding: 20px 32px; background: #f9f9f9; border-bottom: 1px solid #e5e5e5;">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="vertical-align: top; width: 50%;">
+                          <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Scheduled For</div>
+                          <div style="font-size: 14px; font-weight: 600; color: #111111;">${formattedDate}</div>
+                          <div style="font-size: 12px; color: #666666; margin-top: 2px;">${formattedTime}</div>
+                        </td>
+                        <td style="vertical-align: top; text-align: right;">
+                          <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Meeting Type</div>
+                          <div style="font-size: 14px; font-weight: 600; color: #111111;">${isVideoCall ? '📹 Video Call' : '📞 Phone Call'}</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- Greeting -->
+                  <div style="padding: 24px 32px 16px 32px;">
+                    <p style="font-size: 14px; line-height: 1.6; color: #111111; margin: 0;">
+                      ${formalGreeting},
                     </p>
-                    
-                    <p style="font-size: 15px; line-height: 1.8; color: #4a4a4a; margin: 0 0 24px 0;">
-                      Just a friendly reminder that your discovery call${propertyContext} is <strong>${reminderText}</strong>!
+                    <p style="font-size: 13px; line-height: 1.6; color: #444444; margin: 12px 0 0 0;">
+                      ${is1Hour ? `Your discovery call with PeachHaus${propertyContext} starts in about an hour. We're ready when you are!` : `Your discovery call with PeachHaus${propertyContext} is tomorrow. We wanted to make sure you have all the details ready.`}
                     </p>
-                    
-                    <div style="background: #fff8f0; padding: 20px; border-radius: 12px; margin: 0 0 24px 0; border-left: 4px solid #b8956a;">
-                      <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>📅 Date:</strong> ${formattedDate}</p>
-                      <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>🕐 Time:</strong> ${formattedTime}</p>
-                      ${meetingDetails}
-                    </div>
-                    
-                    ${notificationType === "reminder_24h" ? `
-                    <!-- Final pitch link reminder for 24h -->
-                    <div style="background: #fef9e7; padding: 16px; border-radius: 8px; border: 1px solid #f9e79f; margin: 0 0 24px 0; text-align: center;">
-                      <p style="margin: 0 0 10px 0; color: #7d6608; font-size: 13px;">Don't forget to review our presentation before we chat!</p>
-                      <a href="${OWNER_PITCH_URL}" style="display: inline-block; background: #f1c40f; color: #7d6608; padding: 10px 20px; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px;">
-                        View Owner Presentation
+                  </div>
+
+                  ${!is1Hour ? `
+                  <!-- Pre-Call Preparation Section - Owner Pitch Presentation (24h only) -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="background: linear-gradient(135deg, #fef9e7 0%, #fff8e1 100%); border: 1px solid #f9e79f; border-radius: 8px; padding: 20px;">
+                      <p style="margin: 0; font-size: 14px; color: #7d6608; font-weight: 600;">
+                        📊 Don't Forget to Prepare
+                      </p>
+                      <p style="margin: 10px 0 14px 0; font-size: 13px; color: #9a7b0a; line-height: 1.5;">
+                        Haven't seen our presentation yet? Take 5 minutes to see how we've helped other Atlanta property owners maximize their rental income.
+                      </p>
+                      <a href="${OWNER_PITCH_URL}" style="display: inline-block; background: linear-gradient(135deg, #f1c40f 0%, #d4ac0d 100%); color: #7d6608; padding: 12px 24px; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px; box-shadow: 0 2px 4px rgba(241, 196, 15, 0.3);">
+                        View Owner Presentation →
                       </a>
                     </div>
-                    ` : ''}
-                    
-                    ${isVideoCall ? `
-                    <div style="text-align: center; margin: 0 0 24px 0;">
-                      <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">📹 Join Video Call</a>
-                      <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">${GOOGLE_MEET_LINK}</p>
-                    </div>
-                    ` : `
-                    <p style="text-align: center; font-size: 15px; color: #666; margin: 0 0 24px 0;">
-                      📞 We will call you at <strong>${lead.phone || 'your phone number'}</strong>
-                    </p>
-                    `}
-                    
-                    <p style="font-size: 15px; line-height: 1.8; color: #4a4a4a; margin: 0;">
-                      We're looking forward to discussing how we can help you with your property!
-                    </p>
                   </div>
-                  
-                  <!-- Signature -->
-                  <div style="padding: 24px 32px; text-align: center; border-top: 1px solid #e8e4de;">
-                    <p style="margin: 0 0 12px 0; font-size: 13px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
-                      SEE YOU SOON
-                    </p>
-                    <img src="${SIGNATURE_URL}" alt="Signature" style="height: 40px; margin-bottom: 8px;">
-                    <p style="margin: 0; font-size: 12px; color: #8a8a8a;">
-                      (404) 800-5932 | info@peachhausgroup.com
+                  ` : ''}
+
+                  <!-- Call Details Table -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="font-size: 11px; font-weight: 600; color: #111111; padding: 8px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Call Details
+                    </div>
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5; width: 140px;">Date & Time</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; font-weight: 600; border-bottom: 1px solid #e5e5e5;">${formattedDateTime}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Meeting Type</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+                          ${isVideoCall ? 'Video Call (Google Meet)' : `Phone Call to ${lead.phone || 'your number'}`}
+                        </td>
+                      </tr>
+                      ${lead.property_address ? `
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Property</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">${lead.property_address}</td>
+                      </tr>
+                      ` : ''}
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Duration</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">30 minutes</td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  ${isVideoCall ? `
+                  <!-- Video Call CTA -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="text-align: center; padding: 20px; background: #f0fdf4; border: 1px solid #bbf7d0;">
+                      <p style="font-size: 12px; color: #166534; margin: 0 0 12px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${is1Hour ? 'JOIN NOW' : 'JOIN VIDEO CALL'}</p>
+                      <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #16a34a; color: white; padding: 12px 32px; text-decoration: none; font-size: 13px; font-weight: 600; letter-spacing: 0.5px;">
+                        Open Google Meet
+                      </a>
+                      <p style="font-size: 11px; color: #666666; margin: 12px 0 0 0; font-family: 'SF Mono', Menlo, monospace;">${GOOGLE_MEET_LINK}</p>
+                    </div>
+                  </div>
+                  ` : ''}
+
+                  <!-- Signature Section -->
+                  <div style="padding: 24px 32px; border-top: 1px solid #e5e5e5;">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="vertical-align: middle; width: 70px;">
+                          <img src="${HOSTS_PHOTO_URL}" alt="Ingo Schaer" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #e5e5e5;">
+                        </td>
+                        <td style="vertical-align: middle; padding-left: 16px;">
+                          <p style="margin: 0; font-size: 13px; color: #111111; font-weight: 600;">Looking forward to speaking with you,</p>
+                          <img src="${SIGNATURE_URL}" alt="Signature" style="height: 32px; margin: 8px 0;">
+                          <p style="margin: 0; font-size: 12px; color: #666666;">PeachHaus Property Management</p>
+                          <p style="margin: 4px 0 0 0; font-size: 11px; color: #888888;">(404) 800-5932 · info@peachhausgroup.com</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- Footer -->
+                  <div style="padding: 16px 32px; background-color: #f9f9f9; border-top: 1px solid #e5e5e5; text-align: center;">
+                    <p style="margin: 0; font-size: 11px; color: #666666;">
+                      PeachHaus Property Management · Atlanta, Georgia
                     </p>
                   </div>
                 </div>
