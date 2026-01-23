@@ -191,6 +191,7 @@ export default function OwnerDashboard() {
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [revenueBreakdown, setRevenueBreakdown] = useState<any>(null);
   const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
+  const [marketingStats, setMarketingStats] = useState<any[]>([]);
   
   // Session stability & refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -229,6 +230,7 @@ export default function OwnerDashboard() {
       setMonthlyRevenueData(data.monthlyRevenue || []);
       setPerformanceMetrics(data.performance || performanceMetrics);
       setRevenueBreakdown(data.revenueBreakdown || null);
+      setMarketingStats(data.marketingStats || []);
       setLastRefresh(new Date());
       setDataStale(false);
       
@@ -402,6 +404,7 @@ export default function OwnerDashboard() {
         reviewCount: 0,
       });
       setRevenueBreakdown(data.revenueBreakdown || null);
+      setMarketingStats(data.marketingStats || []);
 
       navigate("/owner", { replace: true });
       toast.success("Welcome to your owner portal!");
@@ -476,6 +479,7 @@ export default function OwnerDashboard() {
         reviewCount: 0,
       });
       setRevenueBreakdown(data.revenueBreakdown || null);
+      setMarketingStats(data.marketingStats || []);
 
       // Load AI market insights separately
       if (data.property?.id) {
@@ -1223,6 +1227,7 @@ export default function OwnerDashboard() {
                 propertyId={property.id} 
                 propertyName={property.name}
                 directBookingUrl={property.website_url}
+                marketingStats={marketingStats}
               />
             )}
           </TabsContent>

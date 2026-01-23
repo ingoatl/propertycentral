@@ -3,10 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Megaphone, 
   TrendingUp, 
+  TrendingDown,
   Eye, 
   MousePointerClick, 
   MessageSquare,
@@ -33,6 +35,13 @@ import {
   Globe,
   Package,
   Repeat,
+  Building2,
+  Phone,
+  FileText,
+  UserCheck,
+  Instagram,
+  Facebook,
+  MapPin,
 } from "lucide-react";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 
@@ -56,9 +65,7 @@ interface MarketingActivity {
   activity_url: string | null;
   activity_date: string;
   synced_at: string;
-  // Guest info from joined booking data
   guest_info?: GuestInfo | null;
-  // Extended fields for guest context
   guest_name?: string | null;
   booking_id?: string | null;
   stay_dates?: {
@@ -67,12 +74,42 @@ interface MarketingActivity {
   } | null;
 }
 
+interface MarketingStats {
+  id: string;
+  property_id: string;
+  report_month: string;
+  social_media: {
+    instagram_posts?: number;
+    instagram_stories?: number;
+    facebook_posts?: number;
+    gmb_posts?: number;
+    total_reach?: number;
+    total_engagement?: number;
+    engagement_rate?: number;
+  };
+  outreach: {
+    total_companies_contacted?: number;
+    industries_targeted?: string[];
+    emails_sent?: number;
+    calls_made?: number;
+    hotsheets_distributed?: number;
+    decision_makers_identified?: number;
+  };
+  visibility: {
+    marketing_active?: boolean;
+    included_in_hotsheets?: boolean;
+  };
+  executive_summary?: string;
+  synced_at: string;
+}
+
 interface OwnerMarketingTabProps {
   propertyId: string;
   propertyName: string;
   directBookingUrl?: string | null;
   guidebookUrl?: string | null;
   qrCodeUrl?: string | null;
+  marketingStats?: MarketingStats[];
 }
 
 // Activity type metadata with context, industry insights, and rebooking impact
@@ -179,7 +216,7 @@ const defaultMetadata = {
   impactMetric: "20% more bookings",
 };
 
-export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl }: OwnerMarketingTabProps) => {
+export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl, marketingStats = [] }: OwnerMarketingTabProps) => {
   const [activities, setActivities] = useState<MarketingActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
@@ -190,6 +227,41 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
     activePlatforms: 0,
     totalActivities: 0,
   });
+
+  // Process marketing stats - current and previous month for trends
+  const currentStats = marketingStats[0] || null;
+  const previousStats = marketingStats[1] || null;
+  
+  // Calculate aggregated marketing actions
+  const totalSocialPosts = (currentStats?.social_media?.instagram_posts || 0) + 
+    (currentStats?.social_media?.instagram_stories || 0) + 
+    (currentStats?.social_media?.facebook_posts || 0) + 
+    (currentStats?.social_media?.gmb_posts || 0);
+  
+  const totalMarketingActions = totalSocialPosts + 
+    (currentStats?.outreach?.emails_sent || 0) + 
+    (currentStats?.outreach?.calls_made || 0) + 
+    (currentStats?.outreach?.hotsheets_distributed || 0);
+
+  // Calculate trends (percentage change)
+  const calculateTrend = (current?: number, previous?: number) => {
+    if (!current || !previous || previous === 0) return 0;
+    return Math.round(((current - previous) / previous) * 100);
+  };
+  
+  const reachTrend = calculateTrend(currentStats?.social_media?.total_reach, previousStats?.social_media?.total_reach);
+  const engagementTrend = calculateTrend(currentStats?.social_media?.total_engagement, previousStats?.social_media?.total_engagement);
+  const outreachTrend = calculateTrend(
+    (currentStats?.outreach?.emails_sent || 0) + (currentStats?.outreach?.calls_made || 0),
+    (previousStats?.outreach?.emails_sent || 0) + (previousStats?.outreach?.calls_made || 0)
+  );
+
+  const formatNumber = (num?: number) => {
+    if (!num) return "0";
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toLocaleString();
+  };
 
   useEffect(() => {
     loadMarketingData();
@@ -374,6 +446,255 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
           Refresh
         </Button>
       </div>
+
+      {/* Marketing Stats from Marketing Hub */}
+      {currentStats && (
+        <>
+          {/* Marketing Activity Summary */}
+          <Card className="border-none shadow-lg bg-gradient-to-br from-primary/5 to-accent/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Marketing Activity Summary
+              </CardTitle>
+              <CardDescription>
+                {currentStats.report_month ? `Report for ${format(new Date(currentStats.report_month + '-01'), 'MMMM yyyy')}` : 'Current Period'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center mb-6">
+                <p className="text-5xl font-bold text-primary">
+                  {totalMarketingActions}
+                </p>
+                <p className="text-muted-foreground">Total marketing actions this month</p>
+              </div>
+              <div className="grid grid-cols-4 gap-4 text-center">
+                <div className="p-3 bg-background rounded-xl">
+                  <p className="text-2xl font-semibold">{totalSocialPosts}</p>
+                  <p className="text-xs text-muted-foreground">Social Posts</p>
+                </div>
+                <div className="p-3 bg-background rounded-xl">
+                  <p className="text-2xl font-semibold">{currentStats.outreach?.emails_sent || 0}</p>
+                  <p className="text-xs text-muted-foreground">Emails</p>
+                </div>
+                <div className="p-3 bg-background rounded-xl">
+                  <p className="text-2xl font-semibold">{currentStats.outreach?.calls_made || 0}</p>
+                  <p className="text-xs text-muted-foreground">Calls</p>
+                </div>
+                <div className="p-3 bg-background rounded-xl">
+                  <p className="text-2xl font-semibold">{currentStats.outreach?.hotsheets_distributed || 0}</p>
+                  <p className="text-xs text-muted-foreground">Hotsheets</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Social Media Performance */}
+            <Card className="border-none shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Share2 className="h-5 w-5 text-pink-500" />
+                  Social Media Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center">
+                      <Instagram className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{currentStats.social_media?.instagram_posts || 0}</p>
+                      <p className="text-xs text-muted-foreground">IG Posts</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-400 to-orange-400 flex items-center justify-center">
+                      <Instagram className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{currentStats.social_media?.instagram_stories || 0}</p>
+                      <p className="text-xs text-muted-foreground">IG Stories</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                    <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
+                      <Facebook className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{currentStats.social_media?.facebook_posts || 0}</p>
+                      <p className="text-xs text-muted-foreground">FB Posts</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500 flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{currentStats.social_media?.gmb_posts || 0}</p>
+                      <p className="text-xs text-muted-foreground">GMB Posts</p>
+                    </div>
+                  </div>
+                </div>
+                <Separator className="my-4" />
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold text-primary">{formatNumber(currentStats.social_media?.total_reach)}</p>
+                    <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                      Total Reach 
+                      {reachTrend !== 0 && (
+                        reachTrend > 0 ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-red-500" />
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-primary">{formatNumber(currentStats.social_media?.total_engagement)}</p>
+                    <p className="text-xs text-muted-foreground">Total Engagement</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-emerald-600">{currentStats.social_media?.engagement_rate || 0}%</p>
+                    <p className="text-xs text-muted-foreground">Engagement Rate</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Corporate Outreach (Aggregate Only - Privacy Safe) */}
+            <Card className="border-none shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-blue-500" />
+                  Corporate Outreach
+                </CardTitle>
+                <CardDescription>
+                  Aggregate metrics only - company details kept confidential
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="p-3 bg-muted/30 rounded-xl text-center">
+                    <p className="text-2xl font-bold">{currentStats.outreach?.total_companies_contacted || 0}</p>
+                    <p className="text-xs text-muted-foreground">Companies</p>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-xl text-center">
+                    <p className="text-2xl font-bold">{currentStats.outreach?.emails_sent || 0}</p>
+                    <p className="text-xs text-muted-foreground">Emails Sent</p>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-xl text-center">
+                    <p className="text-2xl font-bold">{currentStats.outreach?.calls_made || 0}</p>
+                    <p className="text-xs text-muted-foreground">Calls Made</p>
+                  </div>
+                </div>
+                
+                {currentStats.outreach?.industries_targeted && currentStats.outreach.industries_targeted.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium mb-2">Industries Targeted</p>
+                    <div className="flex flex-wrap gap-2">
+                      {currentStats.outreach.industries_targeted.map((industry, idx) => (
+                        <Badge key={idx} variant="secondary">{industry}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-purple-500" />
+                    <div>
+                      <p className="font-medium">{currentStats.outreach?.hotsheets_distributed || 0}</p>
+                      <p className="text-xs text-muted-foreground">Hotsheets Sent</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <UserCheck className="h-5 w-5 text-emerald-500" />
+                    <div>
+                      <p className="font-medium">{currentStats.outreach?.decision_makers_identified || 0}</p>
+                      <p className="text-xs text-muted-foreground">Decision Makers</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Executive Summary */}
+          {currentStats.executive_summary && (
+            <Card className="border-none shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                  Executive Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-muted-foreground leading-relaxed">
+                    {currentStats.executive_summary}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Month-over-Month Trends */}
+          {previousStats && (
+            <Card className="border-none shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-emerald-500" />
+                  Month-over-Month Trends
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="text-center p-4 bg-muted/30 rounded-xl">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      {reachTrend >= 0 ? (
+                        <TrendingUp className="w-6 h-6 text-emerald-500" />
+                      ) : (
+                        <TrendingDown className="w-6 h-6 text-red-500" />
+                      )}
+                      <span className={`text-2xl font-bold ${reachTrend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {reachTrend >= 0 ? '+' : ''}{reachTrend}%
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Reach</p>
+                  </div>
+                  <div className="text-center p-4 bg-muted/30 rounded-xl">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      {engagementTrend >= 0 ? (
+                        <TrendingUp className="w-6 h-6 text-emerald-500" />
+                      ) : (
+                        <TrendingDown className="w-6 h-6 text-red-500" />
+                      )}
+                      <span className={`text-2xl font-bold ${engagementTrend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {engagementTrend >= 0 ? '+' : ''}{engagementTrend}%
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Engagement</p>
+                  </div>
+                  <div className="text-center p-4 bg-muted/30 rounded-xl">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      {outreachTrend >= 0 ? (
+                        <TrendingUp className="w-6 h-6 text-emerald-500" />
+                      ) : (
+                        <TrendingDown className="w-6 h-6 text-red-500" />
+                      )}
+                      <span className={`text-2xl font-bold ${outreachTrend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {outreachTrend >= 0 ? '+' : ''}{outreachTrend}%
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Outreach Volume</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Separator />
+        </>
+      )}
 
       {/* Marketing Toolkit Section */}
       {(directBookingUrl || guidebookUrl || qrCodeUrl) && (
