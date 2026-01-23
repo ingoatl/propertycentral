@@ -103,6 +103,31 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
 
   const isLoading = voicemailsLoading || communicationsLoading || ownerCommsLoading;
 
+  // Helper to detect if a communication is a voicemail notification
+  const isVoicemailNotification = (comm: Communication): boolean => {
+    const body = comm.body?.toLowerCase() || "";
+    return (
+      body.includes("voice message") || 
+      body.includes("voicemail") ||
+      body.includes("left you a voice") ||
+      body.includes("/vm/")
+    );
+  };
+
+  // Extract voicemail URL from body
+  const extractVoicemailUrl = (body: string | null): string | null => {
+    if (!body) return null;
+    const match = body.match(/https?:\/\/[^\s]+\/vm\/[^\s]+/);
+    return match ? match[0] : null;
+  };
+
+  // Extract voicemail transcript from body
+  const extractVoicemailTranscript = (body: string | null): string | null => {
+    if (!body) return null;
+    const match = body.match(/"([^"]+)"/);
+    return match ? match[1] : null;
+  };
+
   // Combine all communications
   const allCommunications = [
     ...(communications || []),
@@ -113,6 +138,16 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
   const uniqueCommunications = allCommunications.filter(
     (comm, index, self) => index === self.findIndex(c => c.id === comm.id)
   );
+
+  // Separate voicemail notifications from regular communications
+  const voicemailNotifications = uniqueCommunications.filter(isVoicemailNotification);
+  const regularCommunications = uniqueCommunications.filter(c => !isVoicemailNotification(c));
+
+  // Combine voicemails from both sources
+  const allVoicemails = [
+    ...(voicemails || []).map(v => ({ source: 'table' as const, data: v })),
+    ...voicemailNotifications.map(c => ({ source: 'comm' as const, data: c })),
+  ];
 
   const getChannelIcon = (channel: string | null) => {
     switch (channel?.toLowerCase()) {
@@ -146,25 +181,9 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
     );
   }
 
-  const hasVoicemails = voicemails && voicemails.length > 0;
-  const hasCommunications = uniqueCommunications.length > 0;
+  const hasVoicemails = allVoicemails.length > 0;
+  const hasCommunications = regularCommunications.length > 0;
   const hasAnyMessages = hasVoicemails || hasCommunications;
-
-  if (!hasAnyMessages) {
-    return (
-      <Card className="border-none shadow-lg">
-        <CardContent className="py-12 text-center">
-          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-            <MessageCircle className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">No Messages Yet</h3>
-          <p className="text-muted-foreground">
-            Communications about your property will appear here.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -179,42 +198,53 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
             Refresh
           </Button>
           <Badge variant="secondary">
-            {(voicemails?.length || 0) + uniqueCommunications.length} total
+            {allVoicemails.length + regularCommunications.length} total
           </Badge>
         </div>
       </div>
 
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="all">All ({(voicemails?.length || 0) + uniqueCommunications.length})</TabsTrigger>
-          <TabsTrigger value="communications">Communications ({uniqueCommunications.length})</TabsTrigger>
-          <TabsTrigger value="voicemails">Voicemails ({voicemails?.length || 0})</TabsTrigger>
+          <TabsTrigger value="all">All ({allVoicemails.length + regularCommunications.length})</TabsTrigger>
+          <TabsTrigger value="communications">Communications ({regularCommunications.length})</TabsTrigger>
+          <TabsTrigger value="voicemails">Voicemails ({allVoicemails.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-4 space-y-3">
           {/* Mix and sort all messages by date */}
           {[
-            ...(voicemails || []).map(v => ({ type: 'voicemail' as const, data: v, date: new Date(v.created_at) })),
-            ...uniqueCommunications.map(c => ({ type: 'communication' as const, data: c, date: new Date(c.created_at) })),
+            ...allVoicemails.map(v => ({ 
+              type: 'voicemail' as const, 
+              data: v, 
+              date: new Date(v.source === 'table' ? v.data.created_at : v.data.created_at) 
+            })),
+            ...regularCommunications.map(c => ({ type: 'communication' as const, data: c, date: new Date(c.created_at) })),
           ]
             .sort((a, b) => b.date.getTime() - a.date.getTime())
             .slice(0, 50)
             .map((item) => 
               item.type === 'voicemail' 
-                ? <VoicemailCard key={`vm-${item.data.id}`} message={item.data} />
-                : <CommunicationCard key={`comm-${item.data.id}`} communication={item.data} getChannelIcon={getChannelIcon} getDirectionIcon={getDirectionIcon} />
+                ? item.data.source === 'table'
+                  ? <VoicemailCard key={`vm-${item.data.data.id}`} message={item.data.data} />
+                  : <VoicemailFromCommCard 
+                      key={`vm-comm-${item.data.data.id}`} 
+                      communication={item.data.data as Communication} 
+                      extractVoicemailUrl={extractVoicemailUrl}
+                      extractVoicemailTranscript={extractVoicemailTranscript}
+                    />
+                : <CommunicationCard key={`comm-${(item.data as Communication).id}`} communication={item.data as Communication} getChannelIcon={getChannelIcon} getDirectionIcon={getDirectionIcon} />
             )}
         </TabsContent>
 
         <TabsContent value="communications" className="mt-4 space-y-3">
-          {uniqueCommunications.length === 0 ? (
+          {regularCommunications.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-8 text-center text-muted-foreground">
                 No communications yet
               </CardContent>
             </Card>
           ) : (
-            uniqueCommunications.slice(0, 50).map((comm) => (
+            regularCommunications.slice(0, 50).map((comm) => (
               <CommunicationCard 
                 key={comm.id} 
                 communication={comm}
@@ -233,9 +263,16 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
               </CardContent>
             </Card>
           ) : (
-            voicemails.map((message) => (
-              <VoicemailCard key={message.id} message={message} />
-            ))
+            allVoicemails.map((vm) => 
+              vm.source === 'table' 
+                ? <VoicemailCard key={`vm-${vm.data.id}`} message={vm.data} />
+                : <VoicemailFromCommCard 
+                    key={`vm-comm-${vm.data.id}`} 
+                    communication={vm.data as Communication} 
+                    extractVoicemailUrl={extractVoicemailUrl}
+                    extractVoicemailTranscript={extractVoicemailTranscript}
+                  />
+            )
           )}
         </TabsContent>
       </Tabs>
@@ -321,6 +358,73 @@ function VoicemailCard({ message }: { message: any }) {
             </div>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// New component for voicemails detected from lead_communications
+function VoicemailFromCommCard({ 
+  communication,
+  extractVoicemailUrl,
+  extractVoicemailTranscript
+}: { 
+  communication: Communication;
+  extractVoicemailUrl: (body: string | null) => string | null;
+  extractVoicemailTranscript: (body: string | null) => string | null;
+}) {
+  const voicemailUrl = extractVoicemailUrl(communication.body);
+  const transcript = extractVoicemailTranscript(communication.body);
+  
+  return (
+    <Card className="border shadow-sm hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0 bg-primary/10">
+            <Mic className="h-6 w-6 text-primary" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-medium">Property Manager</span>
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                Voicemail
+              </Badge>
+              <Badge variant="secondary" className="text-xs">Sent</Badge>
+            </div>
+
+            {transcript && (
+              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                "{transcript}"
+              </p>
+            )}
+
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {format(new Date(communication.sent_at || communication.created_at), "MMM d, yyyy 'at' h:mm a")}
+              </span>
+            </div>
+          </div>
+
+          {voicemailUrl && (
+            <Button
+              variant="default"
+              size="sm"
+              asChild
+              className="shrink-0 gap-2"
+            >
+              <a
+                href={voicemailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Play className="h-4 w-4" />
+                Listen
+              </a>
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
