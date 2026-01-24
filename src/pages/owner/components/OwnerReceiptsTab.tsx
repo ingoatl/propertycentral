@@ -430,7 +430,6 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
                                 {formatCurrency(expense.amount)}
                               </p>
                               <div className="flex gap-1">
-+                                {/* All expenses can now be viewed - we auto-generate receipts if needed */}
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -439,7 +438,7 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
                                     handleViewReceipt(expense);
                                   }}
                                   className="h-8 w-8"
-                                  title={hasReceipt ? "View Receipt" : "Generate Receipt"}
+                                  title="View Receipt"
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
@@ -452,15 +451,10 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
                                   }}
                                   disabled={downloadingId === expense.id}
                                   className="h-8 w-8"
-                                  title={hasReceipt ? "Download Receipt" : "Download Generated Receipt"}
+                                  title="Download Receipt"
                                 >
                                   <Download className="h-4 w-4" />
                                 </Button>
-                                {!hasReceipt && (
-                                  <Badge variant="outline" className="text-xs text-primary">
-                                    Auto
-                                  </Badge>
-                                )}
                               </div>
                             </div>
                           </div>
