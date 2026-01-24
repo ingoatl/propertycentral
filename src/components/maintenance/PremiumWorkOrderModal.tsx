@@ -177,7 +177,7 @@ const PremiumWorkOrderModal = ({
   const matchingVendors = vendors.filter(v => workOrder?.category && v.specialty?.includes(workOrder.category));
   const otherVendors = vendors.filter(v => !workOrder?.category || !v.specialty?.includes(workOrder.category));
 
-  // Update status
+  // Update status with verification notification
   const updateStatus = useMutation({
     mutationFn: async (newStatus: WorkOrderStatus) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -186,7 +186,8 @@ const PremiumWorkOrderModal = ({
         .from("work_orders")
         .update({ 
           status: newStatus,
-          ...(newStatus === "completed" ? { completed_at: new Date().toISOString() } : {})
+          ...(newStatus === "completed" ? { completed_at: new Date().toISOString() } : {}),
+          ...(newStatus === "completed" ? { verified_by: user?.id, verified_at: new Date().toISOString() } : {})
         })
         .eq("id", workOrderId);
 
@@ -194,16 +195,29 @@ const PremiumWorkOrderModal = ({
 
       await supabase.from("work_order_timeline").insert({
         work_order_id: workOrderId,
-        action: `Status changed to ${STATUS_CONFIG[newStatus].label}`,
+        action: newStatus === "completed" 
+          ? `Work verified and marked complete by ${user?.email}` 
+          : `Status changed to ${STATUS_CONFIG[newStatus].label}`,
         performed_by_type: "pm",
         performed_by_name: user?.email,
         performed_by_user_id: user?.id,
         previous_status: workOrder?.status,
         new_status: newStatus,
       });
+
+      // If moving to pending_verification, trigger notification to Alex
+      if (newStatus === "pending_verification") {
+        try {
+          await supabase.functions.invoke("notify-work-order-verification", {
+            body: { workOrderId },
+          });
+        } catch (e) {
+          console.error("Failed to send verification notification:", e);
+        }
+      }
     },
-    onSuccess: () => {
-      toast.success("Status updated");
+    onSuccess: (_, newStatus) => {
+      toast.success(newStatus === "completed" ? "Work order verified and completed!" : "Status updated");
       onUpdate();
       queryClient.invalidateQueries({ queryKey: ["work-order-detail", workOrderId] });
       queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrderId] });
@@ -417,44 +431,46 @@ const PremiumWorkOrderModal = ({
             )}
             
             <div className="relative p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  {/* Property Thumbnail */}
-                  {propertyImage ? (
-                    <div className="h-16 w-16 rounded-2xl overflow-hidden border-2 border-white/20 shadow-lg">
-                      <img 
-                        src={propertyImage} 
-                        alt={workOrder.property?.name || 'Property'} 
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                      <Wrench className="h-7 w-7 text-white" />
-                    </div>
-                  )}
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-white/60 text-sm font-mono">WO-{workOrder.work_order_number}</span>
-                      {statusConfig && (
-                        <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
-                          {statusConfig.label}
-                        </Badge>
-                      )}
-                      {urgencyConfig && workOrder.urgency === "emergency" && (
-                        <Badge className="bg-red-500/80 text-white border-red-400">
-                          {urgencyConfig.label}
-                        </Badge>
-                      )}
-                    </div>
-                    <h2 className="text-xl font-semibold">{workOrder.title}</h2>
-                    <div className="flex items-center gap-2 text-white/70 mt-2 text-sm">
-                      <MapPin className="h-4 w-4" />
-                      <span>{workOrder.property?.name || workOrder.property?.address}</span>
-                    </div>
+              <div className="flex items-start gap-5">
+                {/* Property Thumbnail - Larger 16:9 */}
+                {propertyImage ? (
+                  <div className="h-24 w-40 rounded-xl overflow-hidden border-2 border-white/20 shadow-lg flex-shrink-0">
+                    <img 
+                      src={propertyImage} 
+                      alt={workOrder.property?.name || 'Property'} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-24 w-40 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                    <Building2 className="h-10 w-10 text-white/60" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-1 flex-wrap">
+                    <span className="text-white/60 text-sm font-mono">WO-{workOrder.work_order_number}</span>
+                    {statusConfig && (
+                      <Badge className={`${
+                        workOrder.status === 'pending_verification' 
+                          ? 'bg-amber-500/80 text-white border-amber-400' 
+                          : 'bg-white/20 text-white border-white/30 hover:bg-white/30'
+                      }`}>
+                        {statusConfig.label}
+                      </Badge>
+                    )}
+                    {urgencyConfig && workOrder.urgency === "emergency" && (
+                      <Badge className="bg-red-500/80 text-white border-red-400">
+                        {urgencyConfig.label}
+                      </Badge>
+                    )}
+                  </div>
+                  <h2 className="text-xl font-semibold truncate">{workOrder.title}</h2>
+                  <div className="flex items-center gap-2 text-white/70 mt-2 text-sm">
+                    <MapPin className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{workOrder.property?.name || workOrder.property?.address}</span>
                   </div>
                 </div>
-                <div className="text-right space-y-1">
+                <div className="text-right space-y-1 flex-shrink-0">
                   {workOrder.quoted_cost && (
                     <div className="text-2xl font-bold">${workOrder.quoted_cost.toLocaleString()}</div>
                   )}
@@ -907,15 +923,52 @@ const PremiumWorkOrderModal = ({
                   </Card>
                 )}
 
+                {/* Verify & Complete Section */}
+                {workOrder.status === "pending_verification" && (
+                  <Card className="border-2 border-amber-500/50 bg-amber-50/50 dark:bg-amber-900/10">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-4">
+                        <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                          <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg text-foreground">Verification Required</h3>
+                          <p className="text-sm text-muted-foreground mt-1 mb-4">
+                            Please review the before/after photos and videos submitted by the vendor to verify the work was completed correctly.
+                          </p>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <Button 
+                              size="lg"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                              onClick={() => updateStatus.mutate("completed")}
+                              disabled={updateStatus.isPending}
+                            >
+                              {updateStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-5 w-5 mr-2" />}
+                              Verify & Complete Job
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => updateStatus.mutate("in_progress")}
+                              disabled={updateStatus.isPending}
+                            >
+                              Request Revisions
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Quick Actions */}
                 <div className="flex flex-wrap gap-3">
-                  {workOrder.status === "pending_verification" && (
-                    <Button onClick={() => updateStatus.mutate("completed")}>
+                  {workOrder.status !== "pending_verification" && workOrder.status === "in_progress" && (
+                    <Button variant="outline" onClick={() => updateStatus.mutate("pending_verification")}>
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Mark Complete
+                      Submit for Verification
                     </Button>
                   )}
-                  {workOrder.status !== "cancelled" && workOrder.status !== "completed" && (
+                  {workOrder.status !== "cancelled" && workOrder.status !== "completed" && workOrder.status !== "pending_verification" && (
                     <Button variant="outline" onClick={() => updateStatus.mutate("on_hold")}>
                       Put On Hold
                     </Button>
