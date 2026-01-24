@@ -54,6 +54,7 @@ import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
 import { OwnerGuestScreeningsTab } from "./components/OwnerGuestScreeningsTab";
 import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
 import { ScheduleOwnerCallModal } from "./components/ScheduleOwnerCallModal";
+import { AudioPropertySummary } from "./components/AudioPropertySummary";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
@@ -963,6 +964,28 @@ export default function OwnerDashboard() {
                 revenueBreakdown={revenueBreakdown}
                 rentalType={property?.rental_type}
                 peachHausData={peachHausData}
+              />
+
+              {/* Voice Recap - Listen to Your Monthly Summary */}
+              <AudioPropertySummary
+                propertyName={property?.name || "Your Property"}
+                ownerName={session?.ownerName}
+                rentalType={property?.rental_type as "hybrid" | "mid_term" | "long_term"}
+                marketingStats={marketingStats?.[0]}
+                listingHealth={peachHausData?.listingHealth}
+                revenueData={{
+                  thisMonthRevenue: performanceMetrics.totalRevenue,
+                  lastMonthRevenue: statements[0]?.total_revenue,
+                  occupancyRate: performanceMetrics.occupancyRate,
+                  upcomingBookings: bookings?.str?.filter((b: any) => new Date(b.check_in) > new Date()).length || 0,
+                  strRevenue: performanceMetrics.strRevenue,
+                  mtrRevenue: performanceMetrics.mtrRevenue,
+                }}
+                peachHausData={{
+                  maintenanceCompleted: peachHausData?.maintenanceCompleted || 0,
+                  tenantPaymentStatus: peachHausData?.tenantPaymentStatus || "on_time",
+                  marketComparison: peachHausData?.marketComparison,
+                }}
               />
 
               {/* Performance Charts */}

@@ -460,6 +460,18 @@ serve(async (req: Request): Promise<Response> => {
           secondOwnerEmail: "",
         };
         demoData.property.name = "Ingo's Atlanta Retreat";
+        demoData.property.rental_type = "hybrid"; // Hybrid property for Ingo
+        
+        // Add peachHausData for voice recap
+        (demoData as any).peachHausData = {
+          listingHealth: { score: 88, status: "excellent" },
+          maintenanceCompleted: 3,
+          tenantPaymentStatus: "on_time",
+          marketComparison: {
+            avgMonthlyRent: 4200,
+            positioning: "competitive",
+          },
+        };
       }
       return new Response(
         JSON.stringify(demoData),
