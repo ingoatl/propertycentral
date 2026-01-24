@@ -627,10 +627,92 @@ async function generateAudio(text: string): Promise<{ audioBuffer?: ArrayBuffer;
   }
 }
 
+// Find or create GHL contact by phone
+async function findOrCreateGhlContact(
+  phone: string,
+  name: string,
+  email?: string
+): Promise<{ contactId: string | null; error?: string }> {
+  if (!ghlApiKey || !ghlLocationId) {
+    return { contactId: null, error: "GHL not configured" };
+  }
+
+  try {
+    // Format phone
+    let formattedPhone = phone.replace(/\D/g, '');
+    if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
+      formattedPhone = '1' + formattedPhone;
+    }
+    if (!formattedPhone.startsWith('+')) {
+      formattedPhone = '+' + formattedPhone;
+    }
+
+    // Search for existing contact
+    const searchUrl = `https://services.leadconnectorhq.com/contacts/search`;
+    const searchResponse = await fetch(searchUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${ghlApiKey}`,
+        "Content-Type": "application/json",
+        "Version": "2021-07-28",
+      },
+      body: JSON.stringify({
+        locationId: ghlLocationId,
+        query: formattedPhone,
+        limit: 1,
+      }),
+    });
+
+    if (searchResponse.ok) {
+      const searchData = await searchResponse.json();
+      if (searchData.contacts && searchData.contacts.length > 0) {
+        console.log(`Found existing GHL contact: ${searchData.contacts[0].id}`);
+        return { contactId: searchData.contacts[0].id };
+      }
+    }
+
+    // Create new contact if not found
+    console.log(`Creating new GHL contact for ${formattedPhone}`);
+    const createResponse = await fetch(
+      `https://services.leadconnectorhq.com/contacts/`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${ghlApiKey}`,
+          "Content-Type": "application/json",
+          "Version": "2021-07-28",
+        },
+        body: JSON.stringify({
+          locationId: ghlLocationId,
+          phone: formattedPhone,
+          name: name,
+          email: email || undefined,
+          tags: ["property-owner", "recap-recipient"],
+        }),
+      }
+    );
+
+    if (!createResponse.ok) {
+      const error = await createResponse.text();
+      console.error(`GHL contact creation failed: ${error}`);
+      return { contactId: null, error: `Contact creation failed: ${error}` };
+    }
+
+    const createData = await createResponse.json();
+    console.log(`Created GHL contact: ${createData.contact?.id}`);
+    return { contactId: createData.contact?.id || null };
+  } catch (error) {
+    console.error(`GHL contact error: ${error}`);
+    return { contactId: null, error: String(error) };
+  }
+}
+
 // Send SMS via GHL
 async function sendSms(
   phone: string,
-  message: string
+  message: string,
+  ownerName: string,
+  ownerEmail?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!ghlApiKey || !ghlLocationId) {
     console.error("GHL API not configured - missing API key or location ID");
@@ -647,7 +729,19 @@ async function sendSms(
       formattedPhone = '+' + formattedPhone;
     }
     
-    console.log(`Sending SMS to ${formattedPhone} via GHL...`);
+    // First, find or create the contact
+    const { contactId, error: contactError } = await findOrCreateGhlContact(
+      formattedPhone,
+      ownerName,
+      ownerEmail
+    );
+    
+    if (!contactId) {
+      console.error(`Failed to get GHL contact: ${contactError}`);
+      return { success: false, error: contactError || "No contact ID" };
+    }
+    
+    console.log(`Sending SMS to ${formattedPhone} (contact: ${contactId}) via GHL...`);
     
     const response = await fetch(
       `https://services.leadconnectorhq.com/conversations/messages`,
@@ -660,9 +754,8 @@ async function sendSms(
         },
         body: JSON.stringify({
           type: "SMS",
-          phone: formattedPhone,
+          contactId: contactId,
           message,
-          locationId: ghlLocationId,
         }),
       }
     );
@@ -918,7 +1011,7 @@ serve(async (req) => {
         if (owner.phone) {
           const smsMessage = `Hi ${ownerNames}! 🏠 Your ${previousMonthName} performance recap for ${property.name} is ready!\n\n${metrics.totalRevenue > 0 ? `💰 Revenue: ${formatCurrency(metrics.totalRevenue)}\n` : ''}${metrics.occupancyRate > 0 ? `📊 Occupancy: ${Math.round(metrics.occupancyRate)}%\n` : ''}🎧 Listen: ${audioUrl}\n📱 Dashboard: ${portalUrl}\n\n— PeachHaus`;
           
-          smsResult = await sendSms(owner.phone, smsMessage);
+          smsResult = await sendSms(owner.phone, smsMessage, owner.name, owner.email);
         }
         
         // Save recap record
