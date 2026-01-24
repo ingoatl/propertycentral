@@ -345,6 +345,7 @@ serve(async (req: Request): Promise<Response> => {
       leadOnboardingResult,
       guestScreeningsResult,
       marketingStatsResult,
+      peachHausStatsResult,
     ] = await Promise.all([
       // Monthly reconciliations (statements) - fetch all historical data (24 months)
       supabase
@@ -470,6 +471,16 @@ serve(async (req: Request): Promise<Response> => {
         .eq("property_id", property.id)
         .in("report_month", [currentMonth, previousMonth])
         .order("report_month", { ascending: false }),
+      
+      // PeachHaus stats - latest sync for hybrid/STR properties only
+      property.rental_type === 'hybrid' || !property.rental_type || property.rental_type === 'str'
+        ? supabase
+            .from("property_peachhaus_stats")
+            .select("*")
+            .eq("property_id", property.id)
+            .order("sync_date", { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
     const rawStatements = statementsResult.data || [];
@@ -482,9 +493,11 @@ serve(async (req: Request): Promise<Response> => {
     const platformListings = platformListingsResult.data || [];
     const guestScreenings = guestScreeningsResult.data || [];
     const marketingStats = marketingStatsResult.data || [];
+    const peachHausStats = peachHausStatsResult?.data?.[0] || null;
     
     console.log("Guest screenings fetched:", guestScreenings.length);
     console.log("Marketing stats fetched:", marketingStats.length);
+    console.log("PeachHaus stats fetched:", peachHausStats ? "yes" : "no");
     const leadOnboarding = leadOnboardingResult.data;
     
     // Process statements to calculate correct net owner earnings based on service type
@@ -1060,6 +1073,15 @@ serve(async (req: Request): Promise<Response> => {
       })),
       dataWarnings, // Include any data quality warnings for admin awareness
       marketingStats, // Marketing stats from Marketing Hub
+      peachHausData: peachHausStats ? {
+        listingHealth: peachHausStats.listing_health,
+        pricingIntelligence: peachHausStats.pricing_intelligence,
+        recentOptimizations: peachHausStats.recent_optimizations,
+        revenueAlerts: peachHausStats.revenue_alerts,
+        performanceTrends: peachHausStats.performance_trends,
+        syncedAt: peachHausStats.synced_at,
+        syncDate: peachHausStats.sync_date,
+      } : null,
     };
 
     return new Response(

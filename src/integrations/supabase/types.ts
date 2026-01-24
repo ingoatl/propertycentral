@@ -7854,6 +7854,63 @@ export type Database = {
         }
         Relationships: []
       }
+      property_peachhaus_stats: {
+        Row: {
+          created_at: string
+          id: string
+          listing_health: Json | null
+          ownerrez_id: string | null
+          performance_trends: Json | null
+          pricing_intelligence: Json | null
+          property_id: string
+          recent_optimizations: Json | null
+          revenue_alerts: Json | null
+          sync_date: string
+          synced_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_health?: Json | null
+          ownerrez_id?: string | null
+          performance_trends?: Json | null
+          pricing_intelligence?: Json | null
+          property_id: string
+          recent_optimizations?: Json | null
+          revenue_alerts?: Json | null
+          sync_date?: string
+          synced_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_health?: Json | null
+          ownerrez_id?: string | null
+          performance_trends?: Json | null
+          pricing_intelligence?: Json | null
+          property_id?: string
+          recent_optimizations?: Json | null
+          revenue_alerts?: Json | null
+          sync_date?: string
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_peachhaus_stats_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_peachhaus_stats_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_policies: {
         Row: {
           created_at: string

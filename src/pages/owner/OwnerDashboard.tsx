@@ -192,6 +192,7 @@ export default function OwnerDashboard() {
   const [revenueBreakdown, setRevenueBreakdown] = useState<any>(null);
   const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
   const [marketingStats, setMarketingStats] = useState<any[]>([]);
+  const [peachHausData, setPeachHausData] = useState<any>(null);
   
   // Session stability & refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -231,6 +232,7 @@ export default function OwnerDashboard() {
       setPerformanceMetrics(data.performance || performanceMetrics);
       setRevenueBreakdown(data.revenueBreakdown || null);
       setMarketingStats(data.marketingStats || []);
+      setPeachHausData(data.peachHausData || null);
       setLastRefresh(new Date());
       setDataStale(false);
       
@@ -405,6 +407,7 @@ export default function OwnerDashboard() {
       });
       setRevenueBreakdown(data.revenueBreakdown || null);
       setMarketingStats(data.marketingStats || []);
+      setPeachHausData(data.peachHausData || null);
 
       navigate("/owner", { replace: true });
       toast.success("Welcome to your owner portal!");
@@ -480,6 +483,7 @@ export default function OwnerDashboard() {
       });
       setRevenueBreakdown(data.revenueBreakdown || null);
       setMarketingStats(data.marketingStats || []);
+      setPeachHausData(data.peachHausData || null);
 
       // Load AI market insights separately
       if (data.property?.id) {
@@ -1195,6 +1199,7 @@ export default function OwnerDashboard() {
                   secondOwnerName: session.secondOwnerName,
                   secondOwnerEmail: session.secondOwnerEmail,
                 }}
+                peachHausData={peachHausData}
               />
             )}
           </TabsContent>
