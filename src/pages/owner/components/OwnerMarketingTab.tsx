@@ -232,16 +232,28 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
   const currentStats = marketingStats[0] || null;
   const previousStats = marketingStats[1] || null;
   
-  // Calculate aggregated marketing actions
+  // Calculate aggregated marketing actions from stats
   const totalSocialPosts = (currentStats?.social_media?.instagram_posts || 0) + 
     (currentStats?.social_media?.instagram_stories || 0) + 
     (currentStats?.social_media?.facebook_posts || 0) + 
     (currentStats?.social_media?.gmb_posts || 0);
   
-  const totalMarketingActions = totalSocialPosts + 
-    (currentStats?.outreach?.emails_sent || 0) + 
+  const totalOutreachActions = (currentStats?.outreach?.emails_sent || 0) + 
     (currentStats?.outreach?.calls_made || 0) + 
     (currentStats?.outreach?.hotsheets_distributed || 0);
+  
+  const totalMarketingActions = totalSocialPosts + totalOutreachActions;
+
+  // Decision makers reached (corporate outreach)
+  const decisionMakersReached = currentStats?.outreach?.decision_makers_identified || 0;
+  
+  // Platforms count (active marketing channels)
+  const platformsCount = [
+    currentStats?.social_media?.instagram_posts || currentStats?.social_media?.instagram_stories,
+    currentStats?.social_media?.facebook_posts,
+    currentStats?.social_media?.gmb_posts,
+    currentStats?.outreach?.hotsheets_distributed,
+  ].filter(Boolean).length || 0;
 
   // Calculate trends (percentage change)
   const calculateTrend = (current?: number, previous?: number) => {
@@ -776,17 +788,17 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
         </CardContent>
       </Card>
 
-      {/* Metrics Cards */}
+      {/* Metrics Cards - Show stats-based metrics or fallback to activity-based */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100/50 border-none shadow-lg dark:from-cyan-950/30 dark:to-cyan-900/20">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                <Eye className="w-5 h-5 text-cyan-600" />
+                <Share2 className="w-5 h-5 text-cyan-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{aggregateMetrics.totalViews.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Total Views</p>
+                <p className="text-2xl font-bold">{totalSocialPosts || aggregateMetrics.totalViews}</p>
+                <p className="text-xs text-muted-foreground">Social Posts</p>
               </div>
             </div>
           </CardContent>
@@ -796,11 +808,11 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <MousePointerClick className="w-5 h-5 text-blue-600" />
+                <Mail className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{aggregateMetrics.totalClicks.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Clicks</p>
+                <p className="text-2xl font-bold">{totalOutreachActions || aggregateMetrics.totalClicks}</p>
+                <p className="text-xs text-muted-foreground">Outreach</p>
               </div>
             </div>
           </CardContent>
@@ -810,11 +822,11 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-amber-600" />
+                <Users className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{aggregateMetrics.totalInquiries}</p>
-                <p className="text-xs text-muted-foreground">Inquiries</p>
+                <p className="text-2xl font-bold">{formatNumber(decisionMakersReached)}</p>
+                <p className="text-xs text-muted-foreground">Leads Reached</p>
               </div>
             </div>
           </CardContent>
@@ -827,8 +839,8 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                 <TrendingUp className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{aggregateMetrics.activePlatforms}</p>
-                <p className="text-xs text-muted-foreground">Platforms</p>
+                <p className="text-2xl font-bold">{platformsCount || aggregateMetrics.activePlatforms}</p>
+                <p className="text-xs text-muted-foreground">Channels</p>
               </div>
             </div>
           </CardContent>
@@ -841,8 +853,8 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                 <BarChart3 className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{aggregateMetrics.totalActivities}</p>
-                <p className="text-xs text-muted-foreground">Activities</p>
+                <p className="text-2xl font-bold">{totalMarketingActions || aggregateMetrics.totalActivities}</p>
+                <p className="text-xs text-muted-foreground">Total Actions</p>
               </div>
             </div>
           </CardContent>
@@ -862,14 +874,30 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
         </CardHeader>
         <CardContent className="p-0">
           {activities.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-20 h-20 rounded-full bg-muted mx-auto flex items-center justify-center mb-6">
-                <Megaphone className="w-10 h-10 text-muted-foreground/50" />
+            <div className="text-center py-12 px-6">
+              <div className="w-16 h-16 rounded-full bg-muted mx-auto flex items-center justify-center mb-4">
+                <Megaphone className="w-8 h-8 text-muted-foreground/50" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">No Marketing Activities Yet</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Marketing data will appear here once we begin promoting your property. Stay tuned!
-              </p>
+              {currentStats ? (
+                <>
+                  <h3 className="text-lg font-semibold mb-2">Marketing Summary for This Month</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-4">
+                    {currentStats.executive_summary || 
+                      `We've completed ${totalMarketingActions} marketing actions for your property this month, including ${totalSocialPosts} social media posts and ${totalOutreachActions} corporate outreach efforts.`}
+                  </p>
+                  <Badge variant="secondary" className="text-sm">
+                    <CheckCircle className="w-4 h-4 mr-1.5" />
+                    Marketing Active
+                  </Badge>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-xl font-semibold mb-2">No Marketing Activities Yet</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    Marketing data will appear here once we begin promoting your property. Stay tuned!
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <div className="relative">
