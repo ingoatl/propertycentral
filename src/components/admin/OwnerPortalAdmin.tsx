@@ -78,6 +78,7 @@ export function OwnerPortalAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
   const [sendingRecap, setSendingRecap] = useState<string | null>(null);
+  const [sendingWhatsNew, setSendingWhatsNew] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<string | null>(null);
   const [syncingPayments, setSyncingPayments] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -328,6 +329,32 @@ export function OwnerPortalAdmin() {
     }
   };
 
+  // Send What's New email
+  const handleSendWhatsNew = async (owner: OwnerWithProperties, property: OwnerProperty) => {
+    setSendingWhatsNew(`${owner.id}-${property.id}`);
+    try {
+      const { error, data } = await supabase.functions.invoke("send-whats-new-email", {
+        body: { 
+          owner_id: owner.id,
+          property_id: property.id
+        },
+      });
+      
+      if (error) throw error;
+      if (data?.success === false) {
+        toast.info(data.message || "No new features to send");
+      } else {
+        toast.success(`"What's New" email sent to ${owner.email}!`, {
+          description: `${data?.features_count || 0} features highlighted`
+        });
+      }
+    } catch (error: any) {
+      toast.error("Failed to send: " + (error.message || "Unknown error"));
+    } finally {
+      setSendingWhatsNew(null);
+    }
+  };
+
   // Archive/Restore owner
   const handleToggleArchive = async (owner: OwnerWithProperties) => {
     const newStatus = !owner.is_archived;
@@ -561,6 +588,19 @@ export function OwnerPortalAdmin() {
                               <RefreshCw className="h-4 w-4 animate-spin" />
                             ) : (
                               <Megaphone className="h-4 w-4 text-blue-600" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSendWhatsNew(owner, property)}
+                            disabled={sendingWhatsNew === `${owner.id}-${property.id}`}
+                            title="Send What's New Email"
+                          >
+                            {sendingWhatsNew === `${owner.id}-${property.id}` ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-4 w-4 text-purple-600" />
                             )}
                           </Button>
                           <Button

@@ -2130,6 +2130,54 @@ export type Database = {
           },
         ]
       }
+      feature_changelog: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string
+          feature_key: string
+          id: string
+          released_at: string | null
+          relevant_for_active: boolean | null
+          relevant_for_hybrid: boolean | null
+          relevant_for_mid_term: boolean | null
+          relevant_for_onboarding: boolean | null
+          screenshot_url: string | null
+          title: string
+          version: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description: string
+          feature_key: string
+          id?: string
+          released_at?: string | null
+          relevant_for_active?: boolean | null
+          relevant_for_hybrid?: boolean | null
+          relevant_for_mid_term?: boolean | null
+          relevant_for_onboarding?: boolean | null
+          screenshot_url?: string | null
+          title: string
+          version: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string
+          feature_key?: string
+          id?: string
+          released_at?: string | null
+          relevant_for_active?: boolean | null
+          relevant_for_hybrid?: boolean | null
+          relevant_for_mid_term?: boolean | null
+          relevant_for_onboarding?: boolean | null
+          screenshot_url?: string | null
+          title?: string
+          version?: string
+        }
+        Relationships: []
+      }
       follow_up_reminders: {
         Row: {
           ai_generated_followup: string | null
@@ -7878,6 +7926,7 @@ export type Database = {
           has_payment_method: boolean | null
           id: string
           is_archived: boolean | null
+          last_feature_email_sent: string | null
           name: string
           our_w9_sent_at: string | null
           owner_ein_last4: string | null
@@ -7911,6 +7960,7 @@ export type Database = {
           has_payment_method?: boolean | null
           id?: string
           is_archived?: boolean | null
+          last_feature_email_sent?: string | null
           name: string
           our_w9_sent_at?: string | null
           owner_ein_last4?: string | null
@@ -7944,6 +7994,7 @@ export type Database = {
           has_payment_method?: boolean | null
           id?: string
           is_archived?: boolean | null
+          last_feature_email_sent?: string | null
           name?: string
           our_w9_sent_at?: string | null
           owner_ein_last4?: string | null
