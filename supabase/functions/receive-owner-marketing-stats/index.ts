@@ -42,7 +42,17 @@ const PROPERTY_NAME_MAPPINGS: Record<string, string> = {
   "the berkley at chimney lakes": "the berkley",
   "the alpine": "alpine",
   "the scandinavian retreat": "scandinavian retreat",
-  // Add more mappings as needed
+  "old roswell retreat": "modern + cozy townhome",
+  "the old roswell retreat": "modern + cozy townhome",
+  "mableton meadows": "woodland lane",
+  "the boho lux": "house of blues",
+  "homerun hideaway": "family retreat",
+  "the bloom": "whispering oaks",
+  "the maple leaf": "canadian way",
+  "shift sanctuary": "midtown lighthouse",
+  "alpharetta basecamp": "smoke hollow",
+  "lavish living atlanta": "lavish living",
+  "the scandi chic": "scandi chic",
 };
 
 serve(async (req) => {

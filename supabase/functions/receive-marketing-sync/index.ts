@@ -158,21 +158,21 @@ serve(async (req) => {
         if (activity.property_name && !property) {
           const searchName = activity.property_name.toLowerCase();
           
-          // Known property name mappings
+          // Known property name mappings (expanded for all projects)
           const namePatterns: Record<string, string[]> = {
-            "whispering oaks": ["whispering", "oaks", "grady smith", "farmhouse"],
-            "the bloom": ["bloom"],
+            "whispering oaks": ["whispering", "oaks", "grady smith", "farmhouse", "bloom"],
             "the alpine": ["alpine", "cabin"],
             "scandinavian retreat": ["scandinavian", "retreat", "laurel bridge"],
-            "lavish living": ["lavish", "living", "rita way"],
-            "modern + cozy townhome": ["modern", "cozy", "townhome", "willow stream"],
+            "lavish living": ["lavish", "living", "rita way", "lavish living atlanta"],
+            "modern + cozy townhome": ["modern", "cozy", "townhome", "willow stream", "old roswell", "roswell retreat"],
             "scandi chic": ["scandi", "chic", "duvall"],
-            "midtown lighthouse": ["midtown", "lighthouse", "piedmont"],
-            "boho lux": ["boho", "lux", "villa ct", "14 villa"],
-            "house of blues": ["house of blues", "blues", "15 villa"],
-            "smoke hollow": ["smoke hollow", "smoke", "roswell"],
-            "canadian way": ["canadian", "tucker", "peaceful"],
-            "mableton meadows": ["mableton", "woodland"],
+            "midtown lighthouse": ["midtown", "lighthouse", "piedmont", "shift sanctuary"],
+            "house of blues": ["house of blues", "blues", "15 villa", "boho lux", "boho"],
+            "smoke hollow": ["smoke hollow", "smoke", "roswell", "alpharetta basecamp", "basecamp"],
+            "canadian way": ["canadian", "tucker", "peaceful", "maple leaf"],
+            "woodland lane": ["woodland", "mableton", "mableton meadows"],
+            "family retreat": ["family retreat", "durham", "homerun hideaway", "homerun"],
+            "the berkley": ["berkley", "chimney lakes"],
           };
 
           for (const [patternName, keywords] of Object.entries(namePatterns)) {

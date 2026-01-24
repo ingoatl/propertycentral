@@ -51,10 +51,10 @@ export const SyncStatusBar = () => {
       // 3. Marketing Hub = Aggregate social & outreach stats
       // 4. Mid-Term Nation = MTR property listings
       const sourceConfigs = [
-        { id: "peachhaus", name: "Listing Boost", shortName: "Listing Boost", projectSource: "peachhaus-listing-boost", syncTypes: ["property_performance", "listing_health", "peachhaus"] },
-        { id: "guestconnect", name: "GuestConnect", shortName: "GuestConnect", projectSource: "peachhaus-guestconnect", syncTypes: ["incoming", "marketing_activities"] },
-        { id: "marketing_hub", name: "Marketing Hub", shortName: "Mkt Hub", projectSource: "marketing-hub", syncTypes: ["marketing_stats"] },
-        { id: "midtermnation", name: "Mid-Term Nation", shortName: "MTNation", projectSource: "midtermnation", syncTypes: ["incoming", "midterm"] },
+        { id: "peachhaus", name: "Listing Boost", shortName: "Listing Boost", projectSource: "peachhaus-listing-boost", syncTypes: ["property_performance", "listing_health", "listing_boost"], sourceSystems: ["peachhaus"] },
+        { id: "guestconnect", name: "GuestConnect", shortName: "GuestConnect", projectSource: "peachhaus-guestconnect", syncTypes: ["incoming", "marketing_activities"], sourceSystems: ["guestconnect", "peachhaus-guestconnect"] },
+        { id: "marketing_hub", name: "Marketing Hub", shortName: "Mkt Hub", projectSource: "marketing-hub", syncTypes: ["marketing_stats"], sourceSystems: ["marketing_hub"] },
+        { id: "midtermnation", name: "Mid-Term Nation", shortName: "MTNation", projectSource: "midtermnation", syncTypes: ["incoming", "midterm", "partner_properties", "midterm_properties"], sourceSystems: ["midtermnation"] },
       ];
 
       const sourcesData: SyncSource[] = sourceConfigs.map(config => {
@@ -76,12 +76,16 @@ export const SyncStatusBar = () => {
           };
         }
 
-        const relevantLogs = (syncLogs || []).filter(log => 
-          config.syncTypes.some(type => 
-            log.sync_type?.toLowerCase().includes(type.toLowerCase()) ||
-            log.source_system?.toLowerCase().includes(config.id.toLowerCase())
-          )
-        );
+        // Match logs by sync_type OR source_system
+        const relevantLogs = (syncLogs || []).filter(log => {
+          const logSyncType = log.sync_type?.toLowerCase() || "";
+          const logSourceSystem = log.source_system?.toLowerCase() || "";
+          
+          const typeMatch = config.syncTypes.some(type => logSyncType.includes(type.toLowerCase()));
+          const sourceMatch = (config as any).sourceSystems?.some((src: string) => logSourceSystem === src.toLowerCase());
+          
+          return typeMatch || sourceMatch;
+        });
 
         const successfulLogs = relevantLogs.filter(l => l.sync_status === "completed");
         const lastLog = relevantLogs[0];
