@@ -633,6 +633,7 @@ async function sendSms(
   message: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!ghlApiKey || !ghlLocationId) {
+    console.error("GHL API not configured - missing API key or location ID");
     return { success: false, error: "GHL API not configured" };
   }
   
@@ -645,6 +646,8 @@ async function sendSms(
     if (!formattedPhone.startsWith('+')) {
       formattedPhone = '+' + formattedPhone;
     }
+    
+    console.log(`Sending SMS to ${formattedPhone} via GHL...`);
     
     const response = await fetch(
       `https://services.leadconnectorhq.com/conversations/messages`,
@@ -666,11 +669,15 @@ async function sendSms(
     
     if (!response.ok) {
       const error = await response.text();
-      return { success: false, error };
+      console.error(`GHL SMS failed (${response.status}): ${error}`);
+      return { success: false, error: `GHL ${response.status}: ${error}` };
     }
     
+    const result = await response.json();
+    console.log(`SMS sent successfully to ${formattedPhone}`, result);
     return { success: true };
   } catch (error) {
+    console.error(`SMS error: ${String(error)}`);
     return { success: false, error: String(error) };
   }
 }

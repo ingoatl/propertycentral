@@ -354,7 +354,7 @@ async function checkVendorResponse(
 
     case "quote":
       // Check if quote needs owner approval (over threshold)
-      const threshold = workOrder.properties?.auto_approve_threshold || 300;
+      const threshold = workOrder.properties?.auto_approve_threshold || 500;
       if (parsed.quote && parsed.quote > threshold) {
         await supabase.from("work_orders").update({
           status: "pending_approval",

@@ -289,7 +289,7 @@ const VendorJobPortal = () => {
     onError: (error) => toast.error("Failed to decline: " + error.message),
   });
 
-  // Submit quote mutation - triggers owner approval for quotes > $300
+  // Submit quote mutation - triggers owner approval for quotes > $500
   const submitQuote = useMutation({
     mutationFn: async () => {
       if (!workOrder?.id) throw new Error("No work order");
@@ -303,8 +303,8 @@ const VendorJobPortal = () => {
         quote_labor_hours: quoteLaborHours ? Number(quoteLaborHours) : null,
       };
       
-      // Set status based on amount - $300 threshold
-      if (amount > 300) {
+      // Set status based on amount - $500 threshold
+      if (amount > 500) {
         updateData.status = "pending_approval";
       }
       
@@ -317,8 +317,8 @@ const VendorJobPortal = () => {
         throw error;
       }
       
-      // If quote > $300, trigger owner approval notification
-      if (amount > 300) {
+      // If quote > $500, trigger owner approval notification
+      if (amount > 500) {
         try {
           const { error: notifyError } = await supabase.functions.invoke("send-owner-approval-request", {
             body: { 
@@ -339,7 +339,7 @@ const VendorJobPortal = () => {
       return amount;
     },
     onSuccess: (amount) => {
-      if (amount > 300) {
+      if (amount > 500) {
         toast.success("Quote submitted — awaiting owner approval");
       } else {
         toast.success("Quote submitted");
@@ -887,9 +887,9 @@ const VendorJobPortal = () => {
                           className="pl-9 bg-white"
                         />
                       </div>
-                      {Number(quoteAmount) > 300 && (
+                      {Number(quoteAmount) > 500 && (
                         <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />Quotes over $300 require owner approval
+                          <AlertCircle className="h-3 w-3" />Quotes over $500 require owner approval
                         </p>
                       )}
                     </div>
@@ -930,7 +930,7 @@ const VendorJobPortal = () => {
                       </div>
                     </div>
                     
-                    {Number(quoteAmount) > 300 && (
+                    {Number(quoteAmount) > 500 && (
                       <div>
                         <Label htmlFor="quoteNote" className="text-xs text-neutral-600">Note for Owner (optional)</Label>
                         <Textarea 
