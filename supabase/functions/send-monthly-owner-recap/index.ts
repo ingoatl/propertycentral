@@ -373,13 +373,28 @@ function generateEmailHtml(
     (marketingStats?.gmb_posts || 0);
   const callsMade = marketingStats?.calls_made || 0;
   const totalReach = marketingStats?.total_reach || 0;
-  
-  // Generate SVG charts as data URIs (using encodeBase64 to handle non-Latin1 chars)
-  const occupancyGaugeSvg = generateOccupancyGauge(occupancy);
-  const occupancyDataUri = `data:image/svg+xml;base64,${encodeBase64(occupancyGaugeSvg)}`;
-  
-  const starRatingSvg = generateStarRating(avgRating);
-  const starRatingDataUri = `data:image/svg+xml;base64,${encodeBase64(starRatingSvg)}`;
+
+  // Determine if this is a new property with no data
+  const isNewProperty = totalRevenue === 0 && occupancy === 0 && strBookings === 0 && mtrBookings === 0;
+
+  // Generate inline SVG for occupancy (no external images needed)
+  const occupancyPct = Math.min(100, Math.max(0, occupancy));
+  const occupancyColor = occupancyPct >= 80 ? '#22c55e' : occupancyPct >= 50 ? '#f59e0b' : '#ef4444';
+  const occupancyLabel = occupancyPct >= 80 ? 'Excellent' : occupancyPct >= 50 ? 'Good' : occupancyPct > 0 ? 'Building' : 'Getting started';
+
+  // Generate star rating display
+  const fullStars = Math.floor(avgRating);
+  const hasHalf = avgRating - fullStars >= 0.5;
+  let starDisplay = '';
+  for (let i = 0; i < 5; i++) {
+    if (i < fullStars) {
+      starDisplay += '★';
+    } else if (i === fullStars && hasHalf) {
+      starDisplay += '★';
+    } else {
+      starDisplay += '☆';
+    }
+  }
 
   return `
 <!DOCTYPE html>
@@ -389,64 +404,78 @@ function generateEmailHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monthly Performance Recap - ${propertyName}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; -webkit-font-smoothing: antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
           
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px 40px;">
+            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px 40px;">
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>
-                    <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" height="40" style="display: block;">
+                    <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" height="36" style="display: block;">
                   </td>
-                  <td align="right" style="color: #ffffff; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">
-                    ${monthName} ${year}<br>
-                    <span style="font-weight: 600; font-size: 11px; color: #a8dadc;">Performance Report</span>
+                  <td align="right" style="vertical-align: middle;">
+                    <span style="display: inline-block; background: rgba(255,255,255,0.15); color: #ffffff; font-size: 11px; font-weight: 600; padding: 6px 14px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+                      ${monthName} ${year}
+                    </span>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
           
-          <!-- Property Info Bar -->
+          <!-- Property Info -->
           <tr>
-            <td style="background-color: #f8f9fa; padding: 20px 40px; border-bottom: 1px solid #e9ecef;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td>
-                    <p style="margin: 0; font-size: 18px; font-weight: 600; color: #1a1a2e;">${propertyName}</p>
-                    <p style="margin: 4px 0 0 0; font-size: 13px; color: #6c757d;">${propertyAddress}</p>
-                  </td>
-                </tr>
-              </table>
+            <td style="background-color: #f8fafc; padding: 20px 40px; border-bottom: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 18px; font-weight: 600; color: #0f172a;">${propertyName}</p>
+              <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">${propertyAddress}</p>
             </td>
           </tr>
           
           <!-- Greeting -->
           <tr>
-            <td style="padding: 30px 40px 20px;">
-              <p style="margin: 0; font-size: 16px; color: #333;">Dear ${ownerGreeting},</p>
-              <p style="margin: 12px 0 0 0; font-size: 14px; color: #555; line-height: 1.6;">
-                Here's your ${monthName} performance summary for <strong>${propertyName}</strong>. 
-                ${totalRevenue > 0 ? 'Great news on the revenue front!' : 'We\'re working hard to maximize your returns.'}
+            <td style="padding: 32px 40px 24px;">
+              <p style="margin: 0; font-size: 16px; color: #334155;">Dear ${ownerGreeting},</p>
+              <p style="margin: 12px 0 0 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+                Here's your ${monthName} performance summary. ${totalRevenue > 0 ? 'Great month!' : 'We\'re working hard to maximize your returns.'}
               </p>
             </td>
           </tr>
           
+          ${isNewProperty ? `
+          <!-- New Property Message -->
+          <tr>
+            <td style="padding: 0 40px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; border: 1px solid #fbbf24;">
+                <tr>
+                  <td style="padding: 24px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; font-size: 24px;">🏠</p>
+                    <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #92400e;">
+                      Your Property is Getting Set Up
+                    </p>
+                    <p style="margin: 0; font-size: 14px; color: #a16207; line-height: 1.5;">
+                      We're actively preparing your listing and reaching out to potential guests. Full performance metrics will appear after your first bookings!
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          ` : `
           <!-- Total Revenue Hero -->
           <tr>
-            <td style="padding: 0 40px 25px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 12px; overflow: hidden;">
+            <td style="padding: 0 40px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 14px; overflow: hidden;">
                 <tr>
-                  <td style="padding: 30px; text-align: center;">
-                    <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.85);">Total Revenue</p>
-                    <p style="margin: 10px 0 0 0; font-size: 42px; font-weight: 700; color: #ffffff; letter-spacing: -1px;">${formatCurrency(totalRevenue)}</p>
+                  <td style="padding: 32px; text-align: center;">
+                    <p style="margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.85); font-weight: 600;">Total Revenue</p>
+                    <p style="margin: 12px 0 0 0; font-size: 48px; font-weight: 700; color: #ffffff; letter-spacing: -2px;">${formatCurrency(totalRevenue)}</p>
                     ${strRevenue > 0 && mtrRevenue > 0 ? `
-                    <p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.75);">
+                    <p style="margin: 10px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.8);">
                       ${formatCurrency(strRevenue)} STR + ${formatCurrency(mtrRevenue)} MTR
                     </p>
                     ` : ''}
@@ -456,21 +485,19 @@ function generateEmailHtml(
             </td>
           </tr>
           
-          <!-- Visual Metrics Row -->
+          <!-- Metrics Grid -->
           <tr>
-            <td style="padding: 0 40px 25px;">
+            <td style="padding: 0 40px 24px;">
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <!-- Occupancy Gauge -->
+                  <!-- Occupancy -->
                   <td width="48%" style="vertical-align: top;">
-                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8f9fa; border-radius: 10px; border: 1px solid #e5e7eb;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
                       <tr>
-                        <td style="padding: 20px; text-align: center;">
-                          <p style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #6b7280;">Occupancy</p>
-                          <img src="${occupancyDataUri}" alt="Occupancy ${Math.round(occupancy)}%" style="display: block; margin: 0 auto;" width="100" height="60">
-                          <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">
-                            ${occupancy >= 80 ? 'Excellent' : occupancy >= 50 ? 'Good' : occupancy > 0 ? 'Building' : 'Getting started'}
-                          </p>
+                        <td style="padding: 24px; text-align: center;">
+                          <p style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b;">Occupancy</p>
+                          <p style="margin: 0; font-size: 36px; font-weight: 700; color: ${occupancyColor};">${Math.round(occupancyPct)}%</p>
+                          <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">${occupancyLabel}</p>
                         </td>
                       </tr>
                     </table>
@@ -478,17 +505,17 @@ function generateEmailHtml(
                   <td width="4%"></td>
                   <!-- Guest Rating -->
                   <td width="48%" style="vertical-align: top;">
-                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8f9fa; border-radius: 10px; border: 1px solid #e5e7eb;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
                       <tr>
-                        <td style="padding: 20px; text-align: center;">
-                          <p style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #6b7280;">Guest Rating</p>
+                        <td style="padding: 24px; text-align: center;">
+                          <p style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b;">Guest Rating</p>
                           ${avgRating > 0 ? `
-                          <p style="margin: 0; font-size: 32px; font-weight: 700; color: #1f2937;">${avgRating.toFixed(1)}</p>
-                          <img src="${starRatingDataUri}" alt="${avgRating.toFixed(1)} stars" style="display: block; margin: 6px auto 0;" width="90" height="18">
-                          <p style="margin: 6px 0 0 0; font-size: 12px; color: #6b7280;">${reviewCount} review${reviewCount !== 1 ? 's' : ''}</p>
+                          <p style="margin: 0; font-size: 36px; font-weight: 700; color: #0f172a;">${avgRating.toFixed(1)}</p>
+                          <p style="margin: 6px 0 0 0; font-size: 16px; color: #f59e0b; letter-spacing: 2px;">${starDisplay}</p>
+                          <p style="margin: 6px 0 0 0; font-size: 12px; color: #64748b;">${reviewCount} review${reviewCount !== 1 ? 's' : ''}</p>
                           ` : `
-                          <p style="margin: 0; font-size: 24px; color: #9ca3af;">—</p>
-                          <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">No reviews yet</p>
+                          <p style="margin: 0; font-size: 28px; color: #94a3b8;">—</p>
+                          <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">No reviews yet</p>
                           `}
                         </td>
                       </tr>
@@ -498,24 +525,21 @@ function generateEmailHtml(
               </table>
             </td>
           </tr>
+          `}
           
           <!-- Bookings Summary -->
           ${(strBookings > 0 || mtrBookings > 0) ? `
           <tr>
-            <td style="padding: 0 40px 25px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border-radius: 10px; border: 1px solid #bbf7d0;">
+            <td style="padding: 0 40px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
                 <tr>
-                  <td style="padding: 16px 20px;">
-                    <table width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td style="font-size: 14px; color: #166534;">
-                          <strong>📅 Bookings:</strong>
-                          ${strBookings > 0 ? `${strBookings} short-term stays` : ''}
-                          ${strBookings > 0 && mtrBookings > 0 ? ' + ' : ''}
-                          ${mtrBookings > 0 ? `${mtrBookings} mid-term tenant${mtrBookings !== 1 ? 's' : ''}` : ''}
-                        </td>
-                      </tr>
-                    </table>
+                  <td style="padding: 18px 24px;">
+                    <p style="margin: 0; font-size: 14px; color: #166534;">
+                      <strong>📅 Bookings:</strong>
+                      ${strBookings > 0 ? `${strBookings} short-term stay${strBookings !== 1 ? 's' : ''}` : ''}
+                      ${strBookings > 0 && mtrBookings > 0 ? ' + ' : ''}
+                      ${mtrBookings > 0 ? `${mtrBookings} mid-term tenant${mtrBookings !== 1 ? 's' : ''}` : ''}
+                    </p>
                   </td>
                 </tr>
               </table>
@@ -526,38 +550,24 @@ function generateEmailHtml(
           <!-- Marketing Activities -->
           ${(totalSocialPosts > 0 || callsMade > 0) ? `
           <tr>
-            <td style="padding: 0 40px 25px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%); border-radius: 10px; border: 1px solid #bfdbfe;">
+            <td style="padding: 0 40px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%); border-radius: 12px; border: 1px solid #bfdbfe;">
                 <tr>
-                  <td style="padding: 20px;">
-                    <p style="margin: 0 0 12px 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #1e40af;">PeachHaus Marketing Activity</p>
+                  <td style="padding: 20px 24px;">
+                    <p style="margin: 0 0 14px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #1e40af;">📣 Marketing Activity</p>
                     <table width="100%" cellpadding="0" cellspacing="0">
                       ${totalSocialPosts > 0 ? `
                       <tr>
-                        <td style="padding: 6px 0;">
-                          <table cellpadding="0" cellspacing="0">
-                            <tr>
-                              <td style="width: 28px; text-align: center; font-size: 16px;">📱</td>
-                              <td style="font-size: 14px; color: #1e3a8a; padding-left: 8px;">
-                                <strong>${totalSocialPosts}</strong> social posts
-                                ${totalReach > 0 ? ` · <span style="color: #3b82f6;">${totalReach.toLocaleString()} reach</span>` : ''}
-                              </td>
-                            </tr>
-                          </table>
+                        <td style="padding: 6px 0; font-size: 14px; color: #1e3a8a;">
+                          📱 <strong>${totalSocialPosts}</strong> social posts
+                          ${totalReach > 0 ? ` reaching <span style="color: #3b82f6; font-weight: 600;">${totalReach.toLocaleString()}</span> travelers` : ''}
                         </td>
                       </tr>
                       ` : ''}
                       ${callsMade > 0 ? `
                       <tr>
-                        <td style="padding: 6px 0;">
-                          <table cellpadding="0" cellspacing="0">
-                            <tr>
-                              <td style="width: 28px; text-align: center; font-size: 16px;">📞</td>
-                              <td style="font-size: 14px; color: #1e3a8a; padding-left: 8px;">
-                                <strong>${callsMade}</strong> corporate outreach calls
-                              </td>
-                            </tr>
-                          </table>
+                        <td style="padding: 6px 0; font-size: 14px; color: #1e3a8a;">
+                          📞 <strong>${callsMade}</strong> corporate outreach calls
                         </td>
                       </tr>
                       ` : ''}
@@ -571,13 +581,13 @@ function generateEmailHtml(
           
           <!-- Voice Recap CTA -->
           <tr>
-            <td style="padding: 0 40px 25px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 12px; overflow: hidden;">
+            <td style="padding: 0 40px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 14px; overflow: hidden;">
                 <tr>
-                  <td style="padding: 28px 30px; text-align: center;">
-                    <p style="margin: 0 0 4px 0; font-size: 22px;">🎧</p>
-                    <p style="margin: 0 0 14px 0; font-size: 15px; font-weight: 500; color: rgba(255,255,255,0.95);">Listen to Your Personalized Voice Recap</p>
-                    <a href="https://propertycentral.lovable.app/recap/${recapId}" style="display: inline-block; background-color: #ffffff; color: #ea580c; font-size: 14px; font-weight: 600; text-decoration: none; padding: 14px 36px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">▶ Play Audio Summary</a>
+                  <td style="padding: 28px 32px; text-align: center;">
+                    <p style="margin: 0 0 6px 0; font-size: 24px;">🎧</p>
+                    <p style="margin: 0 0 16px 0; font-size: 15px; font-weight: 500; color: rgba(255,255,255,0.95);">Listen to Your Personalized Voice Recap</p>
+                    <a href="https://propertycentral.lovable.app/recap/${recapId}" style="display: inline-block; background-color: #ffffff; color: #ea580c; font-size: 14px; font-weight: 600; text-decoration: none; padding: 14px 40px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">▶ Play Audio Summary</a>
                   </td>
                 </tr>
               </table>
@@ -586,16 +596,16 @@ function generateEmailHtml(
           
           <!-- Portal CTA -->
           <tr>
-            <td style="padding: 0 40px 30px; text-align: center;">
-              <a href="${portalUrl}" style="display: inline-block; background-color: #1a1a2e; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 14px 44px; border-radius: 8px;">View Full Dashboard →</a>
+            <td style="padding: 0 40px 32px; text-align: center;">
+              <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #0f172a, #1e293b); color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 16px 48px; border-radius: 10px; box-shadow: 0 4px 12px rgba(15,23,42,0.2);">View Full Dashboard →</a>
             </td>
           </tr>
           
           <!-- Footer -->
           <tr>
-            <td style="background-color: #f8f9fa; padding: 28px 40px; border-top: 1px solid #e9ecef;">
-              <p style="margin: 0 0 10px 0; font-size: 14px; color: #333;">Thank you for trusting PeachHaus with your property.</p>
-              <p style="margin: 0; font-size: 13px; color: #6c757d;">
+            <td style="background-color: #f8fafc; padding: 28px 40px; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0 0 10px 0; font-size: 14px; color: #334155;">Thank you for trusting PeachHaus with your property.</p>
+              <p style="margin: 0; font-size: 13px; color: #64748b;">
                 Warm regards,<br>
                 <strong>Anja & Ingo</strong><br>
                 PeachHaus Group<br>

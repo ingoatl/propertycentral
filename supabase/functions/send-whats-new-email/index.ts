@@ -6,37 +6,72 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Feature screenshots captured from the portal
-const FEATURE_SCREENSHOTS: Record<string, string> = {
-  "messages": "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/feature-screenshots/messages.png",
-  "maintenance": "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/feature-screenshots/maintenance.png",
-  "screenings": "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/feature-screenshots/screenings.png",
-  "marketing": "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/feature-screenshots/marketing.png",
-  "voice-recap": "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/feature-screenshots/voice-recap.png",
-  "onboarding": "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/feature-screenshots/onboarding.png",
-  "schedule-calls": "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/feature-screenshots/schedule-calls.png",
-  "reports": "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/feature-screenshots/reports.png",
+// Beautiful SVG icons for each feature category
+const FEATURE_ICONS: Record<string, { svg: string; color: string; bgColor: string }> = {
+  communication: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+    color: '#3b82f6',
+    bgColor: '#eff6ff'
+  },
+  maintenance: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+    color: '#22c55e',
+    bgColor: '#f0fdf4'
+  },
+  security: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+    color: '#8b5cf6',
+    bgColor: '#f5f3ff'
+  },
+  marketing: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>`,
+    color: '#f59e0b',
+    bgColor: '#fffbeb'
+  },
+  reports: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+    color: '#ef4444',
+    bgColor: '#fef2f2'
+  },
+  scheduling: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    color: '#06b6d4',
+    bgColor: '#ecfeff'
+  },
+  analytics: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+    color: '#ec4899',
+    bgColor: '#fdf2f8'
+  },
+  audio: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+    color: '#f97316',
+    bgColor: '#fff7ed'
+  },
+  onboarding: {
+    svg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+    color: '#10b981',
+    bgColor: '#ecfdf5'
+  }
 };
 
-// Map feature_key to screenshot key
-const FEATURE_KEY_TO_SCREENSHOT: Record<string, string> = {
-  "owner_messages": "messages",
-  "owner_voicemail": "messages",
-  "maintenance_tracking": "maintenance",
-  "maintenance_requests": "maintenance",
-  "guest_screening": "screenings",
-  "tenant_verification": "screenings",
-  "marketing_activity": "marketing",
-  "marketing_stats": "marketing",
-  "voice_recap": "voice-recap",
-  "monthly_recap": "voice-recap",
-  "onboarding_timeline": "onboarding",
-  "onboarding_progress": "onboarding",
-  "schedule_call": "schedule-calls",
-  "owner_calls": "schedule-calls",
-  "pdf_reports": "reports",
-  "owner_statements": "reports",
-};
+// Map feature_key to icon category
+function getIconCategory(featureKey: string, category: string): string {
+  const keyLower = featureKey.toLowerCase();
+  if (keyLower.includes('message') || keyLower.includes('voicemail') || keyLower.includes('sms')) return 'communication';
+  if (keyLower.includes('maintenance') || keyLower.includes('repair') || keyLower.includes('work_order')) return 'maintenance';
+  if (keyLower.includes('screen') || keyLower.includes('verify') || keyLower.includes('security')) return 'security';
+  if (keyLower.includes('market') || keyLower.includes('social') || keyLower.includes('listing')) return 'marketing';
+  if (keyLower.includes('report') || keyLower.includes('statement') || keyLower.includes('pdf')) return 'reports';
+  if (keyLower.includes('call') || keyLower.includes('schedule') || keyLower.includes('calendar')) return 'scheduling';
+  if (keyLower.includes('recap') || keyLower.includes('voice') || keyLower.includes('audio')) return 'audio';
+  if (keyLower.includes('onboard') || keyLower.includes('timeline') || keyLower.includes('progress')) return 'onboarding';
+  if (keyLower.includes('analytic') || keyLower.includes('metric') || keyLower.includes('performance')) return 'analytics';
+  
+  // Fallback to category
+  if (category) return category.toLowerCase();
+  return 'reports';
+}
 
 interface Feature {
   id: string;
@@ -63,14 +98,6 @@ interface Property {
   name: string;
   address: string;
   rental_type: string | null;
-}
-
-function getScreenshotUrl(featureKey: string): string | null {
-  const screenshotKey = FEATURE_KEY_TO_SCREENSHOT[featureKey];
-  if (screenshotKey && FEATURE_SCREENSHOTS[screenshotKey]) {
-    return FEATURE_SCREENSHOTS[screenshotKey];
-  }
-  return null;
 }
 
 function generateWhatsNewEmail(
@@ -100,67 +127,41 @@ function generateWhatsNewEmail(
     featuresForYou = features.filter(f => f.category === 'marketing');
   }
 
-  // Generate feature cards with screenshots
+  // Generate icon-based feature cards
   const featureCards = features.map((feature, index) => {
     const isHighlighted = featuresForYou.some(f => f.id === feature.id);
-    const screenshotUrl = getScreenshotUrl(feature.feature_key);
-    const isEven = index % 2 === 0;
+    const iconCategory = getIconCategory(feature.feature_key, feature.category);
+    const iconData = FEATURE_ICONS[iconCategory] || FEATURE_ICONS.reports;
     
-    // Card with screenshot
-    if (screenshotUrl) {
-      return `
-        <tr>
-          <td style="padding: 0 0 24px 0;">
-            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
-              <!-- Screenshot -->
-              <tr>
-                <td style="padding: 0;">
-                  <img src="${screenshotUrl}" alt="${feature.title}" style="width: 100%; height: auto; display: block; border-radius: 16px 16px 0 0;" />
-                </td>
-              </tr>
-              <!-- Content -->
-              <tr>
-                <td style="padding: 24px;">
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <td>
-                        ${isHighlighted ? '<span style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #ffffff; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">✨ Perfect for You</span>' : ''}
-                        <h3 style="margin: ${isHighlighted ? '12px' : '0'} 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em;">
-                          ${feature.title}
-                        </h3>
-                        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475569;">
-                          ${feature.description}
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      `;
-    }
-    
-    // Card without screenshot (compact)
     return `
       <tr>
         <td style="padding: 0 0 16px 0;">
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: ${isHighlighted ? 'linear-gradient(135deg, #eff6ff, #f0f9ff)' : '#f8fafc'}; border-radius: 12px; border: 1px solid ${isHighlighted ? '#bfdbfe' : '#e2e8f0'};">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid ${isHighlighted ? iconData.color + '40' : '#e2e8f0'}; ${isHighlighted ? 'box-shadow: 0 4px 12px ' + iconData.color + '15;' : ''}">
             <tr>
-              <td style="padding: 20px 24px;">
+              <td style="padding: 24px;">
                 <table width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td width="48" valign="top">
-                      <div style="width: 40px; height: 40px; background: ${isHighlighted ? '#3b82f6' : '#e2e8f0'}; color: ${isHighlighted ? '#ffffff' : '#64748b'}; border-radius: 10px; text-align: center; line-height: 40px; font-size: 18px;">
-                        ${isHighlighted ? '⭐' : '✓'}
+                    <!-- Icon Container -->
+                    <td width="60" valign="top">
+                      <div style="width: 52px; height: 52px; background: ${iconData.bgColor}; border-radius: 14px; text-align: center; line-height: 52px;">
+                        <img src="data:image/svg+xml;base64,${btoa(`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="${iconData.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconData.svg.replace(/<\/?svg[^>]*>/g, '')}</svg>`)}" width="24" height="24" style="vertical-align: middle;" alt="">
                       </div>
                     </td>
-                    <td style="padding-left: 16px;">
-                      <h3 style="margin: 0 0 4px 0; font-size: 17px; font-weight: 600; color: #0f172a;">
+                    <!-- Content -->
+                    <td style="padding-left: 16px; vertical-align: top;">
+                      ${isHighlighted ? `
+                      <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 8px;">
+                        <tr>
+                          <td style="background: linear-gradient(135deg, ${iconData.color}, ${iconData.color}cc); color: #ffffff; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            ✨ Perfect for You
+                          </td>
+                        </tr>
+                      </table>
+                      ` : ''}
+                      <h3 style="margin: 0 0 6px 0; font-size: 17px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em;">
                         ${feature.title}
                       </h3>
-                      <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #475569;">
+                      <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #64748b;">
                         ${feature.description}
                       </p>
                     </td>
@@ -182,8 +183,8 @@ function generateWhatsNewEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>What's New at PeachHaus</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f1f5f9; -webkit-font-smoothing: antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f1f5f9;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; -webkit-font-smoothing: antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc;">
     <tr>
       <td align="center" style="padding: 48px 20px;">
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%;">
@@ -197,7 +198,7 @@ function generateWhatsNewEmail(
                     <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" style="height: 40px; width: auto;" />
                   </td>
                   <td align="right" style="vertical-align: middle;">
-                    <span style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #ffffff; font-size: 11px; font-weight: 600; padding: 6px 14px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <span style="display: inline-block; background: linear-gradient(135deg, #0f172a, #1e293b); color: #ffffff; font-size: 11px; font-weight: 600; padding: 6px 14px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
                       Product Update
                     </span>
                   </td>
@@ -209,7 +210,7 @@ function generateWhatsNewEmail(
           <!-- Hero Card -->
           <tr>
             <td style="padding: 0 0 24px 0;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 20px; overflow: hidden;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 20px; overflow: hidden;">
                 <tr>
                   <td style="padding: 48px 40px;">
                     <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 500; color: #94a3b8; letter-spacing: 0.5px;">
@@ -242,16 +243,22 @@ function generateWhatsNewEmail(
             </td>
           </tr>
 
-          <!-- Features Section Header -->
+          <!-- Features Count Badge -->
           <tr>
-            <td style="padding: 16px 0;">
-              <h2 style="margin: 0; font-size: 13px; font-weight: 700; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase;">
-                ✨ New Features
-              </h2>
+            <td style="padding: 0 0 20px 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <span style="display: inline-block; background: #f0fdf4; color: #166534; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                      🚀 ${features.length} New Features
+                    </span>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
-          <!-- Feature Cards with Screenshots -->
+          <!-- Feature Cards -->
           ${featureCards}
 
           <!-- Primary CTA -->
@@ -261,7 +268,7 @@ function generateWhatsNewEmail(
                 <tr>
                   <td align="center">
                     <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #0f172a, #1e293b); color: #ffffff; padding: 18px 56px; border-radius: 12px; font-size: 16px; font-weight: 600; text-decoration: none; letter-spacing: -0.01em; box-shadow: 0 4px 14px rgba(15,23,42,0.25);">
-                      Open Your Portal →
+                      Explore Your Portal →
                     </a>
                   </td>
                 </tr>
@@ -269,33 +276,33 @@ function generateWhatsNewEmail(
             </td>
           </tr>
 
-          <!-- Contact Card -->
+          <!-- Help Card -->
           <tr>
             <td style="padding: 0 0 32px 0;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
                 <tr>
-                  <td style="padding: 32px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #0f172a;">
+                  <td style="padding: 28px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 17px; font-weight: 600; color: #0f172a;">
                       Questions? We're here.
                     </h3>
-                    <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+                    <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
                       Reply to this email, leave a voicemail in your portal, or text us anytime.
                     </p>
                     <table cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td style="padding-right: 10px;">
-                          <a href="${portalUrl}#messages" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; text-decoration: none;">
+                          <a href="${portalUrl}#messages" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none;">
                             🎤 Voicemail
                           </a>
                         </td>
                         <td style="padding-right: 10px;">
-                          <a href="sms:+14048005932" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; text-decoration: none;">
+                          <a href="sms:+14048005932" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none;">
                             💬 Text Us
                           </a>
                         </td>
                         <td>
-                          <a href="${portalUrl}#schedule" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; text-decoration: none;">
-                            📞 Schedule Call
+                          <a href="${portalUrl}#schedule" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none;">
+                            📞 Call
                           </a>
                         </td>
                       </tr>
@@ -417,7 +424,7 @@ serve(async (req: Request) => {
         .from("feature_changelog")
         .select("*")
         .order("released_at", { ascending: false })
-        .limit(8);
+        .limit(10);
       featuresToSend = allFeatures || [];
     }
 
