@@ -30,15 +30,17 @@ import {
   MapPin, User, Clock, DollarSign, Wrench, Send, 
   CheckCircle, AlertTriangle, Phone, Mail, Calendar,
   RotateCcw, ExternalLink, Loader2, Image, Video, Play,
-  Building2, FileText, MessageSquare, History, Settings, X, Camera, MessageCircle, Smartphone
+  Building2, FileText, MessageSquare, History, Settings, X, Camera, MessageCircle, Smartphone, Mic
 } from "lucide-react";
 import { 
   WorkOrder, WorkOrderStatus, WorkOrderTimeline, MaintenanceMessage,
   STATUS_CONFIG, URGENCY_CONFIG, WORK_ORDER_CATEGORIES, Vendor 
 } from "@/types/maintenance";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
+import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDialog";
 import { WorkOrderBeforeAfterComparison } from "@/components/maintenance/WorkOrderBeforeAfterComparison";
 import { WorkOrderVendorSMSThread } from "@/components/maintenance/WorkOrderVendorSMSThread";
+import { WorkOrderMiniTimeline } from "@/components/maintenance/WorkOrderMiniTimeline";
 
 interface WorkOrderPhoto {
   id: string;
@@ -78,7 +80,9 @@ const PremiumWorkOrderModal = ({
   const [selectedMedia, setSelectedMedia] = useState<WorkOrderPhoto | null>(null);
   const [activePhotoTab, setActivePhotoTab] = useState<string>("before");
   const [showVendorSMS, setShowVendorSMS] = useState(false);
+  const [showVendorVoicemail, setShowVendorVoicemail] = useState(false);
   const [isRequestingRevisions, setIsRequestingRevisions] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   const queryClient = useQueryClient();
 
   // Fetch the complete work order data with property image
@@ -528,7 +532,15 @@ const PremiumWorkOrderModal = ({
 
           {/* Content */}
           <div className="p-6 overflow-y-auto max-h-[calc(92vh-120px)]">
-            <Tabs defaultValue="overview" className="w-full">
+            {/* Mini Timeline Header */}
+            <WorkOrderMiniTimeline
+              status={workOrder.status as WorkOrderStatus}
+              timeline={timeline}
+              createdAt={workOrder.created_at}
+              className="mb-4"
+            />
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-6 mb-6 bg-muted/50">
                 <TabsTrigger value="overview" className="gap-2">
                   <FileText className="h-4 w-4" />
@@ -606,36 +618,37 @@ const PremiumWorkOrderModal = ({
                       </CardContent>
                     </Card>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <Card className="border-border/50">
-                        <CardContent className="p-4 text-center">
-                          <div className="text-3xl font-bold text-foreground">{totalPhotos}</div>
-                          <div className="text-xs text-muted-foreground mt-1">Photos</div>
-                        </CardContent>
-                      </Card>
-                      <Card className="border-border/50">
-                        <CardContent className="p-4 text-center">
-                          <div className="text-3xl font-bold text-foreground">{totalVideos}</div>
-                          <div className="text-xs text-muted-foreground mt-1">Videos</div>
-                        </CardContent>
-                      </Card>
-                      <Card className="border-border/50">
-                        <CardContent className="p-4 text-center">
-                          <div className="text-3xl font-bold text-foreground">{messages.length}</div>
-                          <div className="text-xs text-muted-foreground mt-1">Messages</div>
-                        </CardContent>
-                      </Card>
+                    {/* Compact Stats Row */}
+                    <div className="flex items-center gap-4 px-1 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <Image className="h-4 w-4" />
+                        <span className="font-medium text-foreground">{totalPhotos}</span> photos
+                      </span>
+                      <span className="text-muted-foreground/40">•</span>
+                      <span className="flex items-center gap-1.5">
+                        <Video className="h-4 w-4" />
+                        <span className="font-medium text-foreground">{totalVideos}</span> videos
+                      </span>
+                      <span className="text-muted-foreground/40">•</span>
+                      <span className="flex items-center gap-1.5">
+                        <MessageSquare className="h-4 w-4" />
+                        <span className="font-medium text-foreground">{messages.length}</span> messages
+                      </span>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="ml-auto text-xs p-0 h-auto"
+                        onClick={() => setActiveTab("media")}
+                      >
+                        View All Media →
+                      </Button>
                     </div>
 
                     {/* Before/After Comparison - Prominent Display */}
                     <WorkOrderBeforeAfterComparison
                       beforePhotos={mediaByType.before}
                       afterPhotos={mediaByType.after}
-                      onViewAll={() => {
-                        // Switch to media tab
-                        const mediaTab = document.querySelector('[value="media"]');
-                        if (mediaTab) (mediaTab as HTMLElement).click();
-                      }}
+                      onViewAll={() => setActiveTab("media")}
                     />
                   </div>
 
@@ -708,6 +721,15 @@ const PremiumWorkOrderModal = ({
                             >
                               <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
                               Message Vendor
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowVendorVoicemail(true)}
+                              className="w-full"
+                            >
+                              <Mic className="h-3.5 w-3.5 mr-1.5" />
+                              Voice Message
                             </Button>
                           </div>
                         </CardContent>
@@ -1147,6 +1169,18 @@ const PremiumWorkOrderModal = ({
           contactType="vendor"
           contactId={workOrder.assigned_vendor.id}
           workOrderId={workOrderId}
+        />
+      )}
+
+      {/* Vendor Voice Message Dialog */}
+      {workOrder.assigned_vendor?.phone && (
+        <SendVoicemailDialog
+          open={showVendorVoicemail}
+          onOpenChange={setShowVendorVoicemail}
+          recipientPhone={workOrder.assigned_vendor.phone}
+          recipientName={workOrder.assigned_vendor.name}
+          vendorId={workOrder.assigned_vendor.id}
+          propertyAddress={workOrder.property?.address}
         />
       )}
     </>

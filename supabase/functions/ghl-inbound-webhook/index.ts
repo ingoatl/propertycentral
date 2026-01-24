@@ -58,11 +58,49 @@ async function findPhoneOwner(supabase: any, phoneNumber: string): Promise<{ use
 // Reverse lookup: Find who last messaged this contact when toNumber is not provided
 // This is CRITICAL for routing inbound SMS to the correct user's inbox
 // Now also returns the phoneNumber so we can populate to_number in user_phone_messages
+// PRIORITY: Check for alex_routed vendor messages FIRST to ensure vendor replies go to Alex's inbox only
 async function findLastOutboundSender(supabase: any, contactPhone: string): Promise<{ userId: string | null; assignmentId: string | null; displayName: string | null; phoneNumber: string | null }> {
   const normalizedPhone = normalizePhone(contactPhone);
   const last10 = normalizedPhone.replace(/\D/g, "").slice(-10);
   
   console.log("Reverse lookup for contact phone:", contactPhone, "last10:", last10);
+  
+  // Alex's constants - vendor messages routed through his line
+  const ALEX_USER_ID = "fbd13e57-3a59-4c53-bb3b-14ab354b3420";
+  const ALEX_ASSIGNMENT_ID = "8f7ad44a-0fd1-412e-aba7-16c6908c89d5";
+  const ALEX_PHONE_NUMBER = "+14043415202";
+  
+  // PRIORITY STRATEGY: Check for alex_routed vendor messages FIRST
+  // This ensures vendor replies ONLY go to Alex's inbox, not whoever else messaged them
+  const { data: alexRoutedComms } = await supabase
+    .from("lead_communications")
+    .select("assigned_user_id, metadata")
+    .eq("communication_type", "sms")
+    .eq("direction", "outbound")
+    .order("created_at", { ascending: false })
+    .limit(50);
+    
+  if (alexRoutedComms && alexRoutedComms.length > 0) {
+    for (const comm of alexRoutedComms) {
+      const meta = comm.metadata as any;
+      // Check if this was an alex_routed vendor message
+      if (meta?.alex_routed && meta?.vendor_id) {
+        const commToNumber = meta?.to_number || meta?.ghl_data?.contactPhone || meta?.vendor_phone;
+        if (commToNumber) {
+          const commLast10 = commToNumber.replace(/\D/g, "").slice(-10);
+          if (commLast10 === last10) {
+            console.log("PRIORITY MATCH: Found alex_routed vendor message to this contact - routing to Alex");
+            return { 
+              userId: ALEX_USER_ID, 
+              assignmentId: ALEX_ASSIGNMENT_ID, 
+              displayName: "Alex Heim", 
+              phoneNumber: ALEX_PHONE_NUMBER 
+            };
+          }
+        }
+      }
+    }
+  }
   
   // Strategy 1: Check user_phone_messages for recent outbound to this contact
   const { data: recentOutbound } = await supabase
