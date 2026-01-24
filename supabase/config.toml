@@ -593,3 +593,6 @@ verify_jwt = true
 
 [functions.process-comms-hub-sync]
 verify_jwt = false
+
+[functions.voicemail-text-reply]
+verify_jwt = false

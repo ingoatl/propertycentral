@@ -14,11 +14,13 @@ import {
   Check,
   Video,
   Maximize2,
-  Minimize2
+  Minimize2,
+  MessageSquare
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import VoiceReplyRecorder from "@/components/voicemail/VoiceReplyRecorder";
+import TextReplyComposer from "@/components/voicemail/TextReplyComposer";
 
 export default function VoicemailPlayer() {
   const { token } = useParams<{ token: string }>();
@@ -29,6 +31,7 @@ export default function VoicemailPlayer() {
   const [hasTrackedOpen, setHasTrackedOpen] = useState(false);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [showReplyRecorder, setShowReplyRecorder] = useState(false);
+  const [showTextReply, setShowTextReply] = useState(false);
   const [replySent, setReplySent] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -64,9 +67,9 @@ export default function VoicemailPlayer() {
     }
   }, [voicemail, hasTrackedOpen]);
 
-  // Check if reply was already sent
+  // Check if reply was already sent (voice or text)
   useEffect(() => {
-    if (voicemail?.reply_audio_url) {
+    if (voicemail?.reply_audio_url || voicemail?.reply_text) {
       setReplySent(true);
     }
   }, [voicemail]);
@@ -198,12 +201,23 @@ export default function VoicemailPlayer() {
   const handleReplySent = () => {
     setReplySent(true);
     setShowReplyRecorder(false);
+    setShowTextReply(false);
     refetch();
   };
 
   const handleReplyCancel = () => {
     trackEvent("voice_reply_cancelled");
     setShowReplyRecorder(false);
+  };
+
+  const handleTextReplyClick = () => {
+    trackEvent("text_reply_started");
+    setShowTextReply(true);
+  };
+
+  const handleTextReplyCancel = () => {
+    trackEvent("text_reply_cancelled");
+    setShowTextReply(false);
   };
 
   const formatTime = (seconds: number) => {
@@ -407,6 +421,13 @@ export default function VoicemailPlayer() {
               onReplySent={handleReplySent}
               onCancel={handleReplyCancel}
             />
+          ) : showTextReply ? (
+            <TextReplyComposer
+              token={token!}
+              voicemailId={voicemail.id}
+              onReplySent={handleReplySent}
+              onCancel={handleTextReplyCancel}
+            />
           ) : (
             <>
               {/* Call to Action Buttons */}
@@ -417,14 +438,26 @@ export default function VoicemailPlayer() {
                     <span className="text-green-700 font-medium">Reply Sent Successfully</span>
                   </div>
                 ) : (
-                  <Button
-                    size="lg"
-                    className="w-full gap-3 h-14 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
-                    onClick={handleReplyClick}
-                  >
-                    <Mic className="h-5 w-5" />
-                    Reply with Voice Message
-                  </Button>
+                  <>
+                    <Button
+                      size="lg"
+                      className="w-full gap-3 h-14 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
+                      onClick={handleReplyClick}
+                    >
+                      <Mic className="h-5 w-5" />
+                      Reply with Voice Message
+                    </Button>
+                    
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="w-full gap-3 h-14 rounded-xl border-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                      onClick={handleTextReplyClick}
+                    >
+                      <MessageSquare className="h-5 w-5" />
+                      Reply with Text Message
+                    </Button>
+                  </>
                 )}
                 
                 <Button

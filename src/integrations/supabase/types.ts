@@ -10685,7 +10685,10 @@ export type Database = {
           reply_audio_url: string | null
           reply_clicked: boolean | null
           reply_duration_seconds: number | null
+          reply_method: string | null
           reply_recorded_at: string | null
+          reply_text: string | null
+          reply_text_sent_at: string | null
           reply_transcript: string | null
           sender_name: string | null
           sender_user_id: string | null
@@ -10718,7 +10721,10 @@ export type Database = {
           reply_audio_url?: string | null
           reply_clicked?: boolean | null
           reply_duration_seconds?: number | null
+          reply_method?: string | null
           reply_recorded_at?: string | null
+          reply_text?: string | null
+          reply_text_sent_at?: string | null
           reply_transcript?: string | null
           sender_name?: string | null
           sender_user_id?: string | null
@@ -10751,7 +10757,10 @@ export type Database = {
           reply_audio_url?: string | null
           reply_clicked?: boolean | null
           reply_duration_seconds?: number | null
+          reply_method?: string | null
           reply_recorded_at?: string | null
+          reply_text?: string | null
+          reply_text_sent_at?: string | null
           reply_transcript?: string | null
           sender_name?: string | null
           sender_user_id?: string | null
