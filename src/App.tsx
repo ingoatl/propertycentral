@@ -52,6 +52,7 @@ const OnboardingPresentation = lazy(() => import("./pages/OnboardingPresentation
 const DesignerPresentation = lazy(() => import("./pages/DesignerPresentation"));
 const RescheduleCall = lazy(() => import("./pages/RescheduleCall"));
 const VoicemailPlayer = lazy(() => import("./pages/VoicemailPlayer"));
+const RecapPlayer = lazy(() => import("./pages/RecapPlayer"));
 const VendorJobPortal = lazy(() => import("./pages/VendorJobPortal"));
 const VendorW9Upload = lazy(() => import("./pages/VendorW9Upload"));
 const TeamHub = lazy(() => import("./pages/TeamHub"));
@@ -131,6 +132,7 @@ const App = () => (
             <Route path="/designer-presentation" element={<DesignerPresentation />} />
             <Route path="/reschedule/:callId" element={<RescheduleCall />} />
             <Route path="/vm/:token" element={<VoicemailPlayer />} />
+            <Route path="/recap" element={<RecapPlayer />} />
             <Route path="/vendor-job/:token" element={<VendorJobPortal />} />
             <Route path="/vendor/w9-upload" element={<VendorW9Upload />} />
             <Route path="*" element={
