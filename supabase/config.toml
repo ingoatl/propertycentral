@@ -578,3 +578,6 @@ verify_jwt = false
 
 [functions.send-vendor-followup-reminder]
 verify_jwt = false
+
+[functions.notify-work-order-verification]
+verify_jwt = true

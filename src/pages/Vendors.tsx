@@ -25,7 +25,7 @@ import { MeetingsDialog } from "@/components/communications/MeetingsDialog";
 import DeleteVendorDialog from "@/components/maintenance/DeleteVendorDialog";
 import { StartWorkOrderDialog } from "@/components/maintenance/StartWorkOrderDialog";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
-import WorkOrderDetailModal from "@/components/maintenance/WorkOrderDetailModal";
+import PremiumWorkOrderModal from "@/components/maintenance/PremiumWorkOrderModal";
 
 const Vendors = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -378,7 +378,7 @@ const Vendors = () => {
       )}
       {deleteVendor && <DeleteVendorDialog open={!!deleteVendor} onOpenChange={(open) => !open && setDeleteVendor(null)} vendorName={deleteVendor.name} onConfirm={handleDeleteVendor} isDeleting={isDeleting} />}
       <StartWorkOrderDialog open={showStartWorkOrder} onOpenChange={setShowStartWorkOrder} onSuccess={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />
-      {selectedWorkOrderId && <WorkOrderDetailModal workOrderId={selectedWorkOrderId} open={!!selectedWorkOrderId} onOpenChange={(open) => !open && setSelectedWorkOrderId(null)} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />}
+      {selectedWorkOrderId && <PremiumWorkOrderModal workOrderId={selectedWorkOrderId} open={!!selectedWorkOrderId} onOpenChange={(open) => !open && setSelectedWorkOrderId(null)} onUpdate={() => queryClient.invalidateQueries({ queryKey: ["all-work-orders"] })} />}
     </>
   );
 };
