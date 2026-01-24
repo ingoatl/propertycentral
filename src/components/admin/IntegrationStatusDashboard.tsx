@@ -116,7 +116,7 @@ export function IntegrationStatusDashboard() {
         {
           id: "peachhaus",
           name: "PeachHaus",
-          description: "Listing optimization & performance metrics",
+          description: "peachhaus-guestconnect",
           icon: <TrendingUp className="h-4 w-4" />,
           lastSync: sourceMap.get("peachhaus")?.lastSync || null,
           status: getSourceStatus(sourceMap.get("peachhaus")),
@@ -128,7 +128,7 @@ export function IntegrationStatusDashboard() {
         {
           id: "guestconnect",
           name: "GuestConnect",
-          description: "Marketing activities & social media",
+          description: "peachhaus-guestconnect",
           icon: <Cloud className="h-4 w-4" />,
           lastSync: sourceMap.get("guestconnect")?.lastSync || null,
           status: getSourceStatus(sourceMap.get("guestconnect")),
@@ -140,7 +140,7 @@ export function IntegrationStatusDashboard() {
         {
           id: "marketing_hub",
           name: "Marketing Hub",
-          description: "Monthly marketing reports & stats",
+          description: "peachhaus-guestconnect",
           icon: <Zap className="h-4 w-4" />,
           lastSync: sourceMap.get("marketing_hub")?.lastSync || null,
           status: getSourceStatus(sourceMap.get("marketing_hub")),
@@ -152,7 +152,7 @@ export function IntegrationStatusDashboard() {
         {
           id: "midtermnation",
           name: "Mid-Term Nation",
-          description: "Partner property listings",
+          description: "midtermnation",
           icon: <Shield className="h-4 w-4" />,
           lastSync: sourceMap.get("midtermnation")?.lastSync || null,
           status: getSourceStatus(sourceMap.get("midtermnation")),
@@ -382,7 +382,9 @@ export function IntegrationStatusDashboard() {
                   </div>
                   <div>
                     <p className="font-semibold text-sm">{source.name}</p>
-                    <p className="text-xs text-muted-foreground">{source.description}</p>
+                    <p className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded w-fit">
+                      {source.description}
+                    </p>
                   </div>
                 </div>
                 {getStatusIcon(source.status)}

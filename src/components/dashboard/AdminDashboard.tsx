@@ -21,11 +21,9 @@ import { OverdueTasksCard } from "./OverdueTasksCard";
 import { AllTasksCard } from "./AllTasksCard";
 import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
 import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
-import { ExpenseWatchdogCard } from "@/components/admin/ExpenseWatchdogCard";
-import { VisitPriceWatchdogCard } from "@/components/admin/VisitPriceWatchdogCard";
-import { PartnerSyncWatchdogCard } from "@/components/admin/PartnerSyncWatchdogCard";
-import { GmailHealthWatchdog } from "@/components/dashboard/GmailHealthWatchdog";
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
+import { SystemHealthPanel } from "@/components/admin/SystemHealthPanel";
+import { SyncStatusBar } from "@/components/admin/SyncStatusBar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -389,12 +387,16 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         <div className="container mx-auto px-6 max-md:px-3">
           <TabsList className="my-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="system-health">System Health</TabsTrigger>
             <TabsTrigger value="daily-entries">Daily Entries</TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="overview" className="mt-0">
         <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4 space-y-8 max-md:space-y-6">
+        
+        {/* Sync Status Bar - Always visible at top */}
+        <SyncStatusBar />
         
         {/* Discovery Call Calendar - Prominent at top */}
         <DiscoveryCallCalendar />
@@ -525,20 +527,18 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           />
         </div>
 
-        {/* Watchdog Section - Critical for catching data issues */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 max-md:gap-4">
-          <GmailHealthWatchdog />
-          <VisitPriceWatchdogCard />
-          <ExpenseWatchdogCard />
-          <PartnerSyncWatchdogCard />
-        </div>
-
         {/* Admin Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:gap-4">
           <PendingQuestionsCard />
           <DashboardBugReportsCard />
         </div>
       </div>
+      </TabsContent>
+
+      <TabsContent value="system-health" className="mt-0">
+        <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4">
+          <SystemHealthPanel />
+        </div>
       </TabsContent>
 
       <TabsContent value="daily-entries">
