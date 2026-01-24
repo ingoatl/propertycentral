@@ -17,9 +17,7 @@ import {
   Square,
   RotateCcw,
   ExternalLink,
-  TrendingUp,
-  Calendar,
-  Home
+  TrendingUp
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -48,7 +46,7 @@ export default function RecapPlayer() {
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Get audio URL from query param or fetch from recap record
+  // Fallback params for legacy links
   const audioUrlParam = searchParams.get("audio");
   const propertyNameParam = searchParams.get("property") || "Your Property";
   const monthNameParam = searchParams.get("month") || "Monthly";
@@ -56,7 +54,7 @@ export default function RecapPlayer() {
   const propertyIdParam = searchParams.get("propertyId");
 
   // Fetch recap data if token provided (route param takes priority)
-  const { data: recap, isLoading, error } = useQuery({
+  const { data: recap, isLoading } = useQuery({
     queryKey: ["recap", token],
     queryFn: async () => {
       if (!token) return null;
@@ -82,6 +80,13 @@ export default function RecapPlayer() {
   const effectiveMonthName = token && recap?.recap_month 
     ? new Date(recap.recap_month).toLocaleString('default', { month: 'long' })
     : monthNameParam;
+
+  // Portal URL for owner
+  const portalUrl = recap?.property_owners?.id 
+    ? `https://propertycentral.lovable.app/owner?owner=${recap.property_owners.id}`
+    : effectiveOwnerId 
+      ? `https://propertycentral.lovable.app/owner?owner=${effectiveOwnerId}`
+      : "https://propertycentral.lovable.app/owner";
 
   useEffect(() => {
     return () => {
@@ -211,15 +216,15 @@ export default function RecapPlayer() {
         .from("message-attachments")
         .getPublicUrl(fileName);
 
-      const { error } = await supabase.from("lead_communications").insert({
-        owner_id: effectiveOwnerId,
-        property_id: effectivePropertyId || null,
-        communication_type: "voicemail",
-        direction: "inbound",
-        body: `🎙️ Voice reply to ${effectiveMonthName} recap for ${effectivePropertyName} (${recordingDuration}s)`,
-        subject: `Voice reply from owner - ${effectivePropertyName}`,
-        attachment_url: urlData.publicUrl,
-        status: "unread",
+      const { error } = await supabase.functions.invoke("owner-send-message", {
+        body: {
+          owner_id: effectiveOwnerId,
+          property_id: effectivePropertyId || null,
+          communication_type: "voicemail",
+          body: `🎙️ Voice reply to ${effectiveMonthName} recap for ${effectivePropertyName} (${recordingDuration}s)`,
+          subject: `Voice reply from owner - ${effectivePropertyName}`,
+          attachment_url: urlData.publicUrl,
+        }
       });
 
       if (error) throw error;
@@ -242,14 +247,14 @@ export default function RecapPlayer() {
 
     setIsSending(true);
     try {
-      const { error } = await supabase.from("lead_communications").insert({
-        owner_id: effectiveOwnerId,
-        property_id: effectivePropertyId || null,
-        communication_type: "sms",
-        direction: "inbound",
-        body: `Reply to ${effectiveMonthName} recap: ${textMessage}`,
-        subject: `Text reply from owner - ${effectivePropertyName}`,
-        status: "unread",
+      const { error } = await supabase.functions.invoke("owner-send-message", {
+        body: {
+          owner_id: effectiveOwnerId,
+          property_id: effectivePropertyId || null,
+          communication_type: "sms",
+          body: `Reply to ${effectiveMonthName} recap: ${textMessage}`,
+          subject: `Text reply from owner - ${effectivePropertyName}`,
+        }
       });
 
       if (error) throw error;
@@ -270,21 +275,16 @@ export default function RecapPlayer() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Generate portal URL
-  const portalUrl = token 
-    ? `https://propertycentral.lovable.app/owner?token=${token}`
-    : `https://propertycentral.lovable.app/owner${effectiveOwnerId ? `?owner=${effectiveOwnerId}` : ''}`;
-
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
         <div className="text-center">
           <img 
             src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
             alt="PeachHaus" 
             className="h-12 mx-auto mb-6"
           />
-          <Loader2 className="h-8 w-8 animate-spin text-amber-500 mx-auto" />
+          <Loader2 className="h-8 w-8 animate-spin text-amber-600 mx-auto" />
         </div>
       </div>
     );
@@ -292,16 +292,16 @@ export default function RecapPlayer() {
 
   if (!effectiveAudioUrl) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-        <Card className="max-w-sm w-full p-8 text-center shadow-xl border-0 bg-white/10 backdrop-blur">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
+        <Card className="max-w-sm w-full p-8 text-center shadow-xl border-0">
           <img 
             src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
             alt="PeachHaus" 
             className="h-10 mx-auto mb-6"
           />
           <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold mb-2 text-white">Recap Not Found</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-xl font-semibold mb-2 text-gray-900">Recap Not Found</h1>
+          <p className="text-sm text-gray-500">
             This performance recap may have expired or doesn't exist.
           </p>
         </Card>
@@ -310,7 +310,7 @@ export default function RecapPlayer() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex flex-col items-center justify-center p-4">
       {/* Hidden audio element */}
       <audio
         ref={audioRef}
@@ -321,9 +321,9 @@ export default function RecapPlayer() {
         preload="metadata"
       />
 
-      <Card className="max-w-md w-full overflow-hidden shadow-2xl border-0 rounded-3xl bg-gradient-to-b from-slate-800 to-slate-900">
+      <Card className="max-w-md w-full overflow-hidden shadow-2xl border-0 rounded-3xl">
         {/* Header with branding */}
-        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 p-6 text-white text-center relative overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 p-8 text-white text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
           
@@ -331,34 +331,34 @@ export default function RecapPlayer() {
             <img 
               src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
               alt="PeachHaus" 
-              className="h-10 mx-auto mb-2"
+              className="h-12 mx-auto mb-3"
             />
-            <p className="text-amber-100 text-xs font-medium tracking-wide uppercase">Property Management</p>
+            <p className="text-amber-100 text-sm font-medium">Property Management</p>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6">
-          {/* Property & Month Info */}
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-full mb-3 border border-amber-500/30">
-              <TrendingUp className="w-7 h-7 text-amber-500" />
+        {/* Message Info */}
+        <div className="p-6 sm:p-8">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 rounded-full mb-4">
+              <TrendingUp className="w-8 h-8 text-amber-600" />
             </div>
-            <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-              <Calendar className="w-3 h-3" />
+            <p className="text-sm text-gray-500 mb-1">
               {effectiveMonthName} Performance Recap
             </p>
-            <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
-              <Home className="w-5 h-5 text-amber-500" />
-              {effectivePropertyName}
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900">{effectivePropertyName}</h2>
+            {recap?.created_at && (
+              <p className="text-sm text-gray-400 mt-2">
+                {format(new Date(recap.created_at), "MMMM d, yyyy 'at' h:mm a")}
+              </p>
+            )}
           </div>
 
-          {/* Audio Player */}
-          <div className="bg-slate-800/50 rounded-2xl p-5 mb-6 border border-slate-700/50">
-            {/* Waveform visualization */}
+          {/* Audio Player - matching VoicemailPlayer style */}
+          <div className="bg-gradient-to-br from-gray-50 to-amber-50/50 rounded-2xl p-5 mb-6">
+            {/* Waveform-style progress bar */}
             <div 
-              className="h-16 mb-5 bg-slate-900/50 rounded-xl overflow-hidden cursor-pointer relative"
+              className="h-16 mb-5 bg-white rounded-xl overflow-hidden cursor-pointer relative shadow-inner"
               onClick={handleSeek}
             >
               <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-3">
@@ -372,7 +372,7 @@ export default function RecapPlayer() {
                         "w-1 rounded-full transition-all duration-150",
                         isPlayed 
                           ? "bg-gradient-to-t from-amber-500 to-orange-400" 
-                          : "bg-slate-600"
+                          : "bg-gray-200"
                       )}
                       style={{ height: `${height}%` }}
                     />
@@ -383,35 +383,30 @@ export default function RecapPlayer() {
 
             {/* Time and Play Button */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400 font-mono w-12">
+              <span className="text-sm text-gray-500 font-mono w-12">
                 {formatTime(currentTime)}
               </span>
               
               <Button
                 size="lg"
-                className="rounded-full h-16 w-16 bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30 transition-all hover:scale-105"
+                className="rounded-full h-20 w-20 bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30 transition-all hover:scale-105"
                 onClick={handlePlay}
               >
                 {isPlaying ? (
-                  <Pause className="h-7 w-7" />
+                  <Pause className="h-8 w-8" />
                 ) : (
-                  <Play className="h-7 w-7 ml-1" />
+                  <Play className="h-8 w-8 ml-1" />
                 )}
               </Button>
               
-              <span className="text-sm text-slate-400 font-mono w-12 text-right">
+              <span className="text-sm text-gray-500 font-mono w-12 text-right">
                 {formatTime(duration)}
               </span>
             </div>
           </div>
 
           {/* Reply Section */}
-          {replySent ? (
-            <div className="flex items-center justify-center gap-2 py-4 px-6 bg-green-500/10 rounded-xl border border-green-500/30 mb-4">
-              <Check className="h-5 w-5 text-green-500" />
-              <span className="text-green-400 font-medium">Reply Sent Successfully</span>
-            </div>
-          ) : showVoiceReply ? (
+          {showVoiceReply ? (
             <div className="space-y-4 mb-4">
               <div className="flex flex-col items-center gap-4">
                 {!recordedBlob ? (
@@ -427,15 +422,15 @@ export default function RecapPlayer() {
                     >
                       {isRecording ? <Square className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
                     </button>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-gray-500">
                       {isRecording ? `Recording... ${formatDuration(recordingDuration)}` : "Tap to start recording"}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="text-white font-medium">Recording Complete ({formatDuration(recordingDuration)})</p>
+                    <p className="text-gray-700 font-medium">Recording Complete ({formatDuration(recordingDuration)})</p>
                     <div className="flex gap-3">
-                      <Button variant="outline" onClick={resetRecording} className="border-slate-600 text-slate-300">
+                      <Button variant="outline" onClick={resetRecording} className="border-gray-300">
                         <RotateCcw className="h-4 w-4 mr-2" />
                         Re-record
                       </Button>
@@ -449,7 +444,7 @@ export default function RecapPlayer() {
               </div>
               <Button 
                 variant="ghost" 
-                className="w-full text-slate-400" 
+                className="w-full text-gray-500" 
                 onClick={() => { setShowVoiceReply(false); resetRecording(); }}
               >
                 Cancel
@@ -462,19 +457,19 @@ export default function RecapPlayer() {
                 onChange={(e) => setTextMessage(e.target.value)}
                 placeholder="Type your message..."
                 rows={3}
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                className="bg-white border-gray-200"
               />
               <div className="flex gap-3">
                 <Button 
                   variant="outline" 
-                  className="flex-1 border-slate-600 text-slate-300"
+                  className="flex-1 border-gray-300"
                   onClick={() => { setShowTextReply(false); setTextMessage(""); }}
                 >
                   Cancel
                 </Button>
                 <Button 
                   onClick={handleSendText} 
-                  disabled={isSending || !textMessage.trim()}
+                  disabled={isSending}
                   className="flex-1 bg-amber-500 hover:bg-amber-600"
                 >
                   {isSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
@@ -483,47 +478,61 @@ export default function RecapPlayer() {
               </div>
             </div>
           ) : (
-            <div className="space-y-3 mb-4">
-              <Button
-                size="lg"
-                className="w-full gap-3 h-12 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
-                onClick={() => setShowVoiceReply(true)}
-              >
-                <Mic className="h-5 w-5" />
-                Reply with Voice
-              </Button>
+            <div className="space-y-3">
+              {replySent ? (
+                <div className="flex items-center justify-center gap-2 py-4 px-6 bg-green-50 rounded-xl border border-green-100">
+                  <Check className="h-5 w-5 text-green-600" />
+                  <span className="text-green-700 font-medium">Reply Sent Successfully</span>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    size="lg"
+                    className="w-full gap-3 h-14 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
+                    onClick={() => setShowVoiceReply(true)}
+                  >
+                    <Mic className="h-5 w-5" />
+                    Reply with Voice Message
+                  </Button>
+                  
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="w-full gap-3 h-14 rounded-xl border-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                    onClick={() => setShowTextReply(true)}
+                  >
+                    <MessageSquare className="h-5 w-5" />
+                    Reply with Text Message
+                  </Button>
+                </>
+              )}
               
+              {/* View Owner Portal Button */}
               <Button
-                size="lg"
                 variant="outline"
-                className="w-full gap-3 h-12 rounded-xl border-slate-600 text-slate-200 hover:bg-slate-800"
-                onClick={() => setShowTextReply(true)}
+                size="lg"
+                className="w-full gap-3 h-14 rounded-xl border-2 hover:bg-amber-50"
+                onClick={() => window.open(portalUrl, '_blank')}
               >
-                <MessageSquare className="h-5 w-5" />
-                Reply with Text
+                <ExternalLink className="h-5 w-5" />
+                View Owner Portal
               </Button>
             </div>
           )}
-
-          {/* View Full Dashboard */}
-          <a 
-            href={portalUrl}
-            className="flex items-center justify-center gap-2 py-3 px-4 bg-slate-800/50 rounded-xl border border-slate-700/50 text-slate-300 hover:bg-slate-700/50 transition-colors text-sm"
-          >
-            <ExternalLink className="h-4 w-4" />
-            View Full Dashboard
-          </a>
         </div>
 
         {/* Footer */}
-        <div className="px-6 pb-6">
-          <div className="text-center pt-4 border-t border-slate-700/50">
-            <p className="text-xs text-slate-500">
-              Questions? Call us at (404) 800-5932
-            </p>
-          </div>
+        <div className="bg-gray-50 p-5 text-center border-t">
+          <p className="text-xs text-gray-500">
+            Questions? Call us at <a href="tel:+14048005932" className="text-amber-600 font-medium hover:underline">(404) 800-5932</a>
+          </p>
         </div>
       </Card>
+
+      {/* Powered by badge */}
+      <p className="mt-6 text-xs text-gray-400">
+        Powered by PeachHaus
+      </p>
     </div>
   );
 }
