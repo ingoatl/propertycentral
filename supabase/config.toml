@@ -569,3 +569,6 @@ verify_jwt = false
 
 [functions.receive-owner-marketing-stats]
 verify_jwt = false
+
+[functions.receive-midtermnation-sync]
+verify_jwt = false
