@@ -5461,6 +5461,79 @@ export type Database = {
           },
         ]
       }
+      owner_monthly_recaps: {
+        Row: {
+          audio_url: string | null
+          created_at: string | null
+          email_sent: boolean | null
+          email_sent_at: string | null
+          error_message: string | null
+          id: string
+          metrics: Json | null
+          owner_id: string | null
+          property_id: string | null
+          recap_month: string
+          sms_sent: boolean | null
+          sms_sent_at: string | null
+          updated_at: string | null
+          voice_script: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string | null
+          email_sent?: boolean | null
+          email_sent_at?: string | null
+          error_message?: string | null
+          id?: string
+          metrics?: Json | null
+          owner_id?: string | null
+          property_id?: string | null
+          recap_month: string
+          sms_sent?: boolean | null
+          sms_sent_at?: string | null
+          updated_at?: string | null
+          voice_script?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string | null
+          email_sent?: boolean | null
+          email_sent_at?: string | null
+          error_message?: string | null
+          id?: string
+          metrics?: Json | null
+          owner_id?: string | null
+          property_id?: string | null
+          recap_month?: string
+          sms_sent?: boolean | null
+          sms_sent_at?: string | null
+          updated_at?: string | null
+          voice_script?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_monthly_recaps_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_monthly_recaps_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_monthly_recaps_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_notifications: {
         Row: {
           created_at: string
