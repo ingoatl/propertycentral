@@ -9,6 +9,7 @@ const corsHeaders = {
 interface MarketingStatsPayload {
   property_source_id?: string;
   property_name?: string;
+  marketing_hub_property_id?: string;
   report_period: string;
   social_media?: {
     instagram_posts?: number;
@@ -34,6 +35,15 @@ interface MarketingStatsPayload {
   executive_summary?: string;
   synced_at?: string;
 }
+
+// Known property name mappings (Marketing Hub name -> Property Central name)
+const PROPERTY_NAME_MAPPINGS: Record<string, string> = {
+  "the durham family retreat": "family retreat",
+  "the berkley at chimney lakes": "the berkley",
+  "the alpine": "alpine",
+  "the scandinavian retreat": "scandinavian retreat",
+  // Add more mappings as needed
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -80,33 +90,102 @@ serve(async (req) => {
       }
     }
     
-    // Method 2: Name matching fallback
+    // Method 2: Name matching fallback with multiple strategies
     if (!property && payload.property_name) {
       const searchName = payload.property_name.toLowerCase().trim();
+      
+      // Check for known mappings first
+      const mappedName = PROPERTY_NAME_MAPPINGS[searchName];
+      
       const { data: allProperties } = await supabase
         .from("properties")
         .select("id, name, owner_id")
         .is("offboarded_at", null);
       
-      property = allProperties?.find(p => {
-        const propName = p.name?.toLowerCase() || "";
-        return propName === searchName || 
-               propName.includes(searchName) || 
-               searchName.includes(propName);
-      });
-      
-      if (property) {
-        console.log(`[receive-owner-marketing-stats] Matched by property_name "${payload.property_name}" -> ${property.name}`);
+      if (allProperties) {
+        // Strategy 1: Check known mapping
+        if (mappedName) {
+          property = allProperties.find(p => 
+            p.name?.toLowerCase() === mappedName
+          );
+          if (property) {
+            console.log(`[receive-owner-marketing-stats] Matched via known mapping: "${payload.property_name}" -> ${property.name}`);
+          }
+        }
+        
+        // Strategy 2: Exact match
+        if (!property) {
+          property = allProperties.find(p => 
+            p.name?.toLowerCase() === searchName
+          );
+          if (property) {
+            console.log(`[receive-owner-marketing-stats] Matched by exact name: ${property.name}`);
+          }
+        }
+        
+        // Strategy 3: Property Central name is contained in Marketing Hub name
+        if (!property) {
+          property = allProperties.find(p => {
+            const propName = p.name?.toLowerCase() || "";
+            return searchName.includes(propName) && propName.length > 3;
+          });
+          if (property) {
+            console.log(`[receive-owner-marketing-stats] Matched by property name contained in: "${payload.property_name}" -> ${property.name}`);
+          }
+        }
+        
+        // Strategy 4: Marketing Hub name is contained in Property Central name
+        if (!property) {
+          property = allProperties.find(p => {
+            const propName = p.name?.toLowerCase() || "";
+            return propName.includes(searchName) && searchName.length > 3;
+          });
+          if (property) {
+            console.log(`[receive-owner-marketing-stats] Matched by name containing: "${payload.property_name}" -> ${property.name}`);
+          }
+        }
+        
+        // Strategy 5: Keyword extraction (remove common prefixes like "The")
+        if (!property) {
+          const cleanedSearch = searchName.replace(/^the\s+/i, "").trim();
+          property = allProperties.find(p => {
+            const propName = p.name?.toLowerCase().replace(/^the\s+/i, "").trim() || "";
+            return propName === cleanedSearch || 
+                   propName.includes(cleanedSearch) || 
+                   cleanedSearch.includes(propName);
+          });
+          if (property) {
+            console.log(`[receive-owner-marketing-stats] Matched by cleaned keyword: "${payload.property_name}" -> ${property.name}`);
+          }
+        }
       }
     }
 
     if (!property) {
       console.error(`[receive-owner-marketing-stats] Property not found: source_id=${payload.property_source_id}, name=${payload.property_name}`);
+      console.log(`[receive-owner-marketing-stats] Marketing Hub ID for reference: ${payload.marketing_hub_property_id}`);
+      
+      // Log the unmatched property for admin review
+      await supabase.from("partner_sync_log").insert({
+        source_system: "marketing_hub",
+        sync_type: "marketing_stats_unmatched",
+        properties_synced: 0,
+        sync_status: "failed",
+        error_details: { 
+          property_name: payload.property_name,
+          marketing_hub_property_id: payload.marketing_hub_property_id,
+          report_month: payload.report_period,
+          reason: "Property not found in Property Central"
+        }
+      });
+      
       return new Response(
         JSON.stringify({ 
           error: "Property not found", 
           source_id: payload.property_source_id,
-          property_name: payload.property_name 
+          property_name: payload.property_name,
+          marketing_hub_property_id: payload.marketing_hub_property_id,
+          suggestion: "Add property name mapping or create property in Property Central"
         }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -138,7 +217,11 @@ serve(async (req) => {
       sync_type: "marketing_stats",
       properties_synced: 1,
       sync_status: "completed",
-      error_details: { property_name: property.name, report_month: payload.report_period }
+      error_details: { 
+        property_name: property.name, 
+        report_month: payload.report_period,
+        marketing_hub_property_id: payload.marketing_hub_property_id 
+      }
     });
 
     console.log(`[receive-owner-marketing-stats] Successfully stored marketing stats for ${property.name} (${payload.report_period})`);
@@ -147,6 +230,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         property_name: property.name,
+        property_id: property.id,
         report_month: payload.report_period,
         received_at: new Date().toISOString()
       }),
