@@ -7,7 +7,6 @@ import { Send, X, Loader2, MessageSquare } from "lucide-react";
 
 const QUICK_REPLIES = [
   "Got it, thanks!",
-  "Please call me",
   "I'll review and get back to you",
   "Thanks for the update!",
 ];
@@ -66,20 +65,20 @@ export default function TextReplyComposer({
   };
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-5 mb-6 space-y-4">
+    <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-4 sm:p-5 mb-6 space-y-4">
       <div className="flex items-center gap-2 text-blue-700 mb-2">
         <MessageSquare className="h-5 w-5" />
         <span className="font-medium">Send a Text Reply</span>
       </div>
 
-      {/* Quick Reply Buttons */}
-      <div className="flex flex-wrap gap-2">
+      {/* Quick Reply Buttons - Grid layout for mobile */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {QUICK_REPLIES.map((reply) => (
           <button
             key={reply}
             type="button"
             onClick={() => handleQuickReply(reply)}
-            className={`px-3 py-1.5 text-sm rounded-full border transition-all ${
+            className={`px-3 py-2 text-sm rounded-lg border transition-all text-left ${
               message === reply
                 ? "bg-blue-600 text-white border-blue-600"
                 : "bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50"
@@ -105,13 +104,13 @@ export default function TextReplyComposer({
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex gap-3">
+      {/* Action Buttons - Stack on mobile */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <Button
           variant="outline"
           onClick={onCancel}
           disabled={isSending}
-          className="flex-1 h-12 rounded-xl"
+          className="h-12 rounded-xl order-2 sm:order-1 sm:flex-1"
         >
           <X className="h-4 w-4 mr-2" />
           Cancel
@@ -119,7 +118,7 @@ export default function TextReplyComposer({
         <Button
           onClick={handleSend}
           disabled={isSending || !message.trim()}
-          className="flex-1 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
+          className="h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 order-1 sm:order-2 sm:flex-1"
         >
           {isSending ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />

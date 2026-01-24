@@ -278,11 +278,25 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
     return num.toLocaleString();
   };
 
+  // Demo property ID - skip DB fetch for demo
+  const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+  const isDemo = propertyId === DEMO_PROPERTY_ID;
+
   useEffect(() => {
+    // For demo, skip DB fetch - we already have mock data from marketingStats prop
+    if (isDemo) {
+      setLoading(false);
+      return;
+    }
     loadMarketingData();
-  }, [propertyId]);
+  }, [propertyId, isDemo]);
 
   const loadMarketingData = async () => {
+    if (isDemo) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       // Fetch marketing activities
