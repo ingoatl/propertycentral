@@ -132,6 +132,7 @@ const App = () => (
             <Route path="/designer-presentation" element={<DesignerPresentation />} />
             <Route path="/reschedule/:callId" element={<RescheduleCall />} />
             <Route path="/vm/:token" element={<VoicemailPlayer />} />
+            <Route path="/recap/:token" element={<RecapPlayer />} />
             <Route path="/recap" element={<RecapPlayer />} />
             <Route path="/vendor-job/:token" element={<VendorJobPortal />} />
             <Route path="/vendor/w9-upload" element={<VendorW9Upload />} />

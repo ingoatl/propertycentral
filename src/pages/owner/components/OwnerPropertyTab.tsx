@@ -29,6 +29,7 @@ import {
   Shield,
   Fence,
   Accessibility,
+  BookOpen,
 } from "lucide-react";
 import { PeachHausActivityCard } from "./PeachHausActivityCard";
 
@@ -73,6 +74,7 @@ interface PropertyData {
   middle_school?: string;
   high_school?: string;
   website_url?: string;
+  guidebook_url?: string;
   platforms?: PlatformListing[];
 }
 
@@ -374,6 +376,44 @@ export function OwnerPropertyTab({ property, owner, peachHausData }: OwnerProper
           </div>
         </CardContent>
       </Card>
+
+      {/* Guest Guidebook Section */}
+      {property.guidebook_url && (
+        <Card className="border-none shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 border-b">
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Guest Guidebook
+            </CardTitle>
+            <CardDescription>
+              The digital guidebook we share with all guests staying at your property
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <BookOpen className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Property Guidebook</p>
+                  <p className="text-sm text-muted-foreground">Check-in instructions, house rules, local tips & more</p>
+                </div>
+              </div>
+              <a
+                href={property.guidebook_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" size="sm" className="gap-2">
+                  <ExternalLink className="w-4 h-4" />
+                  View Guidebook
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Property Details Grid */}
       <div className="grid md:grid-cols-2 gap-6">

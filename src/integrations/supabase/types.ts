@@ -7387,6 +7387,7 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           created_at: string
+          guidebook_url: string | null
           id: string
           property_id: string
           updated_at: string
@@ -7396,6 +7397,7 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
+          guidebook_url?: string | null
           id?: string
           property_id: string
           updated_at?: string
@@ -7405,6 +7407,7 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
+          guidebook_url?: string | null
           id?: string
           property_id?: string
           updated_at?: string

@@ -49,13 +49,13 @@ export default function RecapPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Get audio URL from query param or fetch from recap record
-  const audioUrl = searchParams.get("audio");
-  const propertyName = searchParams.get("property") || "Your Property";
-  const monthName = searchParams.get("month") || "Monthly";
-  const ownerId = searchParams.get("owner");
-  const propertyId = searchParams.get("propertyId");
+  const audioUrlParam = searchParams.get("audio");
+  const propertyNameParam = searchParams.get("property") || "Your Property";
+  const monthNameParam = searchParams.get("month") || "Monthly";
+  const ownerIdParam = searchParams.get("owner");
+  const propertyIdParam = searchParams.get("propertyId");
 
-  // Fetch recap data if token provided
+  // Fetch recap data if token provided (route param takes priority)
   const { data: recap, isLoading, error } = useQuery({
     queryKey: ["recap", token],
     queryFn: async () => {
@@ -70,14 +70,18 @@ export default function RecapPlayer() {
       if (error) throw error;
       return data;
     },
-    enabled: !!token && !audioUrl,
+    enabled: !!token,
   });
 
-  const effectiveAudioUrl = audioUrl || recap?.audio_url;
-  const effectivePropertyName = propertyName || recap?.properties?.name;
-  const effectiveOwnerId = ownerId || recap?.owner_id;
-  const effectivePropertyId = propertyId || recap?.property_id;
+  // Derive effective values - prioritize database data when token is used
+  const effectiveAudioUrl = token ? recap?.audio_url : audioUrlParam;
+  const effectivePropertyName = token ? recap?.properties?.name : propertyNameParam;
+  const effectiveOwnerId = token ? recap?.owner_id : ownerIdParam;
+  const effectivePropertyId = token ? recap?.property_id : propertyIdParam;
   const ownerName = recap?.property_owners?.name || "Owner";
+  const effectiveMonthName = token && recap?.recap_month 
+    ? new Date(recap.recap_month).toLocaleString('default', { month: 'long' })
+    : monthNameParam;
 
   useEffect(() => {
     return () => {
@@ -212,7 +216,7 @@ export default function RecapPlayer() {
         property_id: effectivePropertyId || null,
         communication_type: "voicemail",
         direction: "inbound",
-        body: `🎙️ Voice reply to ${monthName} recap for ${effectivePropertyName} (${recordingDuration}s)`,
+        body: `🎙️ Voice reply to ${effectiveMonthName} recap for ${effectivePropertyName} (${recordingDuration}s)`,
         subject: `Voice reply from owner - ${effectivePropertyName}`,
         attachment_url: urlData.publicUrl,
         status: "unread",
@@ -243,7 +247,7 @@ export default function RecapPlayer() {
         property_id: effectivePropertyId || null,
         communication_type: "sms",
         direction: "inbound",
-        body: `Reply to ${monthName} recap: ${textMessage}`,
+        body: `Reply to ${effectiveMonthName} recap: ${textMessage}`,
         subject: `Text reply from owner - ${effectivePropertyName}`,
         status: "unread",
       });
@@ -269,7 +273,7 @@ export default function RecapPlayer() {
   // Generate portal URL
   const portalUrl = token 
     ? `https://propertycentral.lovable.app/owner?token=${token}`
-    : `https://propertycentral.lovable.app/owner${ownerId ? `?owner=${ownerId}` : ''}`;
+    : `https://propertycentral.lovable.app/owner${effectiveOwnerId ? `?owner=${effectiveOwnerId}` : ''}`;
 
   if (isLoading) {
     return (
@@ -342,7 +346,7 @@ export default function RecapPlayer() {
             </div>
             <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
               <Calendar className="w-3 h-3" />
-              {monthName} Performance Recap
+              {effectiveMonthName} Performance Recap
             </p>
             <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
               <Home className="w-5 h-5 text-amber-500" />
