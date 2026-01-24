@@ -906,48 +906,50 @@ export default function OwnerDashboard() {
         
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 bg-background/95 backdrop-blur shadow-lg border p-1 h-auto flex-wrap">
-            <TabsTrigger value="overview" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Overview</span>
-            </TabsTrigger>
-            <TabsTrigger value="insights" className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Market Insights</span>
-            </TabsTrigger>
-            <TabsTrigger value="bookings" className="gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Bookings</span>
-            </TabsTrigger>
-            <TabsTrigger value="statements" className="gap-2">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Statements</span>
-            </TabsTrigger>
-            <TabsTrigger value="receipts" className="gap-2">
-              <Receipt className="h-4 w-4" />
-              <span className="hidden sm:inline">Receipts</span>
-            </TabsTrigger>
-            <TabsTrigger value="property" className="gap-2">
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Property</span>
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="gap-2">
-              <MessageCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Messages</span>
-            </TabsTrigger>
-            <TabsTrigger value="maintenance" className="gap-2">
-              <Wrench className="h-4 w-4" />
-              <span className="hidden sm:inline">Maintenance</span>
-            </TabsTrigger>
-            <TabsTrigger value="screenings" className="gap-2">
-              <Shield className="h-4 w-4" />
-              <span className="hidden sm:inline">Guest Screenings</span>
-            </TabsTrigger>
-            <TabsTrigger value="marketing" className="gap-2">
-              <Megaphone className="h-4 w-4" />
-              <span className="hidden sm:inline">Marketing</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="mb-6 overflow-x-auto scrollbar-thin scrollbar-thumb-muted">
+            <TabsList className="bg-background/95 backdrop-blur shadow-lg border p-1 h-auto inline-flex min-w-max">
+              <TabsTrigger value="overview" className="gap-1.5 px-3">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="insights" className="gap-1.5 px-3">
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Insights</span>
+              </TabsTrigger>
+              <TabsTrigger value="bookings" className="gap-1.5 px-3">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Bookings</span>
+              </TabsTrigger>
+              <TabsTrigger value="statements" className="gap-1.5 px-3">
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Statements</span>
+              </TabsTrigger>
+              <TabsTrigger value="receipts" className="gap-1.5 px-3">
+                <Receipt className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Receipts</span>
+              </TabsTrigger>
+              <TabsTrigger value="property" className="gap-1.5 px-3">
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Property</span>
+              </TabsTrigger>
+              <TabsTrigger value="messages" className="gap-1.5 px-3">
+                <MessageCircle className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Messages</span>
+              </TabsTrigger>
+              <TabsTrigger value="maintenance" className="gap-1.5 px-3">
+                <Wrench className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Repairs</span>
+              </TabsTrigger>
+              <TabsTrigger value="screenings" className="gap-1.5 px-3">
+                <Shield className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Screenings</span>
+              </TabsTrigger>
+              <TabsTrigger value="marketing" className="gap-1.5 px-3">
+                <Megaphone className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Marketing</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Show onboarding timeline if property is in onboarding */}
           {property?.onboarding_stage && <OwnerOnboardingTimeline onboardingStage={property.onboarding_stage} />}
