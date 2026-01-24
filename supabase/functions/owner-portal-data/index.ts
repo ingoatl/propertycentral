@@ -456,8 +456,8 @@ serve(async (req: Request): Promise<Response> => {
           name: "Ingo Schaer",
           email: "youtology1@gmail.com",
           phone: "(404) 555-0199",
-          secondOwnerName: null,
-          secondOwnerEmail: null,
+          secondOwnerName: "",
+          secondOwnerEmail: "",
         };
         demoData.property.name = "Ingo's Atlanta Retreat";
       }
