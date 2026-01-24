@@ -599,3 +599,6 @@ verify_jwt = false
 
 [functions.send-monthly-owner-recap]
 verify_jwt = true
+
+[functions.send-whats-new-email]
+verify_jwt = true
