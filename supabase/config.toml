@@ -602,3 +602,9 @@ verify_jwt = true
 
 [functions.send-whats-new-email]
 verify_jwt = true
+
+[functions.capture-portal-screenshots]
+verify_jwt = true
+
+[functions.owner-send-message]
+verify_jwt = false
