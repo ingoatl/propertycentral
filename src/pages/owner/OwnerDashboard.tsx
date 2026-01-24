@@ -912,49 +912,55 @@ export default function OwnerDashboard() {
         
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="mb-6 overflow-x-auto scrollbar-thin scrollbar-thumb-muted">
-            <TabsList className="bg-background/95 backdrop-blur shadow-lg border p-1 h-auto inline-flex min-w-max">
-              <TabsTrigger value="overview" className="gap-1.5 px-3">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Overview</span>
-              </TabsTrigger>
-              <TabsTrigger value="insights" className="gap-1.5 px-3">
-                <Sparkles className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Insights</span>
-              </TabsTrigger>
-              <TabsTrigger value="bookings" className="gap-1.5 px-3">
-                <Users className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Bookings</span>
-              </TabsTrigger>
-              <TabsTrigger value="statements" className="gap-1.5 px-3">
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Statements</span>
-              </TabsTrigger>
-              <TabsTrigger value="receipts" className="gap-1.5 px-3">
-                <Receipt className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Expenses</span>
-              </TabsTrigger>
-              <TabsTrigger value="property" className="gap-1.5 px-3">
-                <Home className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Property</span>
-              </TabsTrigger>
-              <TabsTrigger value="messages" className="gap-1.5 px-3">
-                <MessageCircle className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Messages</span>
-              </TabsTrigger>
-              <TabsTrigger value="maintenance" className="gap-1.5 px-3">
-                <Wrench className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Repairs</span>
-              </TabsTrigger>
-              <TabsTrigger value="screenings" className="gap-1.5 px-3">
-                <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Screenings</span>
-              </TabsTrigger>
-              <TabsTrigger value="marketing" className="gap-1.5 px-3">
-                <Megaphone className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Marketing</span>
-              </TabsTrigger>
-            </TabsList>
+          <div className="mb-6 relative">
+            {/* Scroll fade indicators for mobile */}
+            <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none sm:hidden" />
+            <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none sm:hidden" />
+            
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-muted -mx-4 px-4 sm:mx-0 sm:px-0">
+              <TabsList className="bg-background/95 backdrop-blur shadow-lg border p-1 h-auto inline-flex min-w-max">
+                <TabsTrigger value="overview" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Overview</span>
+                </TabsTrigger>
+                <TabsTrigger value="insights" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Insights</span>
+                </TabsTrigger>
+                <TabsTrigger value="bookings" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <Users className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Bookings</span>
+                </TabsTrigger>
+                <TabsTrigger value="statements" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <FileText className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Statements</span>
+                </TabsTrigger>
+                <TabsTrigger value="receipts" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <Receipt className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Expenses</span>
+                </TabsTrigger>
+                <TabsTrigger value="property" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <Home className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Property</span>
+                </TabsTrigger>
+                <TabsTrigger value="messages" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <MessageCircle className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Messages</span>
+                </TabsTrigger>
+                <TabsTrigger value="maintenance" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <Wrench className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Repairs</span>
+                </TabsTrigger>
+                <TabsTrigger value="screenings" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <Shield className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Screenings</span>
+                </TabsTrigger>
+                <TabsTrigger value="marketing" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
+                  <Megaphone className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-xs">Marketing</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
 
           {/* Show onboarding timeline if property is in onboarding */}

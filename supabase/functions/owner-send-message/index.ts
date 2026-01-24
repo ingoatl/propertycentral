@@ -82,6 +82,7 @@ serve(async (req) => {
     }
 
     // Insert into lead_communications
+    // Note: lead_communications uses call_recording_url for voicemails, media_urls for other attachments
     const { data: comm, error: insertError } = await supabase
       .from("lead_communications")
       .insert({
@@ -91,9 +92,9 @@ serve(async (req) => {
         direction: "inbound",
         body,
         subject: finalSubject,
-        sender_email: sender_email || owner.email,
-        attachment_url: attachment_url || null,
         status: "unread",
+        call_recording_url: message_type === "voicemail" && attachment_url ? attachment_url : null,
+        media_urls: attachment_url && message_type !== "voicemail" ? [attachment_url] : null,
       })
       .select()
       .single();

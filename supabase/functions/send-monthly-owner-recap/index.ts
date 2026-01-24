@@ -296,10 +296,10 @@ function generateEmailHtml(
   marketingStats: any,
   audioUrl: string,
   portalUrl: string,
-  monthName: string
+  monthName: string,
+  recapId: string
 ): string {
   const year = new Date().getFullYear();
-  const recapId = `RECAP-${year}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   
   const ownerGreeting = secondOwnerName 
     ? `${ownerName?.split(' ')[0]} & ${secondOwnerName?.split(' ')[0]}`
@@ -513,7 +513,7 @@ function generateEmailHtml(
                 <tr>
                   <td style="padding: 25px 30px; text-align: center;">
                     <p style="margin: 0 0 12px 0; font-size: 14px; color: rgba(255,255,255,0.9);">🎧 Listen to Your Voice Recap</p>
-                    <a href="${audioUrl}" style="display: inline-block; background-color: #ffffff; color: #4361ee; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 30px; border-radius: 6px;">Play Audio Summary</a>
+                    <a href="https://propertycentral.lovable.app/recap/${recapId}" style="display: inline-block; background-color: #ffffff; color: #4361ee; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 30px; border-radius: 6px;">Play Audio Summary</a>
                   </td>
                 </tr>
               </table>
@@ -985,7 +985,10 @@ serve(async (req) => {
           ? `https://propertycentral.lovable.app/owner?token=${magicLink}`
           : `https://propertycentral.lovable.app/owner`;
         
-        // Generate email HTML
+        // Generate recap ID FIRST so we can use it in the email link
+        const recapId = crypto.randomUUID();
+        
+        // Generate email HTML with the recap ID for the branded player link
         const emailHtml = generateEmailHtml(
           owner.name,
           owner.second_owner_name,
@@ -995,7 +998,8 @@ serve(async (req) => {
           mktStats,
           audioUrl,
           portalUrl,
-          previousMonthName
+          previousMonthName,
+          recapId
         );
         
         // Send email
@@ -1006,8 +1010,7 @@ serve(async (req) => {
           owner.second_owner_email
         );
         
-        // Save recap record FIRST to get the ID for short URL
-        const recapId = crypto.randomUUID();
+        // Save recap record with the same ID we used in the email
         await supabase.from('owner_monthly_recaps').upsert({
           id: recapId,
           property_id: property.id,
