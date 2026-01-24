@@ -88,11 +88,17 @@ interface OwnerInfo {
 }
 
 interface PeachHausData {
+  listing_health?: { score: number; status: string; summary: string };
   listingHealth?: { score: number; status: string; summary: string };
+  pricing_intelligence?: { current_base_rate: number; recommended_rate: number; rate_change_percent: number; market_adr: number; mpi_7_day: number; occupancy_rate: number; competitiveness_score: number };
   pricingIntelligence?: { current_base_rate: number; recommended_rate: number; rate_change_percent: number; market_adr: number; mpi_7_day: number; occupancy_rate: number; competitiveness_score: number };
+  recent_optimizations?: Array<{ type: string; date: string; description: string; expected_impact: string }>;
   recentOptimizations?: Array<{ type: string; date: string; description: string; expected_impact: string }>;
+  revenue_alerts?: Array<{ type: string; severity: string; title: string; description: string; action_taken: string }>;
   revenueAlerts?: Array<{ type: string; severity: string; title: string; description: string; action_taken: string }>;
+  performance_trends?: { booking_velocity_trend: string; ctr_trend: string; conversion_trend: string };
   performanceTrends?: { booking_velocity_trend: string; ctr_trend: string; conversion_trend: string };
+  synced_at?: string;
   syncedAt?: string;
 }
 
@@ -121,7 +127,13 @@ export function OwnerPropertyTab({ property, owner, peachHausData }: OwnerProper
   const hasPetPolicy = property.pets_allowed !== undefined;
   const hasPricing = property.nightly_rate || property.monthly_rent || property.cleaning_fee;
   const hasFeatures = property.parking_type || property.fenced_yard || property.basement || property.ada_compliant;
-  const showPeachHaus = (property.rental_type === 'hybrid' || !property.rental_type) && peachHausData;
+  const showPeachHaus = (property.rental_type === 'hybrid' || property.rental_type === 'str' || !property.rental_type) && peachHausData;
+
+  // Normalize PeachHaus data to handle both snake_case and camelCase
+  const listingHealth = peachHausData?.listingHealth || peachHausData?.listing_health;
+  const pricingIntelligence = peachHausData?.pricingIntelligence || peachHausData?.pricing_intelligence;
+  const recentOptimizations = peachHausData?.recentOptimizations || peachHausData?.recent_optimizations || [];
+  const revenueAlerts = peachHausData?.revenueAlerts || peachHausData?.revenue_alerts || [];
 
   const formatCurrency = (amount?: number) => {
     if (!amount) return null;
@@ -233,34 +245,34 @@ export function OwnerPropertyTab({ property, owner, peachHausData }: OwnerProper
             {/* Health & Pricing Grid */}
             <div className="grid md:grid-cols-3 gap-4">
               {/* Health Score */}
-              {peachHausData.listingHealth && (
+              {listingHealth && (
                 <div className="p-4 rounded-xl bg-muted/30 text-center">
                   <div className={`text-4xl font-bold mb-1 ${
-                    peachHausData.listingHealth.status === 'healthy' ? 'text-emerald-600' :
-                    peachHausData.listingHealth.status === 'warning' ? 'text-amber-600' : 'text-destructive'
+                    listingHealth.status === 'healthy' ? 'text-emerald-600' :
+                    listingHealth.status === 'warning' ? 'text-amber-600' : 'text-destructive'
                   }`}>
-                    {peachHausData.listingHealth.score}
+                    {listingHealth.score}
                   </div>
                   <Badge className={
-                    peachHausData.listingHealth.status === 'healthy' ? 'bg-emerald-100 text-emerald-700' :
-                    peachHausData.listingHealth.status === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                    listingHealth.status === 'healthy' ? 'bg-emerald-100 text-emerald-700' :
+                    listingHealth.status === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                   }>
-                    {peachHausData.listingHealth.status}
+                    {listingHealth.status}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-2">Health Score</p>
                 </div>
               )}
 
               {/* Pricing Intelligence */}
-              {peachHausData.pricingIntelligence && (
+              {pricingIntelligence && (
                 <div className="p-4 rounded-xl bg-muted/30 text-center">
-                  <div className="text-2xl font-bold">${peachHausData.pricingIntelligence.current_base_rate}</div>
+                  <div className="text-2xl font-bold">${pricingIntelligence.current_base_rate}</div>
                   <div className="flex items-center justify-center gap-1 text-sm">
                     <span className="text-muted-foreground">→</span>
-                    <span className="text-emerald-600 font-medium">${peachHausData.pricingIntelligence.recommended_rate}</span>
-                    {peachHausData.pricingIntelligence.rate_change_percent > 0 && (
+                    <span className="text-emerald-600 font-medium">${pricingIntelligence.recommended_rate}</span>
+                    {pricingIntelligence.rate_change_percent > 0 && (
                       <Badge variant="outline" className="text-emerald-600 text-xs">
-                        +{peachHausData.pricingIntelligence.rate_change_percent}%
+                        +{pricingIntelligence.rate_change_percent}%
                       </Badge>
                     )}
                   </div>
@@ -269,17 +281,17 @@ export function OwnerPropertyTab({ property, owner, peachHausData }: OwnerProper
               )}
 
               {/* MPI Score */}
-              {peachHausData.pricingIntelligence?.mpi_7_day && (
+              {pricingIntelligence?.mpi_7_day && (
                 <div className="p-4 rounded-xl bg-muted/30 text-center">
                   <div className={`text-4xl font-bold mb-1 ${
-                    peachHausData.pricingIntelligence.mpi_7_day >= 1 ? 'text-emerald-600' : 'text-amber-600'
+                    pricingIntelligence.mpi_7_day >= 1 ? 'text-emerald-600' : 'text-amber-600'
                   }`}>
-                    {peachHausData.pricingIntelligence.mpi_7_day.toFixed(1)}x
+                    {pricingIntelligence.mpi_7_day.toFixed(1)}x
                   </div>
                   <Badge variant="outline" className={
-                    peachHausData.pricingIntelligence.mpi_7_day >= 1 ? 'text-emerald-600' : 'text-amber-600'
+                    pricingIntelligence.mpi_7_day >= 1 ? 'text-emerald-600' : 'text-amber-600'
                   }>
-                    {peachHausData.pricingIntelligence.mpi_7_day >= 1 ? 'Beating Market' : 'Below Market'}
+                    {pricingIntelligence.mpi_7_day >= 1 ? 'Beating Market' : 'Below Market'}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-2">Market Performance Index</p>
                 </div>
@@ -287,14 +299,14 @@ export function OwnerPropertyTab({ property, owner, peachHausData }: OwnerProper
             </div>
 
             {/* Recent Optimizations */}
-            {peachHausData.recentOptimizations && peachHausData.recentOptimizations.length > 0 && (
+            {recentOptimizations.length > 0 && (
               <div>
                 <h4 className="font-semibold mb-3 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-600" />
                   Recent Optimizations
                 </h4>
                 <div className="space-y-2">
-                  {peachHausData.recentOptimizations.slice(0, 3).map((opt, idx) => (
+                  {recentOptimizations.slice(0, 3).map((opt, idx) => (
                     <div key={idx} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                       <div className="flex-1">
@@ -309,14 +321,14 @@ export function OwnerPropertyTab({ property, owner, peachHausData }: OwnerProper
             )}
 
             {/* Revenue Alerts */}
-            {peachHausData.revenueAlerts && peachHausData.revenueAlerts.length > 0 && (
+            {revenueAlerts.length > 0 && (
               <div>
                 <h4 className="font-semibold mb-3 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
                   Revenue Alerts
                 </h4>
                 <div className="space-y-2">
-                  {peachHausData.revenueAlerts.slice(0, 3).map((alert, idx) => (
+                  {revenueAlerts.slice(0, 3).map((alert, idx) => (
                     <div key={idx} className={`flex items-start gap-3 p-3 rounded-lg ${
                       alert.severity === 'critical' ? 'bg-red-50 dark:bg-red-950/20' :
                       alert.severity === 'warning' ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-blue-50 dark:bg-blue-950/20'
