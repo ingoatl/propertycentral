@@ -36,7 +36,7 @@ interface SendSMSDialogProps {
 // Alex's user ID - he gets CC'd on all vendor communications
 const ALEX_USER_ID = "fbd13e57-3a59-4c53-bb3b-14ab354b3420";
 
-// Templates for leads/owners
+// Templates for leads/owners (general)
 const OWNER_LEAD_TEMPLATES = [
   {
     label: "Check-in",
@@ -57,6 +57,34 @@ const OWNER_LEAD_TEMPLATES = [
   {
     label: "Thanks",
     content: "Hi {{name}}, thank you for taking the time to speak with me today. I'll follow up with the information we discussed shortly.",
+  },
+];
+
+// Maintenance-specific templates for owners (when workOrderId is provided)
+const OWNER_MAINTENANCE_TEMPLATES = [
+  {
+    label: "Request Approval",
+    content: "Hi {{name}}, we need your approval for a repair at your property. The vendor quoted ${{quote}}. Reply APPROVE to proceed or call us with questions.",
+  },
+  {
+    label: "Work Started",
+    content: "Hi {{name}}, just letting you know the vendor has started work at your property. We'll update you when complete.",
+  },
+  {
+    label: "Work Complete",
+    content: "Hi {{name}}, great news! The repair at your property is complete. Photos are available in your owner portal.",
+  },
+  {
+    label: "Additional Issue",
+    content: "Hi {{name}}, while working on the repair, the vendor found an additional issue. Please call us to discuss options.",
+  },
+  {
+    label: "Schedule Access",
+    content: "Hi {{name}}, we need to schedule vendor access to your property. What times work for you this week?",
+  },
+  {
+    label: "Urgent",
+    content: "URGENT: Hi {{name}}, there's a maintenance emergency at your property. We've dispatched a vendor. Please call us ASAP.",
   },
 ];
 
@@ -380,9 +408,14 @@ export function SendSMSDialog({
           )}
 
           <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
-            {/* Quick templates */}
+            {/* Quick templates - use maintenance templates for owners with workOrderId */}
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-              {(contactType === "vendor" ? VENDOR_TEMPLATES : OWNER_LEAD_TEMPLATES).map((template, idx) => (
+              {(contactType === "vendor" 
+                ? VENDOR_TEMPLATES 
+                : (contactType === "owner" && workOrderId)
+                  ? OWNER_MAINTENANCE_TEMPLATES
+                  : OWNER_LEAD_TEMPLATES
+              ).map((template, idx) => (
                 <button
                   key={idx}
                   onClick={() => applyTemplate(template)}
