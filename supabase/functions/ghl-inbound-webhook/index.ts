@@ -58,21 +58,18 @@ async function findPhoneOwner(supabase: any, phoneNumber: string): Promise<{ use
 // Reverse lookup: Find who last messaged this contact when toNumber is not provided
 // This is CRITICAL for routing inbound SMS to the correct user's inbox
 // Now also returns the phoneNumber so we can populate to_number in user_phone_messages
-// PRIORITY: Check for alex_routed vendor messages FIRST to ensure vendor replies go to Alex's inbox only
-async function findLastOutboundSender(supabase: any, contactPhone: string): Promise<{ userId: string | null; assignmentId: string | null; displayName: string | null; phoneNumber: string | null }> {
+// For vendors: Route to the person who last messaged them, NOT always Alex
+async function findLastOutboundSender(supabase: any, contactPhone: string): Promise<{ userId: string | null; assignmentId: string | null; displayName: string | null; phoneNumber: string | null; isVendorMessage: boolean; vendorId: string | null }> {
   const normalizedPhone = normalizePhone(contactPhone);
   const last10 = normalizedPhone.replace(/\D/g, "").slice(-10);
   
   console.log("Reverse lookup for contact phone:", contactPhone, "last10:", last10);
   
-  // Alex's constants - vendor messages routed through his line
+  // Alex's constants - for CC purposes
   const ALEX_USER_ID = "fbd13e57-3a59-4c53-bb3b-14ab354b3420";
-  const ALEX_ASSIGNMENT_ID = "8f7ad44a-0fd1-412e-aba7-16c6908c89d5";
-  const ALEX_PHONE_NUMBER = "+14043415202";
   
-  // PRIORITY STRATEGY: Check for alex_routed vendor messages FIRST
-  // This ensures vendor replies ONLY go to Alex's inbox, not whoever else messaged them
-  const { data: alexRoutedComms } = await supabase
+  // First, check if this is a vendor by looking at recent outbound messages
+  const { data: recentVendorComms } = await supabase
     .from("lead_communications")
     .select("assigned_user_id, metadata")
     .eq("communication_type", "sms")
@@ -80,22 +77,52 @@ async function findLastOutboundSender(supabase: any, contactPhone: string): Prom
     .order("created_at", { ascending: false })
     .limit(50);
     
-  if (alexRoutedComms && alexRoutedComms.length > 0) {
-    for (const comm of alexRoutedComms) {
+  // Find the most recent message to this phone number that has vendor_id
+  if (recentVendorComms && recentVendorComms.length > 0) {
+    for (const comm of recentVendorComms) {
       const meta = comm.metadata as any;
-      // Check if this was an alex_routed vendor message
-      if (meta?.alex_routed && meta?.vendor_id) {
+      if (meta?.vendor_id) {
         const commToNumber = meta?.to_number || meta?.ghl_data?.contactPhone || meta?.vendor_phone;
         if (commToNumber) {
           const commLast10 = commToNumber.replace(/\D/g, "").slice(-10);
           if (commLast10 === last10) {
-            console.log("PRIORITY MATCH: Found alex_routed vendor message to this contact - routing to Alex");
-            return { 
-              userId: ALEX_USER_ID, 
-              assignmentId: ALEX_ASSIGNMENT_ID, 
-              displayName: "Alex Heim", 
-              phoneNumber: ALEX_PHONE_NUMBER 
-            };
+            // This is a vendor message - route to whoever sent the last message
+            const senderId = comm.assigned_user_id || meta?.sent_by_user_id;
+            console.log("Found vendor message to this contact, routing to original sender:", senderId);
+            
+            // Get the sender's personal phone assignment
+            if (senderId) {
+              const { data: userAssignment } = await supabase
+                .from("user_phone_assignments")
+                .select("id, user_id, display_name, phone_type, phone_number")
+                .eq("user_id", senderId)
+                .eq("phone_type", "personal")
+                .eq("is_active", true)
+                .limit(1)
+                .maybeSingle();
+                
+              if (userAssignment) {
+                console.log("Vendor reply routing to user with personal phone:", userAssignment);
+                return { 
+                  userId: userAssignment.user_id, 
+                  assignmentId: userAssignment.id, 
+                  displayName: userAssignment.display_name, 
+                  phoneNumber: userAssignment.phone_number,
+                  isVendorMessage: true,
+                  vendorId: meta.vendor_id
+                };
+              }
+              
+              // User found but no personal phone - still route to them
+              return { 
+                userId: senderId, 
+                assignmentId: null, 
+                displayName: null, 
+                phoneNumber: null,
+                isVendorMessage: true,
+                vendorId: meta.vendor_id
+              };
+            }
           }
         }
       }
@@ -126,7 +153,7 @@ async function findLastOutboundSender(supabase: any, contactPhone: string): Prom
         
       if (assignment && assignment.phone_type === "personal") {
         console.log("Reverse lookup SUCCESS - found personal assignment:", assignment);
-        return { userId: assignment.user_id, assignmentId: assignment.id, displayName: assignment.display_name, phoneNumber: assignment.phone_number };
+        return { userId: assignment.user_id, assignmentId: assignment.id, displayName: assignment.display_name, phoneNumber: assignment.phone_number, isVendorMessage: false, vendorId: null };
       }
     }
     
@@ -143,12 +170,12 @@ async function findLastOutboundSender(supabase: any, contactPhone: string): Prom
         
       if (userAssignment) {
         console.log("Reverse lookup SUCCESS - found user's personal assignment:", userAssignment);
-        return { userId: userAssignment.user_id, assignmentId: userAssignment.id, displayName: userAssignment.display_name, phoneNumber: userAssignment.phone_number };
+        return { userId: userAssignment.user_id, assignmentId: userAssignment.id, displayName: userAssignment.display_name, phoneNumber: userAssignment.phone_number, isVendorMessage: false, vendorId: null };
       }
       
       // Last resort: return user_id without assignment (for assigned_user_id routing only)
       console.log("Reverse lookup - found user_id but no personal assignment, routing to user anyway:", match.user_id);
-      return { userId: match.user_id, assignmentId: null, displayName: null, phoneNumber: null };
+      return { userId: match.user_id, assignmentId: null, displayName: null, phoneNumber: null, isVendorMessage: false, vendorId: null };
     }
   }
   
@@ -184,19 +211,19 @@ async function findLastOutboundSender(supabase: any, contactPhone: string): Prom
             
           if (userAssignment) {
             console.log("Reverse lookup SUCCESS via lead_communications assigned_user_id:", userAssignment);
-            return { userId: userAssignment.user_id, assignmentId: userAssignment.id, displayName: userAssignment.display_name, phoneNumber: userAssignment.phone_number };
+            return { userId: userAssignment.user_id, assignmentId: userAssignment.id, displayName: userAssignment.display_name, phoneNumber: userAssignment.phone_number, isVendorMessage: false, vendorId: null };
           }
           
           // Return user_id without assignment (for assigned_user_id routing)
           console.log("Reverse lookup - found assigned_user_id but no personal assignment:", comm.assigned_user_id);
-          return { userId: comm.assigned_user_id, assignmentId: null, displayName: null, phoneNumber: null };
+          return { userId: comm.assigned_user_id, assignmentId: null, displayName: null, phoneNumber: null, isVendorMessage: false, vendorId: null };
         }
       }
     }
   }
   
   console.log("Reverse lookup - no outbound sender found");
-  return { userId: null, assignmentId: null, displayName: null, phoneNumber: null };
+  return { userId: null, assignmentId: null, displayName: null, phoneNumber: null, isVendorMessage: false, vendorId: null };
 }
 
 // Check if phone number matches the Google Reviews number
