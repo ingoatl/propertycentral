@@ -23,7 +23,8 @@ interface SendSMSDialogProps {
   contactId: string;
 }
 
-const SMS_TEMPLATES = [
+// Templates for leads/owners
+const OWNER_LEAD_TEMPLATES = [
   {
     label: "Check-in",
     content: "Hi {{name}}, just checking in to see if you have any questions about your property. Let me know if there's anything I can help with!",
@@ -43,6 +44,42 @@ const SMS_TEMPLATES = [
   {
     label: "Thanks",
     content: "Hi {{name}}, thank you for taking the time to speak with me today. I'll follow up with the information we discussed shortly.",
+  },
+];
+
+// Templates for vendors
+const VENDOR_TEMPLATES = [
+  {
+    label: "ETA Check",
+    content: "Hi {{name}}, checking in on your ETA for the job today. Please update us when you're en route or on-site.",
+  },
+  {
+    label: "Job Status",
+    content: "Hi {{name}}, can you provide a quick status update on the current work order? Let us know if you need anything.",
+  },
+  {
+    label: "Photos Needed",
+    content: "Hi {{name}}, please remember to upload before and after photos through the job portal link. We need these to complete the work order.",
+  },
+  {
+    label: "Schedule",
+    content: "Hi {{name}}, we have a new work order that needs attention. When is your earliest availability to take a look?",
+  },
+  {
+    label: "Invoice Reminder",
+    content: "Hi {{name}}, please submit your invoice for the completed work at your earliest convenience so we can process payment.",
+  },
+  {
+    label: "Quality Issue",
+    content: "Hi {{name}}, we need to discuss some concerns about the recent job. Please call us at your earliest convenience.",
+  },
+  {
+    label: "Great Job",
+    content: "Hi {{name}}, great work on the recent job! The property looks excellent. We'll definitely keep you in mind for future work.",
+  },
+  {
+    label: "Urgent",
+    content: "Hi {{name}}, we have an urgent maintenance request. Are you available to respond today? Please call us ASAP.",
   },
 ];
 
@@ -107,7 +144,7 @@ export function SendSMSDialog({
     },
   });
 
-  const applyTemplate = (template: typeof SMS_TEMPLATES[0]) => {
+  const applyTemplate = (template: typeof OWNER_LEAD_TEMPLATES[0]) => {
     const personalizedMessage = template.content.replace(
       /{{name}}/g,
       contactName.split(" ")[0]
@@ -177,7 +214,7 @@ export function SendSMSDialog({
           <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
             {/* Quick templates - horizontal scroll on mobile */}
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-              {SMS_TEMPLATES.map((template, idx) => (
+              {(contactType === "vendor" ? VENDOR_TEMPLATES : OWNER_LEAD_TEMPLATES).map((template, idx) => (
                 <button
                   key={idx}
                   onClick={() => applyTemplate(template)}
