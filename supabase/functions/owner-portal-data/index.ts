@@ -396,8 +396,22 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log("Owner portal data request:", { token, ownerId, propertyId });
 
+    // Demo mode constants
+    const DEMO_OWNER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+    const DEMO_TOKEN = "demo-portal-token-3069-rita-way";
+
     let validatedOwnerId = ownerId;
     let validatedPropertyId = propertyId;
+
+    // Special handling for demo token - bypass DB lookup
+    if (token === DEMO_TOKEN) {
+      console.log("Demo token detected - returning mock data immediately");
+      return new Response(
+        JSON.stringify(getDemoPortalData()),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // If token provided, validate it and get owner/property info
     if (token) {
@@ -429,9 +443,6 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Demo mode - return mock data for demo owner ID
-    const DEMO_OWNER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
-    const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
-    
     if (validatedOwnerId === DEMO_OWNER_ID) {
       console.log("Demo mode activated - returning mock data");
       return new Response(
