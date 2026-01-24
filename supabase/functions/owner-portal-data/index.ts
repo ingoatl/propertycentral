@@ -400,6 +400,9 @@ serve(async (req: Request): Promise<Response> => {
     const DEMO_OWNER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
     const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
     const DEMO_TOKEN = "demo-portal-token-3069-rita-way";
+    
+    // Ingo Test owner ID for demo purposes
+    const INGO_TEST_OWNER_ID = "ea4db249-0a31-4eac-a430-64c0f149bedb";
 
     let validatedOwnerId = ownerId;
     let validatedPropertyId = propertyId;
@@ -442,11 +445,24 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Demo mode - return mock data for demo owner ID
-    if (validatedOwnerId === DEMO_OWNER_ID) {
-      console.log("Demo mode activated - returning mock data");
+    // Demo mode - return mock data for demo owner ID or Ingo Test
+    if (validatedOwnerId === DEMO_OWNER_ID || validatedOwnerId === INGO_TEST_OWNER_ID) {
+      console.log("Demo mode activated - returning mock data for:", validatedOwnerId);
+      const demoData = getDemoPortalData();
+      // Customize for Ingo Test
+      if (validatedOwnerId === INGO_TEST_OWNER_ID) {
+        demoData.owner = {
+          id: INGO_TEST_OWNER_ID,
+          name: "Ingo Schaer",
+          email: "youtology1@gmail.com",
+          phone: "(404) 555-0199",
+          secondOwnerName: null,
+          secondOwnerEmail: null,
+        };
+        demoData.property.name = "Ingo's Atlanta Retreat";
+      }
       return new Response(
-        JSON.stringify(getDemoPortalData()),
+        JSON.stringify(demoData),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
