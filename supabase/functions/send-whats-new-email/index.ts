@@ -62,25 +62,26 @@ function generateWhatsNewEmail(
     featuresForYou = features.filter(f => f.category === 'marketing');
   }
 
-  // Generate feature list HTML (clean, minimal Fortune 500 style)
-  const featureList = features.map((feature) => {
+  // Generate feature list HTML (clean, minimal Fortune 500 style - NO IMAGES)
+  const featureList = features.map((feature, index) => {
     const isHighlighted = featuresForYou.some(f => f.id === feature.id);
+    const featureNumber = index + 1;
     
     return `
       <tr>
-        <td style="padding: 24px 0; border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 20px 0; border-bottom: 1px solid #e2e8f0;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>
-              <td width="60" valign="top">
-                <div style="width: 48px; height: 48px; background: ${isHighlighted ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#f1f5f9'}; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                  <span style="font-size: 20px;">${isHighlighted ? '⭐' : '✓'}</span>
+              <td width="44" valign="top">
+                <div style="width: 36px; height: 36px; background: ${isHighlighted ? '#3b82f6' : '#e2e8f0'}; color: ${isHighlighted ? '#ffffff' : '#64748b'}; border-radius: 50%; text-align: center; line-height: 36px; font-size: 14px; font-weight: 600;">
+                  ${featureNumber}
                 </div>
               </td>
-              <td style="padding-left: 16px;">
-                <h3 style="margin: 0 0 6px 0; font-size: 17px; font-weight: 600; color: #0f172a; letter-spacing: -0.02em;">
-                  ${feature.title}
+              <td style="padding-left: 12px;">
+                <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 600; color: #0f172a;">
+                  ${feature.title}${isHighlighted ? ' ⭐' : ''}
                 </h3>
-                <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475569;">
+                <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #475569;">
                   ${feature.description}
                 </p>
               </td>
