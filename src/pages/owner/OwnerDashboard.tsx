@@ -718,12 +718,12 @@ export default function OwnerDashboard() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-6 text-center p-8">
-          {/* Branded loading screen with PeachHaus logo */}
-          <div className="w-24 h-24 rounded-2xl bg-white shadow-xl overflow-hidden flex items-center justify-center p-2">
+          {/* Animated Logo - wider display */}
+          <div className="animate-fade-in">
             <img 
               src="/peachhaus-logo.png" 
               alt="PeachHaus" 
-              className="w-full h-full object-contain"
+              className="w-48 h-auto max-h-24 object-contain drop-shadow-lg"
             />
           </div>
           <div className="space-y-2">

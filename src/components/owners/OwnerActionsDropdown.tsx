@@ -21,9 +21,9 @@ import {
   CheckCircle,
   Loader2,
   Users,
-  Phone,
   Mic,
   Building2,
+  Megaphone,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -62,6 +62,7 @@ export function OwnerActionsDropdown({
   const [sendingSpecialW9, setSendingSpecialW9] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
   const [sendingVoiceReminder, setSendingVoiceReminder] = useState(false);
+  const [sendingRecap, setSendingRecap] = useState(false);
 
   // Send OUR W-9 to co-hosting clients
   const handleSendOurW9 = async () => {
@@ -159,6 +160,42 @@ export function OwnerActionsDropdown({
     }
   };
 
+  // Send monthly recap
+  const handleSendMonthlyRecap = async () => {
+    setSendingRecap(true);
+    try {
+      // Get the first property for this owner
+      const { data: property } = await supabase
+        .from('properties')
+        .select('id, name')
+        .eq('owner_id', owner.id)
+        .is('offboarded_at', null)
+        .limit(1)
+        .single();
+      
+      if (!property) {
+        toast.error("No active property found for this owner");
+        return;
+      }
+      
+      const { error } = await supabase.functions.invoke("send-monthly-owner-recap", {
+        body: { 
+          property_id: property.id,
+          force: true
+        },
+      });
+      
+      if (error) throw error;
+      toast.success(`Monthly recap sent to ${owner.email}!`, {
+        description: `Generated for ${property.name}`
+      });
+    } catch (error: any) {
+      toast.error("Failed to send recap: " + (error.message || "Unknown error"));
+    } finally {
+      setSendingRecap(false);
+    }
+  };
+
   // View owner's W-9
   const handleViewOwnerW9 = async () => {
     if (!owner.owner_w9_file_path) {
@@ -178,7 +215,7 @@ export function OwnerActionsDropdown({
     }
   };
 
-  const isLoading = sendingW9 || requestingW9 || sendingSpecialW9 || sendingInvite || sendingVoiceReminder;
+  const isLoading = sendingW9 || requestingW9 || sendingSpecialW9 || sendingInvite || sendingVoiceReminder || sendingRecap;
 
   return (
     <div className="flex gap-2 items-center">
@@ -244,6 +281,11 @@ export function OwnerActionsDropdown({
           <DropdownMenuItem onClick={onEdit}>
             <Edit className="w-4 h-4 mr-2" />
             Edit Details
+          </DropdownMenuItem>
+          
+          <DropdownMenuItem onClick={handleSendMonthlyRecap} disabled={sendingRecap}>
+            <Megaphone className="w-4 h-4 mr-2 text-blue-600" />
+            {sendingRecap ? 'Sending Recap...' : 'Send Monthly Recap'}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
