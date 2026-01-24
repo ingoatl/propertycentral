@@ -2497,7 +2497,7 @@ export function InboxView() {
         const isActionRequired = insight?.action_required === true;
         const aiPriority = insight?.priority as string | undefined;
         
-        // Determine priority based on AI insights
+        // Determine priority based on AI insights OR keyword detection (fallback)
         let emailPriority: ConversationPriority = "normal";
         if (isActionRequired || aiPriority === "urgent" || aiPriority === "high") {
           emailPriority = "urgent";
@@ -2505,6 +2505,16 @@ export function InboxView() {
           emailPriority = "important";
         } else if (isPromotional) {
           emailPriority = "low";
+        } else {
+          // Fallback: Use keyword detection for emails without AI insights
+          // Check subject and snippet for important keywords (booking, reservation, inquiry, etc.)
+          const subjectAndBody = `${email.subject || ''} ${email.snippet || ''}`.toLowerCase();
+          const importantKeywords = ['reservation', 'booking', 'inquiry', 'urgent', 'important', 'invoice', 'payment', 'signed', 'contract', 'lease', 'verification', 'request'];
+          const hasImportantKeyword = importantKeywords.some(kw => subjectAndBody.includes(kw));
+          
+          if (hasImportantKeyword) {
+            emailPriority = "important";
+          }
         }
         
         // For urgent/priority filter, only include urgent/important emails
