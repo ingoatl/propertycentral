@@ -48,10 +48,12 @@ export function EnhancedInboxSelector({
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [isOpen, setIsOpen] = useState(false);
 
+  // Fetch team members and unread counts (only runs for admins since component is hidden otherwise)
   useEffect(() => {
+    if (!isAdmin) return; // Skip fetch for non-admins
     fetchTeamMembers();
     fetchUnreadCounts();
-  }, []);
+  }, [isAdmin]);
 
   const fetchTeamMembers = async () => {
     try {
@@ -185,6 +187,12 @@ export function EnhancedInboxSelector({
   };
 
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+
+  // Non-admin users only see their own inbox - hide the selector completely
+  // This prevents them from switching to other team members' inboxes
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
