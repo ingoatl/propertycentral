@@ -76,6 +76,7 @@ const PremiumWorkOrderModal = ({
   const [selectedMedia, setSelectedMedia] = useState<WorkOrderPhoto | null>(null);
   const [activePhotoTab, setActivePhotoTab] = useState<string>("before");
   const [showVendorSMS, setShowVendorSMS] = useState(false);
+  const [isRequestingRevisions, setIsRequestingRevisions] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch the complete work order data with property image
@@ -228,6 +229,45 @@ const PremiumWorkOrderModal = ({
       toast.error("Failed to update: " + error.message);
     },
   });
+
+  // Separate handler for requesting revisions - moves to in_progress and opens SMS dialog
+  const handleRequestRevisions = async () => {
+    setIsRequestingRevisions(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from("work_orders")
+        .update({ status: "in_progress" })
+        .eq("id", workOrderId);
+
+      if (error) throw error;
+
+      await supabase.from("work_order_timeline").insert({
+        work_order_id: workOrderId,
+        action: `Revisions requested - returned to In Progress by ${user?.email}`,
+        performed_by_type: "pm",
+        performed_by_name: user?.email,
+        performed_by_user_id: user?.id,
+        previous_status: workOrder?.status,
+        new_status: "in_progress",
+      });
+
+      toast.success("Work order returned for revisions");
+      onUpdate();
+      queryClient.invalidateQueries({ queryKey: ["work-order-detail", workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrderId] });
+      
+      // Open the SMS dialog so PM can message the vendor about what needs to be fixed
+      if (workOrder?.assigned_vendor?.phone) {
+        setShowVendorSMS(true);
+      }
+    } catch (error: any) {
+      toast.error("Failed to request revisions: " + error.message);
+    } finally {
+      setIsRequestingRevisions(false);
+    }
+  };
 
   // Assign vendor
   const assignVendor = useMutation({
@@ -530,16 +570,17 @@ const PremiumWorkOrderModal = ({
                               size="lg"
                               className="bg-emerald-600 hover:bg-emerald-700 text-white"
                               onClick={() => updateStatus.mutate("completed")}
-                              disabled={updateStatus.isPending}
+                              disabled={updateStatus.isPending || isRequestingRevisions}
                             >
                               {updateStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-5 w-5 mr-2" />}
                               Verify & Complete Job
                             </Button>
                             <Button 
                               variant="outline"
-                              onClick={() => updateStatus.mutate("in_progress")}
-                              disabled={updateStatus.isPending}
+                              onClick={handleRequestRevisions}
+                              disabled={updateStatus.isPending || isRequestingRevisions}
                             >
+                              {isRequestingRevisions ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <MessageCircle className="h-4 w-4 mr-2" />}
                               Request Revisions
                             </Button>
                           </div>
