@@ -579,5 +579,11 @@ verify_jwt = false
 [functions.send-vendor-followup-reminder]
 verify_jwt = false
 
+[functions.vendor-send-message]
+verify_jwt = false
+
+[functions.vendor-voice-message]
+verify_jwt = false
+
 [functions.notify-work-order-verification]
 verify_jwt = true
