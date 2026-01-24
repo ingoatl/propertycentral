@@ -8,6 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Building2,
   Receipt,
   FileText,
@@ -34,6 +40,10 @@ import {
   Shield,
   Megaphone,
   Calendar,
+  MoreHorizontal,
+  Phone,
+  FileDown,
+  Menu,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -56,6 +66,7 @@ import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
 import { ScheduleOwnerCallModal } from "./components/ScheduleOwnerCallModal";
 import { ContactPeachHausDropdown } from "./components/ContactPeachHausDropdown";
 import { AudioPropertySummary } from "./components/AudioPropertySummary";
+import { useIsMobile } from "@/hooks/use-mobile";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
@@ -157,9 +168,28 @@ interface MarketInsightsData {
   generatedAt: string;
 }
 
+// Primary tabs always visible on mobile bottom bar
+const PRIMARY_TABS = [
+  { value: "overview", label: "Overview", icon: BarChart3 },
+  { value: "messages", label: "Messages", icon: MessageCircle },
+  { value: "bookings", label: "Bookings", icon: Users },
+  { value: "property", label: "Property", icon: Home },
+];
+
+// Secondary tabs in "More" menu on mobile
+const SECONDARY_TABS = [
+  { value: "insights", label: "Insights", icon: Sparkles },
+  { value: "statements", label: "Statements", icon: FileText },
+  { value: "receipts", label: "Expenses", icon: Receipt },
+  { value: "maintenance", label: "Repairs", icon: Wrench },
+  { value: "screenings", label: "Screenings", icon: Shield },
+  { value: "marketing", label: "Marketing", icon: Megaphone },
+];
+
 export default function OwnerDashboard() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [isAdminAccess, setIsAdminAccess] = useState(false);
   const [session, setSession] = useState<OwnerSession | null>(null);
@@ -712,6 +742,10 @@ export default function OwnerDashboard() {
     return data?.publicUrl;
   }, [property?.image_path, property?.id]);
 
+  // Check if current tab is a secondary tab (for "More" menu highlighting)
+  const isSecondaryTabActive = SECONDARY_TABS.some(tab => tab.value === activeTab);
+  const activeSecondaryTab = SECONDARY_TABS.find(tab => tab.value === activeTab);
+
   // For demo mode with session already set, don't block with loading screen - show dashboard with loading indicator
   const isDemoWithSession = isAdminAccess && session?.ownerId === "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
   
@@ -792,98 +826,160 @@ export default function OwnerDashboard() {
   const latestStatement = statements[0];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
-      {/* Hero Header with Property Image */}
+    <div className={`min-h-screen bg-gradient-to-br from-background via-muted/20 to-background ${isMobile ? 'pb-32' : ''}`}>
+      {/* Mobile-Optimized Header */}
       <header className="relative">
+        {/* Property Image Hero - Compact on Mobile */}
         {propertyImageUrl && (
-          <div className="absolute inset-0 h-64 md:h-80">
+          <div className={`absolute inset-0 ${isMobile ? 'h-40' : 'h-64 md:h-80'}`}>
             <img
               src={propertyImageUrl}
               alt={property?.name || "Property"}
               className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-background" />
           </div>
         )}
         
-        <div className={`relative ${propertyImageUrl ? 'pt-8 pb-32 md:pb-40' : 'py-6'} bg-gradient-to-br from-primary/10 to-primary/5`}>
+        <div className={`relative ${propertyImageUrl ? (isMobile ? 'pt-4 pb-20' : 'pt-8 pb-32 md:pb-40') : 'py-4 md:py-6'} ${!propertyImageUrl ? 'bg-gradient-to-br from-primary/10 to-primary/5' : ''}`}>
           <div className="max-w-7xl mx-auto px-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/90 dark:bg-background/90 backdrop-blur flex items-center justify-center shadow-lg">
-                  <Building2 className="h-7 w-7 text-primary" />
+            {/* Mobile Layout */}
+            {isMobile ? (
+              <div className="space-y-3">
+                {/* Top row: Logo + Actions */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/90 dark:bg-background/90 backdrop-blur flex items-center justify-center shadow-lg">
+                      <Building2 className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className={propertyImageUrl ? 'text-white' : ''}>
+                      <h1 className="font-bold text-lg leading-tight line-clamp-1">{property?.name || "Your Property"}</h1>
+                    </div>
+                  </div>
+                  {/* Compact action menu for mobile */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant={propertyImageUrl ? "secondary" : "outline"} 
+                        size="sm"
+                        className="h-9 w-9 p-0"
+                      >
+                        <Menu className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => setShowScheduleCallModal(true)}>
+                        <Phone className="h-4 w-4 mr-2" />
+                        Schedule Call
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => refreshData(true)} disabled={isRefreshing}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleLogout}>
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <div className={propertyImageUrl ? 'text-white' : ''}>
-                  <h1 className="font-bold text-2xl md:text-3xl">{property?.name || "Your Property"}</h1>
-                  <div className="flex items-center gap-2 text-sm opacity-90">
-                    <MapPin className="h-4 w-4" />
-                    {property?.address}
+                
+                {/* Welcome + Rating */}
+                <div className={`${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
+                  <p className="text-sm">
+                    Welcome, {session.ownerName?.split(' ')[0]}
+                    {session.secondOwnerName && ` & ${session.secondOwnerName.split(' ')[0]}`}
+                  </p>
+                  {performanceMetrics.averageRating && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      <span className="font-medium text-sm">{performanceMetrics.averageRating.toFixed(1)}</span>
+                      <span className="text-xs opacity-75">({performanceMetrics.reviewCount})</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Desktop Layout */
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-white/90 dark:bg-background/90 backdrop-blur flex items-center justify-center shadow-lg">
+                      <Building2 className="h-7 w-7 text-primary" />
+                    </div>
+                    <div className={propertyImageUrl ? 'text-white' : ''}>
+                      <h1 className="font-bold text-2xl md:text-3xl">{property?.name || "Your Property"}</h1>
+                      <div className="flex items-center gap-2 text-sm opacity-90">
+                        <MapPin className="h-4 w-4" />
+                        {property?.address}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {session && (
+                      <ContactPeachHausDropdown
+                        ownerId={session.ownerId}
+                        ownerName={session.ownerName}
+                        ownerEmail={session.email}
+                        propertyId={property?.id}
+                        propertyName={property?.name}
+                        onScheduleCall={() => setShowScheduleCallModal(true)}
+                        variant={propertyImageUrl ? "outline" : "outline"}
+                      />
+                    )}
+                    {session && property && (
+                      <GenerateDashboardPdfButton
+                        ownerId={session.ownerId}
+                        propertyId={property.id}
+                        propertyName={property.name}
+                        variant={propertyImageUrl ? "outline" : "outline"}
+                        size="sm"
+                        onBeforeGenerate={() => refreshData(false)}
+                      />
+                    )}
+                    <Button 
+                      variant={propertyImageUrl ? "secondary" : "outline"} 
+                      size="sm" 
+                      onClick={() => refreshData(true)}
+                      disabled={isRefreshing}
+                      className="gap-2"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                    </Button>
+                    <Button 
+                      variant={propertyImageUrl ? "secondary" : "ghost"} 
+                      size="sm" 
+                      onClick={handleLogout} 
+                      className="gap-2"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="hidden sm:inline">Logout</span>
+                    </Button>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {session && (
-                  <ContactPeachHausDropdown
-                    ownerId={session.ownerId}
-                    ownerName={session.ownerName}
-                    ownerEmail={session.email}
-                    propertyId={property?.id}
-                    propertyName={property?.name}
-                    onScheduleCall={() => setShowScheduleCallModal(true)}
-                    variant={propertyImageUrl ? "outline" : "outline"}
-                  />
-                )}
-                {session && property && (
-                  <GenerateDashboardPdfButton
-                    ownerId={session.ownerId}
-                    propertyId={property.id}
-                    propertyName={property.name}
-                    variant={propertyImageUrl ? "outline" : "outline"}
-                    size="sm"
-                    onBeforeGenerate={() => refreshData(false)}
-                  />
-                )}
-                <Button 
-                  variant={propertyImageUrl ? "secondary" : "outline"} 
-                  size="sm" 
-                  onClick={() => refreshData(true)}
-                  disabled={isRefreshing}
-                  className="gap-2"
-                >
-                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-                </Button>
-                <Button 
-                  variant={propertyImageUrl ? "secondary" : "ghost"} 
-                  size="sm" 
-                  onClick={handleLogout} 
-                  className="gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </Button>
-              </div>
-            </div>
-            
-            <div className={`mt-4 ${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
-              <p className="text-lg">
-                Welcome back, {session.ownerName}
-                {session.secondOwnerName && ` & ${session.secondOwnerName}`}
-              </p>
-              {performanceMetrics.averageRating && (
-                <div className="flex items-center gap-2 mt-2">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span className="font-semibold">{performanceMetrics.averageRating.toFixed(1)}</span>
-                  <span className="text-sm">({performanceMetrics.reviewCount} reviews)</span>
+                
+                <div className={`mt-4 ${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
+                  <p className="text-lg">
+                    Welcome back, {session.ownerName}
+                    {session.secondOwnerName && ` & ${session.secondOwnerName}`}
+                  </p>
+                  {performanceMetrics.averageRating && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      <span className="font-semibold">{performanceMetrics.averageRating.toFixed(1)}</span>
+                      <span className="text-sm">({performanceMetrics.reviewCount} reviews)</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8 -mt-16 md:-mt-20 relative z-10">
+      <main className={`max-w-7xl mx-auto px-4 py-6 ${propertyImageUrl ? (isMobile ? '-mt-8' : '-mt-16 md:-mt-20') : ''} relative z-10`}>
         {/* Data Status Alert */}
         {(isRefreshing || dataStale) && (
           <Alert className={`mb-4 ${dataStale ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'}`}>
@@ -910,64 +1006,67 @@ export default function OwnerDashboard() {
           </Alert>
         )}
         
-        {/* Tabs */}
+        {/* Tabs - Desktop horizontal scroll, Mobile uses bottom bar */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="mb-6 relative">
-            {/* Scroll fade indicators for mobile */}
-            <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none sm:hidden" />
-            <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none sm:hidden" />
-            
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-muted -mx-4 px-4 sm:mx-0 sm:px-0">
-              <TabsList className="bg-background/95 backdrop-blur shadow-lg border p-1 h-auto inline-flex min-w-max">
-                <TabsTrigger value="overview" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Overview</span>
-                </TabsTrigger>
-                <TabsTrigger value="insights" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Insights</span>
-                </TabsTrigger>
-                <TabsTrigger value="bookings" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <Users className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Bookings</span>
-                </TabsTrigger>
-                <TabsTrigger value="statements" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <FileText className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Statements</span>
-                </TabsTrigger>
-                <TabsTrigger value="receipts" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <Receipt className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Expenses</span>
-                </TabsTrigger>
-                <TabsTrigger value="property" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <Home className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Property</span>
-                </TabsTrigger>
-                <TabsTrigger value="messages" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <MessageCircle className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Messages</span>
-                </TabsTrigger>
-                <TabsTrigger value="maintenance" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <Wrench className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Repairs</span>
-                </TabsTrigger>
-                <TabsTrigger value="screenings" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <Shield className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Screenings</span>
-                </TabsTrigger>
-                <TabsTrigger value="marketing" className="gap-1 sm:gap-1.5 px-2 sm:px-3 min-h-[40px]">
-                  <Megaphone className="h-4 w-4" />
-                  <span className="text-[10px] sm:text-xs">Marketing</span>
-                </TabsTrigger>
-              </TabsList>
+          {/* Desktop Tab List */}
+          {!isMobile && (
+            <div className="mb-6 relative">
+              {/* Scroll fade indicators for tablet */}
+              <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none lg:hidden" />
+              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none lg:hidden" />
+              
+              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-muted -mx-4 px-4 lg:mx-0 lg:px-0">
+                <TabsList className="bg-background/95 backdrop-blur shadow-lg border p-1 h-auto inline-flex min-w-max">
+                  <TabsTrigger value="overview" className="gap-1.5 px-3 min-h-[40px]">
+                    <BarChart3 className="h-4 w-4" />
+                    <span className="text-xs">Overview</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="insights" className="gap-1.5 px-3 min-h-[40px]">
+                    <Sparkles className="h-4 w-4" />
+                    <span className="text-xs">Insights</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="bookings" className="gap-1.5 px-3 min-h-[40px]">
+                    <Users className="h-4 w-4" />
+                    <span className="text-xs">Bookings</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="statements" className="gap-1.5 px-3 min-h-[40px]">
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs">Statements</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="receipts" className="gap-1.5 px-3 min-h-[40px]">
+                    <Receipt className="h-4 w-4" />
+                    <span className="text-xs">Expenses</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="property" className="gap-1.5 px-3 min-h-[40px]">
+                    <Home className="h-4 w-4" />
+                    <span className="text-xs">Property</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="messages" className="gap-1.5 px-3 min-h-[40px]">
+                    <MessageCircle className="h-4 w-4" />
+                    <span className="text-xs">Messages</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="maintenance" className="gap-1.5 px-3 min-h-[40px]">
+                    <Wrench className="h-4 w-4" />
+                    <span className="text-xs">Repairs</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="screenings" className="gap-1.5 px-3 min-h-[40px]">
+                    <Shield className="h-4 w-4" />
+                    <span className="text-xs">Screenings</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="marketing" className="gap-1.5 px-3 min-h-[40px]">
+                    <Megaphone className="h-4 w-4" />
+                    <span className="text-xs">Marketing</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Show onboarding timeline if property is in onboarding */}
           {property?.onboarding_stage && <OwnerOnboardingTimeline onboardingStage={property.onboarding_stage} />}
 
           <TabsContent value="overview">
-            <div className="space-y-8">
+            <div className="space-y-6 md:space-y-8">
               {/* Performance Overview */}
               <OwnerPerformanceOverview 
                 metrics={performanceMetrics}
@@ -1037,24 +1136,24 @@ export default function OwnerDashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
+                    <div className={`flex ${isMobile ? 'flex-col gap-4' : 'items-center justify-between'} p-4 bg-muted/30 rounded-xl`}>
                       <div>
-                        <p className="text-xl font-bold">
+                        <p className={`font-bold ${isMobile ? 'text-lg' : 'text-xl'}`}>
                           {format(new Date(latestStatement.reconciliation_month), "MMMM yyyy")}
                         </p>
-                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                        <div className={`flex gap-4 mt-2 text-sm text-muted-foreground ${isMobile ? 'flex-wrap gap-x-4 gap-y-1' : ''}`}>
                           <span>Revenue: {formatCurrency(latestStatement.total_revenue || 0)}</span>
-                          <span>•</span>
+                          {!isMobile && <span>•</span>}
                           <span className="text-emerald-600 font-medium">
                             Net: {formatCurrency(latestStatement.actual_net_earnings ?? latestStatement.net_to_owner ?? 0)}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className={`flex items-center gap-2 ${isMobile ? 'w-full' : ''}`}>
                         <Button
                           variant="outline"
                           onClick={() => openStatementViewer(latestStatement)}
-                          className="gap-2"
+                          className={`gap-2 ${isMobile ? 'flex-1' : ''}`}
                         >
                           <Eye className="h-4 w-4" />
                           View
@@ -1062,7 +1161,7 @@ export default function OwnerDashboard() {
                         <Button
                           onClick={() => downloadStatement(latestStatement)}
                           disabled={downloadingPdf === latestStatement.id}
-                          className="gap-2"
+                          className={`gap-2 ${isMobile ? 'flex-1' : ''}`}
                         >
                           {downloadingPdf === latestStatement.id ? (
                             <RefreshCw className="h-4 w-4 animate-spin" />
@@ -1100,7 +1199,7 @@ export default function OwnerDashboard() {
               />
             ) : marketInsights?.aiInsights ? (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <h2 className="text-xl font-semibold">Market Research & Insights</h2>
                     <p className="text-sm text-muted-foreground">
@@ -1188,24 +1287,24 @@ export default function OwnerDashboard() {
                     {statements.map((statement) => (
                       <div
                         key={statement.id}
-                        className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/30 transition-colors"
+                        className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'} p-4 border rounded-xl hover:bg-muted/30 transition-colors`}
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                            <FileText className="h-6 w-6" />
+                          <div className={`${isMobile ? 'w-10 h-10' : 'w-12 h-12'} rounded-xl bg-muted flex items-center justify-center`}>
+                            <FileText className={`${isMobile ? 'h-5 w-5' : 'h-6 w-6'}`} />
                           </div>
                           <div>
                             <p className="font-semibold">
                               {format(new Date(statement.reconciliation_month), "MMMM yyyy")}
                             </p>
-                            <div className="flex gap-3 text-sm text-muted-foreground">
+                            <div className={`flex gap-3 text-sm text-muted-foreground ${isMobile ? 'flex-wrap gap-x-3 gap-y-0.5' : ''}`}>
                               <span>Revenue: {formatCurrency(statement.total_revenue || 0)}</span>
-                              <span>•</span>
+                              {!isMobile && <span>•</span>}
                               <span className="text-emerald-600">Net: {formatCurrency(statement.actual_net_earnings ?? statement.net_to_owner ?? 0)}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className={`flex items-center gap-2 ${isMobile ? 'pl-14' : ''}`}>
                           <Button
                             variant="outline"
                             size="icon"
@@ -1309,17 +1408,93 @@ export default function OwnerDashboard() {
         </Tabs>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t mt-12 bg-muted/30">
-        <div className="max-w-7xl mx-auto px-4 py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            PeachHaus Group LLC • Questions? Email{" "}
-            <a href="mailto:info@peachhausgroup.com" className="text-primary underline font-medium">
-              info@peachhausgroup.com
-            </a>
-          </p>
-        </div>
-      </footer>
+      {/* Mobile Bottom Tab Bar */}
+      {isMobile && (
+        <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-lg border-t safe-area-inset z-50">
+          <div className="flex justify-around items-center h-16 px-2">
+            {PRIMARY_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setActiveTab(tab.value)}
+                  className={`flex flex-col items-center justify-center flex-1 h-full min-w-0 px-1 transition-colors ${
+                    isActive 
+                      ? 'text-primary' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Icon className={`h-5 w-5 mb-0.5 ${isActive ? 'text-primary' : ''}`} />
+                  <span className={`text-[10px] font-medium truncate ${isActive ? 'text-primary' : ''}`}>
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            })}
+            
+            {/* More Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`flex flex-col items-center justify-center flex-1 h-full min-w-0 px-1 transition-colors ${
+                    isSecondaryTabActive 
+                      ? 'text-primary' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {isSecondaryTabActive && activeSecondaryTab ? (
+                    <>
+                      {(() => {
+                        const Icon = activeSecondaryTab.icon;
+                        return <Icon className="h-5 w-5 mb-0.5 text-primary" />;
+                      })()}
+                      <span className="text-[10px] font-medium truncate text-primary">
+                        {activeSecondaryTab.label}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <MoreHorizontal className="h-5 w-5 mb-0.5" />
+                      <span className="text-[10px] font-medium">More</span>
+                    </>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top" className="w-48 mb-2">
+                {SECONDARY_TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.value;
+                  return (
+                    <DropdownMenuItem 
+                      key={tab.value}
+                      onClick={() => setActiveTab(tab.value)}
+                      className={isActive ? 'bg-primary/10 text-primary' : ''}
+                    >
+                      <Icon className="h-4 w-4 mr-2" />
+                      {tab.label}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </nav>
+      )}
+
+      {/* Footer - Hidden on mobile due to bottom nav */}
+      {!isMobile && (
+        <footer className="border-t mt-12 bg-muted/30">
+          <div className="max-w-7xl mx-auto px-4 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              PeachHaus Group LLC • Questions? Email{" "}
+              <a href="mailto:info@peachhausgroup.com" className="text-primary underline font-medium">
+                info@peachhausgroup.com
+              </a>
+            </p>
+          </div>
+        </footer>
+      )}
 
       {/* Statement Viewer Modal */}
       <StatementViewer
