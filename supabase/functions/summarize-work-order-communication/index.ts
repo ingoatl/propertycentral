@@ -26,13 +26,12 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch work order details
+    // Fetch work order details - specify relationship for vendors
     const { data: workOrder, error: woError } = await supabase
       .from("work_orders")
       .select(`
-        id, title, description, status, urgency, estimated_cost, final_cost,
-        owner_approved_at, vendor_quote_amount, vendor_notes, vendor_started_at, vendor_completed_at,
-        vendor:vendors(id, company_name, contact_name, phone),
+        id, title, description, status, urgency, estimated_cost, actual_cost,
+        owner_approved_at, quoted_cost, vendor_notes, assigned_vendor_id,
         property:properties(id, name, address, owner_id)
       `)
       .eq("id", workOrderId)
@@ -41,13 +40,24 @@ serve(async (req) => {
     if (woError || !workOrder) {
       console.error("Error fetching work order:", woError);
       return new Response(
-        JSON.stringify({ error: "Work order not found" }),
+        JSON.stringify({ error: "Work order not found", details: woError?.message }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Fetch vendor separately if assigned
+    let vendor = null;
+    if (workOrder.assigned_vendor_id) {
+      const { data: vendorData } = await supabase
+        .from("vendors")
+        .select("id, company_name, contact_name, phone")
+        .eq("id", workOrder.assigned_vendor_id)
+        .single();
+      vendor = vendorData;
+    }
+
     // Fetch vendor communications
-    const vendorId = workOrder.vendor?.id;
+    const vendorId = vendor?.id;
     let vendorMessages: any[] = [];
     
     if (vendorId) {
@@ -85,8 +95,8 @@ Work Order: ${workOrder.title}
 Description: ${workOrder.description || "N/A"}
 Status: ${workOrder.status}
 Urgency: ${workOrder.urgency}
-Vendor: ${workOrder.vendor?.company_name || "Not assigned"}
-Quote Amount: ${workOrder.vendor_quote_amount ? `$${workOrder.vendor_quote_amount}` : "No quote yet"}
+Vendor: ${vendor?.company_name || "Not assigned"}
+Quote Amount: ${workOrder.quoted_cost ? `$${workOrder.quoted_cost}` : "No quote yet"}
 Vendor Notes: ${workOrder.vendor_notes || "None"}
 Owner Approved: ${workOrder.owner_approved_at ? "Yes" : "No"}
 Property: ${workOrder.property?.name || "Unknown"} - ${workOrder.property?.address || ""}
@@ -144,15 +154,15 @@ Be concise and focus on actionable information. If there's a quote pending appro
       // Return a basic summary if AI fails
       return new Response(
         JSON.stringify({
-          summary: `Work order "${workOrder.title}" is ${workOrder.status}. ${workOrder.vendor_quote_amount ? `Vendor quoted $${workOrder.vendor_quote_amount}.` : ""} ${workOrder.owner_approved_at ? "Owner has approved." : "Awaiting owner approval."}`,
+          summary: `Work order "${workOrder.title}" is ${workOrder.status}. ${workOrder.quoted_cost ? `Vendor quoted $${workOrder.quoted_cost}.` : ""} ${workOrder.owner_approved_at ? "Owner has approved." : "Awaiting owner approval."}`,
           keyFacts: {
-            vendorName: workOrder.vendor?.company_name || null,
-            quotedAmount: workOrder.vendor_quote_amount || null,
+            vendorName: vendor?.company_name || null,
+            quotedAmount: workOrder.quoted_cost || null,
             scope: workOrder.description || workOrder.title,
             status: workOrder.status,
             nextStep: workOrder.owner_approved_at ? "Vendor can proceed" : "Need owner approval"
           },
-          suggestedAction: workOrder.vendor_quote_amount && !workOrder.owner_approved_at ? "approval_request" : null,
+          suggestedAction: workOrder.quoted_cost && !workOrder.owner_approved_at ? "approval_request" : null,
           messageCount: vendorMessages.length,
           raw: false
         }),
@@ -178,8 +188,8 @@ Be concise and focus on actionable information. If there's a quote pending appro
       parsedResponse = {
         summary: aiContent || `Work order "${workOrder.title}" is ${workOrder.status}.`,
         keyFacts: {
-          vendorName: workOrder.vendor?.company_name || null,
-          quotedAmount: workOrder.vendor_quote_amount || null,
+          vendorName: vendor?.company_name || null,
+          quotedAmount: workOrder.quoted_cost || null,
           scope: workOrder.description || workOrder.title,
           status: workOrder.status,
           nextStep: "Review and take action"
