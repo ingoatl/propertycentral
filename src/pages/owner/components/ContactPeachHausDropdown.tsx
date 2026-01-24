@@ -153,17 +153,19 @@ export function ContactPeachHausDropdown({
         .from("message-attachments")
         .getPublicUrl(fileName);
 
-      // Save as lead communication
-      const { error } = await supabase.from("lead_communications").insert({
-        owner_id: ownerId,
-        property_id: propertyId || null,
-        communication_type: "voicemail",
-        direction: "inbound",
-        body: `Voice message from ${ownerName} (${duration}s)`,
-        subject: `Voice message from ${ownerName}`,
-        sender_email: ownerEmail,
-        attachment_url: urlData.publicUrl,
-        status: "unread",
+      // Use edge function to save message (bypasses RLS)
+      const { error } = await supabase.functions.invoke("owner-send-message", {
+        body: {
+          owner_id: ownerId,
+          property_id: propertyId || null,
+          message_type: "voicemail",
+          body: `Voice message from ${ownerName} (${duration}s)`,
+          subject: `Voice message from ${ownerName}`,
+          sender_email: ownerEmail,
+          sender_name: ownerName,
+          attachment_url: urlData.publicUrl,
+          duration,
+        },
       });
 
       if (error) throw error;
@@ -192,15 +194,15 @@ export function ContactPeachHausDropdown({
 
     setIsSending(true);
     try {
-      const { error } = await supabase.from("lead_communications").insert({
-        owner_id: ownerId,
-        property_id: propertyId || null,
-        communication_type: "sms",
-        direction: "inbound",
-        body: textMessage,
-        subject: `Message from ${ownerName}`,
-        sender_email: ownerEmail,
-        status: "unread",
+      const { error } = await supabase.functions.invoke("owner-send-message", {
+        body: {
+          owner_id: ownerId,
+          property_id: propertyId || null,
+          message_type: "sms",
+          body: textMessage,
+          sender_email: ownerEmail,
+          sender_name: ownerName,
+        },
       });
 
       if (error) throw error;
@@ -224,15 +226,16 @@ export function ContactPeachHausDropdown({
 
     setIsSending(true);
     try {
-      const { error } = await supabase.from("lead_communications").insert({
-        owner_id: ownerId,
-        property_id: propertyId || null,
-        communication_type: "email",
-        direction: "inbound",
-        body: emailBody,
-        subject: emailSubject,
-        sender_email: ownerEmail,
-        status: "unread",
+      const { error } = await supabase.functions.invoke("owner-send-message", {
+        body: {
+          owner_id: ownerId,
+          property_id: propertyId || null,
+          message_type: "email",
+          body: emailBody,
+          subject: emailSubject,
+          sender_email: ownerEmail,
+          sender_name: ownerName,
+        },
       });
 
       if (error) throw error;

@@ -1006,10 +1006,13 @@ serve(async (req) => {
           owner.second_owner_email
         );
         
-        // Send SMS
+        // Send SMS with recap player link
         let smsResult: { success: boolean; error?: string } = { success: false, error: 'No phone number' };
         if (owner.phone) {
-          const smsMessage = `Hi ${ownerNames}! 🏠 Your ${previousMonthName} performance recap for ${property.name} is ready!\n\n${metrics.totalRevenue > 0 ? `💰 Revenue: ${formatCurrency(metrics.totalRevenue)}\n` : ''}${metrics.occupancyRate > 0 ? `📊 Occupancy: ${Math.round(metrics.occupancyRate)}%\n` : ''}🎧 Listen: ${audioUrl}\n📱 Dashboard: ${portalUrl}\n\n— PeachHaus`;
+          // Build recap player URL with all context
+          const recapPlayerUrl = `https://propertycentral.lovable.app/recap?audio=${encodeURIComponent(audioUrl)}&property=${encodeURIComponent(property.name)}&month=${encodeURIComponent(previousMonthName)}&owner=${owner.id}&propertyId=${property.id}`;
+          
+          const smsMessage = `Hi ${ownerNames}! 🏠 Your ${previousMonthName} performance recap for ${property.name} is ready!\n\n${metrics.totalRevenue > 0 ? `💰 Revenue: ${formatCurrency(metrics.totalRevenue)}\n` : ''}${metrics.occupancyRate > 0 ? `📊 Occupancy: ${Math.round(metrics.occupancyRate)}%\n` : ''}🎧 Listen & Reply: ${recapPlayerUrl}\n\n— PeachHaus`;
           
           smsResult = await sendSms(owner.phone, smsMessage, owner.name, owner.email);
         }
