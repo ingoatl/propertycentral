@@ -10918,6 +10918,7 @@ export type Database = {
           description: string
           estimated_cost: number | null
           expense_id: string | null
+          followup_reminder_sent_at: string | null
           guest_notified: boolean | null
           guest_notified_at: string | null
           id: string
@@ -11007,6 +11008,7 @@ export type Database = {
           description: string
           estimated_cost?: number | null
           expense_id?: string | null
+          followup_reminder_sent_at?: string | null
           guest_notified?: boolean | null
           guest_notified_at?: string | null
           id?: string
@@ -11096,6 +11098,7 @@ export type Database = {
           description?: string
           estimated_cost?: number | null
           expense_id?: string | null
+          followup_reminder_sent_at?: string | null
           guest_notified?: boolean | null
           guest_notified_at?: string | null
           id?: string
