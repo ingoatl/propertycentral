@@ -64,16 +64,11 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
 
   useEffect(() => {
     const fetchReceipt = async () => {
-      if (!receiptPath) {
-        setError("No receipt file available");
-        setLoading(false);
-        return;
-      }
-
       try {
-        console.log("OwnerReceiptViewer: Fetching receipt for path:", receiptPath);
+        console.log("OwnerReceiptViewer: Fetching receipt for expense:", expense.id, "path:", receiptPath);
         
-        // Use edge function to get signed URL
+        // Use edge function to get signed URL OR auto-generate receipt if none exists
+        // The edge function handles both cases - it will generate a professional PDF if no file exists
         const { data, error: urlError } = await supabase.functions.invoke("owner-receipt-url", {
           body: { expenseId: expense.id, token, filePath: receiptPath },
         });
@@ -81,7 +76,19 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
         if (urlError) throw urlError;
         if (data?.error) throw new Error(data.error);
 
-        console.log("OwnerReceiptViewer: Got signed URL, fetching as blob...");
+        console.log("OwnerReceiptViewer: Got response, generated:", data?.generated, "path:", data?.path);
+        
+        // Check if this is a data URL (auto-generated PDF)
+        if (data.signedUrl.startsWith('data:')) {
+          console.log("OwnerReceiptViewer: Auto-generated PDF detected");
+          // Convert data URL to blob
+          const response = await fetch(data.signedUrl);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setBlobUrl(url);
+          setContentType("pdf");
+          return;
+        }
         
         // Fetch the content as a blob - this avoids ad blocker issues
         const response = await fetch(data.signedUrl);
@@ -95,12 +102,13 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
         // Determine content type from blob MIME type and file extension
         const mimeType = blob.type.toLowerCase();
         let detectedType: ContentType = "unknown";
+        const pathToCheck = receiptPath || data.path || "";
 
-        if (mimeType.includes("pdf") || receiptPath.toLowerCase().endsWith(".pdf")) {
+        if (mimeType.includes("pdf") || pathToCheck.toLowerCase().endsWith(".pdf")) {
           detectedType = "pdf";
-        } else if (mimeType.includes("image") || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(receiptPath)) {
+        } else if (mimeType.includes("image") || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(pathToCheck)) {
           detectedType = "image";
-        } else if (mimeType.includes("html") || mimeType.includes("text") || /\.html?$/i.test(receiptPath)) {
+        } else if (mimeType.includes("html") || mimeType.includes("text") || /\.html?$/i.test(pathToCheck)) {
           detectedType = "html";
         }
 
