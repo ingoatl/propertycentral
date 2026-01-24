@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import GetPaidModal from "@/components/maintenance/GetPaidModal";
 import VendorMultiPhotoUpload from "@/components/maintenance/VendorMultiPhotoUpload";
+import VendorContactCard from "@/components/vendor/VendorContactCard";
 import { 
   MapPin, Clock, CheckCircle, XCircle, 
   Camera, DollarSign, ExternalLink, Phone, Loader2, Send, 
@@ -488,37 +489,47 @@ const VendorJobPortal = () => {
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-4">
         
-        {/* Progress Steps */}
-        <div className="flex items-center justify-between mb-2">
+        {/* Compact Progress Steps */}
+        <div className="flex items-center justify-between px-2">
           {steps.map((step, idx) => (
             <div key={step.num} className="flex items-center flex-1">
               <div className="flex flex-col items-center flex-1">
                 <div className={cn(
-                  "w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors",
+                  "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium border-2 transition-colors",
                   step.num < currentStep 
-                    ? "bg-neutral-900 border-neutral-900 text-white" 
+                    ? "bg-primary border-primary text-primary-foreground" 
                     : step.num === currentStep 
-                      ? "bg-white border-neutral-900 text-neutral-900" 
-                      : "bg-white border-neutral-200 text-neutral-400"
+                      ? "bg-background border-primary text-primary" 
+                      : "bg-background border-muted text-muted-foreground"
                 )}>
-                  {step.num < currentStep ? <CheckCircle className="h-3.5 w-3.5" /> : step.num}
+                  {step.num < currentStep ? <CheckCircle className="h-3 w-3" /> : step.num}
                 </div>
                 <span className={cn(
-                  "text-[10px] mt-1 font-medium",
-                  step.num <= currentStep ? "text-neutral-700" : "text-neutral-400"
+                  "text-[9px] mt-0.5 font-medium",
+                  step.num <= currentStep ? "text-foreground" : "text-muted-foreground"
                 )}>
                   {step.label}
                 </span>
               </div>
               {idx < steps.length - 1 && (
                 <div className={cn(
-                  "h-px flex-1 mx-1 -mt-4",
-                  step.num < currentStep ? "bg-neutral-900" : "bg-neutral-200"
+                  "h-px flex-1 mx-0.5 -mt-3",
+                  step.num < currentStep ? "bg-primary" : "bg-muted"
                 )} />
               )}
             </div>
           ))}
         </div>
+
+        {/* Need Help? Contact Card */}
+        {workOrder.assigned_vendor && (
+          <VendorContactCard
+            workOrderId={workOrder.id}
+            vendorId={workOrder.assigned_vendor.id}
+            vendorName={workOrder.assigned_vendor.name}
+            vendorPhone={workOrder.assigned_vendor.phone}
+          />
+        )}
 
         {/* Pending Approval Notice */}
         {isPendingApproval && (
