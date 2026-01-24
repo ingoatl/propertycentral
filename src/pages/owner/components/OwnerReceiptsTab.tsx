@@ -162,30 +162,20 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
     }).format(amount);
   };
 
-  // Handle viewing/downloading receipt - always use inline viewer for best compatibility
+  // Handle viewing/downloading receipt - auto-generates PDF if no receipt exists
   const handleViewReceipt = (expense: Expense) => {
-    const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
-    if (!receiptPath) {
-      toast.error("No receipt file available");
-      return;
-    }
-    // Always use the inline viewer - it handles all file types and avoids ad blocker issues
+    // Always use the inline viewer - it handles all file types and auto-generation
     setViewingReceipt(expense);
   };
 
-  // Download receipt programmatically (avoids browser blocking)
+  // Download receipt programmatically (generates PDF if needed)
   const handleDownloadReceipt = async (expense: Expense) => {
-    const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
-    if (!receiptPath) {
-      toast.error("No receipt file available");
-      return;
-    }
-
     setDownloadingId(expense.id);
     try {
-      console.log("Downloading receipt:", receiptPath);
+      const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
+      console.log("Downloading receipt for expense:", expense.id, "path:", receiptPath);
       
-      // Use edge function to get signed URL
+      // Use edge function to get signed URL (will auto-generate if no receipt exists)
       const { data, error } = await supabase.functions.invoke("owner-receipt-url", {
         body: { expenseId: expense.id, token, filePath: receiptPath },
       });
@@ -201,7 +191,9 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
       const blobUrl = URL.createObjectURL(blob);
       
       // Determine filename
-      const filename = receiptPath.split('/').pop() || `receipt-${expense.id}`;
+      const filename = data.generated 
+        ? `receipt-${expense.id}.pdf`
+        : (receiptPath?.split('/').pop() || `receipt-${expense.id}`);
       
       // Create download link
       const link = document.createElement('a');
@@ -438,36 +430,35 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
                                 {formatCurrency(expense.amount)}
                               </p>
                               <div className="flex gap-1">
-                                {hasReceipt ? (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleViewReceipt(expense);
-                                      }}
-                                      className="h-8 w-8"
-                                      title="View Receipt"
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDownloadReceipt(expense);
-                                      }}
-                                      disabled={downloadingId === expense.id}
-                                      className="h-8 w-8"
-                                    >
-                                      <Download className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs text-muted-foreground">
-                                    No Receipt
++                                {/* All expenses can now be viewed - we auto-generate receipts if needed */}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewReceipt(expense);
+                                  }}
+                                  className="h-8 w-8"
+                                  title={hasReceipt ? "View Receipt" : "Generate Receipt"}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadReceipt(expense);
+                                  }}
+                                  disabled={downloadingId === expense.id}
+                                  className="h-8 w-8"
+                                  title={hasReceipt ? "Download Receipt" : "Download Generated Receipt"}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                {!hasReceipt && (
+                                  <Badge variant="outline" className="text-xs text-primary">
+                                    Auto
                                   </Badge>
                                 )}
                               </div>

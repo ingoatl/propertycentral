@@ -111,12 +111,16 @@ export function IntegrationStatusDashboard() {
         sourceMap.set(source, existing);
       }
 
-      // Build sync sources list with predefined integrations
+      // Build sync sources list with correct project names and data types
+      // PeachHaus Listing Boost = SEO/Performance/Pricing data
+      // GuestConnect = Marketing activities from automation
+      // Marketing Hub = Aggregate marketing stats
+      // Mid-Term Nation = MTR property listings
       const sources: SyncSource[] = [
         {
           id: "peachhaus",
-          name: "PeachHaus",
-          description: "peachhaus-guestconnect",
+          name: "Listing Boost",
+          description: "SEO & Pricing Intelligence",
           icon: <TrendingUp className="h-4 w-4" />,
           lastSync: sourceMap.get("peachhaus")?.lastSync || null,
           status: getSourceStatus(sourceMap.get("peachhaus")),
@@ -128,7 +132,7 @@ export function IntegrationStatusDashboard() {
         {
           id: "guestconnect",
           name: "GuestConnect",
-          description: "peachhaus-guestconnect",
+          description: "Marketing Activities",
           icon: <Cloud className="h-4 w-4" />,
           lastSync: sourceMap.get("guestconnect")?.lastSync || null,
           status: getSourceStatus(sourceMap.get("guestconnect")),
@@ -140,7 +144,7 @@ export function IntegrationStatusDashboard() {
         {
           id: "marketing_hub",
           name: "Marketing Hub",
-          description: "peachhaus-guestconnect",
+          description: "Social & Outreach Stats",
           icon: <Zap className="h-4 w-4" />,
           lastSync: sourceMap.get("marketing_hub")?.lastSync || null,
           status: getSourceStatus(sourceMap.get("marketing_hub")),
@@ -152,7 +156,7 @@ export function IntegrationStatusDashboard() {
         {
           id: "midtermnation",
           name: "Mid-Term Nation",
-          description: "midtermnation",
+          description: "MTR Listings",
           icon: <Shield className="h-4 w-4" />,
           lastSync: sourceMap.get("midtermnation")?.lastSync || null,
           status: getSourceStatus(sourceMap.get("midtermnation")),

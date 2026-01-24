@@ -41,11 +41,15 @@ serve(async (req: Request): Promise<Response> => {
 
     // Use provided filePath or fetch from expense
     let receiptPath = filePath;
+    let expenseData: any = null;
     
-    if (!receiptPath && expenseId) {
+    if (expenseId) {
       const { data: expense, error: expenseError } = await supabase
         .from("expenses")
-        .select("email_screenshot_path, file_path, original_receipt_path")
+        .select(`
+          id, email_screenshot_path, file_path, original_receipt_path,
+          amount, date, vendor, purpose, category, items_detail, property_id
+        `)
         .eq("id", expenseId)
         .single();
 
@@ -57,8 +61,366 @@ serve(async (req: Request): Promise<Response> => {
         );
       }
 
+      expenseData = expense;
+      
       // Priority: email_screenshot_path > file_path > original_receipt_path
-      receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
+      if (!receiptPath) {
+        receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
+      }
+    }
+
+    // AUTO-GENERATE PDF if no receipt exists but we have expense data
+    if (!receiptPath && expenseData) {
+      console.log("No receipt found, auto-generating professional PDF receipt for expense:", expenseId);
+      
+      // Get property info for the receipt
+      const { data: property } = await supabase
+        .from("properties")
+        .select("name, address")
+        .eq("id", expenseData.property_id)
+        .single();
+      
+      // Import pdf-lib for PDF generation
+      const { PDFDocument, rgb, StandardFonts } = await import("https://esm.sh/pdf-lib@1.17.1");
+      
+      // Generate professional PDF with PeachHaus branding (matching owner statement style)
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([612, 792]); // Letter size
+      
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      // Colors matching owner statement branding
+      const darkGray = rgb(0.1, 0.1, 0.1);
+      const mediumGray = rgb(0.4, 0.4, 0.4);
+      const lightGray = rgb(0.6, 0.6, 0.6);
+      const accentColor = rgb(0.878, 0.478, 0.259); // PeachHaus orange #E07A42
+      const greenColor = rgb(0.086, 0.396, 0.204);
+      
+      const { width, height } = page.getSize();
+      let y = height - 60;
+      
+      const expenseDate = new Date(expenseData.date);
+      const formattedDate = expenseDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      
+      const generatedDate = new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      
+      const receiptNumber = `EXP-${expenseDate.getFullYear()}${String(expenseDate.getMonth() + 1).padStart(2, '0')}-${expenseId.slice(0, 6).toUpperCase()}`;
+      
+      const amount = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+      }).format(expenseData.amount);
+
+      const description = expenseData.items_detail || expenseData.purpose || expenseData.category || "Service";
+      const vendor = expenseData.vendor || "PeachHaus Property Management";
+      const category = expenseData.category ? expenseData.category.charAt(0).toUpperCase() + expenseData.category.slice(1) : "General";
+
+      // ======== HEADER ========
+      page.drawText("Peach", {
+        x: 50,
+        y: y,
+        size: 24,
+        font: helveticaBold,
+        color: darkGray,
+      });
+      page.drawText("Haus", {
+        x: 50 + helveticaBold.widthOfTextAtSize("Peach", 24),
+        y: y,
+        size: 24,
+        font: helveticaBold,
+        color: accentColor,
+      });
+      
+      page.drawText("EXPENSE RECEIPT", {
+        x: width - 50 - helveticaBold.widthOfTextAtSize("EXPENSE RECEIPT", 10),
+        y: y + 4,
+        size: 10,
+        font: helveticaBold,
+        color: mediumGray,
+      });
+      
+      y -= 35;
+      
+      page.drawText(`Receipt No: ${receiptNumber}`, {
+        x: 50,
+        y: y,
+        size: 10,
+        font: helvetica,
+        color: lightGray,
+      });
+      
+      page.drawText(`Issue Date: ${generatedDate}`, {
+        x: width - 50 - helvetica.widthOfTextAtSize(`Issue Date: ${generatedDate}`, 10),
+        y: y,
+        size: 10,
+        font: helvetica,
+        color: lightGray,
+      });
+      
+      y -= 10;
+      
+      page.drawLine({
+        start: { x: 50, y: y },
+        end: { x: width - 50, y: y },
+        thickness: 1,
+        color: rgb(0.9, 0.9, 0.9),
+      });
+      
+      // ======== AMOUNT ========
+      y -= 50;
+      
+      page.drawText("AMOUNT", {
+        x: width / 2 - helveticaBold.widthOfTextAtSize("AMOUNT", 10) / 2,
+        y: y,
+        size: 10,
+        font: helveticaBold,
+        color: lightGray,
+      });
+      
+      y -= 45;
+      
+      page.drawText(amount, {
+        x: width / 2 - helveticaBold.widthOfTextAtSize(amount, 42) / 2,
+        y: y,
+        size: 42,
+        font: helveticaBold,
+        color: darkGray,
+      });
+      
+      y -= 25;
+      
+      page.drawText("PAID", {
+        x: width / 2 - helveticaBold.widthOfTextAtSize("PAID", 11) / 2,
+        y: y,
+        size: 11,
+        font: helveticaBold,
+        color: greenColor,
+      });
+      
+      y -= 30;
+      
+      page.drawLine({
+        start: { x: 50, y: y },
+        end: { x: width - 50, y: y },
+        thickness: 1,
+        color: rgb(0.9, 0.9, 0.9),
+      });
+      
+      // ======== PROPERTY ========
+      y -= 35;
+      
+      page.drawText("PROPERTY", {
+        x: 50,
+        y: y,
+        size: 10,
+        font: helveticaBold,
+        color: lightGray,
+      });
+      
+      y -= 20;
+      
+      const propertyText = property?.address || property?.name || "Property";
+      page.drawText(propertyText, {
+        x: 50,
+        y: y,
+        size: 14,
+        font: helveticaBold,
+        color: darkGray,
+      });
+      
+      y -= 30;
+      
+      page.drawLine({
+        start: { x: 50, y: y },
+        end: { x: width - 50, y: y },
+        thickness: 1,
+        color: rgb(0.9, 0.9, 0.9),
+      });
+      
+      // ======== TRANSACTION DETAILS ========
+      y -= 35;
+      
+      page.drawText("TRANSACTION DETAILS", {
+        x: 50,
+        y: y,
+        size: 10,
+        font: helveticaBold,
+        color: lightGray,
+      });
+      
+      y -= 30;
+      
+      page.drawText("Transaction Date", {
+        x: 50,
+        y: y,
+        size: 12,
+        font: helvetica,
+        color: mediumGray,
+      });
+      page.drawText(formattedDate, {
+        x: width - 50 - helveticaBold.widthOfTextAtSize(formattedDate, 12),
+        y: y,
+        size: 12,
+        font: helveticaBold,
+        color: darkGray,
+      });
+      
+      y -= 25;
+      
+      page.drawText("Vendor", {
+        x: 50,
+        y: y,
+        size: 12,
+        font: helvetica,
+        color: mediumGray,
+      });
+      const vendorDisplay = vendor.length > 35 ? vendor.slice(0, 35) + "..." : vendor;
+      page.drawText(vendorDisplay, {
+        x: width - 50 - helveticaBold.widthOfTextAtSize(vendorDisplay, 12),
+        y: y,
+        size: 12,
+        font: helveticaBold,
+        color: darkGray,
+      });
+      
+      y -= 25;
+      
+      page.drawText("Category", {
+        x: 50,
+        y: y,
+        size: 12,
+        font: helvetica,
+        color: mediumGray,
+      });
+      page.drawText(category, {
+        x: width - 50 - helveticaBold.widthOfTextAtSize(category, 12),
+        y: y,
+        size: 12,
+        font: helveticaBold,
+        color: darkGray,
+      });
+      
+      // ======== DESCRIPTION ========
+      if (description && description !== category) {
+        y -= 40;
+        
+        page.drawLine({
+          start: { x: 50, y: y + 10 },
+          end: { x: width - 50, y: y + 10 },
+          thickness: 1,
+          color: rgb(0.9, 0.9, 0.9),
+        });
+        
+        y -= 20;
+        
+        page.drawText("DESCRIPTION", {
+          x: 50,
+          y: y,
+          size: 10,
+          font: helveticaBold,
+          color: lightGray,
+        });
+        
+        y -= 25;
+        
+        page.drawLine({
+          start: { x: 50, y: y + 30 },
+          end: { x: 50, y: y - 10 },
+          thickness: 3,
+          color: accentColor,
+        });
+        
+        // Wrap text
+        const words = description.split(' ');
+        const lines: string[] = [];
+        let currentLine = '';
+        
+        for (const word of words) {
+          if ((currentLine + ' ' + word).trim().length <= 70) {
+            currentLine = (currentLine + ' ' + word).trim();
+          } else {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+          }
+        }
+        if (currentLine) lines.push(currentLine);
+        
+        for (const line of lines.slice(0, 4)) {
+          page.drawText(line, {
+            x: 60,
+            y: y,
+            size: 11,
+            font: helvetica,
+            color: mediumGray,
+          });
+          y -= 16;
+        }
+      }
+      
+      // ======== FOOTER ========
+      y = 100;
+      
+      page.drawLine({
+        start: { x: 50, y: y },
+        end: { x: width - 50, y: y },
+        thickness: 1,
+        color: rgb(0.9, 0.9, 0.9),
+      });
+      
+      y -= 30;
+      
+      page.drawText("PeachHaus Group LLC", {
+        x: width / 2 - helveticaBold.widthOfTextAtSize("PeachHaus Group LLC", 11) / 2,
+        y: y,
+        size: 11,
+        font: helveticaBold,
+        color: darkGray,
+      });
+      
+      y -= 18;
+      
+      page.drawText("info@peachhausgroup.com", {
+        x: width / 2 - helvetica.widthOfTextAtSize("info@peachhausgroup.com", 10) / 2,
+        y: y,
+        size: 10,
+        font: helvetica,
+        color: lightGray,
+      });
+      
+      y -= 25;
+      
+      page.drawText("This receipt confirms payment for property management services rendered.", {
+        x: width / 2 - helvetica.widthOfTextAtSize("This receipt confirms payment for property management services rendered.", 8) / 2,
+        y: y,
+        size: 8,
+        font: helvetica,
+        color: lightGray,
+      });
+      
+      const pdfBytes = await pdfDoc.save();
+      
+      // Convert to base64 for response
+      const base64Pdf = btoa(String.fromCharCode(...pdfBytes));
+      const dataUrl = `data:application/pdf;base64,${base64Pdf}`;
+      
+      return new Response(
+        JSON.stringify({ 
+          signedUrl: dataUrl,
+          path: `auto-generated/${expenseId}.pdf`,
+          generated: true 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     if (!receiptPath) {

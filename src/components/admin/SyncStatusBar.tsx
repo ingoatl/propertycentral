@@ -29,6 +29,7 @@ export const SyncStatusBar = () => {
 
   const loadSyncStatus = async () => {
     try {
+      // Load partner sync logs
       const { data: syncLogs, error } = await supabase
         .from("partner_sync_log")
         .select("*")
@@ -37,15 +38,44 @@ export const SyncStatusBar = () => {
 
       if (error) throw error;
 
-      // Define sources with their project origins
+      // Also check if PeachHaus has data even if no sync logs (direct table check)
+      const { data: peachhausStats } = await supabase
+        .from("property_peachhaus_stats")
+        .select("synced_at")
+        .order("synced_at", { ascending: false })
+        .limit(1);
+
+      // Projects and their data types:
+      // 1. PeachHaus Listing Boost = SEO, Pricing, Performance data
+      // 2. GuestConnect = Marketing activities from automation
+      // 3. Marketing Hub = Aggregate social & outreach stats
+      // 4. Mid-Term Nation = MTR property listings
       const sourceConfigs = [
-        { id: "peachhaus", name: "PeachHaus Performance", shortName: "PeachHaus", projectSource: "peachhaus-guestconnect", syncTypes: ["incoming", "property_performance"] },
-        { id: "guestconnect", name: "GuestConnect", shortName: "GuestConnect", projectSource: "peachhaus-guestconnect", syncTypes: ["marketing_activities"] },
-        { id: "marketing_hub", name: "Marketing Hub", shortName: "Mkt Hub", projectSource: "peachhaus-guestconnect", syncTypes: ["marketing_stats"] },
-        { id: "midtermnation", name: "Mid-Term Nation", shortName: "MTNation", projectSource: "midtermnation", syncTypes: ["midterm"] },
+        { id: "peachhaus", name: "Listing Boost", shortName: "Listing Boost", projectSource: "peachhaus-listing-boost", syncTypes: ["property_performance", "listing_health", "peachhaus"] },
+        { id: "guestconnect", name: "GuestConnect", shortName: "GuestConnect", projectSource: "peachhaus-guestconnect", syncTypes: ["incoming", "marketing_activities"] },
+        { id: "marketing_hub", name: "Marketing Hub", shortName: "Mkt Hub", projectSource: "marketing-hub", syncTypes: ["marketing_stats"] },
+        { id: "midtermnation", name: "Mid-Term Nation", shortName: "MTNation", projectSource: "midtermnation", syncTypes: ["incoming", "midterm"] },
       ];
 
       const sourcesData: SyncSource[] = sourceConfigs.map(config => {
+        // Special handling for PeachHaus - check both logs AND direct data
+        if (config.id === "peachhaus") {
+          const hasData = peachhausStats && peachhausStats.length > 0;
+          const lastSyncTime = hasData ? new Date(peachhausStats[0].synced_at) : null;
+          const isRecent = lastSyncTime && (Date.now() - lastSyncTime.getTime()) < 24 * 60 * 60 * 1000;
+          
+          return {
+            id: config.id,
+            name: config.name,
+            shortName: config.shortName,
+            projectSource: config.projectSource,
+            status: hasData && isRecent ? "healthy" : hasData ? "warning" : "unknown" as SyncSource["status"],
+            lastSync: lastSyncTime,
+            successRate: hasData ? 100 : 0,
+            totalSyncs: hasData ? 1 : 0,
+          };
+        }
+
         const relevantLogs = (syncLogs || []).filter(log => 
           config.syncTypes.some(type => 
             log.sync_type?.toLowerCase().includes(type.toLowerCase()) ||
