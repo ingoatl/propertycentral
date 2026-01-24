@@ -868,6 +868,51 @@ export type Database = {
           },
         ]
       }
+      comms_hub_sync_queue: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          processed_at: string | null
+          property_id: string
+          status: string
+          sync_type: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          property_id: string
+          status?: string
+          sync_type?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          property_id?: string
+          status?: string
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_property"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_property"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       communication_recipients: {
         Row: {
           communication_id: string

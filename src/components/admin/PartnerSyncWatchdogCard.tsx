@@ -173,18 +173,46 @@ export const PartnerSyncWatchdogCard = () => {
           </div>
         )}
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={() => {
-            loadData();
-            toast.success("Watchdog data refreshed");
-          }}
-        >
-          <RefreshCw className="w-3 h-3 mr-2" />
-          Refresh Status
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={() => {
+              loadData();
+              toast.success("Watchdog data refreshed");
+            }}
+          >
+            <RefreshCw className="w-3 h-3 mr-2" />
+            Refresh
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            className="flex-1"
+            onClick={async () => {
+              try {
+                toast.loading("Syncing properties to Comms Hub...");
+                const { data, error } = await supabase.functions.invoke("sync-properties-to-comms-hub", {
+                  body: { sync_all: true }
+                });
+                toast.dismiss();
+                if (error) {
+                  toast.error("Sync failed: " + error.message);
+                } else {
+                  toast.success(`Synced ${data.synced_count || 0} properties to Comms Hub`);
+                  loadData();
+                }
+              } catch (e: any) {
+                toast.dismiss();
+                toast.error("Sync failed: " + e.message);
+              }
+            }}
+          >
+            <ArrowUpRight className="w-3 h-3 mr-2" />
+            Sync to Comms Hub
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
