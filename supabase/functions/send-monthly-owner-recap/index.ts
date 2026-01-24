@@ -1,6 +1,16 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+
+// Helper to encode UTF-8 string to base64 (works with non-Latin1 characters)
+function encodeBase64(str: string): string {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -364,12 +374,12 @@ function generateEmailHtml(
   const callsMade = marketingStats?.calls_made || 0;
   const totalReach = marketingStats?.total_reach || 0;
   
-  // Generate SVG charts as data URIs
+  // Generate SVG charts as data URIs (using encodeBase64 to handle non-Latin1 chars)
   const occupancyGaugeSvg = generateOccupancyGauge(occupancy);
-  const occupancyDataUri = `data:image/svg+xml;base64,${btoa(occupancyGaugeSvg)}`;
+  const occupancyDataUri = `data:image/svg+xml;base64,${encodeBase64(occupancyGaugeSvg)}`;
   
   const starRatingSvg = generateStarRating(avgRating);
-  const starRatingDataUri = `data:image/svg+xml;base64,${btoa(starRatingSvg)}`;
+  const starRatingDataUri = `data:image/svg+xml;base64,${encodeBase64(starRatingSvg)}`;
 
   return `
 <!DOCTYPE html>

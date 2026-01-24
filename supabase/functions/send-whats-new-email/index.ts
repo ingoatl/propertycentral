@@ -349,7 +349,7 @@ serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const { owner_id, property_id, test_email } = await req.json();
+    const { owner_id, property_id, test_email, force_send } = await req.json();
 
     if (!owner_id || !property_id) {
       throw new Error("owner_id and property_id are required");
@@ -396,8 +396,8 @@ serve(async (req: Request) => {
 
     const hasBookings = (bookingCount || 0) > 0;
 
-    // Fetch features new since last email
-    const lastEmailDate = owner.last_feature_email_sent || '2024-01-01T00:00:00Z';
+    // Fetch features - if force_send, get all features; otherwise only new since last email
+    const lastEmailDate = force_send ? '2020-01-01T00:00:00Z' : (owner.last_feature_email_sent || '2024-01-01T00:00:00Z');
     
     const { data: features, error: featuresError } = await supabase
       .from("feature_changelog")
@@ -409,7 +409,19 @@ serve(async (req: Request) => {
       throw new Error(`Error fetching features: ${featuresError.message}`);
     }
 
-    if (!features || features.length === 0) {
+    // If no features found and force_send, get the latest features anyway
+    let featuresToSend = features || [];
+    if (force_send && featuresToSend.length === 0) {
+      console.log("Force send: fetching all features");
+      const { data: allFeatures } = await supabase
+        .from("feature_changelog")
+        .select("*")
+        .order("released_at", { ascending: false })
+        .limit(8);
+      featuresToSend = allFeatures || [];
+    }
+
+    if (featuresToSend.length === 0 && !force_send) {
       console.log("No new features since last email");
       return new Response(
         JSON.stringify({ success: false, message: "No new features to announce" }),
@@ -417,18 +429,29 @@ serve(async (req: Request) => {
       );
     }
 
-    // Filter features based on owner status
-    const relevantFeatures = features.filter(f => {
-      if (isOnboarding) return f.relevant_for_onboarding;
-      return f.relevant_for_active;
-    });
+    // Filter features based on owner status (skip filter if force_send with all features)
+    let relevantFeatures = featuresToSend;
+    if (!force_send) {
+      relevantFeatures = featuresToSend.filter(f => {
+        if (isOnboarding) return f.relevant_for_onboarding;
+        return f.relevant_for_active;
+      });
+    } else {
+      // For force_send, include features relevant to either type
+      relevantFeatures = featuresToSend.filter(f => f.relevant_for_onboarding || f.relevant_for_active);
+    }
 
-    if (relevantFeatures.length === 0) {
+    if (relevantFeatures.length === 0 && !force_send) {
       console.log("No relevant features for this owner type");
       return new Response(
         JSON.stringify({ success: false, message: "No relevant features for this owner" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+    
+    // If still no features after filtering, use what we have
+    if (relevantFeatures.length === 0) {
+      relevantFeatures = featuresToSend;
     }
 
     // Generate portal URL with magic link
