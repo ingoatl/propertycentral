@@ -197,20 +197,52 @@ function generateWhatsNewEmail(
 
           <!-- Feedback Section -->
           <tr>
-            <td style="background: #ffffff; border-radius: 16px; padding: 40px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
-              <div style="font-size: 40px; margin-bottom: 16px;">💬</div>
-              <h3 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; color: #1e293b;">
-                We'd Love Your Feedback
-              </h3>
-              <p style="margin: 0 0 24px 0; font-size: 15px; color: #64748b; line-height: 1.7;">
-                What do you think? Simply <strong>reply to this email</strong> with your thoughts, questions, or ideas for features you'd like to see.
-              </p>
-              <p style="margin: 0 0 24px 0; font-size: 15px; color: #64748b;">
-                Or schedule a quick call to walk through the new features together:
-              </p>
-              <a href="https://peachhaus-bookings.setmore.com" style="display: inline-block; background: transparent; color: #3b82f6; padding: 14px 32px; border-radius: 30px; font-size: 14px; font-weight: 600; text-decoration: none; border: 2px solid #3b82f6;">
-                Schedule a Call →
-              </a>
+            <td style="background: #ffffff; border-radius: 16px; padding: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
+              <div style="text-align: center; margin-bottom: 24px;">
+                <div style="font-size: 40px; margin-bottom: 16px;">💬</div>
+                <h3 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; color: #1e293b;">
+                  We'd Love Your Feedback
+                </h3>
+                <p style="margin: 0 0 24px 0; font-size: 15px; color: #64748b; line-height: 1.7;">
+                  Have questions? Want a walkthrough? We're here for you—choose how you'd like to connect:
+                </p>
+              </div>
+              
+              <!-- Communication Options Grid -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding: 8px;">
+                    <a href="${portalUrl}#schedule-call" style="display: block; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 16px 20px; border-radius: 12px; text-decoration: none; text-align: center;">
+                      <span style="font-size: 24px; display: block; margin-bottom: 6px;">📞</span>
+                      <span style="font-size: 14px; font-weight: 600;">Schedule a Call</span>
+                      <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 4px;">Video or phone</span>
+                    </a>
+                  </td>
+                  <td style="padding: 8px;">
+                    <a href="mailto:info@peachhausgroup.com?subject=Feedback on ${encodeURIComponent(propertyName)} Portal" style="display: block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 16px 20px; border-radius: 12px; text-decoration: none; text-align: center;">
+                      <span style="font-size: 24px; display: block; margin-bottom: 6px;">✉️</span>
+                      <span style="font-size: 14px; font-weight: 600;">Send Email</span>
+                      <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 4px;">Reply anytime</span>
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px;">
+                    <a href="sms:+14048005932" style="display: block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 16px 20px; border-radius: 12px; text-decoration: none; text-align: center;">
+                      <span style="font-size: 24px; display: block; margin-bottom: 6px;">💬</span>
+                      <span style="font-size: 14px; font-weight: 600;">Text Us</span>
+                      <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 4px;">(404) 800-5932</span>
+                    </a>
+                  </td>
+                  <td style="padding: 8px;">
+                    <a href="${portalUrl}#messages" style="display: block; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 16px 20px; border-radius: 12px; text-decoration: none; text-align: center;">
+                      <span style="font-size: 24px; display: block; margin-bottom: 6px;">🎤</span>
+                      <span style="font-size: 14px; font-weight: 600;">Leave Voicemail</span>
+                      <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 4px;">In your portal</span>
+                    </a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
