@@ -708,7 +708,6 @@ serve(async (req) => {
         address,
         rental_type,
         owner_id,
-        onboarding_stage,
         property_owners!inner (
           id,
           name,
@@ -789,6 +788,15 @@ serve(async (req) => {
         
         const hasBookings = (bookingCount || 0) > 0;
         
+        // Fetch onboarding stage from onboarding_projects
+        const { data: onboardingProject } = await supabase
+          .from('onboarding_projects')
+          .select('status')
+          .eq('property_id', property.id)
+          .maybeSingle();
+        
+        const onboardingStage = onboardingProject?.status || null;
+        
         // Fetch reviews for rating
         const { data: reviews } = await supabase
           .from('ownerrez_reviews')
@@ -825,7 +833,7 @@ serve(async (req) => {
           metrics,
           mktStats,
           hasBookings,
-          property.onboarding_stage
+          onboardingStage
         );
         
         console.log(`Generated script for ${property.name}: ${voiceScript.substring(0, 100)}...`);
