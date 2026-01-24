@@ -1006,31 +1006,39 @@ serve(async (req) => {
           owner.second_owner_email
         );
         
-        // Send SMS with recap player link
+        // Save recap record FIRST to get the ID for short URL
+        const recapId = crypto.randomUUID();
+        await supabase.from('owner_monthly_recaps').upsert({
+          id: recapId,
+          property_id: property.id,
+          owner_id: owner.id,
+          recap_month: recapMonth,
+          email_sent: false,
+          sms_sent: false,
+          audio_url: audioUrl,
+          voice_script: voiceScript,
+          metrics,
+        }, { onConflict: 'property_id,recap_month' });
+        
+        // Send SMS with SHORT recap player link using recap ID
         let smsResult: { success: boolean; error?: string } = { success: false, error: 'No phone number' };
         if (owner.phone) {
-          // Build recap player URL with all context
-          const recapPlayerUrl = `https://propertycentral.lovable.app/recap?audio=${encodeURIComponent(audioUrl)}&property=${encodeURIComponent(property.name)}&month=${encodeURIComponent(previousMonthName)}&owner=${owner.id}&propertyId=${property.id}`;
+          // Short URL using recap ID - the player will fetch details from the database
+          const shortRecapUrl = `https://propertycentral.lovable.app/recap/${recapId}`;
           
-          const smsMessage = `Hi ${ownerNames}! 🏠 Your ${previousMonthName} performance recap for ${property.name} is ready!\n\n${metrics.totalRevenue > 0 ? `💰 Revenue: ${formatCurrency(metrics.totalRevenue)}\n` : ''}${metrics.occupancyRate > 0 ? `📊 Occupancy: ${Math.round(metrics.occupancyRate)}%\n` : ''}🎧 Listen & Reply: ${recapPlayerUrl}\n\n— PeachHaus`;
+          const smsMessage = `Hi ${ownerNames}! 🏠 Your ${previousMonthName} recap for ${property.name} is ready!\n\n${metrics.totalRevenue > 0 ? `💰 ${formatCurrency(metrics.totalRevenue)}\n` : ''}🎧 Listen: ${shortRecapUrl}\n\n— PeachHaus`;
           
           smsResult = await sendSms(owner.phone, smsMessage, owner.name, owner.email);
         }
         
-        // Save recap record
-        await supabase.from('owner_monthly_recaps').upsert({
-          property_id: property.id,
-          owner_id: owner.id,
-          recap_month: recapMonth,
+        // Update recap record with send status
+        await supabase.from('owner_monthly_recaps').update({
           email_sent: emailResult.success,
           sms_sent: smsResult.success,
-          audio_url: audioUrl,
-          voice_script: voiceScript,
           email_sent_at: emailResult.success ? new Date().toISOString() : null,
           sms_sent_at: smsResult.success ? new Date().toISOString() : null,
-          metrics,
           error_message: emailResult.error || smsResult.error || null,
-        }, { onConflict: 'property_id,recap_month' });
+        }).eq('id', recapId);
         
         results.push({
           property: property.name,
