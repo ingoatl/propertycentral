@@ -46,18 +46,25 @@ serve(async (req) => {
     const formattedPhone = formatPhoneE164(recipientPhone);
     
     // Phone number routing:
-    // - Vendors: +1 404-341-5202 (Alex's direct line - all vendor comms route through him)
+    // - Vendors: Use the sender's personal phone so replies go to their inbox
+    //            Falls back to Alex's line if no personal phone provided
     // - Google Reviews / Leads: +1 404-609-0955 (A2P verified for guest SMS)
     // - Owners: +1 404-800-5932 (Owner communications line)
     const isVendorMessage = !!vendorId;
-    const ALEX_PERSONAL_NUMBER = "+14043415202"; // Alex's direct line for vendor communications
-    const defaultNumber = isVendorMessage ? ALEX_PERSONAL_NUMBER : "+14046090955";
+    const ALEX_PERSONAL_NUMBER = "+14043415202"; // Alex's direct line - fallback for vendors
+    
+    // For vendors: use provided fromNumber (sender's personal line) or fall back to Alex
+    // For others: use default number based on message type
+    let defaultNumber = "+14046090955"; // Default lead/guest line
+    if (isVendorMessage) {
+      defaultNumber = fromNumber || ALEX_PERSONAL_NUMBER; // Use sender's line or Alex's line
+    }
     const formattedFromNumber = formatPhoneE164(fromNumber || defaultNumber);
     
-    // Alex's user ID for routing vendor replies to his inbox
+    // Alex's user ID for CC'ing on all vendor messages
     const ALEX_USER_ID = "fbd13e57-3a59-4c53-bb3b-14ab354b3420";
     
-    console.log(`Sending SMS via GHL to ${formattedPhone} from ${formattedFromNumber} (vendor=${isVendorMessage}, alexLine=${isVendorMessage})`);
+    console.log(`Sending SMS via GHL to ${formattedPhone} from ${formattedFromNumber} (vendor=${isVendorMessage}, fromNumber=${fromNumber || 'default'})`);
 
     // Initialize Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -298,11 +305,13 @@ serve(async (req) => {
     }
 
     // Record communication for vendors - store in lead_communications with vendor metadata
-    // This allows messages to show in both the vendor tab AND Alex's inbox (he handles all vendor comms)
+    // Route to sender's inbox AND CC Alex so he sees all vendor communications
     if (vendorId) {
-      // ALWAYS route vendor communications to Alex so replies show in his inbox
-      const vendorAssignedUserId = ALEX_USER_ID;
+      // Use the sender's user ID (from auth) so replies go to their inbox
+      // The sender's personal phone was already used as fromNumber
+      const vendorAssignedUserId = userId || ALEX_USER_ID; // Fall back to Alex if no auth
       
+      // Primary message record - goes to sender's inbox
       await supabase.from("lead_communications").insert({
         communication_type: "sms",
         direction: "outbound",
@@ -310,7 +319,7 @@ serve(async (req) => {
         status: "sent",
         external_id: sendData.messageId || sendData.conversationId,
         ghl_conversation_id: sendData.conversationId,
-        assigned_user_id: vendorAssignedUserId, // Always Alex for vendor messages
+        assigned_user_id: vendorAssignedUserId, // Route to sender
         metadata: {
           provider: "gohighlevel",
           ghl_contact_id: contactId,
@@ -321,11 +330,41 @@ serve(async (req) => {
           vendor_phone: formattedPhone,
           contact_type: "vendor",
           sent_by_user_id: userId,
-          requested_by_user_id: requestedByUserId || userId, // Who initiated this
-          work_order_id: workOrderId, // Link to work order for tracking in modal
-          alex_routed: true, // Flag that this goes through Alex's line
+          requested_by_user_id: requestedByUserId || userId,
+          work_order_id: workOrderId,
+          // Only mark as alex_routed if sent FROM Alex's line
+          alex_routed: formattedFromNumber === ALEX_PERSONAL_NUMBER,
         },
       });
+      
+      // CC Alex on all vendor communications (if sender is not Alex)
+      if (vendorAssignedUserId !== ALEX_USER_ID) {
+        await supabase.from("lead_communications").insert({
+          communication_type: "sms",
+          direction: "outbound",
+          body: message,
+          status: "sent",
+          external_id: `${sendData.messageId || sendData.conversationId}_cc_alex`,
+          ghl_conversation_id: sendData.conversationId,
+          assigned_user_id: ALEX_USER_ID, // CC copy for Alex
+          is_read: true, // Mark as read since it's a CC
+          metadata: {
+            provider: "gohighlevel",
+            ghl_contact_id: contactId,
+            ghl_conversation_id: sendData.conversationId,
+            from_number: formattedFromNumber,
+            to_number: formattedPhone,
+            vendor_id: vendorId,
+            vendor_phone: formattedPhone,
+            contact_type: "vendor",
+            sent_by_user_id: userId,
+            work_order_id: workOrderId,
+            cc_copy_for: ALEX_USER_ID,
+            original_sender: vendorAssignedUserId,
+          },
+        });
+        console.log(`CC'd Alex on vendor SMS from user ${vendorAssignedUserId}`);
+      }
 
       // Mark all unread inbound communications for this vendor as read
       const { data: vendorComms } = await supabase
@@ -355,7 +394,7 @@ serve(async (req) => {
         }
       }
       
-      console.log(`Recorded vendor SMS for vendor ${vendorId}`);
+      console.log(`Recorded vendor SMS for vendor ${vendorId}, assigned to user ${vendorAssignedUserId}`);
     }
     // so they appear in the conversation thread
     if (!leadId && !ownerId) {

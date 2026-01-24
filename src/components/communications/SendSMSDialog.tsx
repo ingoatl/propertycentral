@@ -33,8 +33,7 @@ interface SendSMSDialogProps {
   workOrderId?: string;
 }
 
-// Alex's direct line for vendor communications
-const ALEX_PERSONAL_NUMBER = "+14043415202";
+// Alex's user ID - he gets CC'd on all vendor communications
 const ALEX_USER_ID = "fbd13e57-3a59-4c53-bb3b-14ab354b3420";
 
 // Templates for leads/owners
@@ -119,6 +118,26 @@ export function SendSMSDialog({
       setAttachments([]);
     }
   }, [open]);
+
+  // Fetch current user's personal phone assignment for routing
+  const { data: userPhoneData } = useQuery({
+    queryKey: ["current-user-phone"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      const { data } = await supabase
+        .from("user_phone_assignments")
+        .select("phone_number, id, user_id")
+        .eq("user_id", user.id)
+        .eq("phone_type", "personal")
+        .eq("is_active", true)
+        .maybeSingle();
+      
+      return { userId: user.id, phone: data?.phone_number || null };
+    },
+    enabled: open && contactType === "vendor",
+  });
 
   // Fetch recent messages with this contact
   const { data: recentMessages = [] } = useQuery({
@@ -233,6 +252,8 @@ export function SendSMSDialog({
   // Send SMS/MMS mutation
   const sendSMS = useMutation({
     mutationFn: async () => {
+      // For vendors: use the current user's personal phone, replies come to their inbox
+      // The edge function will also CC Alex on all vendor communications
       const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
         body: {
           phone: contactPhone,
@@ -241,9 +262,9 @@ export function SendSMSDialog({
           ownerId: contactType === "owner" ? contactId : undefined,
           vendorId: contactType === "vendor" ? contactId : undefined,
           workOrderId: workOrderId,
-          // Route vendor messages through Alex's personal line
-          requestedByUserId: contactType === "vendor" ? ALEX_USER_ID : undefined,
-          fromNumber: contactType === "vendor" ? ALEX_PERSONAL_NUMBER : undefined,
+          // For vendors: use sender's personal phone so replies come to their inbox
+          // If no personal phone, edge function will fall back to Alex's line
+          fromNumber: contactType === "vendor" ? userPhoneData?.phone : undefined,
           // MMS attachments
           mediaUrls: attachments.length > 0 ? attachments.map(a => a.url) : undefined,
         },
