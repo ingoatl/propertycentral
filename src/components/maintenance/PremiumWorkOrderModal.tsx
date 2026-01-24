@@ -30,13 +30,15 @@ import {
   MapPin, User, Clock, DollarSign, Wrench, Send, 
   CheckCircle, AlertTriangle, Phone, Mail, Calendar,
   RotateCcw, ExternalLink, Loader2, Image, Video, Play,
-  Building2, FileText, MessageSquare, History, Settings, X, Camera, MessageCircle
+  Building2, FileText, MessageSquare, History, Settings, X, Camera, MessageCircle, Smartphone
 } from "lucide-react";
 import { 
   WorkOrder, WorkOrderStatus, WorkOrderTimeline, MaintenanceMessage,
   STATUS_CONFIG, URGENCY_CONFIG, WORK_ORDER_CATEGORIES, Vendor 
 } from "@/types/maintenance";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
+import { WorkOrderBeforeAfterComparison } from "@/components/maintenance/WorkOrderBeforeAfterComparison";
+import { WorkOrderVendorSMSThread } from "@/components/maintenance/WorkOrderVendorSMSThread";
 
 interface WorkOrderPhoto {
   id: string;
@@ -527,7 +529,7 @@ const PremiumWorkOrderModal = ({
           {/* Content */}
           <div className="p-6 overflow-y-auto max-h-[calc(92vh-120px)]">
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 mb-6 bg-muted/50">
+              <TabsList className="grid w-full grid-cols-6 mb-6 bg-muted/50">
                 <TabsTrigger value="overview" className="gap-2">
                   <FileText className="h-4 w-4" />
                   Overview
@@ -536,9 +538,13 @@ const PremiumWorkOrderModal = ({
                   <Camera className="h-4 w-4" />
                   Media ({workOrderMedia.length})
                 </TabsTrigger>
+                <TabsTrigger value="sms" className="gap-2">
+                  <Smartphone className="h-4 w-4" />
+                  SMS
+                </TabsTrigger>
                 <TabsTrigger value="messages" className="gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  Messages ({messages.length})
+                  Notes ({messages.length})
                 </TabsTrigger>
                 <TabsTrigger value="timeline" className="gap-2">
                   <History className="h-4 w-4" />
@@ -621,27 +627,16 @@ const PremiumWorkOrderModal = ({
                       </Card>
                     </div>
 
-                    {/* Quick Media Preview */}
-                    {workOrderMedia.length > 0 && (
-                      <Card className="border-border/50">
-                        <CardContent className="p-5">
-                          <div className="flex items-center justify-between mb-4">
-                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                              Recent Media
-                            </Label>
-                            <Button variant="ghost" size="sm" className="text-xs" onClick={() => {
-                              const element = document.querySelector('[data-state="active"][value="media"]');
-                              if (element) (element as HTMLElement).click();
-                            }}>
-                              View All →
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-4 gap-3">
-                            {workOrderMedia.slice(0, 4).map(renderMediaItem)}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
+                    {/* Before/After Comparison - Prominent Display */}
+                    <WorkOrderBeforeAfterComparison
+                      beforePhotos={mediaByType.before}
+                      afterPhotos={mediaByType.after}
+                      onViewAll={() => {
+                        // Switch to media tab
+                        const mediaTab = document.querySelector('[value="media"]');
+                        if (mediaTab) (mediaTab as HTMLElement).click();
+                      }}
+                    />
                   </div>
 
                   {/* Sidebar */}
@@ -819,7 +814,32 @@ const PremiumWorkOrderModal = ({
                 </div>
               </TabsContent>
 
-              {/* Messages Tab */}
+              {/* SMS Tab - Vendor Communications */}
+              <TabsContent value="sms" className="mt-0">
+                {workOrder.assigned_vendor ? (
+                  <WorkOrderVendorSMSThread
+                    workOrderId={workOrderId}
+                    vendorId={workOrder.assigned_vendor.id}
+                    vendorPhone={workOrder.assigned_vendor.phone}
+                    vendorName={workOrder.assigned_vendor.name}
+                    onSendMessage={() => setShowVendorSMS(true)}
+                  />
+                ) : (
+                  <Card className="border-border/50">
+                    <CardContent className="p-8 text-center">
+                      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                        <Smartphone className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <h3 className="font-medium text-foreground mb-1">No Vendor Assigned</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Assign a vendor to this work order to start communicating via SMS.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* Internal Notes Tab */}
               <TabsContent value="messages" className="mt-0">
                 <Card className="border-border/50">
                   <CardContent className="p-4">
@@ -1126,6 +1146,7 @@ const PremiumWorkOrderModal = ({
           contactPhone={workOrder.assigned_vendor.phone}
           contactType="vendor"
           contactId={workOrder.assigned_vendor.id}
+          workOrderId={workOrderId}
         />
       )}
     </>

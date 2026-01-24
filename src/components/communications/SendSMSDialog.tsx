@@ -21,6 +21,7 @@ interface SendSMSDialogProps {
   contactPhone: string;
   contactType: "lead" | "owner" | "vendor";
   contactId: string;
+  workOrderId?: string; // For linking vendor SMS to specific work orders
 }
 
 // Templates for leads/owners
@@ -90,6 +91,7 @@ export function SendSMSDialog({
   contactPhone,
   contactType,
   contactId,
+  workOrderId,
 }: SendSMSDialogProps) {
   const [message, setMessage] = useState("");
   const queryClient = useQueryClient();
@@ -114,14 +116,19 @@ export function SendSMSDialog({
 
   const sendSMS = useMutation({
     mutationFn: async () => {
+      // Alex's user ID - all vendor communications route through his line
+      const ALEX_USER_ID = "fbd13e57-3a59-4c53-bb3b-14ab354b3420";
+      
       const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
         body: {
           leadId: contactType === "lead" ? contactId : undefined,
           ownerId: contactType === "owner" ? contactId : undefined,
           vendorId: contactType === "vendor" ? contactId : undefined,
+          workOrderId: contactType === "vendor" ? workOrderId : undefined, // Link to work order
+          requestedByUserId: contactType === "vendor" ? ALEX_USER_ID : undefined, // Route vendor replies to Alex
           phone: contactPhone,
           message: message,
-          fromNumber: "+14048005932",
+          fromNumber: contactType === "vendor" ? "+14043415202" : "+14048005932", // Alex's line for vendors
         },
       });
       if (error) throw error;
