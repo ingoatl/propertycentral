@@ -62,28 +62,25 @@ function generateWhatsNewEmail(
     featuresForYou = features.filter(f => f.category === 'marketing');
   }
 
-  // Generate feature cards HTML (2-column layout)
-  const featureCards = features.map((feature, idx) => {
+  // Generate feature list HTML (clean, minimal Fortune 500 style)
+  const featureList = features.map((feature) => {
     const isHighlighted = featuresForYou.some(f => f.id === feature.id);
-    const badge = isHighlighted ? `<span style="background: linear-gradient(135deg, #fbbf24, #f59e0b); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">⭐ For You</span>` : '';
     
     return `
       <tr>
-        <td style="padding: 12px 0;">
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(145deg, #ffffff, #f8fafc); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
-            ${feature.screenshot_url ? `
+        <td style="padding: 24px 0; border-bottom: 1px solid #e2e8f0;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>
-              <td style="padding: 0;">
-                <img src="${feature.screenshot_url}" alt="${feature.title}" style="width: 100%; height: auto; display: block; border-radius: 12px 12px 0 0;" />
+              <td width="60" valign="top">
+                <div style="width: 48px; height: 48px; background: ${isHighlighted ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#f1f5f9'}; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                  <span style="font-size: 20px;">${isHighlighted ? '⭐' : '✓'}</span>
+                </div>
               </td>
-            </tr>
-            ` : ''}
-            <tr>
-              <td style="padding: 20px;">
-                <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #1e293b;">
-                  ${feature.title}${badge}
+              <td style="padding-left: 16px;">
+                <h3 style="margin: 0 0 6px 0; font-size: 17px; font-weight: 600; color: #0f172a; letter-spacing: -0.02em;">
+                  ${feature.title}
                 </h3>
-                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #64748b;">
+                <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475569;">
                   ${feature.description}
                 </p>
               </td>
@@ -102,23 +99,23 @@ function generateWhatsNewEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>What's New at PeachHaus</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f1f5f9;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; -webkit-font-smoothing: antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc;">
     <tr>
-      <td align="center" style="padding: 40px 20px;">
+      <td align="center" style="padding: 48px 24px;">
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%;">
           
-          <!-- Header -->
+          <!-- Minimal Header -->
           <tr>
-            <td style="padding: 0 0 30px 0;">
+            <td style="padding: 0 0 40px 0;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td>
-                    <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" style="height: 50px; width: auto;" />
+                    <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" style="height: 36px; width: auto;" />
                   </td>
-                  <td align="right">
-                    <span style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
-                      PRODUCT UPDATE 2.0
+                  <td align="right" style="vertical-align: middle;">
+                    <span style="font-size: 12px; font-weight: 500; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase;">
+                      Owner Update
                     </span>
                   </td>
                 </tr>
@@ -126,146 +123,131 @@ function generateWhatsNewEmail(
             </td>
           </tr>
 
-          <!-- Hero Section -->
+          <!-- Main Content Card -->
           <tr>
-            <td style="background: linear-gradient(135deg, #0f172a, #1e3a5f); border-radius: 16px; padding: 50px 40px; text-align: center;">
-              <h1 style="margin: 0 0 16px 0; font-size: 32px; font-weight: 800; color: white; line-height: 1.2;">
-                Your Portal Just Got Smarter
-              </h1>
-              <p style="margin: 0; font-size: 18px; color: #94a3b8; line-height: 1.6;">
-                ${features.length} new features designed for complete transparency
-              </p>
-            </td>
-          </tr>
-
-          <!-- Greeting -->
-          <tr>
-            <td style="padding: 40px 0 20px 0;">
-              <p style="margin: 0; font-size: 18px; color: #334155; line-height: 1.6;">
-                Hi ${greeting},
-              </p>
-              <p style="margin: 16px 0 0 0; font-size: 16px; color: #64748b; line-height: 1.7;">
-                We've been building. Your Owner Portal just received a major upgrade with powerful new features designed to give you unprecedented visibility into how we manage <strong style="color: #334155;">${propertyName}</strong>.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Personalized Section -->
-          <tr>
-            <td style="padding: 0 0 30px 0;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #dbeafe, #ede9fe); border-radius: 12px; border-left: 4px solid #3b82f6;">
-                <tr>
-                  <td style="padding: 20px 24px;">
-                    <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 700; color: #3b82f6; letter-spacing: 1px;">
-                      🎯 TAILORED FOR YOU
-                    </p>
-                    <p style="margin: 0; font-size: 15px; color: #334155; line-height: 1.6;">
-                      ${personalizedText}
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Features Header -->
-          <tr>
-            <td style="padding: 0 0 20px 0;">
-              <h2 style="margin: 0; font-size: 14px; font-weight: 700; color: #64748b; letter-spacing: 1px; text-transform: uppercase;">
-                What's New
-              </h2>
-            </td>
-          </tr>
-
-          <!-- Feature Cards -->
-          ${featureCards}
-
-          <!-- CTA Button -->
-          <tr>
-            <td style="padding: 40px 0;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td align="center">
-                    <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 18px 40px; border-radius: 30px; font-size: 16px; font-weight: 700; text-decoration: none; box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4);">
-                      Explore Your Updated Portal →
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Feedback Section -->
-          <tr>
-            <td style="background: #ffffff; border-radius: 16px; padding: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
-              <div style="text-align: center; margin-bottom: 24px;">
-                <div style="font-size: 40px; margin-bottom: 16px;">💬</div>
-                <h3 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; color: #1e293b;">
-                  We'd Love Your Feedback
-                </h3>
-                <p style="margin: 0 0 24px 0; font-size: 15px; color: #64748b; line-height: 1.7;">
-                  Have questions? Want a walkthrough? We're here for you—choose how you'd like to connect:
-                </p>
-              </div>
+            <td style="background: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 8px 30px rgba(0,0,0,0.04);">
               
-              <!-- Communication Options Grid -->
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding: 8px;">
-                    <a href="${portalUrl}#schedule-call" style="display: block; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 16px 20px; border-radius: 12px; text-decoration: none; text-align: center;">
-                      <span style="font-size: 24px; display: block; margin-bottom: 6px;">📞</span>
-                      <span style="font-size: 14px; font-weight: 600;">Schedule a Call</span>
-                      <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 4px;">Video or phone</span>
-                    </a>
-                  </td>
-                  <td style="padding: 8px;">
-                    <a href="mailto:info@peachhausgroup.com?subject=Feedback on ${encodeURIComponent(propertyName)} Portal" style="display: block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 16px 20px; border-radius: 12px; text-decoration: none; text-align: center;">
-                      <span style="font-size: 24px; display: block; margin-bottom: 6px;">✉️</span>
-                      <span style="font-size: 14px; font-weight: 600;">Send Email</span>
-                      <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 4px;">Reply anytime</span>
-                    </a>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px;">
-                    <a href="sms:+14048005932" style="display: block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 16px 20px; border-radius: 12px; text-decoration: none; text-align: center;">
-                      <span style="font-size: 24px; display: block; margin-bottom: 6px;">💬</span>
-                      <span style="font-size: 14px; font-weight: 600;">Text Us</span>
-                      <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 4px;">(404) 800-5932</span>
-                    </a>
-                  </td>
-                  <td style="padding: 8px;">
-                    <a href="${portalUrl}#messages" style="display: block; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 16px 20px; border-radius: 12px; text-decoration: none; text-align: center;">
-                      <span style="font-size: 24px; display: block; margin-bottom: 6px;">🎤</span>
-                      <span style="font-size: 14px; font-weight: 600;">Leave Voicemail</span>
-                      <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 4px;">In your portal</span>
-                    </a>
-                  </td>
-                </tr>
-              </table>
+              <!-- Hero -->
+              <tr>
+                <td style="padding: 48px 40px 32px 40px;">
+                  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #3b82f6; letter-spacing: 0.5px; text-transform: uppercase;">
+                    Product Update
+                  </p>
+                  <h1 style="margin: 0 0 16px 0; font-size: 32px; font-weight: 700; color: #0f172a; letter-spacing: -0.03em; line-height: 1.2;">
+                    Your Portal Just Got Better
+                  </h1>
+                  <p style="margin: 0; font-size: 17px; color: #475569; line-height: 1.6;">
+                    Hi ${greeting}, we've been working on new features designed to give you complete transparency into how we manage <strong style="color: #0f172a;">${propertyName}</strong>.
+                  </p>
+                </td>
+              </tr>
+
+              <!-- Personalized Note -->
+              <tr>
+                <td style="padding: 0 40px 32px 40px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f0f9ff; border-radius: 12px; border-left: 4px solid #3b82f6;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; font-size: 15px; color: #0369a1; line-height: 1.6; font-style: italic;">
+                          "${personalizedText}"
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Features Section -->
+              <tr>
+                <td style="padding: 0 40px;">
+                  <h2 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase;">
+                    What's New
+                  </h2>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 0 40px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    ${featureList}
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Primary CTA -->
+              <tr>
+                <td style="padding: 40px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center">
+                        <a href="${portalUrl}" style="display: inline-block; background: #0f172a; color: #ffffff; padding: 16px 48px; border-radius: 8px; font-size: 16px; font-weight: 600; text-decoration: none; letter-spacing: -0.01em;">
+                          Open Your Portal
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Contact Section (Fortune 500 style) -->
+              <tr>
+                <td style="padding: 0 40px 40px 40px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f8fafc; border-radius: 12px;">
+                    <tr>
+                      <td style="padding: 32px;">
+                        <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #0f172a;">
+                          Questions? We're here.
+                        </h3>
+                        <p style="margin: 0 0 20px 0; font-size: 15px; color: #64748b; line-height: 1.6;">
+                          Reply to this email, leave a voicemail in your portal, or text us anytime.
+                        </p>
+                        <table cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td style="padding-right: 12px;">
+                              <a href="${portalUrl}#messages" style="display: inline-block; background: #ffffff; color: #0f172a; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; border: 1px solid #e2e8f0;">
+                                🎤 Leave Voicemail
+                              </a>
+                            </td>
+                            <td style="padding-right: 12px;">
+                              <a href="sms:+14048005932" style="display: inline-block; background: #ffffff; color: #0f172a; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; border: 1px solid #e2e8f0;">
+                                💬 Text Us
+                              </a>
+                            </td>
+                            <td>
+                              <a href="${portalUrl}#schedule-call" style="display: inline-block; background: #ffffff; color: #0f172a; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; border: 1px solid #e2e8f0;">
+                                📞 Schedule Call
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
             <td style="padding: 40px 0; text-align: center;">
-              <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #334155;">
-                Thank you for trusting PeachHaus with your property.
+              <p style="margin: 0 0 8px 0; font-size: 15px; font-weight: 500; color: #334155;">
+                Thank you for your partnership.
               </p>
-              <p style="margin: 0 0 24px 0; font-size: 15px; color: #64748b;">
-                Warm regards,<br/>
-                <strong>Anja & Ingo</strong><br/>
-                PeachHaus Group
+              <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748b;">
+                Anja & Ingo<br/>
+                <span style="color: #94a3b8;">Co-Founders, PeachHaus Group</span>
               </p>
               <p style="margin: 0; font-size: 13px; color: #94a3b8;">
-                (404) 800-5932 &nbsp;|&nbsp; info@peachhausgroup.com
+                (404) 800-5932 · info@peachhausgroup.com
               </p>
             </td>
           </tr>
 
           <!-- Legal -->
           <tr>
-            <td style="padding: 20px 0 0 0; border-top: 1px solid #e2e8f0; text-align: center;">
+            <td style="padding: 24px 0 0 0; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.6;">
                 © ${new Date().getFullYear()} PeachHaus Group LLC. All rights reserved.<br/>
                 You're receiving this because you're a valued property owner partner.

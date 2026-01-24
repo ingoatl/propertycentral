@@ -54,6 +54,7 @@ import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
 import { OwnerGuestScreeningsTab } from "./components/OwnerGuestScreeningsTab";
 import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
 import { ScheduleOwnerCallModal } from "./components/ScheduleOwnerCallModal";
+import { ContactPeachHausDropdown } from "./components/ContactPeachHausDropdown";
 import { AudioPropertySummary } from "./components/AudioPropertySummary";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
@@ -822,15 +823,15 @@ export default function OwnerDashboard() {
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {session && (
-                  <Button 
-                    variant={propertyImageUrl ? "outline" : "outline"} 
-                    size="sm" 
-                    onClick={() => setShowScheduleCallModal(true)}
-                    className="gap-2"
-                  >
-                    <Calendar className="h-4 w-4" />
-                    <span className="hidden sm:inline">Schedule Call</span>
-                  </Button>
+                  <ContactPeachHausDropdown
+                    ownerId={session.ownerId}
+                    ownerName={session.ownerName}
+                    ownerEmail={session.email}
+                    propertyId={property?.id}
+                    propertyName={property?.name}
+                    onScheduleCall={() => setShowScheduleCallModal(true)}
+                    variant={propertyImageUrl ? "outline" : "outline"}
+                  />
                 )}
                 {session && property && (
                   <GenerateDashboardPdfButton
