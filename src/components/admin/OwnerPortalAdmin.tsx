@@ -29,7 +29,18 @@ import {
   Play,
   FileText,
   RotateCw,
+  Megaphone,
+  Archive,
+  ArchiveRestore,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { OwnerReportModal } from "./OwnerReportModal";
 
 interface OwnerProperty {
@@ -51,6 +62,7 @@ interface OwnerWithProperties {
   stripe_customer_id: string | null;
   payment_method: string | null;
   has_payment_method: boolean;
+  is_archived: boolean;
 }
 
 interface OwnerStats {
@@ -65,7 +77,10 @@ export function OwnerPortalAdmin() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
+  const [sendingRecap, setSendingRecap] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<string | null>(null);
   const [syncingPayments, setSyncingPayments] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [reportModal, setReportModal] = useState<{
     open: boolean;
     owner: OwnerWithProperties | null;
@@ -97,17 +112,17 @@ export function OwnerPortalAdmin() {
           second_owner_email,
           stripe_customer_id,
           payment_method,
-          has_payment_method
+          has_payment_method,
+          is_archived
         `)
         .order("name");
 
       if (error) throw error;
 
-      // Load properties to match with owners
+      // Load properties to match with owners (including offboarded for archived owners)
       const { data: propertiesData } = await supabase
         .from("properties")
-        .select("id, name, address, owner_id")
-        .is("offboarded_at", null);
+        .select("id, name, address, owner_id, offboarded_at");
 
       // Load portal sessions to track invites
       const { data: sessionsData } = await supabase
@@ -117,7 +132,12 @@ export function OwnerPortalAdmin() {
 
       // Combine data - support multiple properties per owner
       const ownersWithProperties: OwnerWithProperties[] = (ownersData || []).map((owner) => {
-        const ownerProperties = propertiesData?.filter((p) => p.owner_id === owner.id) || [];
+        // For archived owners, include offboarded properties; for active owners, only active properties
+        const ownerProperties = propertiesData?.filter((p) => {
+          if (p.owner_id !== owner.id) return false;
+          if (owner.is_archived) return true; // Show all properties for archived owners
+          return !p.offboarded_at; // Only active properties for active owners
+        }) || [];
         const sessions = sessionsData?.filter((s) => s.owner_id === owner.id) || [];
         const lastInvite = sessions[0];
         const lastAccess = sessions.find((s) => s.used_at);
@@ -131,6 +151,7 @@ export function OwnerPortalAdmin() {
           })),
           last_invite_sent: lastInvite?.created_at || null,
           last_portal_access: lastAccess?.used_at || null,
+          is_archived: owner.is_archived || false,
         };
       });
 
@@ -285,12 +306,57 @@ export function OwnerPortalAdmin() {
     toast.success('Opening Sara Thompson demo portal');
   };
 
+  // Send monthly recap
+  const handleSendMonthlyRecap = async (owner: OwnerWithProperties, property: OwnerProperty) => {
+    setSendingRecap(`${owner.id}-${property.id}`);
+    try {
+      const { error } = await supabase.functions.invoke("send-monthly-owner-recap", {
+        body: { 
+          property_id: property.id,
+          force: true
+        },
+      });
+      
+      if (error) throw error;
+      toast.success(`Monthly recap sent to ${owner.email}!`, {
+        description: `Generated for ${property.name}`
+      });
+    } catch (error: any) {
+      toast.error("Failed to send recap: " + (error.message || "Unknown error"));
+    } finally {
+      setSendingRecap(null);
+    }
+  };
+
+  // Archive/Restore owner
+  const handleToggleArchive = async (owner: OwnerWithProperties) => {
+    const newStatus = !owner.is_archived;
+    setArchiving(owner.id);
+    try {
+      const { error } = await supabase
+        .from("property_owners")
+        .update({ is_archived: newStatus })
+        .eq("id", owner.id);
+      if (error) throw error;
+      toast.success(newStatus ? "Owner archived - records kept for tax purposes" : "Owner restored to active");
+      loadOwners();
+    } catch (error: any) {
+      toast.error("Failed to update owner: " + (error.message || "Unknown error"));
+    } finally {
+      setArchiving(null);
+    }
+  };
+
+  // Filter and separate active/archived owners
   const filteredOwners = owners.filter(
     (o) =>
       o.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       o.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       o.properties.some(p => p.address?.toLowerCase().includes(searchTerm.toLowerCase()) || p.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+  
+  const activeOwners = filteredOwners.filter(o => !o.is_archived);
+  const archivedOwners = filteredOwners.filter(o => o.is_archived);
 
 
   if (loading) {
@@ -403,7 +469,7 @@ export function OwnerPortalAdmin() {
         <CardHeader>
           <CardTitle>Owner Portal Management</CardTitle>
           <CardDescription>
-            Send portal invites and preview owner dashboards
+            Send portal invites, monthly recaps, and preview owner dashboards
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -419,7 +485,7 @@ export function OwnerPortalAdmin() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredOwners.map((owner) => (
+              {activeOwners.map((owner) => (
                 owner.properties.length > 0 ? (
                   owner.properties.map((property, idx) => (
                     <TableRow key={`${owner.id}-${property.id}`}>
@@ -475,7 +541,7 @@ export function OwnerPortalAdmin() {
                         ) : null}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -483,6 +549,19 @@ export function OwnerPortalAdmin() {
                             title="Generate PDF Report"
                           >
                             <FileText className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSendMonthlyRecap(owner, property)}
+                            disabled={sendingRecap === `${owner.id}-${property.id}`}
+                            title="Send Monthly Recap (Voice + SMS)"
+                          >
+                            {sendingRecap === `${owner.id}-${property.id}` ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Megaphone className="h-4 w-4 text-blue-600" />
+                            )}
                           </Button>
                           <Button
                             variant="outline"
@@ -506,6 +585,24 @@ export function OwnerPortalAdmin() {
                             )}
                             Send
                           </Button>
+                          {idx === 0 && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                  onClick={() => handleToggleArchive(owner)}
+                                  disabled={archiving === owner.id}
+                                >
+                                  <Archive className="h-4 w-4 mr-2" />
+                                  Archive Owner
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -542,7 +639,22 @@ export function OwnerPortalAdmin() {
                       <span className="text-muted-foreground text-sm">-</span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="text-muted-foreground text-sm">No actions available</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={() => handleToggleArchive(owner)}
+                            disabled={archiving === owner.id}
+                          >
+                            <Archive className="h-4 w-4 mr-2" />
+                            Archive Owner
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 )
@@ -551,6 +663,92 @@ export function OwnerPortalAdmin() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Archived Owners Section */}
+      {archivedOwners.length > 0 && (
+        <Card className="opacity-75">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Archived Owners</CardTitle>
+                <Badge variant="outline" className="bg-muted">
+                  {archivedOwners.length}
+                </Badge>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowArchived(!showArchived)}
+              >
+                {showArchived ? 'Hide' : 'Show'}
+              </Button>
+            </div>
+            <CardDescription className="text-xs">
+              Former clients - tax records preserved
+            </CardDescription>
+          </CardHeader>
+          {showArchived && (
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {archivedOwners.map((owner) => (
+                    <TableRow key={owner.id} className="opacity-60">
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{owner.name}</p>
+                          <p className="text-sm text-muted-foreground">{owner.email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {owner.properties.length > 0 ? (
+                          <div className="max-w-[200px]">
+                            <p className="font-medium truncate">{owner.properties[0].name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {owner.properties.length > 1 ? `+${owner.properties.length - 1} more` : ''}
+                            </p>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            No Property
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-muted">
+                          Former Client
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleArchive(owner)}
+                          disabled={archiving === owner.id}
+                        >
+                          {archiving === owner.id ? (
+                            <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <ArchiveRestore className="h-4 w-4 mr-1" />
+                          )}
+                          Restore
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Report Modal */}
       {reportModal.owner && reportModal.property && (
