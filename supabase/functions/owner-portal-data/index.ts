@@ -219,6 +219,75 @@ function getDemoPortalData() {
       }
     },
     dataWarnings: [],
+    // PeachHaus listing optimization data for hybrid property demo
+    peachHausData: {
+      listing_health: {
+        score: 92,
+        status: "healthy",
+        summary: "Your listing is outperforming 85% of similar properties in the Smyrna/Vinings area. Strong click-through rates and excellent guest reviews are driving consistent bookings."
+      },
+      pricing_intelligence: {
+        current_base_rate: 375,
+        recommended_rate: 399,
+        rate_change_percent: 6.4,
+        market_adr: 325,
+        mpi_7_day: 1.35,
+        mpi_30_day: 1.28,
+        occupancy_rate: 78,
+        competitiveness_score: 91
+      },
+      recent_optimizations: [
+        {
+          type: "photo_reorder",
+          date: formatDate(new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000)),
+          status: "synced",
+          description: "Moved pool and hot tub photos to top positions based on click analysis",
+          expected_impact: "12-18% increase in listing clicks"
+        },
+        {
+          type: "title_update",
+          date: formatDate(new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000)),
+          status: "synced",
+          description: "Added 'Game Room • Pool • Hot Tub' to title for better search visibility",
+          expected_impact: "20% more impressions for family searches"
+        },
+        {
+          type: "pricing_adjustment",
+          date: formatDate(new Date(today.getTime() - 8 * 24 * 60 * 60 * 1000)),
+          status: "synced",
+          description: "Weekend rates increased $50/night based on demand patterns",
+          expected_impact: "$200-400 additional revenue per weekend booking"
+        },
+        {
+          type: "description_update",
+          date: formatDate(new Date(today.getTime() - 12 * 24 * 60 * 60 * 1000)),
+          status: "synced",
+          description: "Enhanced amenity descriptions and added Battery Atlanta proximity highlights",
+          expected_impact: "Better conversion for visitors exploring Atlanta events"
+        }
+      ],
+      revenue_alerts: [
+        {
+          type: "demand_spike",
+          severity: "info",
+          title: "High Demand Period Detected",
+          description: "Feb 14-17 (Valentine's weekend) showing 3x normal search traffic",
+          action_taken: "Rates automatically increased 25% for this period"
+        },
+        {
+          type: "gap_night",
+          severity: "warning",
+          title: "Gap Night Opportunity",
+          description: `1-night gap on ${formatDate(new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000))}`,
+          action_taken: "15% discount applied to attract last-minute bookers"
+        }
+      ],
+      performance_trends: {
+        booking_velocity_trend: "up",
+        ctr_trend: "up",
+        conversion_trend: "stable"
+      }
+    },
   };
 }
 
