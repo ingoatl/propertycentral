@@ -317,6 +317,18 @@ function getDemoPortalData() {
         status: "healthy",
         summary: "Your listing is outperforming 85% of similar properties in the Smyrna/Vinings area. Strong click-through rates and excellent guest reviews are driving consistent bookings."
       },
+      listingHealth: {
+        score: 92,
+        status: "healthy",
+      },
+      // Voice recap fields
+      maintenanceCompleted: 4,
+      tenantPaymentStatus: "on_time",
+      guestCommunicationsHandled: 28,
+      marketComparison: {
+        avgMonthlyRent: 6200,
+        positioning: "above_market",
+      },
       pricing_intelligence: {
         current_base_rate: 375,
         recommended_rate: 399,
@@ -465,8 +477,10 @@ serve(async (req: Request): Promise<Response> => {
         // Add peachHausData for voice recap
         (demoData as any).peachHausData = {
           listingHealth: { score: 88, status: "excellent" },
+          listing_health: { score: 88, status: "excellent" },
           maintenanceCompleted: 3,
           tenantPaymentStatus: "on_time",
+          guestCommunicationsHandled: 18,
           marketComparison: {
             avgMonthlyRent: 4200,
             positioning: "competitive",

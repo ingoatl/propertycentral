@@ -113,6 +113,27 @@ interface OwnerMarketingTabProps {
   guidebookUrl?: string | null;
   qrCodeUrl?: string | null;
   marketingStats?: MarketingStats[];
+  ownerName?: string;
+  rentalType?: "hybrid" | "mid_term" | "long_term" | string | null;
+  revenueData?: {
+    thisMonthRevenue?: number;
+    lastMonthRevenue?: number;
+    occupancyRate?: number;
+    upcomingBookings?: number;
+    strRevenue?: number;
+    mtrRevenue?: number;
+    averageRating?: number;
+    reviewCount?: number;
+    strBookings?: number;
+    mtrBookings?: number;
+  };
+  peachHausData?: {
+    listingHealth?: { score?: number; status?: string };
+    maintenanceCompleted?: number;
+    tenantPaymentStatus?: string;
+    guestCommunicationsHandled?: number;
+    marketComparison?: { avgMonthlyRent?: number; positioning?: string };
+  };
 }
 
 // Activity type metadata with context, industry insights, and rebooking impact
@@ -219,7 +240,7 @@ const defaultMetadata = {
   impactMetric: "20% more bookings",
 };
 
-export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl, marketingStats = [] }: OwnerMarketingTabProps) => {
+export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl, marketingStats = [], ownerName, rentalType, revenueData, peachHausData }: OwnerMarketingTabProps) => {
   const [activities, setActivities] = useState<MarketingActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
@@ -721,9 +742,17 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
             {/* Audio Property Summary */}
             <AudioPropertySummary 
               propertyName={propertyName}
+              ownerName={ownerName}
+              rentalType={rentalType}
               marketingStats={effectiveStats}
-              listingHealth={null}
-              revenueData={null}
+              listingHealth={peachHausData?.listingHealth}
+              revenueData={revenueData}
+              peachHausData={{
+                maintenanceCompleted: peachHausData?.maintenanceCompleted,
+                tenantPaymentStatus: peachHausData?.tenantPaymentStatus,
+                guestCommunicationsHandled: peachHausData?.guestCommunicationsHandled,
+                marketComparison: peachHausData?.marketComparison,
+              }}
             />
 
             {/* Value Realized */}

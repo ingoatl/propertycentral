@@ -1259,6 +1259,27 @@ export default function OwnerDashboard() {
                 propertyName={property.name}
                 directBookingUrl={property.website_url}
                 marketingStats={marketingStats}
+                ownerName={session?.ownerName}
+                rentalType={property.rental_type}
+                revenueData={{
+                  thisMonthRevenue: performanceMetrics.totalRevenue,
+                  lastMonthRevenue: statements[0]?.total_revenue,
+                  occupancyRate: performanceMetrics.occupancyRate,
+                  upcomingBookings: bookings?.str?.filter((b: any) => new Date(b.check_in) > new Date()).length || 0,
+                  strRevenue: performanceMetrics.strRevenue,
+                  mtrRevenue: performanceMetrics.mtrRevenue,
+                  averageRating: performanceMetrics.averageRating || undefined,
+                  reviewCount: performanceMetrics.reviewCount,
+                  strBookings: performanceMetrics.strBookings,
+                  mtrBookings: performanceMetrics.mtrBookings,
+                }}
+                peachHausData={peachHausData ? {
+                  listingHealth: peachHausData.listingHealth || peachHausData.listing_health,
+                  maintenanceCompleted: peachHausData.maintenanceCompleted || 0,
+                  tenantPaymentStatus: peachHausData.tenantPaymentStatus || "on_time",
+                  guestCommunicationsHandled: peachHausData.guestCommunicationsHandled || 0,
+                  marketComparison: peachHausData.marketComparison,
+                } : undefined}
               />
             )}
           </TabsContent>
