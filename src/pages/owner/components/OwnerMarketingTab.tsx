@@ -457,6 +457,48 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
     );
   }
 
+  // Generate default stats for demo when no stats are passed
+  const effectiveStats = currentStats || (isDemo ? {
+    id: "demo-stats",
+    property_id: propertyId,
+    report_month: new Date().toISOString().substring(0, 7),
+    social_media: {
+      instagram_posts: 12,
+      instagram_stories: 28,
+      facebook_posts: 8,
+      gmb_posts: 6,
+      total_reach: 45200,
+      total_engagement: 2840,
+      engagement_rate: 6.3,
+    },
+    outreach: {
+      total_companies_contacted: 24,
+      industries_targeted: ["Healthcare", "Tech", "Consulting", "Relocation"],
+      emails_sent: 48,
+      calls_made: 12,
+      hotsheets_distributed: 6,
+      decision_makers_identified: 18,
+    },
+    visibility: {
+      marketing_active: true,
+      included_in_hotsheets: true,
+    },
+    executive_summary: "Strong month! Your property was featured in 6 industry hotsheets sent to corporate housing coordinators. We made direct contact with 12 relocation managers at Delta, Coca-Cola, and Home Depot. Social media engagement is up 23% from last month.",
+    synced_at: new Date().toISOString(),
+  } : null);
+  
+  // Recalculate with effective stats
+  const effectiveTotalSocialPosts = (effectiveStats?.social_media?.instagram_posts || 0) + 
+    (effectiveStats?.social_media?.instagram_stories || 0) + 
+    (effectiveStats?.social_media?.facebook_posts || 0) + 
+    (effectiveStats?.social_media?.gmb_posts || 0);
+  
+  const effectiveTotalOutreachActions = (effectiveStats?.outreach?.emails_sent || 0) + 
+    (effectiveStats?.outreach?.calls_made || 0) + 
+    (effectiveStats?.outreach?.hotsheets_distributed || 0);
+  
+  const effectiveTotalMarketingActions = effectiveTotalSocialPosts + effectiveTotalOutreachActions;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -470,14 +512,16 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
             Track all marketing efforts for {propertyName}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadMarketingData}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        {!isDemo && (
+          <Button variant="outline" size="sm" onClick={loadMarketingData}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        )}
       </div>
 
       {/* Marketing Stats from Marketing Hub */}
-      {currentStats && (
+      {effectiveStats && (
         <>
           {/* Marketing Activity Summary */}
           <Card className="border-none shadow-lg bg-gradient-to-br from-primary/5 to-accent/5">
@@ -487,31 +531,31 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                 Marketing Activity Summary
               </CardTitle>
               <CardDescription>
-                {currentStats.report_month ? `Report for ${format(new Date(currentStats.report_month + '-01'), 'MMMM yyyy')}` : 'Current Period'}
+                {effectiveStats.report_month ? `Report for ${format(new Date(effectiveStats.report_month + '-01'), 'MMMM yyyy')}` : 'Current Period'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-center mb-6">
                 <p className="text-5xl font-bold text-primary">
-                  {totalMarketingActions}
+                  {effectiveTotalMarketingActions}
                 </p>
                 <p className="text-muted-foreground">Total marketing actions this month</p>
               </div>
-              <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center">
                 <div className="p-3 bg-background rounded-xl">
-                  <p className="text-2xl font-semibold">{totalSocialPosts}</p>
+                  <p className="text-2xl font-semibold">{effectiveTotalSocialPosts}</p>
                   <p className="text-xs text-muted-foreground">Social Posts</p>
                 </div>
                 <div className="p-3 bg-background rounded-xl">
-                  <p className="text-2xl font-semibold">{currentStats.outreach?.emails_sent || 0}</p>
+                  <p className="text-2xl font-semibold">{effectiveStats.outreach?.emails_sent || 0}</p>
                   <p className="text-xs text-muted-foreground">Emails</p>
                 </div>
                 <div className="p-3 bg-background rounded-xl">
-                  <p className="text-2xl font-semibold">{currentStats.outreach?.calls_made || 0}</p>
+                  <p className="text-2xl font-semibold">{effectiveStats.outreach?.calls_made || 0}</p>
                   <p className="text-xs text-muted-foreground">Calls</p>
                 </div>
                 <div className="p-3 bg-background rounded-xl">
-                  <p className="text-2xl font-semibold">{currentStats.outreach?.hotsheets_distributed || 0}</p>
+                  <p className="text-2xl font-semibold">{effectiveStats.outreach?.hotsheets_distributed || 0}</p>
                   <p className="text-xs text-muted-foreground">Hotsheets</p>
                 </div>
               </div>
@@ -523,45 +567,45 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
             <Card className="border-none shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Share2 className="h-5 w-5 text-pink-500" />
+                  <Share2 className="h-5 w-5 text-primary" />
                   Social Media Performance
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center">
-                      <Instagram className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                      <Instagram className="w-5 h-5 text-primary-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold">{currentStats.social_media?.instagram_posts || 0}</p>
+                      <p className="font-semibold">{effectiveStats.social_media?.instagram_posts || 0}</p>
                       <p className="text-xs text-muted-foreground">IG Posts</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-400 to-orange-400 flex items-center justify-center">
-                      <Instagram className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center">
+                      <Instagram className="w-5 h-5 text-primary-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold">{currentStats.social_media?.instagram_stories || 0}</p>
+                      <p className="font-semibold">{effectiveStats.social_media?.instagram_stories || 0}</p>
                       <p className="text-xs text-muted-foreground">IG Stories</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
-                      <Facebook className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+                      <Facebook className="w-5 h-5 text-primary-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold">{currentStats.social_media?.facebook_posts || 0}</p>
+                      <p className="font-semibold">{effectiveStats.social_media?.facebook_posts || 0}</p>
                       <p className="text-xs text-muted-foreground">FB Posts</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-500 flex items-center justify-center">
-                      <MapPin className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-accent-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold">{currentStats.social_media?.gmb_posts || 0}</p>
+                      <p className="font-semibold">{effectiveStats.social_media?.gmb_posts || 0}</p>
                       <p className="text-xs text-muted-foreground">GMB Posts</p>
                     </div>
                   </div>
@@ -569,20 +613,20 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                 <Separator className="my-4" />
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <p className="text-2xl font-bold text-primary">{formatNumber(currentStats.social_media?.total_reach)}</p>
+                    <p className="text-2xl font-bold text-primary">{formatNumber(effectiveStats.social_media?.total_reach)}</p>
                     <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                       Total Reach 
                       {reachTrend !== 0 && (
-                        reachTrend > 0 ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-red-500" />
+                        reachTrend > 0 ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-destructive" />
                       )}
                     </p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-primary">{formatNumber(currentStats.social_media?.total_engagement)}</p>
+                    <p className="text-2xl font-bold text-primary">{formatNumber(effectiveStats.social_media?.total_engagement)}</p>
                     <p className="text-xs text-muted-foreground">Total Engagement</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-emerald-600">{currentStats.social_media?.engagement_rate || 0}%</p>
+                    <p className="text-2xl font-bold text-accent">{effectiveStats.social_media?.engagement_rate || 0}%</p>
                     <p className="text-xs text-muted-foreground">Engagement Rate</p>
                   </div>
                 </div>
@@ -591,24 +635,24 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
 
             {/* Corporate Outreach - Enhanced with value explanation */}
             <CorporateOutreachCard 
-              outreach={currentStats.outreach} 
-              reportMonth={currentStats.report_month}
+              outreach={effectiveStats.outreach} 
+              reportMonth={effectiveStats.report_month}
             />
           </div>
 
           {/* Executive Summary */}
-          {currentStats.executive_summary && (
+          {effectiveStats.executive_summary && (
             <Card className="border-none shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-amber-500" />
+                  <Sparkles className="h-5 w-5 text-primary" />
                   Executive Summary
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="prose prose-sm max-w-none">
                   <p className="text-muted-foreground leading-relaxed">
-                    {currentStats.executive_summary}
+                    {effectiveStats.executive_summary}
                   </p>
                 </div>
               </CardContent>
@@ -620,7 +664,7 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
             <Card className="border-none shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-emerald-500" />
+                  <TrendingUp className="h-5 w-5 text-accent" />
                   Month-over-Month Trends
                 </CardTitle>
               </CardHeader>
@@ -629,11 +673,11 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                   <div className="text-center p-4 bg-muted/30 rounded-xl">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       {reachTrend >= 0 ? (
-                        <TrendingUp className="w-6 h-6 text-emerald-500" />
+                        <TrendingUp className="w-6 h-6 text-accent" />
                       ) : (
-                        <TrendingDown className="w-6 h-6 text-red-500" />
+                        <TrendingDown className="w-6 h-6 text-destructive" />
                       )}
-                      <span className={`text-2xl font-bold ${reachTrend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <span className={`text-2xl font-bold ${reachTrend >= 0 ? 'text-accent' : 'text-destructive'}`}>
                         {reachTrend >= 0 ? '+' : ''}{reachTrend}%
                       </span>
                     </div>
@@ -642,11 +686,11 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                   <div className="text-center p-4 bg-muted/30 rounded-xl">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       {engagementTrend >= 0 ? (
-                        <TrendingUp className="w-6 h-6 text-emerald-500" />
+                        <TrendingUp className="w-6 h-6 text-accent" />
                       ) : (
-                        <TrendingDown className="w-6 h-6 text-red-500" />
+                        <TrendingDown className="w-6 h-6 text-destructive" />
                       )}
-                      <span className={`text-2xl font-bold ${engagementTrend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <span className={`text-2xl font-bold ${engagementTrend >= 0 ? 'text-accent' : 'text-destructive'}`}>
                         {engagementTrend >= 0 ? '+' : ''}{engagementTrend}%
                       </span>
                     </div>
@@ -655,11 +699,11 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                   <div className="text-center p-4 bg-muted/30 rounded-xl">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       {outreachTrend >= 0 ? (
-                        <TrendingUp className="w-6 h-6 text-emerald-500" />
+                        <TrendingUp className="w-6 h-6 text-accent" />
                       ) : (
-                        <TrendingDown className="w-6 h-6 text-red-500" />
+                        <TrendingDown className="w-6 h-6 text-destructive" />
                       )}
-                      <span className={`text-2xl font-bold ${outreachTrend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <span className={`text-2xl font-bold ${outreachTrend >= 0 ? 'text-accent' : 'text-destructive'}`}>
                         {outreachTrend >= 0 ? '+' : ''}{outreachTrend}%
                       </span>
                     </div>
@@ -677,7 +721,7 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
             {/* Audio Property Summary */}
             <AudioPropertySummary 
               propertyName={propertyName}
-              marketingStats={currentStats}
+              marketingStats={effectiveStats}
               listingHealth={null}
               revenueData={null}
             />
