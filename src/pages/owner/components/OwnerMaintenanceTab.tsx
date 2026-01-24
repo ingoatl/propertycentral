@@ -57,9 +57,17 @@ interface WorkOrderPhoto {
   id: string;
   photo_url: string;
   photo_type: string;
+  media_type: string | null;
   caption: string | null;
   created_at: string;
+  uploaded_by: string | null;
 }
+
+const isVideoFile = (url: string, mediaType: string | null): boolean => {
+  if (mediaType === 'video') return true;
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.m4v', '.MOV', '.MP4'];
+  return videoExtensions.some(ext => url.toLowerCase().includes(ext.toLowerCase()));
+};
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   new: { label: "New", color: "bg-blue-100 text-blue-800", icon: AlertCircle },
@@ -328,26 +336,53 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
 
   const renderPhotoGrid = (photos: WorkOrderPhoto[], label: string) => {
     if (photos.length === 0) return null;
+    const videos = photos.filter(p => isVideoFile(p.photo_url, p.media_type));
+    const images = photos.filter(p => !isVideoFile(p.photo_url, p.media_type));
+    
     return (
-      <div className="space-y-2">
-        <h4 className="text-sm font-medium text-muted-foreground">{label} Photos</h4>
-        <div className="grid grid-cols-3 gap-2">
-          {photos.map((photo) => (
-            <div
-              key={photo.id}
-              className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity relative group"
-              onClick={() => setSelectedPhoto(photo.photo_url)}
-            >
-              <img
-                src={photo.photo_url}
-                alt={photo.caption || label}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                <Image className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+          {label} 
+          <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
+            {images.length} photos, {videos.length} videos
+          </span>
+        </h4>
+        <div className="grid grid-cols-3 gap-3">
+          {photos.map((photo) => {
+            const isVideo = isVideoFile(photo.photo_url, photo.media_type);
+            return (
+              <div
+                key={photo.id}
+                className="aspect-square rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all relative group shadow-sm"
+                onClick={() => setSelectedPhoto(photo.photo_url)}
+              >
+                {isVideo ? (
+                  <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                      <div className="w-0 h-0 border-t-6 border-b-6 border-l-10 border-transparent border-l-white ml-1" 
+                           style={{ borderWidth: '8px 0 8px 14px' }} />
+                    </div>
+                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                      </svg>
+                      Video
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={photo.photo_url}
+                    alt={photo.caption || label}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-xs text-white font-medium">{photo.uploaded_by || 'Vendor'}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
