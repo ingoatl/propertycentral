@@ -7,7 +7,7 @@ const corsHeaders = {
 
 interface CommsHubProperty {
   source_id: string;
-  name: string;
+  property_title: string;
   address: string;
   city: string;
   state: string;
@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
         // Build the Comms Hub property object
         const commsHubProperty: CommsHubProperty = {
           source_id: property.id,
-          name: brandName || property.name,
+          property_title: brandName || property.name,
           address: parsedAddress.street || property.address,
           city: parsedAddress.city,
           state: parsedAddress.state,
