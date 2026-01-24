@@ -155,22 +155,31 @@ const VendorJobPortal = () => {
     enabled: !!workOrder?.property?.id,
   });
 
-  // Fetch onboarding data for smart lock info
+  // Fetch onboarding data for smart lock info - made non-blocking with error handling
   const { data: onboardingData } = useQuery({
     queryKey: ["property-onboarding", workOrder?.property?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("owner_onboarding_submissions")
-        .select("smart_lock_brand, smart_lock_code, parking_instructions, garage_code")
-        .eq("property_id", workOrder!.property!.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data as OnboardingData | null;
+      try {
+        const { data, error } = await supabase
+          .from("owner_onboarding_submissions")
+          .select("smart_lock_brand, smart_lock_code, parking_instructions, garage_code")
+          .eq("property_id", workOrder!.property!.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (error) {
+          console.log("Onboarding data not accessible for vendor:", error.message);
+          return null;
+        }
+        return data as OnboardingData | null;
+      } catch (e) {
+        console.log("Error fetching onboarding data:", e);
+        return null;
+      }
     },
     enabled: !!workOrder?.property?.id,
+    retry: false, // Don't retry if RLS blocks access
   });
 
   // Fetch photos for this work order

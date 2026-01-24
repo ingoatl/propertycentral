@@ -348,6 +348,7 @@ export function MessageOwnerPanel({
         recipientName={owner.name}
         recipientPhone={owner.phone || ""}
         ownerId={owner.id}
+        workOrderId={workOrderId}
       />
     </>
   );

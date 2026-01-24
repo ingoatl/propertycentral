@@ -26,6 +26,34 @@ import { AIVoiceGenerator } from "./AIVoiceGenerator";
 import { VideoCapture } from "./VideoCapture";
 import { cn } from "@/lib/utils";
 
+// Voice message templates for owners with work orders
+const OWNER_VOICE_TEMPLATES = [
+  {
+    label: "Request Approval",
+    script: "Hi {{name}}, this is Alex from PeachHaus. I'm calling about your property. Our vendor has provided a quote and we need your approval before proceeding. Please give me a call back or reply APPROVE to this number. Thanks!",
+  },
+  {
+    label: "Work Started",
+    script: "Hi {{name}}, this is Alex from PeachHaus with a quick update. The vendor has started work at your property. Everything is going smoothly and we'll let you know as soon as it's complete.",
+  },
+  {
+    label: "Work Complete",
+    script: "Hi {{name}}, this is Alex from PeachHaus with great news! The work at your property is all done. Photos are available in your owner portal. Let me know if you have any questions!",
+  },
+  {
+    label: "Additional Issue",
+    script: "Hi {{name}}, this is Alex from PeachHaus. While our vendor was working, they discovered an additional issue. I wanted to discuss the options with you before proceeding. Please give me a call back when you get a chance.",
+  },
+  {
+    label: "Schedule Access",
+    script: "Hi {{name}}, this is Alex from PeachHaus. I'm calling to schedule access for our vendor at your property. Could you please let me know what times work best for you?",
+  },
+  {
+    label: "Urgent",
+    script: "Hi {{name}}, this is Alex from PeachHaus calling with an urgent matter. We've been notified of an emergency at your property. We've already dispatched a vendor. Please call us back as soon as possible.",
+  },
+];
+
 interface SendVoicemailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -34,6 +62,7 @@ interface SendVoicemailDialogProps {
   leadId?: string;
   ownerId?: string;
   vendorId?: string;
+  workOrderId?: string;
   propertyAddress?: string;
   onSuccess?: () => void;
   /** Allow editing recipient name for manual dial scenarios */
@@ -48,6 +77,7 @@ export function SendVoicemailDialog({
   leadId,
   ownerId,
   vendorId,
+  workOrderId,
   propertyAddress,
   onSuccess,
   allowNameEdit = false,
@@ -293,7 +323,24 @@ export function SendVoicemailDialog({
           />
         </TabsContent>
 
-        <TabsContent value="ai" className="mt-4">
+        <TabsContent value="ai" className="mt-4 space-y-4">
+          {/* Quick templates for owners with work orders */}
+          {ownerId && workOrderId && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Quick Scripts</Label>
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {OWNER_VOICE_TEMPLATES.map((template, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setMessageText(template.script.replace("{{name}}", effectiveRecipientName.split(" ")[0]))}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-background hover:bg-muted transition-colors whitespace-nowrap flex-shrink-0"
+                  >
+                    {template.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <AIVoiceGenerator
             recipientName={effectiveRecipientName}
             senderName={senderName}
