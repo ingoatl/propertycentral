@@ -46,6 +46,19 @@ interface RevenueData {
   upcomingBookings?: number;
   strRevenue?: number;
   mtrRevenue?: number;
+  averageRating?: number;
+  reviewCount?: number;
+  strBookings?: number;
+  mtrBookings?: number;
+}
+
+interface PropertyDetails {
+  bedrooms?: number;
+  bathrooms?: number;
+  squareFeet?: number;
+  maxGuests?: number;
+  amenities?: string[];
+  address?: string;
 }
 
 interface PeachHausData {
@@ -55,6 +68,9 @@ interface PeachHausData {
     avgMonthlyRent?: number;
     positioning?: string;
   };
+  guestCommunicationsHandled?: number;
+  dynamicPricingAdjustments?: number;
+  dynamicPricingValue?: number;
 }
 
 interface AudioPropertySummaryProps {
@@ -65,10 +81,12 @@ interface AudioPropertySummaryProps {
   listingHealth?: ListingHealth | null;
   revenueData?: RevenueData | null;
   peachHausData?: PeachHausData | null;
+  propertyDetails?: PropertyDetails | null;
 }
 
-// Ingo's voice ID from ElevenLabs
-const INGO_VOICE_ID = "HXPJDxQ2YWg0wT4IBlof";
+// Using Sarah's voice - popular, natural-sounding female voice from ElevenLabs
+// Sarah: EXAVITQu4vr4xnSDxMaL - One of the most popular ElevenLabs voices
+const VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
 export function AudioPropertySummary({ 
   propertyName, 
@@ -78,6 +96,7 @@ export function AudioPropertySummary({
   listingHealth,
   revenueData,
   peachHausData,
+  propertyDetails,
 }: AudioPropertySummaryProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -103,7 +122,7 @@ export function AudioPropertySummary({
   const previousMonth = subMonths(new Date(), 1);
   const previousMonthName = format(previousMonth, 'MMMM');
 
-  // Compose the summary script based on rental type
+  // Compose the summary script based on rental type - ENHANCED with property-specific info
   const composeSummaryScript = (): string => {
     const isHybrid = rentalType === "hybrid";
     const isMidTerm = rentalType === "mid_term";
@@ -118,18 +137,22 @@ export function AudioPropertySummary({
     const totalReach = marketingStats?.social_media?.total_reach || 0;
     const companiesContacted = marketingStats?.outreach?.total_companies_contacted || 0;
     const maintenanceItems = peachHausData?.maintenanceCompleted || 0;
-    const upcomingBookingValue = (revenueData?.upcomingBookings || 0) * 250; // Estimated avg booking value
+    const guestComms = peachHausData?.guestCommunicationsHandled || 0;
 
     // Build personalized script based on rental type
     let script = `Hi ${ownerFirstName}, here's your ${previousMonthName} performance recap for ${propertyName}. `;
 
     if (isHybrid) {
-      // HYBRID PROPERTY SCRIPT - Focus on STR bookings, occupancy, dynamic pricing
-      const totalRevenue = revenueData?.thisMonthRevenue || revenueData?.lastMonthRevenue || 0;
+      // HYBRID PROPERTY SCRIPT - Focus on STR bookings, occupancy, dynamic pricing, reviews
+      const totalRevenue = revenueData?.lastMonthRevenue || revenueData?.thisMonthRevenue || 0;
       const strRevenue = revenueData?.strRevenue || 0;
       const mtrRevenue = revenueData?.mtrRevenue || 0;
       const occupancy = revenueData?.occupancyRate || 0;
+      const avgRating = revenueData?.averageRating || 0;
+      const reviewCount = revenueData?.reviewCount || 0;
+      const strBookings = revenueData?.strBookings || 0;
 
+      // Revenue breakdown
       if (totalRevenue > 0) {
         script += `Last month, your property earned $${totalRevenue.toLocaleString()} in total revenue`;
         if (strRevenue > 0 && mtrRevenue > 0) {
@@ -138,8 +161,22 @@ export function AudioPropertySummary({
         script += `. `;
       }
 
+      // Occupancy and bookings
       if (occupancy > 0) {
-        script += `Your occupancy reached ${Math.round(occupancy)}% across the month. `;
+        script += `Your occupancy reached ${Math.round(occupancy)}% across the month`;
+        if (strBookings > 0) {
+          script += ` with ${strBookings} completed short-term stays`;
+        }
+        script += `. `;
+      }
+
+      // Guest reviews and ratings - property owners love hearing about this
+      if (avgRating && avgRating > 0) {
+        script += `Your guests love your property — you're averaging ${avgRating.toFixed(1)} stars`;
+        if (reviewCount > 0) {
+          script += ` across ${reviewCount} reviews`;
+        }
+        script += `. `;
       }
 
       // Marketing activities
@@ -157,6 +194,11 @@ export function AudioPropertySummary({
         script += `. `;
       }
 
+      // Guest communications handled
+      if (guestComms > 0) {
+        script += `We handled ${guestComms} guest communications on your behalf. `;
+      }
+
       // Proactive maintenance
       if (maintenanceItems > 0) {
         script += `We also handled ${maintenanceItems} maintenance items proactively, keeping your property guest-ready at all times. `;
@@ -169,30 +211,32 @@ export function AudioPropertySummary({
 
     } else if (isMidTerm) {
       // MID-TERM PROPERTY SCRIPT - Focus on tenant stability, property value, relationship building
-      // Based on research: owners want to hear about tenant stability, vacancy minimization, 
-      // tenant quality, proactive maintenance, market positioning, net income
+      // Research-backed: owners want to hear about stability, not sales pipeline
       
-      const monthlyRevenue = revenueData?.thisMonthRevenue || revenueData?.lastMonthRevenue || 0;
+      const monthlyRevenue = revenueData?.lastMonthRevenue || revenueData?.thisMonthRevenue || 0;
       const tenantStatus = peachHausData?.tenantPaymentStatus || "on_time";
 
+      // Monthly rental income
       if (monthlyRevenue > 0) {
         script += `Last month, your property generated $${monthlyRevenue.toLocaleString()} in rental income. `;
       }
 
-      // Tenant quality and payment status (key owner concern)
+      // Tenant quality and payment status (key owner concern per research)
       if (tenantStatus === "on_time") {
-        script += `Your current tenant remains in good standing with on-time payments throughout the lease. `;
+        script += `Your current tenant remains in excellent standing with consistent on-time payments throughout the lease. `;
+      } else if (tenantStatus === "monitoring") {
+        script += `We're monitoring your tenant's payment pattern and will keep you informed. `;
       } else {
-        script += `Your tenant's payment status has been monitored and documented. `;
+        script += `Your tenant's payment status has been documented and we're managing the situation. `;
       }
 
-      // Corporate relationship building (NOT "leads in pipeline")
+      // Corporate relationship building (NOT "leads in pipeline" per user request)
       if (callsMade > 0 || companiesContacted > 0) {
         const outreachCount = callsMade || companiesContacted;
-        script += `On the management side, we conducted ${outreachCount} outreach calls to corporate housing coordinators, insurance adjusters, and relocation specialists — building relationships that create tenant demand for properties like yours. `;
+        script += `On the management side, we conducted ${outreachCount} outreach calls to corporate housing coordinators, insurance adjusters, and relocation specialists — building relationships that create ongoing tenant demand for properties like yours. `;
       }
 
-      // Proactive maintenance (property value protection)
+      // Proactive maintenance (property value protection - key MTR owner concern)
       if (maintenanceItems > 0) {
         script += `We also completed ${maintenanceItems} preventive maintenance items, protecting your investment and ensuring long-term property value. `;
       }
@@ -204,10 +248,21 @@ export function AudioPropertySummary({
 
     } else {
       // GENERIC SCRIPT for unspecified rental types
-      const revenue = revenueData?.thisMonthRevenue || revenueData?.lastMonthRevenue || 0;
+      const revenue = revenueData?.lastMonthRevenue || revenueData?.thisMonthRevenue || 0;
+      const avgRating = revenueData?.averageRating || 0;
+      const reviewCount = revenueData?.reviewCount || 0;
       
       if (revenue > 0) {
         script += `Last month, your property generated $${revenue.toLocaleString()} in rental income. `;
+      }
+
+      // Reviews
+      if (avgRating && avgRating > 0) {
+        script += `Your property is rated ${avgRating.toFixed(1)} stars`;
+        if (reviewCount > 0) {
+          script += ` with ${reviewCount} guest reviews`;
+        }
+        script += `. `;
       }
 
       // Marketing activities
@@ -220,11 +275,9 @@ export function AudioPropertySummary({
         script += `. `;
       }
 
-      // Listing health (generic)
-      if (listingHealth?.score) {
-        const healthDesc = listingHealth.score >= 80 ? "excellent" : 
-                          listingHealth.score >= 60 ? "good" : "requires attention";
-        script += `Your listing health score is ${listingHealth.score}, which is ${healthDesc}. `;
+      // Maintenance
+      if (maintenanceItems > 0) {
+        script += `We handled ${maintenanceItems} maintenance items to keep your property in top condition. `;
       }
 
       // Occupancy
@@ -256,7 +309,7 @@ export function AudioPropertySummary({
           },
           body: JSON.stringify({ 
             text: script, 
-            voiceId: INGO_VOICE_ID // Using Ingo's voice
+            voiceId: VOICE_ID // Using Sarah's popular voice
           }),
         }
       );
