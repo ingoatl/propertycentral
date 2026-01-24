@@ -863,9 +863,15 @@ serve(async (req) => {
         const audioUrl = urlData.publicUrl;
         
         // Generate portal URL with magic link
-        const { data: magicLink } = await supabase.rpc('generate_owner_magic_token', {
-          p_owner_id: owner.id,
-        }).catch(() => ({ data: null }));
+        let magicLink: string | null = null;
+        try {
+          const { data } = await supabase.rpc('generate_owner_magic_token', {
+            p_owner_id: owner.id,
+          });
+          magicLink = data;
+        } catch {
+          // Magic link generation failed, use default portal URL
+        }
         
         const portalUrl = magicLink 
           ? `https://propertycentral.lovable.app/owner?token=${magicLink}`
@@ -893,7 +899,7 @@ serve(async (req) => {
         );
         
         // Send SMS
-        let smsResult = { success: false, error: 'No phone number' };
+        let smsResult: { success: boolean; error?: string } = { success: false, error: 'No phone number' };
         if (owner.phone) {
           const smsMessage = `Hi ${ownerNames}! 🏠 Your ${previousMonthName} performance recap for ${property.name} is ready!\n\n${metrics.totalRevenue > 0 ? `💰 Revenue: ${formatCurrency(metrics.totalRevenue)}\n` : ''}${metrics.occupancyRate > 0 ? `📊 Occupancy: ${Math.round(metrics.occupancyRate)}%\n` : ''}🎧 Listen: ${audioUrl}\n📱 Dashboard: ${portalUrl}\n\n— PeachHaus`;
           
