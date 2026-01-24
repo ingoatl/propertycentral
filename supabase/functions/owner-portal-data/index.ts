@@ -219,6 +219,97 @@ function getDemoPortalData() {
       }
     },
     dataWarnings: [],
+    
+    // Marketing Stats for Audio Property Summary (voice recap)
+    marketingStats: [
+      {
+        id: "mkt-demo-1",
+        property_id: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        report_month: formatMonth(lastMonth),
+        social_media: {
+          instagram_posts: 12,
+          instagram_stories: 28,
+          facebook_posts: 8,
+          gmb_posts: 6,
+          total_reach: 45200,
+          total_engagement: 2840,
+          engagement_rate: 6.3,
+        },
+        outreach: {
+          total_companies_contacted: 24,
+          industries_targeted: ["Healthcare", "Tech", "Consulting", "Relocation"],
+          emails_sent: 48,
+          calls_made: 12,
+          hotsheets_distributed: 6,
+          decision_makers_identified: 18,
+        },
+        visibility: {
+          marketing_active: true,
+          included_in_hotsheets: true,
+        },
+        executive_summary: "Strong month! Your property was featured in 6 industry hotsheets sent to corporate housing coordinators. We made direct contact with 12 relocation managers at Delta, Coca-Cola, and Home Depot. Social media engagement is up 23% from last month.",
+        synced_at: new Date().toISOString(),
+      },
+    ],
+    
+    // Guest Screenings mock data - matches GuestScreening interface
+    guestScreenings: [
+      {
+        id: "screen-1",
+        guest_name: "Jennifer Martinez",
+        guest_email: "jennifer.m@email.com",
+        screening_provider: "truvi",
+        screening_status: "passed",
+        verification_type: "full",
+        id_verified: true,
+        background_passed: true,
+        watchlist_clear: true,
+        risk_score: "low",
+        screening_date: formatDate(new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000)),
+        notes: "Verified Airbnb guest with 23 positive reviews. No concerns identified.",
+        raw_result: {
+          check_in: formatDate(new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)),
+          check_out: formatDate(new Date(today.getTime() + 8 * 24 * 60 * 60 * 1000)),
+        },
+      },
+      {
+        id: "screen-2",
+        guest_name: "The Williams Family",
+        guest_email: "williams.fam@email.com",
+        screening_provider: "truvi",
+        screening_status: "passed",
+        verification_type: "full",
+        id_verified: true,
+        background_passed: true,
+        watchlist_clear: true,
+        risk_score: "low",
+        screening_date: formatDate(new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000)),
+        notes: "Returning guest - stayed in 2024 with perfect record. Family with 2 children.",
+        raw_result: {
+          check_in: formatDate(new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000)),
+          check_out: formatDate(new Date(today.getTime() + 22 * 24 * 60 * 60 * 1000)),
+        },
+      },
+      {
+        id: "screen-3",
+        guest_name: "David Chen",
+        guest_email: "d.chen@microsoft.com",
+        screening_provider: "authenticate",
+        screening_status: "passed",
+        verification_type: "full",
+        id_verified: true,
+        background_passed: true,
+        watchlist_clear: true,
+        risk_score: "low",
+        screening_date: formatDate(new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000)),
+        notes: "Corporate traveler from Microsoft. Excellent stay, no issues.",
+        raw_result: {
+          check_in: formatDate(new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000)),
+          check_out: formatDate(new Date(today.getTime() - 4 * 24 * 60 * 60 * 1000)),
+        },
+      },
+    ],
+    
     // PeachHaus listing optimization data for hybrid property demo
     peachHausData: {
       listing_health: {
