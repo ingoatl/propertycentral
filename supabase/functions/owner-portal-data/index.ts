@@ -74,9 +74,11 @@ function getDemoPortalData() {
       square_feet: 3200,
       max_guests: 12,
       amenities: ["WiFi", "Pool", "Hot Tub", "Smart TV", "Full Kitchen", "Washer/Dryer", "Game Room", "Home Gym", "EV Charger"],
-      onboarding_stage: null,
+      onboarding_stage: null, // Fully onboarded - no active onboarding stage
       nightly_rate: 375,
     },
+    // Flag indicating this property has bookings (for voice recap script selection)
+    hasBookings: true,
     statements: [
       {
         id: "stmt-demo-1",

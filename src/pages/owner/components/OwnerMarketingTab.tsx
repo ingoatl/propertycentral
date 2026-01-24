@@ -134,6 +134,9 @@ interface OwnerMarketingTabProps {
     guestCommunicationsHandled?: number;
     marketComparison?: { avgMonthlyRent?: number; positioning?: string };
   };
+  // NEW: Onboarding and booking status props for voice recap
+  hasBookings?: boolean;
+  onboardingStage?: string | null;
 }
 
 // Activity type metadata with context, industry insights, and rebooking impact
@@ -240,7 +243,7 @@ const defaultMetadata = {
   impactMetric: "20% more bookings",
 };
 
-export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl, marketingStats = [], ownerName, rentalType, revenueData, peachHausData }: OwnerMarketingTabProps) => {
+export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl, marketingStats = [], ownerName, rentalType, revenueData, peachHausData, hasBookings, onboardingStage }: OwnerMarketingTabProps) => {
   const [activities, setActivities] = useState<MarketingActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
@@ -753,6 +756,8 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                 guestCommunicationsHandled: peachHausData?.guestCommunicationsHandled,
                 marketComparison: peachHausData?.marketComparison,
               }}
+              hasBookings={hasBookings}
+              onboardingStage={onboardingStage}
             />
 
             {/* Value Realized */}

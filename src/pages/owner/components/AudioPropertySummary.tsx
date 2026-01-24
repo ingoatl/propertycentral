@@ -82,11 +82,52 @@ interface AudioPropertySummaryProps {
   revenueData?: RevenueData | null;
   peachHausData?: PeachHausData | null;
   propertyDetails?: PropertyDetails | null;
+  // NEW: Onboarding and booking status props
+  hasBookings?: boolean;
+  onboardingStage?: string | null;
+  listedSince?: Date | string | null;
 }
 
 // Using Sarah's voice - popular, natural-sounding female voice from ElevenLabs
 // Sarah: EXAVITQu4vr4xnSDxMaL - One of the most popular ElevenLabs voices
 const VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+
+// Onboarding steps mapping - matches OwnerOnboardingTimeline.tsx
+const ONBOARDING_STEPS = [
+  { key: 'payment', label: 'Payment Setup' },
+  { key: 'onboarding_form', label: 'Onboarding Form' },
+  { key: 'insurance', label: 'Insurance' },
+  { key: 'inspection', label: 'Inspection' },
+  { key: 'photos', label: 'Photos & Tour' },
+  { key: 'onboarded', label: 'Go Live' },
+];
+
+// Map onboarding stages to step indices
+function getOnboardingStepIndex(stage: string | null): number {
+  switch(stage) {
+    case 'new_lead':
+    case 'contacted':
+    case 'discovery_call_scheduled':
+    case 'discovery_call_completed':
+    case 'proposal_sent':
+    case 'contract_out':
+    case 'contract_signed': 
+      return 0; // Payment Setup
+    case 'ach_form_signed': 
+    case 'onboarding_form_requested': 
+      return 1; // Onboarding Form
+    case 'insurance_requested': 
+      return 2; // Insurance
+    case 'inspection_scheduled': 
+      return 3; // Inspection
+    case 'photos_walkthrough':
+      return 4; // Photos & Tour
+    case 'ops_handoff': 
+      return 6; // Complete
+    default: 
+      return 0;
+  }
+}
 
 export function AudioPropertySummary({ 
   propertyName, 
@@ -97,6 +138,9 @@ export function AudioPropertySummary({
   revenueData,
   peachHausData,
   propertyDetails,
+  hasBookings,
+  onboardingStage,
+  listedSince,
 }: AudioPropertySummaryProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -122,8 +166,180 @@ export function AudioPropertySummary({
   const previousMonth = subMonths(new Date(), 1);
   const previousMonthName = format(previousMonth, 'MMMM');
 
+  // Helper to compose onboarding-in-progress script
+  const composeOnboardingScript = (stage: string): string => {
+    const stepIndex = getOnboardingStepIndex(stage);
+    const completedSteps = ONBOARDING_STEPS.slice(0, stepIndex).map(s => s.label);
+    const currentStep = ONBOARDING_STEPS[stepIndex]?.label || 'Getting started';
+    const isHybrid = rentalType === "hybrid";
+    
+    let script = `Hi ${ownerFirstName}, welcome to PeachHaus! We're excited to be partnering with you on ${propertyName}. `;
+    
+    // Acknowledge completed steps
+    if (completedSteps.length > 0) {
+      if (completedSteps.length === 1) {
+        script += `Your ${completedSteps[0].toLowerCase()} is complete — great start! `;
+      } else {
+        const lastStep = completedSteps.pop();
+        script += `You've already completed ${completedSteps.join(', ').toLowerCase()}, and ${lastStep?.toLowerCase()} — you're making excellent progress! `;
+      }
+    }
+    
+    // Current step guidance
+    switch(stepIndex) {
+      case 0: // Payment Setup
+        script += `We're currently setting up your payment processing. Once that's complete, we'll move on to gathering important details about your property. `;
+        break;
+      case 1: // Onboarding Form
+        script += `To keep momentum going, please complete your onboarding form when you get a chance. This helps us set up your listing with all the right details about your property — amenities, house rules, and what makes your place special. `;
+        break;
+      case 2: // Insurance
+        script += `Please submit your insurance documentation when you have a moment. This is an important step that protects both you and your future guests. `;
+        break;
+      case 3: // Inspection
+        script += `We're scheduling your property inspection — this is where we document your property's condition and ensure everything is guest-ready. We'll coordinate a convenient time with you. `;
+        break;
+      case 4: // Photos & Tour
+        script += `We're arranging your professional photo shoot and virtual tour. Quality photos are crucial — listings with professional photography see up to 40% more bookings. `;
+        break;
+      default:
+        script += `We're finalizing the last details to get your property live. `;
+    }
+    
+    // Marketing activities already happening
+    const callsMade = marketingStats?.outreach?.calls_made || 0;
+    const companiesContacted = marketingStats?.outreach?.total_companies_contacted || 0;
+    const outreachCount = callsMade || companiesContacted;
+    
+    if (isHybrid) {
+      script += `In the meantime, our marketing team is already building your property's digital presence. We've begun drafting your listing copy and identifying the best platforms to showcase your home. `;
+      if (outreachCount > 0) {
+        script += `We've also made ${outreachCount} outreach calls to corporate housing coordinators and insurance adjusters, building relationships for quality bookings. `;
+      }
+    } else {
+      script += `Our team is already reaching out to corporate housing coordinators, insurance adjusters, and relocation specialists in your area, building the relationships that lead to quality, long-term tenants. `;
+      if (outreachCount > 0) {
+        script += `So far, we've contacted ${outreachCount} companies to start generating interest. `;
+      }
+    }
+    
+    // Remaining steps
+    const remainingCount = ONBOARDING_STEPS.length - stepIndex - 1;
+    if (remainingCount > 0) {
+      script += `After ${currentStep.toLowerCase()}, `;
+      if (remainingCount === 1) {
+        script += `there's just one more step before you go live and start earning. `;
+      } else {
+        script += `there are ${remainingCount} more steps before we go live — we'll guide you through each one. `;
+      }
+    }
+    
+    script += `Thank you for trusting PeachHaus. We're here to make this process smooth and get you earning as quickly as possible.`;
+    
+    return script;
+  };
+  
+  // Helper to compose no-bookings script (fully onboarded but no reservations yet)
+  const composeNoBookingsScript = (): string => {
+    const isHybrid = rentalType === "hybrid";
+    const isMidTerm = rentalType === "mid_term";
+    
+    const callsMade = marketingStats?.outreach?.calls_made || 0;
+    const companiesContacted = marketingStats?.outreach?.total_companies_contacted || 0;
+    const outreachCount = callsMade || companiesContacted;
+    const totalSocialPosts = (marketingStats?.social_media?.instagram_posts || 0) + 
+      (marketingStats?.social_media?.instagram_stories || 0) + 
+      (marketingStats?.social_media?.facebook_posts || 0) + 
+      (marketingStats?.social_media?.gmb_posts || 0);
+    const totalReach = marketingStats?.social_media?.total_reach || 0;
+    const listingScore = listingHealth?.score || 0;
+    const avgMonthlyRent = peachHausData?.marketComparison?.avgMonthlyRent;
+    
+    let script = `Hi ${ownerFirstName}, here's your update for ${propertyName}. `;
+    
+    if (isHybrid) {
+      // HYBRID - No Bookings Yet Script
+      script += `Your property is now live and our marketing machine is in full gear. `;
+      
+      // Social media activity
+      if (totalSocialPosts > 0) {
+        if (totalReach > 1000) {
+          script += `This month, we've posted ${totalSocialPosts} times across social media, reaching over ${Math.round(totalReach / 1000)} thousand potential guests. `;
+        } else {
+          script += `This month, we've made ${totalSocialPosts} social media posts to promote your property. `;
+        }
+      }
+      
+      // Outreach activity
+      if (outreachCount > 0) {
+        script += `We've also made ${outreachCount} outreach calls to corporate housing coordinators and insurance adjusters to build mid-term booking opportunities. `;
+      }
+      
+      // Set expectations for new listings
+      script += `New listings on Airbnb and VRBO typically take 30 to 60 days to gain full visibility in search results. We're using this time strategically — optimizing your listing, adjusting pricing for competitiveness, and running targeted promotions to attract your first guests. `;
+      
+      // Listing health
+      if (listingScore > 0) {
+        script += `Your listing health score is ${listingScore}, which means we're well positioned. `;
+      }
+      
+      script += `We're working every day to line up your first reservation. `;
+      
+    } else if (isMidTerm) {
+      // MID-TERM - No Bookings Yet Script
+      script += `Your property is market-ready and we're actively working to place your first quality tenant. `;
+      
+      // Outreach activity
+      if (outreachCount > 0) {
+        script += `This month, we've contacted ${outreachCount} corporate housing companies, insurance adjusters, and relocation specialists. These relationships take time to develop, but they lead to reliable, longer-term tenants who treat your property with care. `;
+      } else {
+        script += `We're reaching out to corporate housing companies, insurance adjusters, and relocation specialists to find quality tenants. These relationships take time to develop, but they lead to reliable tenants who treat your property with care. `;
+      }
+      
+      // Market context
+      if (avgMonthlyRent) {
+        script += `We're monitoring the local market to ensure your rental rate is competitive while maximizing your returns. Properties like yours in the area are averaging around $${avgMonthlyRent.toLocaleString()} monthly. `;
+      }
+      
+      // Set expectations
+      script += `Mid-term placements often take a few weeks to finalize, but once we secure a tenant, you'll enjoy consistent monthly income with fewer turnovers. `;
+      
+    } else {
+      // GENERIC - No Bookings Yet Script
+      script += `Your property is live and we're actively marketing to potential guests. `;
+      
+      if (totalSocialPosts > 0 || outreachCount > 0) {
+        script += `This month, we've run ${totalSocialPosts + outreachCount} marketing activities on your behalf. `;
+      }
+      
+      script += `New listings typically take a few weeks to gain traction in search results. We're optimizing your listing and building visibility to attract your first booking soon. `;
+    }
+    
+    script += `Thank you for your trust in PeachHaus. We're committed to getting your property earning and will be in touch as soon as that first booking comes through.`;
+    
+    return script;
+  };
+
   // Compose the summary script based on rental type - ENHANCED with property-specific info
   const composeSummaryScript = (): string => {
+    // Determine which script to use based on onboarding status and bookings
+    const isOnboarding = onboardingStage && 
+      onboardingStage !== 'ops_handoff' && 
+      getOnboardingStepIndex(onboardingStage) < 6;
+    
+    const propertyHasNoBookings = hasBookings === false;
+    
+    // Priority 1: Onboarding in progress
+    if (isOnboarding && onboardingStage) {
+      return composeOnboardingScript(onboardingStage);
+    }
+    
+    // Priority 2: Fully onboarded but no bookings yet
+    if (propertyHasNoBookings) {
+      return composeNoBookingsScript();
+    }
+    
+    // Priority 3: Standard performance recap (existing logic)
     const isHybrid = rentalType === "hybrid";
     const isMidTerm = rentalType === "mid_term";
 
