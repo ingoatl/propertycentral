@@ -220,7 +220,7 @@ export default function RecapPlayer() {
         body: {
           owner_id: effectiveOwnerId,
           property_id: effectivePropertyId || null,
-          communication_type: "voicemail",
+          message_type: "voicemail",
           body: `🎙️ Voice reply to ${effectiveMonthName} recap for ${effectivePropertyName} (${recordingDuration}s)`,
           subject: `Voice reply from owner - ${effectivePropertyName}`,
           attachment_url: urlData.publicUrl,
@@ -251,7 +251,7 @@ export default function RecapPlayer() {
         body: {
           owner_id: effectiveOwnerId,
           property_id: effectivePropertyId || null,
-          communication_type: "sms",
+          message_type: "sms",
           body: `Reply to ${effectiveMonthName} recap: ${textMessage}`,
           subject: `Text reply from owner - ${effectivePropertyName}`,
         }
