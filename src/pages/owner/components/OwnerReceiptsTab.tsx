@@ -72,12 +72,9 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
     return Array.from(vends).sort();
   }, [expenses]);
 
-  // Filter and sort expenses
+  // Filter and sort expenses - show ALL expenses (not just those with receipts)
   const filteredExpenses = useMemo(() => {
     let result = [...expenses];
-
-    // First, filter out expenses without any receipt file
-    result = result.filter(e => e.email_screenshot_path || e.file_path || e.original_receipt_path);
 
     // Search filter
     if (searchQuery) {
@@ -350,12 +347,13 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
         </CardContent>
       </Card>
 
-      {/* Receipts List Grouped by Month */}
+      {/* Expenses List Grouped by Month */}
       <Card className="border-none shadow-lg overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-muted/50 to-background border-b">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Receipt className="h-5 w-5" />
-            Expense Receipts by Month
+            All Expenses
+            <Badge variant="secondary" className="ml-2">{filteredExpenses.length} total</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -440,7 +438,7 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
                                 {formatCurrency(expense.amount)}
                               </p>
                               <div className="flex gap-1">
-                                {hasReceipt && (
+                                {hasReceipt ? (
                                   <>
                                     <Button
                                       variant="ghost"
@@ -467,6 +465,10 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
                                       <Download className="h-4 w-4" />
                                     </Button>
                                   </>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground">
+                                    No Receipt
+                                  </Badge>
                                 )}
                               </div>
                             </div>
