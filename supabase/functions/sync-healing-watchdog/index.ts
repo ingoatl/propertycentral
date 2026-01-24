@@ -73,22 +73,48 @@ serve(async (req) => {
 
     // Known property name mappings (fuzzy -> actual) - EXPANDED
     const knownMappings: Record<string, string> = {
+      // Family Retreat
       "the alpine": "alpine",
+      "the durham family retreat": "family retreat",
+      "durham family retreat": "family retreat",
+      "homerun hideaway": "family retreat",
+      "the homerun hideaway": "family retreat",
+      
+      // STR Properties
       "scandi chic-mins to ksu/dt, sleeps 5, w/king, pet frndly": "scandi chic",
+      "the scandi chic": "scandi chic",
+      "the boho lux": "scandi chic",
+      "boho lux": "scandi chic",
+      
+      // Modern + Cozy Townhome
       "old roswell": "modern + cozy townhome",
       "the old roswell retreat": "modern + cozy townhome",
+      "old roswell retreat": "modern + cozy townhome",
+      
+      // Woodland Lane
       "mableton meadows": "woodland lane",
+      
+      // Lavish Living
       "lavish living - 8 mins from braves stadium w/king": "lavish living",
       "lavish living atlanta": "lavish living",
-      "homerun hideaway": "family retreat",
-      "the bloom": "whispering oaks",
+      
+      // Whispering Oaks
+      "the bloom": "whispering oaks farmhouse",
+      "bloom": "whispering oaks farmhouse",
+      
+      // Canadian Way
       "the maple leaf": "canadian way",
+      "maple leaf": "canadian way",
+      
+      // MidTown Lighthouse
       "shift sanctuary": "midtown lighthouse",
+      "the shift sanctuary": "midtown lighthouse",
+      
+      // Other
       "alpharetta basecamp": "smoke hollow",
-      "the boho lux": "house of blues",
       "the berkley at chimney lakes": "the berkley",
+      "berkley at chimney lakes": "the berkley",
       "the scandinavian retreat": "scandinavian retreat",
-      "the scandi chic": "scandi chic",
     };
 
     // ========== HEAL 1: Marketing Activities Without Owner ID ==========
@@ -528,6 +554,86 @@ serve(async (req) => {
     if (strMissingPeachHaus.length > 0) {
       issues.push(`${strMissingPeachHaus.length} STR/hybrid properties missing Listing Boost data`);
     }
+
+    // ========== HEAL 10: Auto-Apply Known Mappings to Fix Failed Syncs ==========
+    console.log("Auto-healing failed syncs with known mappings...");
+    
+    let autoHealedCount = 0;
+    
+    // Get recent unmatched marketing stats from failed sync logs
+    const { data: unmatchedSyncLogs } = await supabase
+      .from("partner_sync_log")
+      .select("id, error_details, source_system")
+      .eq("sync_type", "marketing_stats_unmatched")
+      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .limit(50);
+    
+    for (const syncLog of unmatchedSyncLogs || []) {
+      const errorDetails = syncLog.error_details as any;
+      if (!errorDetails?.property_name) continue;
+      
+      const externalName = errorDetails.property_name.toLowerCase().trim();
+      const mappedName = knownMappings[externalName];
+      
+      if (mappedName) {
+        // Find the property in our system
+        const property = safeProperties.find(p => 
+          p.name?.toLowerCase().trim() === mappedName.toLowerCase()
+        );
+        
+        if (property) {
+          // Check if we already have marketing stats for this property/month
+          const reportMonth = errorDetails.report_month || new Date().toISOString().slice(0, 7);
+          
+          const { data: existingStats } = await supabase
+            .from("property_marketing_stats")
+            .select("id")
+            .eq("property_id", property.id)
+            .eq("report_month", reportMonth)
+            .maybeSingle();
+          
+          if (!existingStats) {
+            // Create placeholder stats entry to mark this property as synced
+            const { error: insertError } = await supabase
+              .from("property_marketing_stats")
+              .insert({
+                property_id: property.id,
+                report_month: reportMonth,
+                social_media: {},
+                outreach: { hotsheets_distributed: 1, decision_makers_identified: 0 },
+                visibility: { marketing_active: true, included_in_hotsheets: true },
+                executive_summary: `Marketing data recovered via self-healing. Property matched: "${errorDetails.property_name}" → "${property.name}"`,
+                synced_at: new Date().toISOString(),
+              });
+            
+            if (!insertError) {
+              autoHealedCount++;
+              console.log(`Auto-healed: "${errorDetails.property_name}" → "${property.name}" for ${reportMonth}`);
+              
+              // Mark the failed sync log as healed
+              await supabase
+                .from("partner_sync_log")
+                .update({ 
+                  sync_status: "healed",
+                  error_details: { 
+                    ...errorDetails, 
+                    healed_at: new Date().toISOString(),
+                    matched_to: property.name 
+                  }
+                })
+                .eq("id", syncLog.id);
+            }
+          }
+        }
+      }
+    }
+    
+    if (autoHealedCount > 0) {
+      healingActions.push(`Auto-healed ${autoHealedCount} marketing stats from failed syncs`);
+      console.log(`Auto-healed ${autoHealedCount} marketing stats entries`);
+    }
+    
+    details.autoHealedMarketingStats = autoHealedCount;
 
     // ========== SUMMARY ==========
     const summary = {

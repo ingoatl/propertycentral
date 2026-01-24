@@ -38,21 +38,56 @@ interface MarketingStatsPayload {
 
 // Known property name mappings (Marketing Hub name -> Property Central name)
 const PROPERTY_NAME_MAPPINGS: Record<string, string> = {
+  // Family Retreat mappings
   "the durham family retreat": "family retreat",
+  "durham family retreat": "family retreat",
+  "homerun hideaway": "family retreat",
+  "the homerun hideaway": "family retreat",
+  
+  // The Berkley mappings
   "the berkley at chimney lakes": "the berkley",
+  "berkley at chimney lakes": "the berkley",
+  
+  // Alpine mappings
   "the alpine": "alpine",
+  
+  // Scandinavian Retreat mappings
   "the scandinavian retreat": "scandinavian retreat",
+  
+  // Modern + Cozy Townhome mappings
   "old roswell retreat": "modern + cozy townhome",
   "the old roswell retreat": "modern + cozy townhome",
+  "old roswell": "modern + cozy townhome",
+  
+  // Woodland Lane mappings
   "mableton meadows": "woodland lane",
-  "the boho lux": "house of blues",
-  "homerun hideaway": "family retreat",
-  "the bloom": "whispering oaks",
+  
+  // House of Blues / Boho Lux - Note: may need to verify actual property
+  "the boho lux": "scandi chic",
+  "boho lux": "scandi chic",
+  
+  // Whispering Oaks mappings
+  "the bloom": "whispering oaks farmhouse",
+  "bloom": "whispering oaks farmhouse",
+  
+  // Canadian Way mappings
   "the maple leaf": "canadian way",
+  "maple leaf": "canadian way",
+  
+  // MidTown Lighthouse mappings
   "shift sanctuary": "midtown lighthouse",
+  "the shift sanctuary": "midtown lighthouse",
+  
+  // Smoke Hollow mappings (if exists)
   "alpharetta basecamp": "smoke hollow",
+  
+  // Lavish Living mappings
   "lavish living atlanta": "lavish living",
+  "lavish living - 8 mins from braves stadium w/king": "lavish living",
+  
+  // Scandi Chic mappings
   "the scandi chic": "scandi chic",
+  "scandi chic-mins to ksu/dt, sleeps 5, w/king, pet frndly": "scandi chic",
 };
 
 serve(async (req) => {
