@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageSquare, CheckCheck, Phone, Send } from "lucide-react";
+import { MessageSquare, Send, CheckCheck, Clock, Image, FileVideo, Play, Mic } from "lucide-react";
 import { format } from "date-fns";
 
 interface WorkOrderVendorSMSThreadProps {
@@ -23,14 +23,11 @@ export function WorkOrderVendorSMSThread({
   vendorName,
   onSendMessage,
 }: WorkOrderVendorSMSThreadProps) {
-  // Fetch all SMS communications related to this work order or vendor
+  // Fetch SMS messages related to this work order
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ["work-order-sms-thread", workOrderId, vendorId, vendorPhone],
+    queryKey: ["work-order-sms", workOrderId, vendorId],
     queryFn: async () => {
-      // Get communications that match:
-      // 1. work_order_id in metadata
-      // 2. vendor_id in metadata
-      // 3. vendor_phone in metadata matching this vendor's phone
+      // Get all SMS communications
       const { data, error } = await supabase
         .from("lead_communications")
         .select("*")
@@ -39,47 +36,42 @@ export function WorkOrderVendorSMSThread({
 
       if (error) throw error;
 
-      // Filter for messages related to this work order or vendor
-      const normalizePhone = (phone: string) => phone?.replace(/\D/g, '').slice(-10);
-      const vendorPhoneNormalized = vendorPhone ? normalizePhone(vendorPhone) : null;
-
-      return (data || []).filter((msg: any) => {
+      // Filter by work order ID or vendor ID/phone in metadata
+      const normalizedVendorPhone = vendorPhone?.replace(/\D/g, "").slice(-10);
+      
+      return (data || []).filter((msg) => {
         const meta = msg.metadata as any;
-        
         // Match by work order ID
         if (meta?.work_order_id === workOrderId) return true;
-        
         // Match by vendor ID
         if (vendorId && meta?.vendor_id === vendorId) return true;
-        
-        // Match by vendor phone
-        if (vendorPhoneNormalized) {
-          const msgPhone = meta?.vendor_phone || meta?.to_number || meta?.ghl_data?.contactPhone;
-          if (msgPhone && normalizePhone(msgPhone) === vendorPhoneNormalized) return true;
+        // Match by phone number
+        if (normalizedVendorPhone) {
+          const metaPhone = meta?.vendor_phone || meta?.to_number || meta?.ghl_data?.contactPhone;
+          if (metaPhone && metaPhone.replace(/\D/g, "").slice(-10) === normalizedVendorPhone) {
+            return true;
+          }
         }
-        
         return false;
       });
     },
-    enabled: !!(workOrderId && (vendorId || vendorPhone)),
+    enabled: !!(workOrderId || vendorId || vendorPhone),
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   if (isLoading) {
     return (
-      <Card className="border-border/50">
-        <CardContent className="p-4">
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-3">
-                <Skeleton className="h-8 w-8 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-16 w-full rounded-lg" />
-                </div>
-              </div>
-            ))}
-          </div>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            SMS History
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-3/4 ml-auto" />
+          <Skeleton className="h-16 w-full" />
         </CardContent>
       </Card>
     );
@@ -87,92 +79,151 @@ export function WorkOrderVendorSMSThread({
 
   if (messages.length === 0) {
     return (
-      <Card className="border-border/50">
-        <CardContent className="p-8 text-center">
-          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-            <MessageSquare className="h-6 w-6 text-muted-foreground" />
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            SMS History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+            <p className="text-sm text-muted-foreground">No SMS history with this vendor</p>
+            {onSendMessage && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 gap-2"
+                onClick={onSendMessage}
+              >
+                <Send className="h-4 w-4" />
+                Send First Message
+              </Button>
+            )}
           </div>
-          <h3 className="font-medium text-foreground mb-1">No SMS History</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            No text messages have been exchanged with this vendor for this work order yet.
-          </p>
-          {onSendMessage && (
-            <Button onClick={onSendMessage} size="sm">
-              <Send className="h-4 w-4 mr-2" />
-              Send First Message
-            </Button>
-          )}
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="border-border/50">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              SMS Thread with {vendorName || 'Vendor'}
-            </span>
-          </div>
-          {onSendMessage && (
-            <Button variant="outline" size="sm" onClick={onSendMessage}>
-              <Send className="h-3.5 w-3.5 mr-1.5" />
-              New Message
-            </Button>
-          )}
-        </div>
-        
-        <ScrollArea className="h-[350px] pr-4">
-          <div className="space-y-4">
+    <Card>
+      <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <MessageSquare className="h-4 w-4" />
+          SMS History
+          <Badge variant="secondary" className="ml-1 text-xs">
+            {messages.length}
+          </Badge>
+        </CardTitle>
+        {onSendMessage && (
+          <Button variant="outline" size="sm" className="gap-2 h-8" onClick={onSendMessage}>
+            <Send className="h-3.5 w-3.5" />
+            New Message
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-0">
+        <ScrollArea className="h-[400px] px-4 pb-4">
+          <div className="space-y-3">
             {messages.map((msg: any) => {
               const isOutbound = msg.direction === "outbound";
               const meta = msg.metadata as any;
+              const hasAttachments = meta?.attachments?.length > 0;
+              const hasVoicemail = meta?.audio_url || meta?.player_url;
+              const hasVideo = meta?.video_url;
               
               return (
-                <div 
-                  key={msg.id} 
-                  className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}
+                <div
+                  key={msg.id}
+                  className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}
                 >
-                  <div className={`max-w-[80%] ${isOutbound ? 'items-end' : 'items-start'}`}>
-                    {/* Sender info */}
-                    <div className={`flex items-center gap-2 mb-1 text-xs text-muted-foreground ${isOutbound ? 'justify-end' : ''}`}>
-                      {!isOutbound && (
-                        <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
-                          Vendor
-                        </Badge>
-                      )}
-                      <span>{format(new Date(msg.created_at), "MMM d, h:mm a")}</span>
-                      {isOutbound && (
-                        <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
-                          PM
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    {/* Message bubble */}
+                  <div className={`max-w-[85%] ${isOutbound ? "items-end" : "items-start"}`}>
                     <div
                       className={`rounded-2xl px-4 py-2.5 text-sm ${
                         isOutbound
-                          ? "bg-gradient-to-br from-violet-500 to-violet-600 text-white"
-                          : "bg-muted text-foreground"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
                       }`}
                     >
                       <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                      
+                      {/* Media attachments */}
+                      {hasAttachments && (
+                        <div className="flex gap-1.5 mt-2 flex-wrap">
+                          {meta.attachments.map((att: any, idx: number) => {
+                            const isImage = att.type === "image" || att.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                            return (
+                              <a
+                                key={idx}
+                                href={att.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block h-16 w-16 rounded-lg overflow-hidden border border-primary-foreground/20"
+                              >
+                                {isImage ? (
+                                  <img src={att.url} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center bg-background/20">
+                                    <FileVideo className="h-6 w-6" />
+                                  </div>
+                                )}
+                              </a>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {/* Voice message */}
+                      {hasVoicemail && (
+                        <a
+                          href={meta.player_url || meta.audio_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-background/20 text-xs"
+                        >
+                          <div className="h-8 w-8 rounded-full bg-background/30 flex items-center justify-center">
+                            <Mic className="h-4 w-4" />
+                          </div>
+                          <span>Voice Message</span>
+                          <Play className="h-3 w-3 ml-auto" />
+                        </a>
+                      )}
+                      
+                      {/* Video message */}
+                      {hasVideo && !hasVoicemail && (
+                        <a
+                          href={meta.video_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-background/20 text-xs"
+                        >
+                          <div className="h-8 w-8 rounded-full bg-background/30 flex items-center justify-center">
+                            <FileVideo className="h-4 w-4" />
+                          </div>
+                          <span>Video Message</span>
+                          <Play className="h-3 w-3 ml-auto" />
+                        </a>
+                      )}
                     </div>
                     
-                    {/* Status indicator for outbound */}
-                    {isOutbound && (
-                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground justify-end">
-                        <CheckCheck className="h-3 w-3" />
-                        <span className="capitalize">{msg.status || 'sent'}</span>
-                        {meta?.alex_routed && (
-                          <span className="text-[10px] opacity-60">• via Alex</span>
-                        )}
-                      </div>
-                    )}
+                    {/* Status & timestamp */}
+                    <div className={`flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground ${isOutbound ? "justify-end" : ""}`}>
+                      {isOutbound && (
+                        <>
+                          {msg.status === "sent" || msg.status === "delivered" ? (
+                            <CheckCheck className="h-3 w-3 text-primary" />
+                          ) : (
+                            <Clock className="h-3 w-3" />
+                          )}
+                        </>
+                      )}
+                      {format(new Date(msg.created_at), "MMM d, h:mm a")}
+                      {isOutbound && meta?.alex_routed && (
+                        <span className="text-muted-foreground/60">• via Alex</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
