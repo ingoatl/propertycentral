@@ -41,6 +41,7 @@ import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDi
 import { WorkOrderBeforeAfterComparison } from "@/components/maintenance/WorkOrderBeforeAfterComparison";
 import { WorkOrderVendorSMSThread } from "@/components/maintenance/WorkOrderVendorSMSThread";
 import { WorkOrderMiniTimeline } from "@/components/maintenance/WorkOrderMiniTimeline";
+import { MessageOwnerPanel } from "@/components/maintenance/MessageOwnerPanel";
 
 interface WorkOrderPhoto {
   id: string;
@@ -93,7 +94,10 @@ const PremiumWorkOrderModal = ({
         .from("work_orders")
         .select(`
           *,
-          property:properties(id, name, address, image_path),
+          property:properties(
+            id, name, address, image_path, owner_id,
+            owner:property_owners(id, name, phone, email)
+          ),
           assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, company_name, phone, email)
         `)
         .eq("id", workOrderId)
@@ -768,6 +772,23 @@ const PremiumWorkOrderModal = ({
                         )}
                       </CardContent>
                     </Card>
+
+                    {/* Message Owner Panel */}
+                    <MessageOwnerPanel
+                      workOrderId={workOrderId}
+                      owner={workOrder.property?.owner ? {
+                        id: workOrder.property.owner.id,
+                        name: workOrder.property.owner.name,
+                        phone: workOrder.property.owner.phone,
+                        email: workOrder.property.owner.email,
+                      } : null}
+                      propertyAddress={workOrder.property?.address || ""}
+                      workOrderTitle={workOrder.title}
+                      workOrderDescription={workOrder.description}
+                      vendorQuoteAmount={workOrder.quoted_cost}
+                      vendorName={workOrder.assigned_vendor?.company_name || workOrder.assigned_vendor?.name}
+                      totalCost={workOrder.actual_cost || workOrder.estimated_cost}
+                    />
                   </div>
                 </div>
               </TabsContent>
