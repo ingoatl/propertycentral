@@ -79,18 +79,22 @@ serve(async (req) => {
     }
 
     for (const workOrder of workOrdersNeedingFollowup || []) {
-      if (!workOrder.vendor?.phone) {
+      // Handle array relations from Supabase joins
+      const vendor = Array.isArray(workOrder.vendor) ? workOrder.vendor[0] : workOrder.vendor;
+      const property = Array.isArray(workOrder.property) ? workOrder.property[0] : workOrder.property;
+
+      if (!vendor?.phone) {
         console.log(`Work order ${workOrder.work_order_number}: No vendor phone`);
         continue;
       }
 
       try {
-        const formattedPhone = formatPhoneE164(workOrder.vendor.phone);
+        const formattedPhone = formatPhoneE164(vendor.phone);
         const portalUrl = `https://propertycentral.lovable.app/vendor-job/${workOrder.vendor_access_token}`;
-        const propertyAddress = workOrder.property?.address || workOrder.property?.name || "the property";
+        const propertyAddress = property?.address || property?.name || "the property";
 
         // Professional follow-up message
-        const followupMessage = `Hi ${workOrder.vendor.name?.split(' ')[0] || 'there'},
+        const followupMessage = `Hi ${vendor.name?.split(' ')[0] || 'there'},
 
 Just following up on the job we sent over 1 hour ago.
 
@@ -143,8 +147,8 @@ Thank you!
               body: JSON.stringify({
                 locationId: ghlLocationId,
                 phone: formattedPhone,
-                name: workOrder.vendor.name || "Vendor",
-                email: workOrder.vendor.email || undefined,
+                name: vendor.name || "Vendor",
+                email: vendor.email || undefined,
               }),
             }
           );
@@ -175,7 +179,7 @@ Thank you!
           );
 
           if (sendResponse.ok) {
-            console.log(`Follow-up SMS sent to vendor ${workOrder.vendor.name} for WO-${workOrder.work_order_number}`);
+            console.log(`Follow-up SMS sent to vendor ${vendor.name} for WO-${workOrder.work_order_number}`);
             
             // Mark as follow-up sent
             await supabase
@@ -186,7 +190,7 @@ Thank you!
             // Log to timeline
             await supabase.from("work_order_timeline").insert({
               work_order_id: workOrder.id,
-              action: `Follow-up reminder SMS sent to ${workOrder.vendor.name} (1 hour after dispatch)`,
+              action: `Follow-up reminder SMS sent to ${vendor.name} (1 hour after dispatch)`,
               performed_by_type: "system",
               performed_by_name: "Automated Follow-up System",
             });
@@ -205,7 +209,7 @@ Thank you!
                 ghl_contact_id: ghlContactId,
                 from_number: VENDOR_FROM_NUMBER,
                 to_number: formattedPhone,
-                vendor_id: workOrder.vendor.id,
+                vendor_id: vendor.id,
                 vendor_phone: formattedPhone,
                 contact_type: "vendor",
                 work_order_id: workOrder.id,
@@ -214,7 +218,7 @@ Thank you!
             });
 
             await supabase.from("sms_log").insert({
-              phone_number: workOrder.vendor.phone,
+              phone_number: vendor.phone,
               message_type: "vendor_followup_reminder",
               message_body: followupMessage,
               ghl_message_id: sendData.messageId,
@@ -228,9 +232,10 @@ Thank you!
             results.errors.push(`WO-${workOrder.work_order_number}: ${errorText}`);
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`Error processing WO-${workOrder.work_order_number}:`, error);
-        results.errors.push(`WO-${workOrder.work_order_number}: ${error.message}`);
+        results.errors.push(`WO-${workOrder.work_order_number}: ${errorMessage}`);
       }
     }
 
@@ -244,10 +249,11 @@ Thank you!
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Error in vendor follow-up reminder:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
