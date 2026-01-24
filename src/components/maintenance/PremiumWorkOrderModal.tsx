@@ -30,12 +30,13 @@ import {
   MapPin, User, Clock, DollarSign, Wrench, Send, 
   CheckCircle, AlertTriangle, Phone, Mail, Calendar,
   RotateCcw, ExternalLink, Loader2, Image, Video, Play,
-  Building2, FileText, MessageSquare, History, Settings, X, Camera
+  Building2, FileText, MessageSquare, History, Settings, X, Camera, MessageCircle
 } from "lucide-react";
 import { 
   WorkOrder, WorkOrderStatus, WorkOrderTimeline, MaintenanceMessage,
   STATUS_CONFIG, URGENCY_CONFIG, WORK_ORDER_CATEGORIES, Vendor 
 } from "@/types/maintenance";
+import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 
 interface WorkOrderPhoto {
   id: string;
@@ -74,6 +75,7 @@ const PremiumWorkOrderModal = ({
   const [isResending, setIsResending] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<WorkOrderPhoto | null>(null);
   const [activePhotoTab, setActivePhotoTab] = useState<string>("before");
+  const [showVendorSMS, setShowVendorSMS] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch the complete work order data with property image
@@ -510,6 +512,43 @@ const PremiumWorkOrderModal = ({
 
               {/* Overview Tab */}
               <TabsContent value="overview" className="mt-0">
+                {/* Verification Alert - Top of Overview */}
+                {workOrder.status === "pending_verification" && (
+                  <Card className="border-2 border-amber-500/50 bg-amber-50/50 dark:bg-amber-900/10 mb-6">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-4">
+                        <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                          <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg text-foreground">Verification Required</h3>
+                          <p className="text-sm text-muted-foreground mt-1 mb-4">
+                            Review the before/after photos and videos to verify work completion.
+                          </p>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <Button 
+                              size="lg"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                              onClick={() => updateStatus.mutate("completed")}
+                              disabled={updateStatus.isPending}
+                            >
+                              {updateStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-5 w-5 mr-2" />}
+                              Verify & Complete Job
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => updateStatus.mutate("in_progress")}
+                              disabled={updateStatus.isPending}
+                            >
+                              Request Revisions
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="grid grid-cols-3 gap-6">
                   {/* Main Info */}
                   <div className="col-span-2 space-y-6">
@@ -624,6 +663,15 @@ const PremiumWorkOrderModal = ({
                             >
                               {isResending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RotateCcw className="h-3.5 w-3.5 mr-1.5" />}
                               Resend Job Link
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setShowVendorSMS(true)}
+                              className="w-full"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                              Message Vendor
                             </Button>
                           </div>
                         </CardContent>
@@ -1027,6 +1075,18 @@ const PremiumWorkOrderModal = ({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Vendor SMS Dialog */}
+      {workOrder.assigned_vendor?.phone && (
+        <SendSMSDialog
+          open={showVendorSMS}
+          onOpenChange={setShowVendorSMS}
+          contactName={workOrder.assigned_vendor.name}
+          contactPhone={workOrder.assigned_vendor.phone}
+          contactType="vendor"
+          contactId={workOrder.assigned_vendor.id}
+        />
+      )}
     </>
   );
 };
