@@ -281,17 +281,15 @@ serve(async (req: Request): Promise<Response> => {
       }));
 
     await supabase.from("partner_sync_log").insert({
-      source_project: "peachhaus",
+      source_system: "peachhaus",
       sync_type: "property_performance",
-      status: processed > 0 ? "completed" : "partial",
-      records_synced: processed,
-      error_message: skipped > 0 ? `${skipped} properties skipped` : null,
-      raw_payload: {
-        total_received: payload.properties.length,
-        processed,
-        skipped,
+      sync_status: processed > 0 ? "completed" : "partial",
+      properties_synced: processed,
+      properties_failed: skipped,
+      error_details: skipped > 0 ? {
+        message: `${skipped} properties skipped`,
         skipped_details: skippedDetails,
-      },
+      } : null,
     });
 
     return new Response(
@@ -312,11 +310,11 @@ serve(async (req: Request): Promise<Response> => {
     // Log failure
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     await supabase.from("partner_sync_log").insert({
-      source_project: "peachhaus",
+      source_system: "peachhaus",
       sync_type: "property_performance",
-      status: "failed",
-      records_synced: 0,
-      error_message: errorMessage,
+      sync_status: "failed",
+      properties_synced: 0,
+      error_details: { message: errorMessage },
     });
 
     return new Response(

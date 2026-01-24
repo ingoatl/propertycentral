@@ -248,16 +248,21 @@ export function OwnerPropertyTab({ property, owner, peachHausData }: OwnerProper
               {listingHealth && (
                 <div className="p-4 rounded-xl bg-muted/30 text-center">
                   <div className={`text-4xl font-bold mb-1 ${
-                    listingHealth.status === 'healthy' ? 'text-emerald-600' :
+                    listingHealth.status === 'excellent' || listingHealth.status === 'healthy' ? 'text-emerald-600' :
+                    listingHealth.status === 'good' ? 'text-blue-600' :
                     listingHealth.status === 'warning' ? 'text-amber-600' : 'text-destructive'
                   }`}>
                     {listingHealth.score}
                   </div>
                   <Badge className={
-                    listingHealth.status === 'healthy' ? 'bg-emerald-100 text-emerald-700' :
+                    listingHealth.status === 'excellent' || listingHealth.status === 'healthy' ? 'bg-emerald-100 text-emerald-700' :
+                    listingHealth.status === 'good' ? 'bg-blue-100 text-blue-700' :
                     listingHealth.status === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                   }>
-                    {listingHealth.status}
+                    {listingHealth.status === 'excellent' ? 'Excellent' : 
+                     listingHealth.status === 'good' ? 'Good' :
+                     listingHealth.status === 'healthy' ? 'Healthy' :
+                     listingHealth.status}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-2">Health Score</p>
                 </div>
