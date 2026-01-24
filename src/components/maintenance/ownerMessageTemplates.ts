@@ -14,7 +14,7 @@ export const OWNER_MAINTENANCE_TEMPLATES: OwnerMessageTemplate[] = [
     id: "approval_request",
     label: "Request Approval",
     icon: CheckSquare,
-    description: "Ask owner to approve a vendor quote over $300",
+    description: "Ask owner to approve a vendor quote over $500",
     sms: "Hi {{owner_name}}, we need your approval for a repair at {{property_address}}. The vendor quoted ${{quote_amount}} for {{work_description}}. Reply APPROVE to proceed or call us with questions.",
     voice: "Hi {{owner_name}}, this is {{sender_name}} from PeachHaus. I'm calling about your property at {{property_address}}. Our vendor has provided a quote of ${{quote_amount}} for {{work_description}}. We need your approval before proceeding. Please give me a call back or reply APPROVE to this number. Thanks!"
   },

@@ -42,6 +42,9 @@ import {
   Instagram,
   Facebook,
   MapPin,
+  Linkedin,
+  Video,
+  AlertCircle,
 } from "lucide-react";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { CorporateOutreachCard } from "./CorporateOutreachCard";
@@ -77,6 +80,15 @@ interface MarketingActivity {
   } | null;
 }
 
+// Recent post from Communications Hub
+interface RecentPost {
+  platform: 'instagram' | 'facebook' | 'gmb' | 'tiktok' | 'linkedin' | 'nextdoor';
+  url: string;
+  has_verified_link: boolean;
+  posted_at: string;
+  note?: string;
+}
+
 interface MarketingStats {
   id: string;
   property_id: string;
@@ -86,9 +98,13 @@ interface MarketingStats {
     instagram_stories?: number;
     facebook_posts?: number;
     gmb_posts?: number;
+    tiktok_posts?: number;
+    linkedin_posts?: number;
+    nextdoor_posts?: number;
     total_reach?: number;
     total_engagement?: number;
     engagement_rate?: number;
+    recent_posts?: RecentPost[];
   };
   outreach: {
     total_companies_contacted?: number;
@@ -234,6 +250,54 @@ const activityMetadata: Record<string, {
     impactMetric: "15-20% fee savings",
     rebookingImpact: "Direct booking invites convert at 12% for repeat stays",
   },
+};
+
+// Platform icon and styling helper for social posts
+const getPlatformConfig = (platform: string) => {
+  const configs: Record<string, { icon: React.ReactNode; label: string; color: string; bgColor: string }> = {
+    instagram: {
+      icon: <Instagram className="w-4 h-4" />,
+      label: "Instagram",
+      color: "text-pink-600 dark:text-pink-400",
+      bgColor: "bg-gradient-to-br from-pink-100 to-purple-100 dark:from-pink-900/30 dark:to-purple-900/30",
+    },
+    facebook: {
+      icon: <Facebook className="w-4 h-4" />,
+      label: "Facebook",
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    },
+    gmb: {
+      icon: <MapPin className="w-4 h-4" />,
+      label: "Google Business",
+      color: "text-emerald-600 dark:text-emerald-400",
+      bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
+    },
+    tiktok: {
+      icon: <Video className="w-4 h-4" />,
+      label: "TikTok",
+      color: "text-slate-800 dark:text-slate-200",
+      bgColor: "bg-gradient-to-br from-slate-100 to-teal-100 dark:from-slate-900/30 dark:to-teal-900/30",
+    },
+    linkedin: {
+      icon: <Linkedin className="w-4 h-4" />,
+      label: "LinkedIn",
+      color: "text-blue-700 dark:text-blue-300",
+      bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    },
+    nextdoor: {
+      icon: <Home className="w-4 h-4" />,
+      label: "Nextdoor",
+      color: "text-green-600 dark:text-green-400",
+      bgColor: "bg-green-100 dark:bg-green-900/30",
+    },
+  };
+  return configs[platform.toLowerCase()] || {
+    icon: <Share2 className="w-4 h-4" />,
+    label: platform,
+    color: "text-muted-foreground",
+    bgColor: "bg-muted",
+  };
 };
 
 const defaultMetadata = {
@@ -657,6 +721,61 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                 </div>
               </CardContent>
             </Card>
+
+            {/* Recent Posts with Live Links */}
+            {effectiveStats.social_media?.recent_posts && effectiveStats.social_media.recent_posts.length > 0 && (
+              <Card className="border-none shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ExternalLink className="h-5 w-5 text-primary" />
+                    Recent Social Posts
+                  </CardTitle>
+                  <CardDescription>Click to view your property's live posts</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {effectiveStats.social_media.recent_posts.map((post, idx) => {
+                      const config = getPlatformConfig(post.platform);
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
+                            post.has_verified_link 
+                              ? 'hover:bg-muted/50 cursor-pointer' 
+                              : 'opacity-60'
+                          } ${config.bgColor}`}
+                          onClick={() => post.has_verified_link && post.url && window.open(post.url, '_blank')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg bg-background flex items-center justify-center ${config.color}`}>
+                              {config.icon}
+                            </div>
+                            <div>
+                              <p className="font-medium">{config.label}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(post.posted_at), 'MMM d, yyyy')}
+                                {post.note && <span className="ml-2 italic">• {post.note}</span>}
+                              </p>
+                            </div>
+                          </div>
+                          {post.has_verified_link ? (
+                            <Button variant="ghost" size="sm" className="gap-1">
+                              <ExternalLink className="w-4 h-4" />
+                              View
+                            </Button>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              Link Pending
+                            </Badge>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Corporate Outreach - Enhanced with value explanation */}
             <CorporateOutreachCard 
