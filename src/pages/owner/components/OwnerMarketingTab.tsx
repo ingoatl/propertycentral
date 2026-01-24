@@ -114,6 +114,7 @@ interface OwnerMarketingTabProps {
   qrCodeUrl?: string | null;
   marketingStats?: MarketingStats[];
   ownerName?: string;
+  secondOwnerName?: string | null;
   rentalType?: "hybrid" | "mid_term" | "long_term" | string | null;
   revenueData?: {
     thisMonthRevenue?: number;
@@ -243,7 +244,7 @@ const defaultMetadata = {
   impactMetric: "20% more bookings",
 };
 
-export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl, marketingStats = [], ownerName, rentalType, revenueData, peachHausData, hasBookings, onboardingStage }: OwnerMarketingTabProps) => {
+export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, guidebookUrl, qrCodeUrl, marketingStats = [], ownerName, secondOwnerName, rentalType, revenueData, peachHausData, hasBookings, onboardingStage }: OwnerMarketingTabProps) => {
   const [activities, setActivities] = useState<MarketingActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
@@ -746,6 +747,7 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
             <AudioPropertySummary 
               propertyName={propertyName}
               ownerName={ownerName}
+              secondOwnerName={secondOwnerName}
               rentalType={rentalType}
               marketingStats={effectiveStats}
               listingHealth={peachHausData?.listingHealth}

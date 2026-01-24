@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -12,8 +12,63 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react";
-import { format, subMonths } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isAfter, isBefore } from "date-fns";
 import { Progress } from "@/components/ui/progress";
+
+// Helper to convert number to spoken words for ElevenLabs TTS
+// ElevenLabs best practice: spell out numbers fully in words for correct pronunciation
+function numberToWords(num: number): string {
+  if (num === 0) return "zero";
+  
+  const ones = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", 
+                "seventeen", "eighteen", "nineteen"];
+  const tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+  
+  function convertHundreds(n: number): string {
+    if (n === 0) return "";
+    if (n < 20) return ones[n];
+    if (n < 100) {
+      const ten = Math.floor(n / 10);
+      const one = n % 10;
+      return tens[ten] + (one ? " " + ones[one] : "");
+    }
+    const hundred = Math.floor(n / 100);
+    const remainder = n % 100;
+    return ones[hundred] + " hundred" + (remainder ? " " + convertHundreds(remainder) : "");
+  }
+  
+  if (num < 0) return "negative " + numberToWords(Math.abs(num));
+  
+  const rounded = Math.round(num);
+  
+  if (rounded >= 1000000) {
+    const millions = Math.floor(rounded / 1000000);
+    const remainder = rounded % 1000000;
+    return numberToWords(millions) + " million" + (remainder ? " " + numberToWords(remainder) : "");
+  }
+  
+  if (rounded >= 1000) {
+    const thousands = Math.floor(rounded / 1000);
+    const remainder = rounded % 1000;
+    return numberToWords(thousands) + " thousand" + (remainder ? " " + numberToWords(remainder) : "");
+  }
+  
+  return convertHundreds(rounded);
+}
+
+// Format currency for TTS - spells out amounts in words
+function formatCurrencyForTTS(amount: number): string {
+  const rounded = Math.round(amount);
+  if (rounded === 0) return "zero dollars";
+  return numberToWords(rounded) + " dollars";
+}
+
+// Format percentage for TTS
+function formatPercentForTTS(percent: number): string {
+  const rounded = Math.round(percent);
+  return numberToWords(rounded) + " percent";
+}
 
 interface MarketingStats {
   social_media?: {
@@ -76,6 +131,7 @@ interface PeachHausData {
 interface AudioPropertySummaryProps {
   propertyName: string;
   ownerName?: string;
+  secondOwnerName?: string | null;
   rentalType?: "hybrid" | "mid_term" | "long_term" | string | null;
   marketingStats?: MarketingStats | null;
   listingHealth?: ListingHealth | null;
@@ -132,6 +188,7 @@ function getOnboardingStepIndex(stage: string | null): number {
 export function AudioPropertySummary({ 
   propertyName, 
   ownerName,
+  secondOwnerName,
   rentalType,
   marketingStats, 
   listingHealth,
@@ -159,10 +216,18 @@ export function AudioPropertySummary({
     };
   }, [audioUrl]);
 
-  // Get owner's first name for personalized greeting
-  const ownerFirstName = ownerName?.split(' ')[0] || "there";
+  // Get owner's first name(s) for personalized greeting - handles 2 owners
+  const ownerFirstName = useMemo(() => {
+    const firstName1 = ownerName?.split(' ')[0] || "there";
+    const firstName2 = secondOwnerName?.split(' ')[0];
+    
+    if (firstName2 && firstName2 !== firstName1) {
+      return `${firstName1} and ${firstName2}`;
+    }
+    return firstName1;
+  }, [ownerName, secondOwnerName]);
 
-  // Always use previous month for the report
+  // Always use previous month for the report - dynamically updates when month changes
   const previousMonth = subMonths(new Date(), 1);
   const previousMonthName = format(previousMonth, 'MMMM');
 
@@ -298,7 +363,7 @@ export function AudioPropertySummary({
       
       // Market context
       if (avgMonthlyRent) {
-        script += `We're monitoring the local market to ensure your rental rate is competitive while maximizing your returns. Properties like yours in the area are averaging around $${avgMonthlyRent.toLocaleString()} monthly. `;
+        script += `We're monitoring the local market to ensure your rental rate is competitive while maximizing your returns. Properties like yours in the area are averaging around ${formatCurrencyForTTS(avgMonthlyRent)} monthly. `;
       }
       
       // Set expectations
@@ -368,20 +433,20 @@ export function AudioPropertySummary({
       const reviewCount = revenueData?.reviewCount || 0;
       const strBookings = revenueData?.strBookings || 0;
 
-      // Revenue breakdown
+      // Revenue breakdown - using spelled-out numbers for correct TTS pronunciation
       if (totalRevenue > 0) {
-        script += `Last month, your property earned $${totalRevenue.toLocaleString()} in total revenue`;
+        script += `Last month, your property earned ${formatCurrencyForTTS(totalRevenue)} in total revenue`;
         if (strRevenue > 0 && mtrRevenue > 0) {
-          script += ` — $${strRevenue.toLocaleString()} from short-term bookings and $${mtrRevenue.toLocaleString()} from an extended stay guest`;
+          script += ` — ${formatCurrencyForTTS(strRevenue)} from short-term bookings and ${formatCurrencyForTTS(mtrRevenue)} from an extended stay guest`;
         }
         script += `. `;
       }
 
-      // Occupancy and bookings
+      // Occupancy and bookings - using spelled-out numbers for TTS
       if (occupancy > 0) {
-        script += `Your occupancy reached ${Math.round(occupancy)}% across the month`;
+        script += `Your occupancy reached ${formatPercentForTTS(occupancy)} across the month`;
         if (strBookings > 0) {
-          script += ` with ${strBookings} completed short-term stays`;
+          script += ` with ${numberToWords(strBookings)} completed short-term stays`;
         }
         script += `. `;
       }
@@ -434,7 +499,7 @@ export function AudioPropertySummary({
 
       // Monthly rental income
       if (monthlyRevenue > 0) {
-        script += `Last month, your property generated $${monthlyRevenue.toLocaleString()} in rental income. `;
+        script += `Last month, your property generated ${formatCurrencyForTTS(monthlyRevenue)} in rental income. `;
       }
 
       // Tenant quality and payment status (key owner concern per research)
@@ -459,7 +524,7 @@ export function AudioPropertySummary({
 
       // Market positioning (owners want to know their rate is competitive)
       if (peachHausData?.marketComparison?.avgMonthlyRent) {
-        script += `Your property's market positioning remains strong — similar homes in your area are averaging $${peachHausData.marketComparison.avgMonthlyRent.toLocaleString()} monthly, and your rental rate is competitive for the quality you offer. `;
+        script += `Your property's market positioning remains strong — similar homes in your area are averaging ${formatCurrencyForTTS(peachHausData.marketComparison.avgMonthlyRent)} monthly, and your rental rate is competitive for the quality you offer. `;
       }
 
     } else {
@@ -469,7 +534,7 @@ export function AudioPropertySummary({
       const reviewCount = revenueData?.reviewCount || 0;
       
       if (revenue > 0) {
-        script += `Last month, your property generated $${revenue.toLocaleString()} in rental income. `;
+        script += `Last month, your property generated ${formatCurrencyForTTS(revenue)} in rental income. `;
       }
 
       // Reviews
@@ -498,7 +563,7 @@ export function AudioPropertySummary({
 
       // Occupancy
       if (revenueData?.occupancyRate && revenueData.occupancyRate > 0) {
-        script += `Your occupancy rate is ${Math.round(revenueData.occupancyRate)}% for the next 30 days. `;
+        script += `Your occupancy rate is ${formatPercentForTTS(revenueData.occupancyRate)} for the next thirty days. `;
       }
     }
 

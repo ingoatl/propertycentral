@@ -718,9 +718,13 @@ export default function OwnerDashboard() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-6 text-center p-8">
-          {/* Branded loading screen */}
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-xl">
-            <Building2 className="h-10 w-10 text-primary-foreground" />
+          {/* Branded loading screen with PeachHaus logo */}
+          <div className="w-24 h-24 rounded-2xl bg-white shadow-xl overflow-hidden flex items-center justify-center p-2">
+            <img 
+              src="/peachhaus-logo.png" 
+              alt="PeachHaus" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <div className="space-y-2">
             <h2 className="text-xl font-semibold">PeachHaus Owner Portal</h2>
@@ -970,6 +974,7 @@ export default function OwnerDashboard() {
               <AudioPropertySummary
                 propertyName={property?.name || "Your Property"}
                 ownerName={session?.ownerName}
+                secondOwnerName={session?.secondOwnerName}
                 rentalType={property?.rental_type as "hybrid" | "mid_term" | "long_term"}
                 marketingStats={marketingStats?.[0]}
                 listingHealth={peachHausData?.listingHealth}
@@ -1265,6 +1270,7 @@ export default function OwnerDashboard() {
                 directBookingUrl={property.website_url}
                 marketingStats={marketingStats}
                 ownerName={session?.ownerName}
+                secondOwnerName={session?.secondOwnerName}
                 rentalType={property.rental_type}
                 revenueData={{
                   thisMonthRevenue: performanceMetrics.totalRevenue,
