@@ -572,3 +572,6 @@ verify_jwt = false
 
 [functions.receive-midtermnation-sync]
 verify_jwt = false
+
+[functions.vendor-photo-reminder-cron]
+verify_jwt = false

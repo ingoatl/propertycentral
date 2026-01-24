@@ -10784,6 +10784,7 @@ export type Database = {
           caption: string | null
           created_at: string | null
           id: string
+          media_type: string | null
           photo_type: string | null
           photo_url: string
           uploaded_by: string
@@ -10794,6 +10795,7 @@ export type Database = {
           caption?: string | null
           created_at?: string | null
           id?: string
+          media_type?: string | null
           photo_type?: string | null
           photo_url: string
           uploaded_by: string
@@ -10804,6 +10806,7 @@ export type Database = {
           caption?: string | null
           created_at?: string | null
           id?: string
+          media_type?: string | null
           photo_type?: string | null
           photo_url?: string
           uploaded_by?: string
@@ -10886,6 +10889,8 @@ export type Database = {
         Row: {
           access_instructions: string | null
           actual_cost: number | null
+          after_photo_reminder_count: number | null
+          after_photo_reminder_sent_at: string | null
           after_photos: string[] | null
           ai_confidence_score: number | null
           ai_estimated_cost_high: number | null
@@ -10897,6 +10902,8 @@ export type Database = {
           assigned_at: string | null
           assigned_by: string | null
           assigned_vendor_id: string | null
+          before_photo_reminder_count: number | null
+          before_photo_reminder_sent_at: string | null
           before_photos: string[] | null
           billcom_bill_id: string | null
           billcom_invoice_url: string | null
@@ -10958,6 +10965,7 @@ export type Database = {
           vendor_access_token_expires_at: string | null
           vendor_declined_reason: string | null
           vendor_notes: string | null
+          vendor_viewed_at: string | null
           verification_notes: string | null
           verified_at: string | null
           verified_by: string | null
@@ -10970,6 +10978,8 @@ export type Database = {
         Insert: {
           access_instructions?: string | null
           actual_cost?: number | null
+          after_photo_reminder_count?: number | null
+          after_photo_reminder_sent_at?: string | null
           after_photos?: string[] | null
           ai_confidence_score?: number | null
           ai_estimated_cost_high?: number | null
@@ -10981,6 +10991,8 @@ export type Database = {
           assigned_at?: string | null
           assigned_by?: string | null
           assigned_vendor_id?: string | null
+          before_photo_reminder_count?: number | null
+          before_photo_reminder_sent_at?: string | null
           before_photos?: string[] | null
           billcom_bill_id?: string | null
           billcom_invoice_url?: string | null
@@ -11042,6 +11054,7 @@ export type Database = {
           vendor_access_token_expires_at?: string | null
           vendor_declined_reason?: string | null
           vendor_notes?: string | null
+          vendor_viewed_at?: string | null
           verification_notes?: string | null
           verified_at?: string | null
           verified_by?: string | null
@@ -11054,6 +11067,8 @@ export type Database = {
         Update: {
           access_instructions?: string | null
           actual_cost?: number | null
+          after_photo_reminder_count?: number | null
+          after_photo_reminder_sent_at?: string | null
           after_photos?: string[] | null
           ai_confidence_score?: number | null
           ai_estimated_cost_high?: number | null
@@ -11065,6 +11080,8 @@ export type Database = {
           assigned_at?: string | null
           assigned_by?: string | null
           assigned_vendor_id?: string | null
+          before_photo_reminder_count?: number | null
+          before_photo_reminder_sent_at?: string | null
           before_photos?: string[] | null
           billcom_bill_id?: string | null
           billcom_invoice_url?: string | null
@@ -11126,6 +11143,7 @@ export type Database = {
           vendor_access_token_expires_at?: string | null
           vendor_declined_reason?: string | null
           vendor_notes?: string | null
+          vendor_viewed_at?: string | null
           verification_notes?: string | null
           verified_at?: string | null
           verified_by?: string | null
