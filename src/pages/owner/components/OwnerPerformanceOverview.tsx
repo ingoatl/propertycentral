@@ -17,7 +17,9 @@ import {
   CalendarDays,
   Home,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Gauge,
+  Sparkles
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -65,14 +67,25 @@ interface RevenueBreakdown {
   };
 }
 
+interface PeachHausData {
+  listingHealth?: { score: number; status: string; summary?: string };
+  pricingIntelligence?: { 
+    current_base_rate: number; 
+    recommended_rate: number; 
+    mpi_7_day?: number;
+  };
+  syncedAt?: string;
+}
+
 interface OwnerPerformanceOverviewProps {
   metrics: PerformanceMetrics;
   propertyName?: string;
   revenueBreakdown?: RevenueBreakdown;
-  rentalType?: string; // Passed from parent for display logic
+  rentalType?: string;
+  peachHausData?: PeachHausData | null;
 }
 
-export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdown, rentalType }: OwnerPerformanceOverviewProps) {
+export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdown, rentalType, peachHausData }: OwnerPerformanceOverviewProps) {
   const [showTotalRevenueModal, setShowTotalRevenueModal] = useState(false);
   const [showOccupancyModal, setShowOccupancyModal] = useState(false);
   const [showBookingsModal, setShowBookingsModal] = useState(false);
@@ -231,6 +244,74 @@ export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdo
           </CardContent>
         </Card>
       </div>
+
+      {/* Listing Health Card from PeachHaus Listing Boost - only for hybrid/STR */}
+      {peachHausData?.listingHealth && (rentalType === 'hybrid' || rentalType === 'str' || !rentalType) && (
+        <Card className="bg-gradient-to-br from-orange-50 to-amber-100/50 border-none shadow-lg dark:from-orange-950/30 dark:to-amber-900/20">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center">
+                  <Sparkles className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-lg">Listing Health</p>
+                  <p className="text-xs text-muted-foreground">
+                    Powered by PeachHaus Listing Boost
+                  </p>
+                </div>
+              </div>
+              <Badge className={
+                peachHausData.listingHealth.status === 'excellent' ? 'bg-emerald-100 text-emerald-700' :
+                peachHausData.listingHealth.status === 'good' ? 'bg-blue-100 text-blue-700' :
+                'bg-amber-100 text-amber-700'
+              }>
+                {peachHausData.listingHealth.status}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {/* Health Score */}
+              <div className="text-center p-3 bg-white/50 dark:bg-black/20 rounded-xl">
+                <div className={`text-3xl font-bold ${
+                  peachHausData.listingHealth.score >= 80 ? 'text-emerald-600' :
+                  peachHausData.listingHealth.score >= 60 ? 'text-blue-600' : 'text-amber-600'
+                }`}>
+                  {peachHausData.listingHealth.score}
+                </div>
+                <p className="text-xs text-muted-foreground">Health Score</p>
+              </div>
+              {/* Current Rate */}
+              {peachHausData.pricingIntelligence?.current_base_rate && (
+                <div className="text-center p-3 bg-white/50 dark:bg-black/20 rounded-xl">
+                  <div className="text-3xl font-bold">${peachHausData.pricingIntelligence.current_base_rate}</div>
+                  <p className="text-xs text-muted-foreground">Current Rate</p>
+                </div>
+              )}
+              {/* Recommended Rate */}
+              {peachHausData.pricingIntelligence?.recommended_rate && (
+                <div className="text-center p-3 bg-white/50 dark:bg-black/20 rounded-xl">
+                  <div className="text-3xl font-bold text-emerald-600">${peachHausData.pricingIntelligence.recommended_rate}</div>
+                  <p className="text-xs text-muted-foreground">Recommended</p>
+                </div>
+              )}
+            </div>
+            {peachHausData.pricingIntelligence?.mpi_7_day && (
+              <div className="mt-4 p-3 bg-white/50 dark:bg-black/20 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Gauge className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Market Performance Index</span>
+                </div>
+                <Badge variant="outline" className={
+                  peachHausData.pricingIntelligence.mpi_7_day >= 1 ? 'text-emerald-600' : 'text-amber-600'
+                }>
+                  {peachHausData.pricingIntelligence.mpi_7_day.toFixed(1)}x
+                  {peachHausData.pricingIntelligence.mpi_7_day >= 1 ? ' Beating Market' : ' Below Market'}
+                </Badge>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Revenue Breakdown - Conditional based on rental type */}
       <div className={`grid grid-cols-1 ${isHybrid ? 'md:grid-cols-2' : ''} gap-4`}>

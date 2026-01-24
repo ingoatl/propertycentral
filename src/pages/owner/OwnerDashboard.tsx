@@ -962,6 +962,7 @@ export default function OwnerDashboard() {
                 propertyName={property?.name}
                 revenueBreakdown={revenueBreakdown}
                 rentalType={property?.rental_type}
+                peachHausData={peachHausData}
               />
 
               {/* Performance Charts */}
