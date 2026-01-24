@@ -76,7 +76,7 @@ const PremiumWorkOrderModal = ({
   const [activePhotoTab, setActivePhotoTab] = useState<string>("before");
   const queryClient = useQueryClient();
 
-  // Fetch the complete work order data
+  // Fetch the complete work order data with property image
   const { data: workOrder, isLoading: workOrderLoading } = useQuery({
     queryKey: ["work-order-detail", workOrderId],
     queryFn: async () => {
@@ -84,7 +84,7 @@ const PremiumWorkOrderModal = ({
         .from("work_orders")
         .select(`
           *,
-          property:properties(id, name, address),
+          property:properties(id, name, address, image_path),
           assigned_vendor:vendors!work_orders_assigned_vendor_id_fkey(id, name, company_name, phone, email)
         `)
         .eq("id", workOrderId)
@@ -396,44 +396,71 @@ const PremiumWorkOrderModal = ({
     );
   }
 
+  const propertyImage = workOrder?.property?.image_path;
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-5xl max-h-[92vh] p-0 overflow-hidden bg-background">
-          {/* Premium Header */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                  <Wrench className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-white/60 text-sm font-mono">WO-{workOrder.work_order_number}</span>
-                    {statusConfig && (
-                      <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
-                        {statusConfig.label}
-                      </Badge>
-                    )}
-                    {urgencyConfig && workOrder.urgency === "emergency" && (
-                      <Badge className="bg-red-500/80 text-white border-red-400">
-                        {urgencyConfig.label}
-                      </Badge>
-                    )}
-                  </div>
-                  <h2 className="text-xl font-semibold">{workOrder.title}</h2>
-                  <div className="flex items-center gap-2 text-white/70 mt-2 text-sm">
-                    <MapPin className="h-4 w-4" />
-                    <span>{workOrder.property?.name || workOrder.property?.address}</span>
-                  </div>
-                </div>
+          {/* Premium Header with Property Image */}
+          <div className="relative bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
+            {/* Property Image Background */}
+            {propertyImage && (
+              <div className="absolute inset-0 overflow-hidden">
+                <img 
+                  src={propertyImage} 
+                  alt={workOrder.property?.name || 'Property'} 
+                  className="w-full h-full object-cover opacity-20"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90" />
               </div>
-              <div className="text-right space-y-1">
-                {workOrder.quoted_cost && (
-                  <div className="text-2xl font-bold">${workOrder.quoted_cost.toLocaleString()}</div>
-                )}
-                <div className="text-white/60 text-xs">
-                  {format(new Date(workOrder.created_at), "MMM d, yyyy")}
+            )}
+            
+            <div className="relative p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  {/* Property Thumbnail */}
+                  {propertyImage ? (
+                    <div className="h-16 w-16 rounded-2xl overflow-hidden border-2 border-white/20 shadow-lg">
+                      <img 
+                        src={propertyImage} 
+                        alt={workOrder.property?.name || 'Property'} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                      <Wrench className="h-7 w-7 text-white" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-white/60 text-sm font-mono">WO-{workOrder.work_order_number}</span>
+                      {statusConfig && (
+                        <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
+                          {statusConfig.label}
+                        </Badge>
+                      )}
+                      {urgencyConfig && workOrder.urgency === "emergency" && (
+                        <Badge className="bg-red-500/80 text-white border-red-400">
+                          {urgencyConfig.label}
+                        </Badge>
+                      )}
+                    </div>
+                    <h2 className="text-xl font-semibold">{workOrder.title}</h2>
+                    <div className="flex items-center gap-2 text-white/70 mt-2 text-sm">
+                      <MapPin className="h-4 w-4" />
+                      <span>{workOrder.property?.name || workOrder.property?.address}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right space-y-1">
+                  {workOrder.quoted_cost && (
+                    <div className="text-2xl font-bold">${workOrder.quoted_cost.toLocaleString()}</div>
+                  )}
+                  <div className="text-white/60 text-xs">
+                    {format(new Date(workOrder.created_at), "MMM d, yyyy")}
+                  </div>
                 </div>
               </div>
             </div>

@@ -93,21 +93,25 @@ serve(async (req) => {
         const portalUrl = `https://propertycentral.lovable.app/vendor-job/${workOrder.vendor_access_token}`;
         const propertyAddress = property?.address || property?.name || "the property";
 
-        // Professional follow-up message
+        // Professional follow-up message with clear instructions
         const followupMessage = `Hi ${vendor.name?.split(' ')[0] || 'there'},
 
-Just following up on the job we sent over 1 hour ago.
+Just following up on the work order we sent over 1 hour ago.
 
 📍 Location: ${propertyAddress}
 🔧 Issue: ${workOrder.title}
 
-To get started:
-1. Click here to view job details: ${portalUrl}
-2. Take BEFORE photos when you arrive
-3. Complete the work
-4. Upload AFTER photos to show it's fixed
+📱 IMPORTANT: Please complete ALL documentation through this link ONLY:
+${portalUrl}
 
-This helps us process your payment faster and keeps our records accurate.
+To get started:
+1. Click the link above
+2. Tap "Start Job" button
+3. Upload BEFORE photos (required to begin work)
+4. Complete the repair
+5. Upload AFTER photos showing the fixed condition
+
+⚠️ Please do NOT send photos or videos via text message - all media must be uploaded through the job portal link above. This ensures proper documentation and faster payment processing.
 
 Questions? Just reply to this text.
 

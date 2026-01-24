@@ -11,7 +11,7 @@ import { Plus, Search, Filter, LayoutGrid, List, Wrench, Clock, AlertTriangle, C
 import { WorkOrder, WorkOrderStatus, STATUS_CONFIG, URGENCY_CONFIG, WORK_ORDER_CATEGORIES } from "@/types/maintenance";
 import CreateWorkOrderDialog from "@/components/maintenance/CreateWorkOrderDialog";
 import WorkOrderCard from "@/components/maintenance/WorkOrderCard";
-import WorkOrderDetailModal from "@/components/maintenance/WorkOrderDetailModal";
+import PremiumWorkOrderModal from "@/components/maintenance/PremiumWorkOrderModal";
 import WorkOrderKanban from "@/components/maintenance/WorkOrderKanban";
 
 const Maintenance = () => {
@@ -219,7 +219,7 @@ const Maintenance = () => {
       />
 
       {selectedWorkOrder && (
-        <WorkOrderDetailModal
+        <PremiumWorkOrderModal
           workOrderId={selectedWorkOrder.id}
           open={!!selectedWorkOrder}
           onOpenChange={(open) => !open && setSelectedWorkOrder(null)}
