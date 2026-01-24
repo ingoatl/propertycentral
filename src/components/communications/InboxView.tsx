@@ -897,40 +897,47 @@ export function InboxView() {
   }, [emailInsights]);
 
   // Filter emails based on selected inbox view AND category filter
+  // Enhanced to match by targetInbox label OR email address in "to" field
   const filteredGmailEmails = useMemo(() => {
     let filtered = gmailEmails;
     
+    // Helper to check if email matches a user's label or email address
+    const emailMatchesUser = (email: GmailEmail, userLabel: typeof userGmailLabels[0]): boolean => {
+      const targetInbox = email.targetInbox?.toLowerCase() || '';
+      const toAddress = email.to?.toLowerCase() || '';
+      const userLabelName = userLabel.label_name.toLowerCase();
+      const userEmail = userLabel.email_address?.toLowerCase() || '';
+      
+      // Match by:
+      // 1. targetInbox contains the user's label name
+      // 2. "to" field contains the user's email address
+      // 3. "to" field contains the user's label name (for variations)
+      return targetInbox.includes(userLabelName) || 
+             (userEmail && toAddress.includes(userEmail)) ||
+             toAddress.includes(userLabelName);
+    };
+    
     // Filter by inbox view
     if (selectedEmailInboxView === "all") {
-      // Show all emails - no filtering
+      // Show all emails - no filtering (admin only)
       filtered = gmailEmails;
     } else if (selectedEmailInboxView === "my-inbox" && currentUserId) {
       // Show only emails for current user
       const currentUserLabel = userGmailLabels.find(l => l.user_id === currentUserId);
       if (currentUserLabel) {
-        filtered = gmailEmails.filter(email => {
-          const targetInbox = email.targetInbox?.toLowerCase() || '';
-          return targetInbox.includes(currentUserLabel.label_name.toLowerCase());
-        });
+        filtered = gmailEmails.filter(email => emailMatchesUser(email, currentUserLabel));
       }
     } else if (selectedEmailInboxView === "unassigned") {
-      // Show emails that don't match any user's label
+      // Show emails that don't match any user's label or email
       filtered = gmailEmails.filter(email => {
-        const targetInbox = email.targetInbox?.toLowerCase() || '';
-        // Check if this email matches any user's label
-        const matchesAnyUser = userGmailLabels.some(label => 
-          targetInbox.includes(label.label_name.toLowerCase())
-        );
-        return !matchesAnyUser || !email.targetInbox;
+        const matchesAnyUser = userGmailLabels.some(label => emailMatchesUser(email, label));
+        return !matchesAnyUser;
       });
     } else {
       // Specific user selected - find their label and filter
       const selectedUserLabel = userGmailLabels.find(l => l.user_id === selectedEmailInboxView);
       if (selectedUserLabel) {
-        filtered = gmailEmails.filter(email => {
-          const targetInbox = email.targetInbox?.toLowerCase() || '';
-          return targetInbox.includes(selectedUserLabel.label_name.toLowerCase());
-        });
+        filtered = gmailEmails.filter(email => emailMatchesUser(email, selectedUserLabel));
       } else {
         // No label found for this user - show no emails
         filtered = [];
@@ -1211,8 +1218,10 @@ export function InboxView() {
           .limit(50);
         
         // Filter by user assignment unless viewing all inboxes
+        // IMPORTANT: Do NOT include unassigned (assigned_to.is.null) - those should only appear in "All Communications"
+        // This ensures strict user-specific inbox isolation
         if (!viewAllInboxes && targetUserId) {
-          ownerCommsQuery = ownerCommsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId},assigned_to.is.null`);
+          ownerCommsQuery = ownerCommsQuery.or(`assigned_to.eq.${targetUserId},recipient_user_id.eq.${targetUserId}`);
         }
         
         const { data: ownerComms } = await ownerCommsQuery;
