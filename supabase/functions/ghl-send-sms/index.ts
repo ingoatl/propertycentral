@@ -46,13 +46,18 @@ serve(async (req) => {
     const formattedPhone = formatPhoneE164(recipientPhone);
     
     // Phone number routing:
-    // - Vendors: +1 404-574-1740 (Local number for vendor/maintenance SMS)
-    // - Google Reviews: +1 404-609-0955 (A2P verified for guest SMS)
+    // - Vendors: +1 404-341-5202 (Alex's direct line - all vendor comms route through him)
+    // - Google Reviews / Leads: +1 404-609-0955 (A2P verified for guest SMS)
+    // - Owners: +1 404-800-5932 (Owner communications line)
     const isVendorMessage = !!vendorId;
-    const defaultNumber = isVendorMessage ? "+14045741740" : "+14046090955";
+    const ALEX_PERSONAL_NUMBER = "+14043415202"; // Alex's direct line for vendor communications
+    const defaultNumber = isVendorMessage ? ALEX_PERSONAL_NUMBER : "+14046090955";
     const formattedFromNumber = formatPhoneE164(fromNumber || defaultNumber);
     
-    console.log(`Sending SMS via GHL to ${formattedPhone} from ${formattedFromNumber} (vendor=${isVendorMessage})`);
+    // Alex's user ID for routing vendor replies to his inbox
+    const ALEX_USER_ID = "fbd13e57-3a59-4c53-bb3b-14ab354b3420";
+    
+    console.log(`Sending SMS via GHL to ${formattedPhone} from ${formattedFromNumber} (vendor=${isVendorMessage}, alexLine=${isVendorMessage})`);
 
     // Initialize Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -293,10 +298,10 @@ serve(async (req) => {
     }
 
     // Record communication for vendors - store in lead_communications with vendor metadata
-    // This allows messages to show in both the vendor tab AND the user's inbox
+    // This allows messages to show in both the vendor tab AND Alex's inbox (he handles all vendor comms)
     if (vendorId) {
-      // Use requestedByUserId if provided, otherwise use the current user
-      const assignedUserId = requestedByUserId || userId;
+      // ALWAYS route vendor communications to Alex so replies show in his inbox
+      const vendorAssignedUserId = ALEX_USER_ID;
       
       await supabase.from("lead_communications").insert({
         communication_type: "sms",
@@ -305,7 +310,7 @@ serve(async (req) => {
         status: "sent",
         external_id: sendData.messageId || sendData.conversationId,
         ghl_conversation_id: sendData.conversationId,
-        assigned_user_id: assignedUserId, // Track who should see replies (requester)
+        assigned_user_id: vendorAssignedUserId, // Always Alex for vendor messages
         metadata: {
           provider: "gohighlevel",
           ghl_contact_id: contactId,
@@ -316,8 +321,9 @@ serve(async (req) => {
           vendor_phone: formattedPhone,
           contact_type: "vendor",
           sent_by_user_id: userId,
-          requested_by_user_id: requestedByUserId, // Original requester
-          work_order_id: workOrderId, // Link to work order if provided
+          requested_by_user_id: requestedByUserId || userId, // Who initiated this
+          work_order_id: workOrderId, // Link to work order for tracking in modal
+          alex_routed: true, // Flag that this goes through Alex's line
         },
       });
 
