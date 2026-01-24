@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { MessageCircle, Play, Video, Mic, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, RefreshCw } from "lucide-react";
+import { MessageCircle, Play, Video, Mic, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, RefreshCw, Building2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface OwnerMessagesTabProps {
@@ -487,26 +487,48 @@ function CommunicationCard({
   getChannelIcon: (channel: string | null) => React.ReactNode;
   getDirectionIcon: (direction: string | null) => React.ReactNode;
 }) {
-  const senderDisplay = communication.from_name || communication.from_email || communication.from_phone || "Property Manager";
+  // Determine if this message is from the owner (inbound) or property manager (outbound)
+  const isFromOwner = communication.direction === "inbound";
+  
+  // Clear sender label - Owner messages say their name or "You", manager messages say "PeachHaus"
+  const senderLabel = isFromOwner 
+    ? (communication.from_name || "You")
+    : "PeachHaus";
   
   return (
-    <Card className="border shadow-sm hover:shadow-md transition-shadow">
+    <Card className={cn(
+      "border shadow-sm hover:shadow-md transition-shadow",
+      isFromOwner 
+        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-l-4 border-l-emerald-400"
+        : "bg-sky-50/50 dark:bg-sky-950/20 border-l-4 border-l-sky-400"
+    )}>
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <div className={cn(
             "h-12 w-12 rounded-xl flex items-center justify-center shrink-0",
-            communication.direction === "inbound" 
+            isFromOwner 
               ? "bg-emerald-100 dark:bg-emerald-900/30" 
               : "bg-sky-100 dark:bg-sky-900/30"
           )}>
-            {getChannelIcon(communication.communication_type)}
+            {isFromOwner ? (
+              <User className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <Building2 className="h-5 w-5 text-sky-600" />
+            )}
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="font-medium">{senderDisplay}</span>
+              {/* Clear sender badge */}
+              <Badge className={cn(
+                "text-xs font-medium",
+                isFromOwner
+                  ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300"
+                  : "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/50 dark:text-sky-300"
+              )}>
+                {senderLabel}
+              </Badge>
               <div className="flex items-center gap-1">
-                {getDirectionIcon(communication.direction)}
                 <Badge variant="outline" className="text-xs capitalize">
                   {communication.communication_type || "message"}
                 </Badge>
