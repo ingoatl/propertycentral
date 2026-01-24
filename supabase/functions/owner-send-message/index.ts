@@ -83,11 +83,11 @@ serve(async (req) => {
 
     // Insert into lead_communications
     // Note: lead_communications uses call_recording_url for voicemails, media_urls for other attachments
+    // Note: lead_communications does NOT have a property_id column - property context is stored in metadata
     const { data: comm, error: insertError } = await supabase
       .from("lead_communications")
       .insert({
         owner_id,
-        property_id: property_id || null,
         communication_type: message_type,
         direction: "inbound",
         body,
@@ -95,6 +95,7 @@ serve(async (req) => {
         status: "unread",
         call_recording_url: message_type === "voicemail" && attachment_url ? attachment_url : null,
         media_urls: attachment_url && message_type !== "voicemail" ? [attachment_url] : null,
+        metadata: property_id ? { property_id, property_name: propertyName } : null,
       })
       .select()
       .single();
