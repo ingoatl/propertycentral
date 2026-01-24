@@ -71,15 +71,24 @@ serve(async (req) => {
       }
     }
 
-    // Known property name mappings (fuzzy -> actual)
+    // Known property name mappings (fuzzy -> actual) - EXPANDED
     const knownMappings: Record<string, string> = {
       "the alpine": "alpine",
       "scandi chic-mins to ksu/dt, sleeps 5, w/king, pet frndly": "scandi chic",
       "old roswell": "modern + cozy townhome",
+      "the old roswell retreat": "modern + cozy townhome",
       "mableton meadows": "woodland lane",
       "lavish living - 8 mins from braves stadium w/king": "lavish living",
-      "homerun hideaway": null as any, // Need to add to DB
-      "the bloom": null as any, // Need to add to DB
+      "lavish living atlanta": "lavish living",
+      "homerun hideaway": "family retreat",
+      "the bloom": "whispering oaks",
+      "the maple leaf": "canadian way",
+      "shift sanctuary": "midtown lighthouse",
+      "alpharetta basecamp": "smoke hollow",
+      "the boho lux": "house of blues",
+      "the berkley at chimney lakes": "the berkley",
+      "the scandinavian retreat": "scandinavian retreat",
+      "the scandi chic": "scandi chic",
     };
 
     // ========== HEAL 1: Marketing Activities Without Owner ID ==========
@@ -384,6 +393,141 @@ serve(async (req) => {
       ownersWithoutData,
       sampleOwnersNeedingData: ownersNeedingData.slice(0, 5),
     };
+
+    // ========== HEAL 7: Auto-Suggest Property Mappings from Failed Syncs ==========
+    console.log("Analyzing failed syncs for property mapping suggestions...");
+    
+    const suggestedMappings: Array<{ external_name: string; suggested_match: string; confidence: string }> = [];
+    
+    // Get failed syncs from the last 7 days
+    const { data: recentFailedSyncs } = await supabase
+      .from("partner_sync_log")
+      .select("error_details, source_system")
+      .in("sync_status", ["failed", "partial"])
+      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .limit(50);
+
+    for (const sync of recentFailedSyncs || []) {
+      const errorDetails = sync.error_details as any;
+      const skippedDetails = errorDetails?.skipped_details || errorDetails?.errors || [];
+      
+      for (const skipped of skippedDetails) {
+        const externalName = skipped.property_name || (typeof skipped === "string" ? skipped.match(/name="([^"]+)"/)?.[1] : null);
+        if (!externalName) continue;
+        
+        const searchName = externalName.toLowerCase().trim();
+        
+        // Skip if already in known mappings
+        if (knownMappings[searchName]) continue;
+        
+        // Try fuzzy matching
+        for (const prop of safeProperties) {
+          const propName = prop.name?.toLowerCase().trim() || "";
+          const cleanedExternal = searchName.replace(/^the\s+/i, "").trim();
+          const cleanedProp = propName.replace(/^the\s+/i, "").trim();
+          
+          // Check for word overlap
+          const externalWords: string[] = cleanedExternal.split(/\s+/).filter((w: string) => w.length > 3);
+          const propWords: string[] = cleanedProp.split(/\s+/).filter((w: string) => w.length > 3);
+          const matchingWords = externalWords.filter((ew: string) => 
+            propWords.some((pw: string) => pw.includes(ew) || ew.includes(pw))
+          );
+          
+          if (matchingWords.length >= 1) {
+            suggestedMappings.push({
+              external_name: externalName,
+              suggested_match: prop.name,
+              confidence: matchingWords.length >= 2 ? "high" : "medium",
+            });
+            break;
+          }
+        }
+      }
+    }
+
+    if (suggestedMappings.length > 0) {
+      issues.push(`${suggestedMappings.length} property mapping suggestions available`);
+      healingActions.push(`Generated ${suggestedMappings.length} property mapping suggestions for admin review`);
+    }
+
+    details.suggestedMappings = suggestedMappings.slice(0, 10);
+
+    // ========== HEAL 8: Detect Stale Sync Sources ==========
+    console.log("Checking for stale sync sources...");
+    
+    const syncSources = ["peachhaus", "guestconnect", "marketing_hub", "midtermnation"];
+    const staleSources: Array<{ source: string; last_sync: string | null; days_since_sync: number }> = [];
+    
+    for (const source of syncSources) {
+      const { data: lastSync } = await supabase
+        .from("partner_sync_log")
+        .select("created_at")
+        .eq("source_system", source)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      const lastSyncDate = lastSync?.created_at ? new Date(lastSync.created_at) : null;
+      const daysSinceSync = lastSyncDate 
+        ? Math.floor((Date.now() - lastSyncDate.getTime()) / (24 * 60 * 60 * 1000))
+        : 999;
+      
+      if (daysSinceSync > 7 || !lastSyncDate) {
+        staleSources.push({
+          source,
+          last_sync: lastSyncDate?.toISOString() || null,
+          days_since_sync: daysSinceSync,
+        });
+      }
+    }
+
+    if (staleSources.length > 0) {
+      issues.push(`${staleSources.length} sync sources are stale (>7 days)`);
+      overallStatus = "warning";
+    }
+
+    details.staleSources = staleSources;
+
+    // ========== HEAL 9: Cross-Validate Sync Data Coverage ==========
+    console.log("Cross-validating sync data coverage...");
+    
+    // Check which properties have Listing Boost data
+    const { data: peachhausData } = await supabase
+      .from("property_peachhaus_stats")
+      .select("property_id")
+      .gte("synced_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+    
+    const propertiesWithPeachHaus = new Set((peachhausData || []).map(p => p.property_id));
+    
+    // Check which properties have Marketing Hub data
+    const { data: marketingData } = await supabase
+      .from("property_marketing_stats")
+      .select("property_id")
+      .gte("synced_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+    
+    const propertiesWithMarketing = new Set((marketingData || []).map(p => p.property_id));
+    
+    // Find hybrid/STR properties missing Listing Boost data
+    const { data: strProperties } = await supabase
+      .from("properties")
+      .select("id, name, rental_type")
+      .is("offboarded_at", null)
+      .in("rental_type", ["hybrid", "str"]);
+    
+    const strMissingPeachHaus = (strProperties || []).filter(p => !propertiesWithPeachHaus.has(p.id));
+    const activeMissingMarketing = safeProperties.filter(p => !propertiesWithMarketing.has(p.id));
+
+    details.dataCoverage = {
+      totalActiveProperties: safeProperties.length,
+      withPeachHausData: propertiesWithPeachHaus.size,
+      withMarketingData: propertiesWithMarketing.size,
+      strPropertiesMissingPeachHaus: strMissingPeachHaus.slice(0, 5).map(p => p.name),
+      propertiesMissingMarketing: activeMissingMarketing.slice(0, 5).map(p => p.name),
+    };
+
+    if (strMissingPeachHaus.length > 0) {
+      issues.push(`${strMissingPeachHaus.length} STR/hybrid properties missing Listing Boost data`);
+    }
 
     // ========== SUMMARY ==========
     const summary = {

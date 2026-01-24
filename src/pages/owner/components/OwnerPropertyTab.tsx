@@ -29,12 +29,8 @@ import {
   Shield,
   Fence,
   Accessibility,
-  Gauge,
-  AlertTriangle,
-  ArrowUp,
-  ArrowDown,
-  Minus,
 } from "lucide-react";
+import { PeachHausActivityCard } from "./PeachHausActivityCard";
 
 interface PlatformListing {
   platform_name: string;
@@ -231,131 +227,16 @@ export function OwnerPropertyTab({ property, owner, peachHausData }: OwnerProper
         </CardContent>
       </Card>
 
-      {/* PeachHaus Listing Optimization - Only for hybrid properties with data */}
+      {/* PeachHaus Listing Optimization - Import and use the detailed card */}
       {showPeachHaus && (
-        <Card className="border-none shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-amber-500/5 via-orange-500/5 to-amber-500/5 border-b">
-            <CardTitle className="flex items-center gap-2">
-              <Gauge className="h-5 w-5 text-amber-600" />
-              Listing Optimization by PeachHaus
-            </CardTitle>
-            <CardDescription>AI-powered performance insights and revenue optimization</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            {/* Health & Pricing Grid */}
-            <div className="grid md:grid-cols-3 gap-4">
-              {/* Health Score */}
-              {listingHealth && (
-                <div className="p-4 rounded-xl bg-muted/30 text-center">
-                  <div className={`text-4xl font-bold mb-1 ${
-                    listingHealth.status === 'excellent' || listingHealth.status === 'healthy' ? 'text-emerald-600' :
-                    listingHealth.status === 'good' ? 'text-blue-600' :
-                    listingHealth.status === 'warning' ? 'text-amber-600' : 'text-destructive'
-                  }`}>
-                    {listingHealth.score}
-                  </div>
-                  <Badge className={
-                    listingHealth.status === 'excellent' || listingHealth.status === 'healthy' ? 'bg-emerald-100 text-emerald-700' :
-                    listingHealth.status === 'good' ? 'bg-blue-100 text-blue-700' :
-                    listingHealth.status === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-                  }>
-                    {listingHealth.status === 'excellent' ? 'Excellent' : 
-                     listingHealth.status === 'good' ? 'Good' :
-                     listingHealth.status === 'healthy' ? 'Healthy' :
-                     listingHealth.status}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-2">Health Score</p>
-                </div>
-              )}
-
-              {/* Pricing Intelligence */}
-              {pricingIntelligence && (
-                <div className="p-4 rounded-xl bg-muted/30 text-center">
-                  <div className="text-2xl font-bold">${pricingIntelligence.current_base_rate}</div>
-                  <div className="flex items-center justify-center gap-1 text-sm">
-                    <span className="text-muted-foreground">→</span>
-                    <span className="text-emerald-600 font-medium">${pricingIntelligence.recommended_rate}</span>
-                    {pricingIntelligence.rate_change_percent > 0 && (
-                      <Badge variant="outline" className="text-emerald-600 text-xs">
-                        +{pricingIntelligence.rate_change_percent}%
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">Current → Recommended Rate</p>
-                </div>
-              )}
-
-              {/* MPI Score */}
-              {pricingIntelligence?.mpi_7_day && (
-                <div className="p-4 rounded-xl bg-muted/30 text-center">
-                  <div className={`text-4xl font-bold mb-1 ${
-                    pricingIntelligence.mpi_7_day >= 1 ? 'text-emerald-600' : 'text-amber-600'
-                  }`}>
-                    {pricingIntelligence.mpi_7_day.toFixed(1)}x
-                  </div>
-                  <Badge variant="outline" className={
-                    pricingIntelligence.mpi_7_day >= 1 ? 'text-emerald-600' : 'text-amber-600'
-                  }>
-                    {pricingIntelligence.mpi_7_day >= 1 ? 'Beating Market' : 'Below Market'}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-2">Market Performance Index</p>
-                </div>
-              )}
-            </div>
-
-            {/* Recent Optimizations */}
-            {recentOptimizations.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  Recent Optimizations
-                </h4>
-                <div className="space-y-2">
-                  {recentOptimizations.slice(0, 3).map((opt, idx) => (
-                    <div key={idx} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{opt.description}</p>
-                        <p className="text-xs text-muted-foreground">{opt.expected_impact}</p>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{opt.date}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Revenue Alerts */}
-            {revenueAlerts.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  Revenue Alerts
-                </h4>
-                <div className="space-y-2">
-                  {revenueAlerts.slice(0, 3).map((alert, idx) => (
-                    <div key={idx} className={`flex items-start gap-3 p-3 rounded-lg ${
-                      alert.severity === 'critical' ? 'bg-red-50 dark:bg-red-950/20' :
-                      alert.severity === 'warning' ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-blue-50 dark:bg-blue-950/20'
-                    }`}>
-                      <AlertTriangle className={`w-4 h-4 mt-0.5 shrink-0 ${
-                        alert.severity === 'critical' ? 'text-red-500' :
-                        alert.severity === 'warning' ? 'text-amber-500' : 'text-blue-500'
-                      }`} />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{alert.title}</p>
-                        <p className="text-xs text-muted-foreground">{alert.description}</p>
-                        {alert.action_taken && (
-                          <p className="text-xs text-emerald-600 mt-1">✓ {alert.action_taken}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <PeachHausActivityCard
+          listingHealth={listingHealth}
+          pricingIntelligence={pricingIntelligence}
+          recentOptimizations={recentOptimizations}
+          revenueAlerts={revenueAlerts}
+          performanceTrends={peachHausData?.performanceTrends || peachHausData?.performance_trends}
+          syncedAt={peachHausData?.syncedAt || peachHausData?.synced_at}
+        />
       )}
 
       {/* How PeachHaus Markets Your Property */}

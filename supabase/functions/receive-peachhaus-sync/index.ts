@@ -60,13 +60,22 @@ interface SyncPayload {
   properties: PropertyPayload[];
 }
 
-// Property name mappings for fuzzy matching
+// Property name mappings for fuzzy matching (Listing Boost name -> Property Central name)
 const PROPERTY_NAME_MAPPINGS: Record<string, string> = {
   "The Berkley at Chimney Lakes": "The Berkley",
   "The Scandinavian Retreat": "Scandinavian Retreat",
   "The Alpine": "Alpine",
   "Lavish Living Atlanta": "Lavish Living",
   "The Scandi Chic": "Scandi Chic",
+  "Old Roswell Retreat": "Modern + Cozy Townhome",
+  "The Old Roswell Retreat": "Modern + Cozy Townhome",
+  "Mableton Meadows": "Woodland Lane",
+  "The Boho Lux": "House of Blues", // Closest match if no exact property
+  "Homerun Hideaway": "Family Retreat",
+  "The Bloom": "Whispering Oaks",
+  "The Maple Leaf": "Canadian Way",
+  "Shift Sanctuary": "Midtown Lighthouse",
+  "Alpharetta Basecamp": "Smoke Hollow",
 };
 
 serve(async (req: Request): Promise<Response> => {
@@ -282,15 +291,17 @@ serve(async (req: Request): Promise<Response> => {
 
     await supabase.from("partner_sync_log").insert({
       source_system: "peachhaus",
-      sync_type: "property_performance",
-      sync_status: processed > 0 ? "completed" : "partial",
+      sync_type: "listing_boost",
+      sync_status: processed > 0 ? "completed" : (skipped > 0 ? "partial" : "failed"),
       properties_synced: processed,
       properties_failed: skipped,
       error_details: skipped > 0 ? {
         message: `${skipped} properties skipped`,
         skipped_details: skippedDetails,
-      } : null,
+      } : { message: "Sync completed successfully" },
     });
+
+    console.log(`[receive-peachhaus-sync] Logged to partner_sync_log: ${processed} processed, ${skipped} skipped`);
 
     return new Response(
       JSON.stringify({
