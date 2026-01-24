@@ -926,7 +926,7 @@ export default function OwnerDashboard() {
               </TabsTrigger>
               <TabsTrigger value="receipts" className="gap-1.5 px-3">
                 <Receipt className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Receipts</span>
+                <span className="hidden sm:inline text-xs">Expenses</span>
               </TabsTrigger>
               <TabsTrigger value="property" className="gap-1.5 px-3">
                 <Home className="h-4 w-4" />
