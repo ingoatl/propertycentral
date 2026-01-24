@@ -986,6 +986,11 @@ export default function OwnerDashboard() {
                   tenantPaymentStatus: peachHausData?.tenantPaymentStatus || "on_time",
                   marketComparison: peachHausData?.marketComparison,
                 }}
+                hasBookings={
+                  (bookings?.str?.length || 0) > 0 || 
+                  (bookings?.mtr?.length || 0) > 0
+                }
+                onboardingStage={property?.onboarding_stage}
               />
 
               {/* Performance Charts */}
@@ -1280,6 +1285,11 @@ export default function OwnerDashboard() {
                   guestCommunicationsHandled: peachHausData.guestCommunicationsHandled || 0,
                   marketComparison: peachHausData.marketComparison,
                 } : undefined}
+                hasBookings={
+                  (bookings?.str?.length || 0) > 0 || 
+                  (bookings?.mtr?.length || 0) > 0
+                }
+                onboardingStage={property?.onboarding_stage}
               />
             )}
           </TabsContent>
