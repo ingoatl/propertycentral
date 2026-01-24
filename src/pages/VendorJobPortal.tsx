@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import GetPaidModal from "@/components/maintenance/GetPaidModal";
+import VendorMultiPhotoUpload from "@/components/maintenance/VendorMultiPhotoUpload";
 import { 
   MapPin, Clock, CheckCircle, XCircle, 
   Camera, DollarSign, ExternalLink, Phone, Loader2, Send, 
@@ -450,6 +451,7 @@ const VendorJobPortal = () => {
 
   const photosByType = {
     before: photos.filter(p => p.photo_type === "before"),
+    during: photos.filter(p => p.photo_type === "during"),
     after: photos.filter(p => p.photo_type === "after"),
   };
 
@@ -972,110 +974,90 @@ const VendorJobPortal = () => {
           <Card className="border-neutral-900 border-2">
             <CardHeader className="pb-2 px-4 pt-4">
               <CardTitle className="text-sm font-medium">Ready to Begin</CardTitle>
-              <p className="text-xs text-neutral-500">Take before photos, then start work</p>
+              <p className="text-xs text-muted-foreground">Take before photos/video, then start work</p>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-4">
-              {/* Before Photos */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-neutral-600">Before Photos</span>
-                  <Badge variant="secondary" className="text-xs">{photosByType.before.length}</Badge>
-                </div>
-                {photosByType.before.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2 mb-2">
-                    {photosByType.before.map((photo) => (
-                      <div key={photo.id} className="aspect-square rounded overflow-hidden bg-neutral-100">
-                        <img src={photo.photo_url} alt="Before" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => beforeInputRef.current?.click()} 
-                  disabled={uploading}
-                >
-                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Camera className="h-4 w-4 mr-2" />Take Before Photo</>}
-                </Button>
-                <input type="file" ref={beforeInputRef} accept="image/*" capture="environment" onChange={handleBeforePhoto} className="hidden" />
-              </div>
+              {/* Multi-Photo/Video Upload for Before */}
+              <VendorMultiPhotoUpload
+                workOrderId={workOrder.id}
+                photoType="before"
+                existingPhotos={photosByType.before}
+                maxPhotos={10}
+                vendorName={workOrder.assigned_vendor?.name}
+                onPhotosUploaded={() => queryClient.invalidateQueries({ queryKey: ["work-order-photos", workOrder?.id] })}
+              />
 
-              <Separator className="bg-neutral-200" />
+              <Separator />
 
               <Button 
                 size="default" 
-                className="w-full bg-neutral-900 hover:bg-neutral-800 text-white" 
+                className="w-full bg-foreground hover:bg-foreground/90 text-background" 
                 onClick={() => startWork.mutate()} 
-                disabled={startWork.isPending}
+                disabled={startWork.isPending || photosByType.before.length === 0}
               >
                 {startWork.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-2" />Start Work</>}
               </Button>
+              {photosByType.before.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center">Upload at least one before photo to start</p>
+              )}
             </CardContent>
           </Card>
         )}
 
         {/* STEP 3: Complete Work */}
         {currentStep === 3 && (
-          <Card className="border-neutral-900 border-2">
+          <Card className="border-foreground border-2">
             <CardHeader className="pb-2 px-4 pt-4">
               <CardTitle className="text-sm font-medium">Work In Progress</CardTitle>
-              <p className="text-xs text-neutral-500">Upload after photos when done</p>
+              <p className="text-xs text-muted-foreground">Document progress and upload after photos when done</p>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-4">
-              {/* Photo Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-xs font-medium text-neutral-500 mb-2 block">Before ({photosByType.before.length})</span>
-                  {photosByType.before.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-1">
-                      {photosByType.before.slice(0, 2).map((photo) => (
-                        <div key={photo.id} className="aspect-square rounded overflow-hidden">
-                          <img src={photo.photo_url} alt="Before" className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="aspect-video rounded bg-neutral-100 flex items-center justify-center">
-                      <Camera className="h-5 w-5 text-neutral-300" />
-                    </div>
-                  )}
+              {/* Before Photos Summary */}
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-muted-foreground">Before Photos</span>
+                  <Badge variant="secondary" className="text-xs">{photosByType.before.length}</Badge>
                 </div>
-                <div>
-                  <span className="text-xs font-medium text-neutral-500 mb-2 block">After ({photosByType.after.length})</span>
-                  {photosByType.after.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-1">
-                      {photosByType.after.slice(0, 2).map((photo) => (
-                        <div key={photo.id} className="aspect-square rounded overflow-hidden">
-                          <img src={photo.photo_url} alt="After" className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="aspect-video rounded bg-neutral-100 flex items-center justify-center">
-                      <Camera className="h-5 w-5 text-neutral-300" />
-                    </div>
-                  )}
-                </div>
+                {photosByType.before.length > 0 && (
+                  <div className="grid grid-cols-4 gap-1">
+                    {photosByType.before.slice(0, 4).map((photo) => (
+                      <div key={photo.id} className="aspect-square rounded overflow-hidden">
+                        <img src={photo.photo_url} alt="Before" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => afterInputRef.current?.click()} 
-                disabled={uploading}
-              >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Camera className="h-4 w-4 mr-2" />Take After Photo</>}
-              </Button>
-              <input type="file" ref={afterInputRef} accept="image/*" capture="environment" onChange={handleAfterPhoto} className="hidden" />
+              {/* During Photos (Optional) */}
+              <VendorMultiPhotoUpload
+                workOrderId={workOrder.id}
+                photoType="during"
+                existingPhotos={photosByType.during}
+                maxPhotos={5}
+                vendorName={workOrder.assigned_vendor?.name}
+                onPhotosUploaded={() => queryClient.invalidateQueries({ queryKey: ["work-order-photos", workOrder?.id] })}
+              />
 
-              <Separator className="bg-neutral-200" />
+              <Separator />
+
+              {/* After Photos */}
+              <VendorMultiPhotoUpload
+                workOrderId={workOrder.id}
+                photoType="after"
+                existingPhotos={photosByType.after}
+                maxPhotos={10}
+                vendorName={workOrder.assigned_vendor?.name}
+                onPhotosUploaded={() => queryClient.invalidateQueries({ queryKey: ["work-order-photos", workOrder?.id] })}
+              />
+
+              <Separator />
 
               {/* Message */}
               <div>
-                <p className="text-xs text-neutral-500 mb-2">Message property manager (optional)</p>
+                <p className="text-xs text-muted-foreground mb-2">Message property manager (optional)</p>
                 <div className="flex gap-2">
-                  <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Any notes..." rows={1} className="flex-1 text-sm" />
+                  <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Any notes about the repair..." rows={2} className="flex-1 text-sm" />
                   <Button onClick={() => sendMessage.mutate()} disabled={!message.trim() || sendMessage.isPending} size="sm" variant="outline">
                     {sendMessage.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>
@@ -1084,12 +1066,15 @@ const VendorJobPortal = () => {
 
               <Button 
                 size="default" 
-                className="w-full bg-neutral-900 hover:bg-neutral-800 text-white" 
+                className="w-full bg-foreground hover:bg-foreground/90 text-background" 
                 onClick={() => markComplete.mutate()} 
-                disabled={markComplete.isPending}
+                disabled={markComplete.isPending || photosByType.after.length === 0}
               >
                 {markComplete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-2" />Mark Complete</>}
               </Button>
+              {photosByType.after.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center">Upload at least one after photo to complete</p>
+              )}
             </CardContent>
           </Card>
         )}
