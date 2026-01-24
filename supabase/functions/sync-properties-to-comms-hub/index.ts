@@ -5,31 +5,60 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Full interface with all possible fields - only populated fields will be sent
 interface CommsHubProperty {
   source_id: string;
-  property_title: string;
-  address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  bedrooms: number;
-  bathrooms: number;
-  square_footage: number | null;
-  max_guests: number;
-  monthly_price: number | null;
-  security_deposit: number | null;
-  cleaning_fee: number | null;
-  description: string;
-  featured_image_url: string | null;
-  gallery_images: string[];
-  amenities: Record<string, boolean>;
-  virtual_tour_url: string | null;
-  ical_url: string | null;
-  existing_listing_url: string | null;
-  status: string;
-  contact_name: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
+  property_title?: string;
+  description?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  distance_from_corporate_hq?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  square_footage?: number;
+  max_guests?: number;
+  monthly_price?: number;
+  security_deposit?: number;
+  cleaning_fee?: number;
+  status?: string;
+  property_website?: string;
+  ical_url?: string;
+  amenities?: Record<string, boolean>;
+  // Marketing images (5 required types)
+  featured_image_url?: string;
+  exterior_image_url?: string;
+  hero_interior_image_url?: string;
+  signature_feature_image_url?: string;
+  primary_bedroom_image_url?: string;
+  kitchen_image_url?: string;
+  gallery_images?: string[];
+  virtual_tour_url?: string;
+  walkthrough_video_url?: string;
+  existing_listing_url?: string;
+  // Contact info
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  // Additional property details
+  property_type_detail?: string;
+  stories?: string;
+  parking_type?: string;
+  parking_spaces?: string;
+  basement?: boolean;
+  fenced_yard?: string;
+  ada_compliant?: boolean;
+  brand_name?: string;
+  // Additional pricing
+  utility_cap?: number;
+  admin_fee?: number;
+  pet_fee?: number;
+  monthly_pet_rent?: number;
+  monthly_cleaning_fee?: number;
+  nightly_rate?: number;
+  // Rental type
+  rental_type?: string;
 }
 
 // Parse address into components
@@ -59,24 +88,44 @@ function parseAddress(fullAddress: string): { street: string; city: string; stat
   return { street: fullAddress, city: "", state: "", zip: "" };
 }
 
-// Build amenities from property data
-function buildAmenities(details: any, policies: any): Record<string, boolean> {
-  return {
-    // From property_details
-    adaAccessible: details?.ada_compliant || false,
-    fencedYard: details?.fenced_yard === "YES" || details?.fenced_yard === true,
-    parking: !!details?.parking_type && details?.parking_type !== "None",
-    
-    // From property_policies
-    petFriendly: policies?.pets_allowed || false,
-    
-    // Defaults for furnished MTR properties
-    fullyFurnished: true,
-    wifi: true,
-    washerDryer: true,
-    centralAC: true,
-    highSpeedInternet: true,
-  };
+// Build amenities from property data - only include truthy values
+function buildAmenities(details: any, policies: any): Record<string, boolean> | undefined {
+  const amenities: Record<string, boolean> = {};
+  
+  // From property_details
+  if (details?.ada_compliant) amenities.adaAccessible = true;
+  if (details?.fenced_yard === "YES" || details?.fenced_yard === true) amenities.fencedYard = true;
+  if (details?.parking_type && details?.parking_type !== "None") amenities.parking = true;
+  if (details?.basement) amenities.basement = true;
+  
+  // From property_policies
+  if (policies?.pets_allowed) amenities.petFriendly = true;
+  
+  // Defaults for furnished MTR properties (these are typically true for managed rentals)
+  amenities.fullyFurnished = true;
+  amenities.wifi = true;
+  amenities.washerDryer = true;
+  amenities.centralAC = true;
+  amenities.highSpeedInternet = true;
+
+  return Object.keys(amenities).length > 0 ? amenities : undefined;
+}
+
+// Remove undefined/null values from object
+function cleanObject<T extends Record<string, any>>(obj: T): Partial<T> {
+  const cleaned: Partial<T> = {};
+  for (const key in obj) {
+    const value = obj[key];
+    // Keep the value if it's not null, not undefined, and not an empty string
+    if (value !== null && value !== undefined && value !== '') {
+      // For arrays, only include if not empty
+      if (Array.isArray(value) && value.length === 0) continue;
+      // For objects, only include if not empty
+      if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) continue;
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
 }
 
 Deno.serve(async (req) => {
@@ -131,7 +180,8 @@ Deno.serve(async (req) => {
         property_type,
         image_path,
         ical_url,
-        owner_id
+        owner_id,
+        nightly_rate
       `)
       .in("property_type", ["Client-Managed", "Company-Owned"])
       .is("offboarded_at", null);
@@ -149,7 +199,7 @@ Deno.serve(async (req) => {
 
     console.log(`[sync-properties-to-comms-hub] Found ${properties?.length || 0} properties to sync`);
 
-    const commsHubProperties: CommsHubProperty[] = [];
+    const commsHubProperties: Partial<CommsHubProperty>[] = [];
     const errors: Array<{ property_id: string; error: string }> = [];
 
     for (const property of properties || []) {
@@ -176,6 +226,13 @@ Deno.serve(async (req) => {
           .eq("property_id", property.id)
           .single();
 
+        // Fetch contact info
+        const { data: contactInfo } = await supabase
+          .from("property_contact_info")
+          .select("*")
+          .eq("property_id", property.id)
+          .single();
+
         // Fetch owner info
         let owner = null;
         if (property.owner_id) {
@@ -187,65 +244,126 @@ Deno.serve(async (req) => {
           owner = ownerData;
         }
 
-        // Fetch platform listings for existing URLs
+        // Fetch platform listings for URLs
         const { data: platforms } = await supabase
           .from("platform_listings")
           .select("platform_name, listing_url, is_active")
           .eq("property_id", property.id)
           .eq("is_active", true);
 
-        // Find Airbnb or VRBO listing URL
-        const existingListingUrl = platforms?.find(
-          p => p.platform_name?.toLowerCase().includes("airbnb") || 
-               p.platform_name?.toLowerCase().includes("vrbo")
-        )?.listing_url || null;
-
-        // Find virtual tour URL
-        const virtualTourUrl = platforms?.find(
+        // Find various URLs from platform listings
+        const airbnbListing = platforms?.find(
+          p => p.platform_name?.toLowerCase().includes("airbnb")
+        );
+        const vrboListing = platforms?.find(
+          p => p.platform_name?.toLowerCase().includes("vrbo")
+        );
+        const virtualTourListing = platforms?.find(
           p => p.platform_name?.toLowerCase().includes("matterport") ||
                p.listing_url?.includes("matterport") ||
                p.listing_url?.includes("my.matterport")
-        )?.listing_url || null;
+        );
+        const websiteListing = platforms?.find(
+          p => p.platform_name?.toLowerCase().includes("website") ||
+               p.platform_name?.toLowerCase().includes("direct")
+        );
+        const walkthroughVideo = platforms?.find(
+          p => p.platform_name?.toLowerCase().includes("video") ||
+               p.platform_name?.toLowerCase().includes("walkthrough") ||
+               p.listing_url?.includes("youtube") ||
+               p.listing_url?.includes("vimeo")
+        );
 
         // Parse address
         const parsedAddress = parseAddress(property.address || "");
 
         // Build description
         const brandName = details?.brand_name || property.name;
-        const description = `${brandName} - Beautiful ${details?.bedrooms || 0} bedroom, ${details?.bathrooms || 0} bath furnished rental in ${parsedAddress.city || "the area"}. ${property.rental_type === "mid_term" ? "Available for mid-term stays." : "Available for short-term and extended stays."}`;
+        let description = "";
+        if (brandName && details?.bedrooms && details?.bathrooms && parsedAddress.city) {
+          description = `${brandName} - Beautiful ${details.bedrooms} bedroom, ${details.bathrooms} bath furnished rental in ${parsedAddress.city}. ${property.rental_type === "mid_term" ? "Available for mid-term stays." : "Available for short-term and extended stays."}`;
+        }
 
         // Calculate max guests (2 per bedroom + 2)
-        const maxGuests = (details?.bedrooms || 1) * 2 + 2;
+        const maxGuests = details?.bedrooms ? (details.bedrooms * 2 + 2) : undefined;
 
-        // Build the Comms Hub property object
-        const commsHubProperty: CommsHubProperty = {
+        // Determine status
+        const status = "available"; // Could be enhanced with booking data
+
+        // Build the Comms Hub property object with all available data
+        const fullPropertyData: CommsHubProperty = {
+          // Required identifier
           source_id: property.id,
+          
+          // Basic info
           property_title: brandName || property.name,
+          description: description || undefined,
+          
+          // Address fields
           address: parsedAddress.street || property.address,
-          city: parsedAddress.city,
-          state: parsedAddress.state,
-          zip_code: parsedAddress.zip,
-          bedrooms: details?.bedrooms || 0,
-          bathrooms: details?.bathrooms || 0,
-          square_footage: details?.sqft || null,
+          city: parsedAddress.city || undefined,
+          state: parsedAddress.state || undefined,
+          zip_code: parsedAddress.zip || undefined,
+          
+          // Property specs
+          bedrooms: details?.bedrooms || undefined,
+          bathrooms: details?.bathrooms || undefined,
+          square_footage: details?.sqft || undefined,
           max_guests: maxGuests,
-          monthly_price: pricing?.monthly_rent || null,
-          security_deposit: pricing?.security_deposit || null,
-          cleaning_fee: pricing?.cleaning_fee || null,
-          description: description,
-          featured_image_url: property.image_path || null,
-          gallery_images: [], // Could fetch from storage if needed
+          
+          // Pricing
+          monthly_price: pricing?.monthly_rent || undefined,
+          security_deposit: pricing?.security_deposit || undefined,
+          cleaning_fee: pricing?.cleaning_fee || undefined,
+          utility_cap: pricing?.utility_cap || undefined,
+          admin_fee: pricing?.admin_fee || undefined,
+          pet_fee: pricing?.pet_fee || undefined,
+          monthly_pet_rent: pricing?.monthly_pet_rent || undefined,
+          monthly_cleaning_fee: pricing?.monthly_cleaning_fee || undefined,
+          nightly_rate: pricing?.nightly_rate || property.nightly_rate || undefined,
+          
+          // Status
+          status: status,
+          rental_type: property.rental_type || undefined,
+          
+          // URLs
+          property_website: contactInfo?.website_url || websiteListing?.listing_url || undefined,
+          ical_url: property.ical_url || undefined,
+          existing_listing_url: airbnbListing?.listing_url || vrboListing?.listing_url || undefined,
+          virtual_tour_url: virtualTourListing?.listing_url || undefined,
+          walkthrough_video_url: walkthroughVideo?.listing_url || undefined,
+          
+          // Images - Featured image from property
+          featured_image_url: property.image_path || undefined,
+          // Note: Specific marketing images would need to be stored and fetched
+          // exterior_image_url, hero_interior_image_url, etc. - add when data available
+          
+          // Amenities
           amenities: buildAmenities(details, policies),
-          virtual_tour_url: virtualTourUrl,
-          ical_url: property.ical_url || null,
-          existing_listing_url: existingListingUrl,
-          status: "available",
-          contact_name: owner?.name || null,
-          contact_email: owner?.email || null,
-          contact_phone: owner?.phone || null,
+          
+          // Contact info (prefer property-specific, fallback to owner)
+          contact_name: owner?.name || undefined,
+          contact_email: contactInfo?.contact_email || owner?.email || undefined,
+          contact_phone: contactInfo?.contact_phone || owner?.phone || undefined,
+          
+          // Additional property details
+          property_type_detail: details?.property_type_detail || undefined,
+          stories: details?.stories || undefined,
+          parking_type: details?.parking_type || undefined,
+          parking_spaces: details?.parking_spaces || undefined,
+          basement: details?.basement || undefined,
+          fenced_yard: details?.fenced_yard || undefined,
+          ada_compliant: details?.ada_compliant || undefined,
+          brand_name: details?.brand_name || undefined,
         };
 
-        commsHubProperties.push(commsHubProperty);
+        // Clean the object to remove null/undefined/empty values
+        const cleanedProperty = cleanObject(fullPropertyData);
+        
+        commsHubProperties.push(cleanedProperty);
+        
+        console.log(`[sync-properties-to-comms-hub] Prepared property ${property.id} with ${Object.keys(cleanedProperty).length} fields`);
+        
       } catch (err: any) {
         console.error(`[sync-properties-to-comms-hub] Error processing property ${property.id}:`, err);
         errors.push({ property_id: property.id, error: err.message || "Unknown error" });
