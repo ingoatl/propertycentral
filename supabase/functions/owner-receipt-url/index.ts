@@ -44,28 +44,37 @@ serve(async (req: Request): Promise<Response> => {
     let expenseData: any = null;
     
     if (expenseId) {
-      const { data: expense, error: expenseError } = await supabase
-        .from("expenses")
-        .select(`
-          id, email_screenshot_path, file_path, original_receipt_path,
-          amount, date, vendor, purpose, category, items_detail, property_id
-        `)
-        .eq("id", expenseId)
-        .single();
-
-      if (expenseError || !expense) {
-        console.error("Expense fetch failed:", expenseError);
-        return new Response(
-          JSON.stringify({ error: "Expense not found" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      expenseData = expense;
+      // Validate UUID format - handle legacy/demo IDs gracefully
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(expenseId);
       
-      // Priority: email_screenshot_path > file_path > original_receipt_path
-      if (!receiptPath) {
-        receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
+      if (!isValidUUID) {
+        console.log("Non-UUID expense ID detected, will generate receipt from provided data:", expenseId);
+        // For non-UUID IDs (legacy/demo), we can still generate a receipt if we have the data
+        // The client should pass expense details in the request body for these cases
+        expenseData = null; // Will trigger auto-generation path below if filePath is also missing
+      } else {
+        const { data: expense, error: expenseError } = await supabase
+          .from("expenses")
+          .select(`
+            id, email_screenshot_path, file_path, original_receipt_path,
+            amount, date, vendor, purpose, category, items_detail, property_id
+          `)
+          .eq("id", expenseId)
+          .single();
+
+        if (expenseError || !expense) {
+          console.error("Expense fetch failed:", expenseError);
+          // Instead of returning 404, try to generate a basic receipt if we have minimal data
+          console.log("Expense not found in DB, checking if we can generate from request context");
+          expenseData = null;
+        } else {
+          expenseData = expense;
+          
+          // Priority: email_screenshot_path > file_path > original_receipt_path
+          if (!receiptPath) {
+            receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
+          }
+        }
       }
     }
 

@@ -44,6 +44,9 @@ import {
   MapPin,
 } from "lucide-react";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
+import { CorporateOutreachCard } from "./CorporateOutreachCard";
+import { AudioPropertySummary } from "./AudioPropertySummary";
+import { OwnerValueRealized } from "./OwnerValueRealized";
 
 interface GuestInfo {
   guest_name: string | null;
@@ -572,62 +575,11 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
               </CardContent>
             </Card>
 
-            {/* Corporate Outreach (Aggregate Only - Privacy Safe) */}
-            <Card className="border-none shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-blue-500" />
-                  Corporate Outreach
-                </CardTitle>
-                <CardDescription>
-                  Aggregate metrics only - company details kept confidential
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="p-3 bg-muted/30 rounded-xl text-center">
-                    <p className="text-2xl font-bold">{currentStats.outreach?.total_companies_contacted || 0}</p>
-                    <p className="text-xs text-muted-foreground">Companies</p>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-xl text-center">
-                    <p className="text-2xl font-bold">{currentStats.outreach?.emails_sent || 0}</p>
-                    <p className="text-xs text-muted-foreground">Emails Sent</p>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-xl text-center">
-                    <p className="text-2xl font-bold">{currentStats.outreach?.calls_made || 0}</p>
-                    <p className="text-xs text-muted-foreground">Calls Made</p>
-                  </div>
-                </div>
-                
-                {currentStats.outreach?.industries_targeted && currentStats.outreach.industries_targeted.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-sm font-medium mb-2">Industries Targeted</p>
-                    <div className="flex flex-wrap gap-2">
-                      {currentStats.outreach.industries_targeted.map((industry, idx) => (
-                        <Badge key={idx} variant="secondary">{industry}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-purple-500" />
-                    <div>
-                      <p className="font-medium">{currentStats.outreach?.hotsheets_distributed || 0}</p>
-                      <p className="text-xs text-muted-foreground">Hotsheets Sent</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <UserCheck className="h-5 w-5 text-emerald-500" />
-                    <div>
-                      <p className="font-medium">{currentStats.outreach?.decision_makers_identified || 0}</p>
-                      <p className="text-xs text-muted-foreground">Decision Makers</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Corporate Outreach - Enhanced with value explanation */}
+            <CorporateOutreachCard 
+              outreach={currentStats.outreach} 
+              reportMonth={currentStats.report_month}
+            />
           </div>
 
           {/* Executive Summary */}
@@ -705,6 +657,33 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
           )}
 
           <Separator />
+
+          {/* Audio Summary & Value Realized Section */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Audio Property Summary */}
+            <AudioPropertySummary 
+              propertyName={propertyName}
+              marketingStats={currentStats}
+              listingHealth={null}
+              revenueData={null}
+            />
+
+            {/* Value Realized */}
+            <OwnerValueRealized 
+              propertyName={propertyName}
+              metrics={{
+                guestCommunicationsHandled: activities.filter(a => 
+                  a.activity_type?.includes('email') || a.activity_type?.includes('message')
+                ).length,
+                maintenanceIssuesCoordinated: 0,
+                bookingInquiriesManaged: activities.filter(a => 
+                  a.activity_type?.includes('inquiry')
+                ).length,
+                gapNightsFilled: 0,
+                dynamicPricingAdjustments: 0,
+              }}
+            />
+          </div>
         </>
       )}
 
