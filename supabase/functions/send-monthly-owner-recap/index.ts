@@ -1020,13 +1020,14 @@ serve(async (req) => {
           metrics,
         }, { onConflict: 'property_id,recap_month' });
         
-        // Send SMS with SHORT recap player link using recap ID
+        // Send SMS with SHORT recap player link using recap ID + portal link
         let smsResult: { success: boolean; error?: string } = { success: false, error: 'No phone number' };
         if (owner.phone) {
           // Short URL using recap ID - the player will fetch details from the database
           const shortRecapUrl = `https://propertycentral.lovable.app/recap/${recapId}`;
+          const ownerPortalUrl = `https://propertycentral.lovable.app/owner?owner=${owner.id}`;
           
-          const smsMessage = `Hi ${ownerNames}! 🏠 Your ${previousMonthName} recap for ${property.name} is ready!\n\n${metrics.totalRevenue > 0 ? `💰 ${formatCurrency(metrics.totalRevenue)}\n` : ''}🎧 Listen: ${shortRecapUrl}\n\n— PeachHaus`;
+          const smsMessage = `Hi ${ownerNames}! 🏠 Your ${previousMonthName} recap is ready!\n\n${metrics.totalRevenue > 0 ? `💰 ${formatCurrency(metrics.totalRevenue)}\n` : ''}🎧 Listen: ${shortRecapUrl}\n📊 Portal: ${ownerPortalUrl}\n\n— PeachHaus`;
           
           smsResult = await sendSms(owner.phone, smsMessage, owner.name, owner.email);
         }
