@@ -2455,13 +2455,23 @@ export function InboxView() {
     }
     
     // Convert Gmail emails to CommunicationItem format and add to the map
-    // Only include if filter allows (skip for owner filter, status filters that don't match)
-    if (activeFilter === "all" || activeFilter === "open" || activeFilter === "unread") {
+    // Include emails for most filters (not just all/open/unread)
+    // Skip only for owner filter and certain status-specific filters
+    if (activeFilter !== "owners") {
       const filteredEmails = filteredGmailEmails.filter(email => {
         // Skip done emails if filtering for open
         if (activeFilter === "open" && doneGmailIds.has(email.id)) return false;
         // For unread filter, only show unread emails
         if (activeFilter === "unread" && (!email.labelIds?.includes('UNREAD') || readGmailIds.has(email.id))) return false;
+        // For snoozed filter, skip emails (no email snooze support yet)
+        if (activeFilter === "snoozed") return false;
+        // For done filter, only show done emails
+        if (activeFilter === "done" && !doneGmailIds.has(email.id)) return false;
+        // For awaiting filter, skip emails (not applicable)
+        if (activeFilter === "awaiting") return false;
+        
+        // For urgent/priority filter, apply priority filtering after we compute priority
+        // (handled below after priority calculation)
         
         // SEARCH FILTER: If searching, only include emails that match
         if (searchTerms.length > 0) {
@@ -2495,6 +2505,11 @@ export function InboxView() {
           emailPriority = "important";
         } else if (isPromotional) {
           emailPriority = "low";
+        }
+        
+        // For urgent/priority filter, only include urgent/important emails
+        if (activeFilter === "urgent" && emailPriority !== "urgent" && emailPriority !== "important") {
+          continue;
         }
         
         // Promotional emails should automatically appear as "done" (green + faded)
