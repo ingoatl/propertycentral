@@ -2509,7 +2509,7 @@ export function InboxView() {
           // Fallback: Use keyword detection for emails without AI insights
           // Check subject and snippet for important keywords (booking, reservation, inquiry, etc.)
           const subjectAndBody = `${email.subject || ''} ${email.snippet || ''}`.toLowerCase();
-          const importantKeywords = ['reservation', 'booking', 'inquiry', 'urgent', 'important', 'invoice', 'payment', 'signed', 'contract', 'lease', 'verification', 'request'];
+          const importantKeywords = ['reservation', 'booking', 'inquiry', 'urgent', 'important', 'invoice', 'payment', 'signed', 'contract', 'lease', 'verification', 'request', 'availability', 'housing', 'corporate', 'opening', 'quote', 'proposal'];
           const hasImportantKeyword = importantKeywords.some(kw => subjectAndBody.includes(kw));
           
           if (hasImportantKeyword) {
