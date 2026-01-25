@@ -1,12 +1,30 @@
 import { useState } from "react";
-import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp, MessageSquare } from "lucide-react";
+import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp, MessageSquare, Users, UserCircle, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { VoiceDictationButton } from "./VoiceDictationButton";
 import { useUnifiedAI } from "@/hooks/useUnifiedAI";
 
-const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
-
+const CALENDAR_LINKS = {
+  discovery: {
+    label: "Lead Discovery Call",
+    url: "https://propertycentral.lovable.app/book-discovery-call",
+    description: "For new leads and prospects",
+    icon: Users,
+  },
+  owner: {
+    label: "Owner Call",
+    url: "https://propertycentral.lovable.app/book-owner-call",
+    description: "For existing property owners",
+    icon: UserCircle,
+  },
+};
 interface AIReplyButtonProps {
   contactName: string;
   contactPhone?: string;
@@ -140,12 +158,44 @@ export function AIReplyButton({
     setEditedReply(generatedReply || "");
   };
 
-  // Quick action buttons to add scheduling or income analysis offer
-  const handleAddScheduleCall = () => {
-    const scheduleText = `\n\nWant to hop on a quick call? Here's my calendar: ${SCHEDULING_LINK}`;
-    const newReply = (isEditing ? editedReply : generatedReply || "") + scheduleText;
-    setEditedReply(newReply);
-    setIsEditing(true);
+  // Quick action buttons to add scheduling or income analysis offer with AI redraft
+  const handleAddScheduleCall = async (callType: "discovery" | "owner") => {
+    const link = CALENDAR_LINKS[callType];
+    const currentMessage = isEditing ? editedReply : generatedReply || "";
+    
+    // Generate a contextual instruction for the AI to redraft
+    const callContext = callType === "owner" 
+      ? "Include a natural invitation to schedule a call to discuss their property, using this booking link: " + link.url
+      : "Include a natural invitation to schedule a discovery call to learn more about their property goals, using this booking link: " + link.url;
+    
+    // Trigger AI regeneration with the call link context
+    try {
+      const cType = contactType === "owner" ? "owner" : "lead";
+      const response = await replyToMessage(
+        cType,
+        contactId || "",
+        "sms",
+        conversationThread.filter(m => m.direction === "inbound").slice(-1)[0]?.body || "",
+        `Redraft this message to smoothly incorporate a call invitation. ${callContext}\n\nOriginal draft: ${currentMessage}`,
+        conversationThread,
+        contactPhone,
+        contactEmail,
+        ghlContactId
+      );
+
+      if (response?.message) {
+        setEditedReply(response.message);
+        setGeneratedReply(response.message);
+        setIsEditing(true);
+      }
+    } catch (error) {
+      // Fallback: just append the link if AI fails
+      console.error("Failed to redraft with call link:", error);
+      const scheduleText = `\n\nWant to hop on a quick call? Here's my calendar: ${link.url}`;
+      const newReply = currentMessage + scheduleText;
+      setEditedReply(newReply);
+      setIsEditing(true);
+    }
   };
 
   const handleAddIncomeAnalysis = () => {
@@ -214,16 +264,41 @@ export function AIReplyButton({
           
           {/* Quick action buttons */}
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleAddScheduleCall}
-              className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-primary"
-              title="Add scheduling link"
-            >
-              <Calendar className="h-3 w-3" />
-              + Call
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isLoading}
+                  className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-primary"
+                  title="Add scheduling link"
+                >
+                  <Calendar className="h-3 w-3" />
+                  + Call
+                  <ChevronDown className="h-2.5 w-2.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {Object.entries(CALENDAR_LINKS).map(([key, link]) => {
+                  const Icon = link.icon;
+                  return (
+                    <DropdownMenuItem
+                      key={key}
+                      onClick={() => handleAddScheduleCall(key as "discovery" | "owner")}
+                      className="flex flex-col items-start gap-1 py-2 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-primary" />
+                        <span className="font-medium">{link.label}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground pl-6">
+                        {link.description}
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="ghost"
               size="sm"
