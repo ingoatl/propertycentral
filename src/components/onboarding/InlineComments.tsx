@@ -18,10 +18,15 @@ export const InlineComments = ({ taskId }: InlineCommentsProps) => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
+  // Only load comments when the section is opened (lazy loading)
   useEffect(() => {
-    loadComments();
-  }, [taskId]);
+    if (isOpen && !hasLoaded) {
+      loadComments();
+      setHasLoaded(true);
+    }
+  }, [isOpen, hasLoaded, taskId]);
 
   const loadComments = async () => {
     setLoading(true);

@@ -145,10 +145,15 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
     }
   };
 
+  // Use skeleton loading instead of spinner for less intrusive UX
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-4">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      <div className="space-y-2 mt-3">
+        <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+        <div className="flex gap-2">
+          <div className="w-16 h-16 bg-muted animate-pulse rounded-lg" />
+          <div className="w-16 h-16 bg-muted animate-pulse rounded-lg" />
+        </div>
       </div>
     );
   }
