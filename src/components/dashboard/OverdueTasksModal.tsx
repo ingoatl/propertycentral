@@ -156,7 +156,7 @@ export const OverdueTasksModal = ({ open, onOpenChange }: OverdueTasksModalProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertCircle className="h-5 w-5" />
@@ -193,7 +193,7 @@ export const OverdueTasksModal = ({ open, onOpenChange }: OverdueTasksModalProps
         </div>
 
         {/* Scrollable Task List */}
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="h-[55vh] pr-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />

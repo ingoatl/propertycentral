@@ -416,12 +416,15 @@ export function DiscoveryCallCalendar() {
               </>
             )}
             <Button
-              variant={calendarView === 'week' ? 'default' : 'outline'}
+              variant={calendarView === 'week' ? 'outline' : 'default'}
               size="sm"
-              className="h-9 px-3 text-xs font-medium"
+              className={cn(
+                "h-9 px-3 text-xs font-medium",
+                calendarView === 'month' && "bg-primary text-primary-foreground"
+              )}
               onClick={() => setCalendarView(calendarView === 'week' ? 'month' : 'week')}
             >
-              {calendarView === 'week' ? 'Show Full Calendar' : 'This Week'}
+              {calendarView === 'week' ? 'Show Full Calendar' : '← Back to Week View'}
             </Button>
           </div>
         </div>
