@@ -31,8 +31,8 @@ export const OverdueTasksCard = () => {
   const navigate = useNavigate();
   const [overdueTasks, setOverdueTasks] = useState<OverdueTaskWithProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [hasInitializedExpansion, setHasInitializedExpansion] = useState(false);
+  const [isCardExpanded, setIsCardExpanded] = useState(false); // Card starts COLLAPSED
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set()); // Projects start collapsed
   const [rescheduleTask, setRescheduleTask] = useState<OverdueTaskWithProject | null>(null);
 
   const loadOverdueTasks = async () => {
@@ -143,15 +143,15 @@ export const OverdueTasksCard = () => {
 
   const groupedTasks = groupTasksByProject();
   const allProjectIds = Object.keys(groupedTasks);
-  
-  // Initialize expanded state with all projects when tasks first load
-  useEffect(() => {
-    if (overdueTasks.length > 0 && !hasInitializedExpansion) {
-      const grouped = groupTasksByProject();
-      setExpandedProjects(new Set(Object.keys(grouped)));
-      setHasInitializedExpansion(true);
+
+  // Expand/Collapse all projects helper
+  const toggleAllProjects = (expand: boolean) => {
+    if (expand) {
+      setExpandedProjects(new Set(allProjectIds));
+    } else {
+      setExpandedProjects(new Set());
     }
-  }, [overdueTasks, hasInitializedExpansion]);
+  };
 
   if (loading) {
     return (
@@ -185,95 +185,131 @@ export const OverdueTasksCard = () => {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              Overdue Tasks ({overdueTasks.length})
-            </span>
-          </CardTitle>
-          <CardDescription>
-            Tasks that are past their due date and require attention
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Object.entries(groupedTasks).map(([projectId, { project, tasks }]) => (
-            <Collapsible
-              key={projectId}
-              open={expandedProjects.has(projectId)}
-              onOpenChange={() => toggleProject(projectId)}
-            >
-              <div className="rounded-lg border bg-card">
-                <CollapsibleTrigger asChild>
-                  <button className="flex w-full items-center justify-between p-4 text-left hover:bg-accent/50 transition-colors">
-                    <div className="flex items-center gap-2">
-                      {expandedProjects.has(projectId) ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                      <div>
-                        <p className="font-semibold">{project.property_address}</p>
-                        <p className="text-sm text-muted-foreground">{project.owner_name}</p>
-                      </div>
-                    </div>
-                    <Badge variant="destructive">{tasks.length} overdue</Badge>
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="border-t p-4 space-y-3">
-                    {tasks.map((task) => {
-                      const daysOverdue = getDaysOverdue(task.due_date || "");
-                      return (
-                        <div
-                          key={task.id}
-                          className={`p-3 rounded-lg border ${getUrgencyColor(daysOverdue)} cursor-pointer hover:opacity-80 transition-opacity`}
-                          onClick={() => {
-                            // Use replace to avoid history buildup and faster navigation
-                            navigate(`/properties?openWorkflow=${task.project_id}&taskId=${task.id}`, { replace: true });
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium">{task.title}</p>
-                                <ExternalLink className="h-3 w-3 opacity-50" />
-                              </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <Calendar className="h-3 w-3" />
-                                <span>
-                                  Due: {task.due_date && format(new Date(task.due_date), "MMM d, yyyy")}
-                                </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {daysOverdue} day{daysOverdue !== 1 ? "s" : ""} ago
-                                </Badge>
-                              </div>
-                              <p className="text-xs opacity-90">
-                                {task.phase_title}
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRescheduleTask(task);
-                              }}
-                            >
-                              Reschedule
-                            </Button>
+      <Collapsible open={isCardExpanded} onOpenChange={setIsCardExpanded}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors rounded-t-lg">
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-destructive">
+                  {isCardExpanded ? (
+                    <ChevronDown className="h-5 w-5" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5" />
+                  )}
+                  <AlertCircle className="h-5 w-5" />
+                  Overdue Tasks
+                </span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="destructive">{overdueTasks.length} total</Badge>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    across {allProjectIds.length} properties
+                  </span>
+                </div>
+              </CardTitle>
+              <CardDescription>
+                {isCardExpanded ? "Tasks past their due date" : "Click to expand and view all overdue tasks"}
+              </CardDescription>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              {/* Expand/Collapse All Controls */}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleAllProjects(false)}
+                  disabled={expandedProjects.size === 0}
+                >
+                  Collapse All
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleAllProjects(true)}
+                  disabled={expandedProjects.size === allProjectIds.length}
+                >
+                  Expand All
+                </Button>
+              </div>
+
+              {Object.entries(groupedTasks).map(([projectId, { project, tasks }]) => (
+                <Collapsible
+                  key={projectId}
+                  open={expandedProjects.has(projectId)}
+                  onOpenChange={() => toggleProject(projectId)}
+                >
+                  <div className="rounded-lg border bg-card">
+                    <CollapsibleTrigger asChild>
+                      <button className="flex w-full items-center justify-between p-4 text-left hover:bg-accent/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          {expandedProjects.has(projectId) ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                          <div>
+                            <p className="font-semibold">{project.property_address}</p>
+                            <p className="text-sm text-muted-foreground">{project.owner_name}</p>
                           </div>
                         </div>
-                      );
-                    })}
+                        <Badge variant="destructive">{tasks.length} overdue</Badge>
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t p-4 space-y-3">
+                        {tasks.map((task) => {
+                          const daysOverdue = getDaysOverdue(task.due_date || "");
+                          return (
+                            <div
+                              key={task.id}
+                              className={`p-3 rounded-lg border ${getUrgencyColor(daysOverdue)} cursor-pointer hover:opacity-80 transition-opacity`}
+                              onClick={() => {
+                                navigate(`/properties?openWorkflow=${task.project_id}&taskId=${task.id}`, { replace: true });
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">{task.title}</p>
+                                    <ExternalLink className="h-3 w-3 opacity-50" />
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>
+                                      Due: {task.due_date && format(new Date(task.due_date), "MMM d, yyyy")}
+                                    </span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {daysOverdue} day{daysOverdue !== 1 ? "s" : ""} ago
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs opacity-90">
+                                    {task.phase_title}
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRescheduleTask(task);
+                                  }}
+                                >
+                                  Reschedule
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-          ))}
-        </CardContent>
-      </Card>
+                </Collapsible>
+              ))}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {rescheduleTask && (
         <RescheduleDueDateDialog

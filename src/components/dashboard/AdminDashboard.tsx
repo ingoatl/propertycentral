@@ -391,7 +391,10 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* TODAY'S FOCUS - Personalized greeting and daily summary */}
         <TodaysFocusCard />
         
-        {/* ACTION REQUIRED - Top Priority */}
+        {/* Discovery Call Calendar - Directly after welcome */}
+        <DiscoveryCallCalendar />
+        
+        {/* ACTION REQUIRED - Questions & Bugs */}
         <div className="p-4 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/20">
           <h3 className="text-lg font-semibold flex items-center gap-2 text-orange-700 dark:text-orange-300 mb-4">
             <AlertTriangle className="h-5 w-5" />
@@ -403,13 +406,10 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           </div>
         </div>
         
-        {/* Discovery Call Calendar - Prominent at top */}
-        <DiscoveryCallCalendar />
-        
         {/* Onboarding Properties Timeline - Always visible */}
         <OnboardingTimelineSection />
         
-        {/* Overdue Tasks - Full width, expanded by default */}
+        {/* Overdue Tasks - Collapsible, CLOSED by default */}
         <OverdueTasksCard />
 
         {/* Gmail Integration */}
