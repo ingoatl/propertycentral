@@ -982,12 +982,24 @@ export function InboxView() {
       if (fetchMessages) {
         // Fetch lead communications - filter by user assignment for non-admin users
         // Include received_on_number for proper phone-based filtering
+        // CRITICAL: When searching, increase limit and add server-side text search
+        const isSearching = search && search.trim().length >= 2;
+        const queryLimit = isSearching ? 500 : 100; // Increase limit when searching
+        
         let commsQuery = supabase
           .from("lead_communications")
           .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, assigned_user_id, received_on_number, ghl_contact_id, leads(id, name, phone, email)`)
           .in("communication_type", ["sms", "email", "voicemail"])
           .order("created_at", { ascending: false })
-          .limit(100);
+          .limit(queryLimit);
+        
+        // Add server-side text search for body and subject when searching
+        // This allows finding matches beyond the normal limit
+        if (isSearching) {
+          const searchTerm = search.trim().toLowerCase();
+          // Use ilike for case-insensitive partial match on body, subject, and lead name
+          commsQuery = commsQuery.or(`body.ilike.%${searchTerm}%,subject.ilike.%${searchTerm}%`);
+        }
         
         // For admin "all" view, fetch everything without filtering
         // For personal inboxes, we'll filter post-query to include:
@@ -997,8 +1009,71 @@ export function InboxView() {
         // We fetch all and filter in JS because we need to cross-reference with userPhoneMap
         
         const { data: allComms } = await commsQuery;
+        
+        // CRITICAL: When searching, also find leads by name and fetch their communications
+        // This allows searching for "Gary Kilgore" even if the body doesn't contain the name
+        let leadSearchComms: typeof allComms = [];
+        if (isSearching) {
+          const searchTerm = search.trim().toLowerCase();
+          
+          // Find leads matching the search term
+          const { data: matchingLeads } = await supabase
+            .from("leads")
+            .select("id")
+            .ilike("name", `%${searchTerm}%`)
+            .limit(50);
+          
+          if (matchingLeads && matchingLeads.length > 0) {
+            const leadIds = matchingLeads.map(l => l.id);
+            
+            // Fetch communications for these leads
+            const { data: leadComms } = await supabase
+              .from("lead_communications")
+              .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, assigned_user_id, received_on_number, ghl_contact_id, leads(id, name, phone, email)`)
+              .in("lead_id", leadIds)
+              .in("communication_type", ["sms", "email", "voicemail"])
+              .order("created_at", { ascending: false })
+              .limit(100);
+            
+            leadSearchComms = leadComms || [];
+          }
+          
+          // Also search property_owners by name
+          const { data: matchingOwners } = await supabase
+            .from("property_owners")
+            .select("id")
+            .ilike("name", `%${searchTerm}%`)
+            .limit(50);
+          
+          if (matchingOwners && matchingOwners.length > 0) {
+            const ownerIds = matchingOwners.map(o => o.id);
+            
+            // Fetch communications for these owners
+            const { data: ownerComms } = await supabase
+              .from("lead_communications")
+              .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, assigned_to, recipient_user_id, assigned_user_id, received_on_number, ghl_contact_id, property_owners(id, name, phone, email)`)
+              .in("owner_id", ownerIds)
+              .in("communication_type", ["sms", "email", "voicemail"])
+              .order("created_at", { ascending: false })
+              .limit(100);
+            
+            // Merge owner communications
+            if (ownerComms) {
+              leadSearchComms = [...leadSearchComms, ...ownerComms as any];
+            }
+          }
+        }
+        
+        // Merge and deduplicate all communications
+        const allCommsMap = new Map<string, typeof allComms extends (infer T)[] ? T : never>();
+        [...(allComms || []), ...leadSearchComms].forEach(comm => {
+          if (!allCommsMap.has(comm.id)) {
+            allCommsMap.set(comm.id, comm);
+          }
+        });
+        const mergedComms = Array.from(allCommsMap.values());
 
-        if (allComms) {
+        if (mergedComms.length > 0) {
           // Lookup tenants for matching
           const { data: allTenants } = await supabase
             .from("mid_term_bookings")
@@ -1055,7 +1130,7 @@ export function InboxView() {
             '925a186d-ed85-42a2-9388-7032c315f239': 'catherine',
           };
 
-          for (const comm of allComms) {
+          for (const comm of mergedComms) {
             // === CRITICAL: Inbox filtering logic ===
             // For personal inboxes (not admin "all" view), only show messages that belong to this user:
             // 1. Explicitly assigned to this user (assigned_to, recipient_user_id, assigned_user_id)
