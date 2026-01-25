@@ -19,6 +19,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { OverdueTasksCard } from "./OverdueTasksCard";
 import { AllTasksCard } from "./AllTasksCard";
+import { TodaysFocusCard } from "./TodaysFocusCard";
 import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
 import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
@@ -386,6 +387,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         
         {/* Sync Status Bar - Always visible at top */}
         <SyncStatusBar />
+        
+        {/* TODAY'S FOCUS - Personalized greeting and daily summary */}
+        <TodaysFocusCard />
         
         {/* ACTION REQUIRED - Top Priority */}
         <div className="p-4 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/20">

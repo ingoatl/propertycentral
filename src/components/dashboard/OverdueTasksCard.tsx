@@ -31,7 +31,8 @@ export const OverdueTasksCard = () => {
   const navigate = useNavigate();
   const [overdueTasks, setOverdueTasks] = useState<OverdueTaskWithProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string> | null>(null); // null = not yet initialized
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [hasInitializedExpansion, setHasInitializedExpansion] = useState(false);
   const [rescheduleTask, setRescheduleTask] = useState<OverdueTaskWithProject | null>(null);
 
   const loadOverdueTasks = async () => {
@@ -140,17 +141,17 @@ export const OverdueTasksCard = () => {
     });
   };
 
-  // Expand all projects by default when tasks load
   const groupedTasks = groupTasksByProject();
   const allProjectIds = Object.keys(groupedTasks);
   
-  // Initialize expanded state with all projects if not yet set
-  if (expandedProjects === null && overdueTasks.length > 0) {
-    setExpandedProjects(new Set(allProjectIds));
-  }
-  
-  // Use expandedProjects or fallback to all expanded
-  const currentExpanded = expandedProjects || new Set(allProjectIds);
+  // Initialize expanded state with all projects when tasks first load
+  useEffect(() => {
+    if (overdueTasks.length > 0 && !hasInitializedExpansion) {
+      const grouped = groupTasksByProject();
+      setExpandedProjects(new Set(Object.keys(grouped)));
+      setHasInitializedExpansion(true);
+    }
+  }, [overdueTasks, hasInitializedExpansion]);
 
   if (loading) {
     return (
@@ -200,14 +201,14 @@ export const OverdueTasksCard = () => {
           {Object.entries(groupedTasks).map(([projectId, { project, tasks }]) => (
             <Collapsible
               key={projectId}
-              open={currentExpanded.has(projectId)}
+              open={expandedProjects.has(projectId)}
               onOpenChange={() => toggleProject(projectId)}
             >
               <div className="rounded-lg border bg-card">
                 <CollapsibleTrigger asChild>
                   <button className="flex w-full items-center justify-between p-4 text-left hover:bg-accent/50 transition-colors">
                     <div className="flex items-center gap-2">
-                      {currentExpanded.has(projectId) ? (
+                      {expandedProjects.has(projectId) ? (
                         <ChevronDown className="h-4 w-4" />
                       ) : (
                         <ChevronRight className="h-4 w-4" />
