@@ -508,7 +508,7 @@ Be helpful and take action. You are not just informational - you can DO things l
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,
@@ -1285,7 +1285,7 @@ Property Management`;
                     "Content-Type": "application/json",
                   },
                   body: JSON.stringify({
-                    model: "gpt-4o-mini",
+                    model: "google/gemini-3-flash-preview",
                     messages: followUpMessages,
                     tools,  // Include tools so AI can continue calling more tools
                     tool_choice: "auto",

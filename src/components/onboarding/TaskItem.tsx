@@ -89,8 +89,8 @@ export const TaskItem = ({ task, onUpdate, assignedUserName: preloadedUserName }
   useEffect(() => {
     // Only load SOP and FAQs when the task is expanded
     if (!isCollapsed) {
-      loadSOP();
-      loadAnsweredFAQs();
+      // Run both queries in parallel for faster loading
+      Promise.all([loadSOP(), loadAnsweredFAQs()]);
     } else {
       // Reset editing state when task is collapsed
       setIsEditing(false);

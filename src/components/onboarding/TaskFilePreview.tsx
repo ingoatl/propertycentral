@@ -46,18 +46,22 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
 
       setAttachments(data || []);
       
-      // Load preview URLs for images (bucket is private, need signed URLs)
-      const urls: Record<string, string> = {};
-      
-      for (const file of (data || [])) {
+      // Load preview URLs for images in PARALLEL (bucket is private, need signed URLs)
+      // Using Promise.all for much faster loading when there are multiple attachments
+      const urlPromises = (data || []).map(async (file) => {
         const { data: urlData } = await supabase.storage
           .from('task-attachments')
           .createSignedUrl(file.file_path, 3600);
-        
-        if (urlData?.signedUrl) {
-          urls[file.id] = urlData.signedUrl;
+        return { id: file.id, url: urlData?.signedUrl };
+      });
+
+      const urlResults = await Promise.all(urlPromises);
+      const urls: Record<string, string> = {};
+      urlResults.forEach(result => {
+        if (result.url) {
+          urls[result.id] = result.url;
         }
-      }
+      });
       
       setImageUrls(urls);
     } catch (error) {

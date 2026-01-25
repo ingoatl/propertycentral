@@ -212,7 +212,7 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: "google/gemini-3-flash-preview",
             messages: [
               {
                 role: "system",

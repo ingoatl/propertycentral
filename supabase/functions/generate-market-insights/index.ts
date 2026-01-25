@@ -603,7 +603,7 @@ Generate 4-5 location strengths specific to the property's neighborhood.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "You are a real estate market analyst. Always respond with valid JSON only, no markdown. IMPORTANT: All numbers must be raw integers or decimals without commas or formatting (e.g., use 4500 not 4,500)." },
           { role: "user", content: aiPrompt }
