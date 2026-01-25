@@ -17,7 +17,7 @@ serve(async (req) => {
     
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
@@ -97,7 +97,7 @@ serve(async (req) => {
     }
 
     // If we still don't have an expiration date, try to read the PDF content with AI
-    if (!extractedData.expiration_date && openaiKey) {
+    if (!extractedData.expiration_date && lovableApiKey) {
       console.log("No date found in filename, attempting to read PDF content with AI...");
       
       try {
@@ -109,22 +109,22 @@ serve(async (req) => {
         if (downloadError) {
           console.error("Failed to download file:", downloadError);
         } else if (fileData) {
-          // Convert blob to base64 for GPT-4 Vision
+          // Convert blob to base64 for vision-capable model
           const arrayBuffer = await fileData.arrayBuffer();
           const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
           const fileType = filePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
           
-          console.log("Sending document to GPT-4o for analysis...");
+          console.log("Sending document to Lovable AI (Gemini) for analysis...");
           
-          // Use GPT-4o with vision capabilities to analyze the document
-          const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          // Use Lovable AI gateway with Gemini vision capabilities
+          const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${openaiKey}`,
+              "Authorization": `Bearer ${lovableApiKey}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "gpt-4o",
+              model: "google/gemini-3-flash-preview",
               messages: [
                 {
                   role: "system",
@@ -166,7 +166,7 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
           if (response.ok) {
             const result = await response.json();
             const content = result.choices[0]?.message?.content || '';
-            console.log("GPT-4o response:", content);
+            console.log("Gemini response:", content);
             
             // Parse JSON from response (handle potential markdown code blocks)
             let cleanContent = content.trim();
@@ -193,7 +193,7 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
             }
           } else {
             const errorText = await response.text();
-            console.error("GPT-4o request failed:", response.status, errorText);
+            console.error("Gemini request failed:", response.status, errorText);
           }
         }
       } catch (aiError) {
@@ -201,14 +201,14 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
       }
     }
     
-    // If still no expiration date but we have a filename with valid-looking content, use GPT to analyze filename
-    if (!extractedData.expiration_date && openaiKey && filenameToAnalyze.length > 10) {
-      console.log("Using GPT-4o-mini for enhanced filename analysis as fallback");
+    // If still no expiration date but we have a filename with valid-looking content, use AI to analyze filename
+    if (!extractedData.expiration_date && lovableApiKey && filenameToAnalyze.length > 10) {
+      console.log("Using Gemini for enhanced filename analysis as fallback");
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${openaiKey}`,
+            "Authorization": `Bearer ${lovableApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -237,7 +237,7 @@ Rules:
         if (response.ok) {
           const result = await response.json();
           const content = result.choices[0]?.message?.content || '';
-          console.log("GPT-4o-mini response:", content);
+          console.log("Gemini filename analysis response:", content);
           
           const jsonMatch = content.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
@@ -254,7 +254,7 @@ Rules:
           }
         }
       } catch (e) {
-        console.log("GPT-4o-mini analysis failed:", e);
+        console.log("Gemini filename analysis failed:", e);
       }
     }
     
