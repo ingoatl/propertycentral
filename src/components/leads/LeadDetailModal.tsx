@@ -557,9 +557,42 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
                   </Button>
                 </div>
               )}
-              <p className="text-sm text-muted-foreground mt-1">
-                Lead #{lead.lead_number} • {lead.opportunity_source || 'Unknown Source'}
-              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Lead #{lead.lead_number} •</span>
+                <Select
+                  value={lead.opportunity_source || ""}
+                  onValueChange={async (value) => {
+                    const { error } = await supabase
+                      .from("leads")
+                      .update({ opportunity_source: value })
+                      .eq("id", lead.id);
+                    if (error) {
+                      toast.error("Failed to update source");
+                    } else {
+                      toast.success("Source updated");
+                      queryClient.invalidateQueries({ queryKey: ["leads"] });
+                      onRefresh();
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-6 w-auto min-w-[140px] text-xs border-dashed">
+                    <SelectValue placeholder="Select source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PeachHaus Discovery Call">PeachHaus Discovery Call</SelectItem>
+                    <SelectItem value="Realtor Referral">Realtor Referral</SelectItem>
+                    <SelectItem value="Anja's Referral">Anja's Referral</SelectItem>
+                    <SelectItem value="Website Inquiry">Website Inquiry</SelectItem>
+                    <SelectItem value="Phone Call">Phone Call</SelectItem>
+                    <SelectItem value="Email Inquiry">Email Inquiry</SelectItem>
+                    <SelectItem value="Social Media">Social Media</SelectItem>
+                    <SelectItem value="Existing Owner Referral">Existing Owner Referral</SelectItem>
+                    <SelectItem value="Agent Referral">Agent Referral</SelectItem>
+                    <SelectItem value="Friend/Family Referral">Friend/Family Referral</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Badge className={`${stageConfig.bgColor} ${stageConfig.color} border-0`}>

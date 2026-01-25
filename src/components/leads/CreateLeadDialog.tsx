@@ -39,11 +39,14 @@ interface CreateLeadDialogProps {
 const OPPORTUNITY_SOURCES = [
   "PeachHaus Discovery Call",
   "Realtor Referral",
+  "Anja's Referral",
   "Website Inquiry",
   "Phone Call",
   "Email Inquiry",
   "Social Media",
   "Existing Owner Referral",
+  "Agent Referral",
+  "Friend/Family Referral",
   "Other",
 ];
 
