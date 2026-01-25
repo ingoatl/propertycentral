@@ -105,7 +105,7 @@ Focus on extracting concrete action items that should be followed up on.`;
             'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'gpt-5-mini',
+            model: 'google/gemini-3-flash-preview',
             messages: [
               { role: 'system', content: 'You are an expert at analyzing sales and customer service calls. Extract actionable insights.' },
               { role: 'user', content: analysisPrompt }

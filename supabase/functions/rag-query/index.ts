@@ -136,7 +136,7 @@ Now answer the user's question based on the above context.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'google/gemini-3-flash-preview',
         messages,
         temperature: 0.3,
         max_tokens: 1500,

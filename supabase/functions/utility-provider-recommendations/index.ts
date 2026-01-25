@@ -151,7 +151,7 @@ If no meaningful savings opportunities exist, return an empty array: []`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'google/gemini-3-flash-preview',
         messages: [
           { role: 'system', content: 'You are a utility cost optimization expert. Return only valid JSON arrays.' },
           { role: 'user', content: aiPrompt }

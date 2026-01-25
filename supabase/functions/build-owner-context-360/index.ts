@@ -519,7 +519,7 @@ Keep it concise and actionable. Start with the owner's name.`;
             Authorization: `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "gpt-5-mini",
+            model: "google/gemini-3-flash-preview",
             messages: [
               { role: "system", content: "You are a helpful property management assistant. Be concise and professional." },
               { role: "user", content: summaryPrompt },

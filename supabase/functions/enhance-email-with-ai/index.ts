@@ -213,7 +213,7 @@ Return ONLY the enhanced email text, nothing else. Preserve ALL formatting, stru
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

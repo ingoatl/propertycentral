@@ -349,7 +349,7 @@ Extract ALL available information. Use null only if truly not found. Be thorough
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: contentToAnalyze }

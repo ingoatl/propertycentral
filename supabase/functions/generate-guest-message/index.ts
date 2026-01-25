@@ -87,7 +87,7 @@ Generate ONLY the refined message text, no explanations or alternatives.`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        model: "openai/gpt-5-mini",
+        model: "google/gemini-3-flash-preview",
         max_tokens: 200,
       }),
     });

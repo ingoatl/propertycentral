@@ -106,7 +106,7 @@ Generate a warm, professional follow-up SMS message (under 160 chars). Respond w
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "user", content: aiPrompt }
         ],
