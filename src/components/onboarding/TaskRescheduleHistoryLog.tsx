@@ -23,14 +23,20 @@ interface TaskRescheduleHistoryLogProps {
 
 export const TaskRescheduleHistoryLog = ({ taskId }: TaskRescheduleHistoryLogProps) => {
   const [logs, setLogs] = useState<RescheduleLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
+  // Lazy load logs only when needed
   useEffect(() => {
-    loadLogs();
-  }, [taskId]);
+    if (!hasLoaded) {
+      loadLogs();
+      setHasLoaded(true);
+    }
+  }, [taskId, hasLoaded]);
 
   const loadLogs = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from("task_reschedule_logs")
@@ -47,6 +53,7 @@ export const TaskRescheduleHistoryLog = ({ taskId }: TaskRescheduleHistoryLogPro
     }
   };
 
+  // Don't show anything while loading or if no logs
   if (loading || logs.length === 0) return null;
 
   const totalDelays = logs.reduce((sum, log) => sum + log.days_delayed, 0);
