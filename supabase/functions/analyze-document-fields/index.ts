@@ -404,7 +404,7 @@ Return ONLY valid JSON with a "fields" array.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "You are a document analysis expert. Return only valid JSON." },
           { role: "user", content: prompt },
