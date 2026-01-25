@@ -12,11 +12,13 @@ import {
   Phone, 
   CheckCircle2,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Eye
 } from "lucide-react";
 import { format, differenceInDays, isToday } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
+import { OverdueTasksModal } from "./OverdueTasksModal";
 
 interface TodaysFocusData {
   userName: string;
@@ -38,6 +40,7 @@ export const TodaysFocusCard = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<TodaysFocusData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showOverdueModal, setShowOverdueModal] = useState(false);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -210,11 +213,22 @@ export const TodaysFocusCard = () => {
               <Badge 
                 variant="destructive" 
                 className="px-4 py-2 text-sm cursor-pointer hover:opacity-80"
-                onClick={() => navigate("/properties")}
+                onClick={() => setShowOverdueModal(true)}
               >
                 <AlertCircle className="h-4 w-4 mr-2" />
                 {data.overdueCount} Overdue
               </Badge>
+            )}
+            {data.overdueCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                onClick={() => setShowOverdueModal(true)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View Overdue Tasks
+              </Button>
             )}
             {data.dueTodayCount > 0 && (
               <Badge 
@@ -289,6 +303,12 @@ export const TodaysFocusCard = () => {
           )}
         </div>
       </CardContent>
+
+      {/* Overdue Tasks Modal */}
+      <OverdueTasksModal 
+        open={showOverdueModal} 
+        onOpenChange={setShowOverdueModal} 
+      />
     </Card>
   );
 };
