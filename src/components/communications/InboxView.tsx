@@ -1132,12 +1132,17 @@ export function InboxView() {
 
           for (const comm of mergedComms) {
             // === CRITICAL: Inbox filtering logic ===
+            // IMPORTANT: When user is actively SEARCHING, bypass inbox filtering to find ALL matching contacts
+            // This allows searching for any contact regardless of assignment status
+            const isActivelySearching = search && search.trim().length >= 2;
+            
             // For personal inboxes (not admin "all" view), only show messages that belong to this user:
             // 1. Explicitly assigned to this user (assigned_to, recipient_user_id, assigned_user_id)
             // 2. Received on the user's personal phone number (received_on_number matches)
             // NOTE: Company line messages are NOT included when viewing a specific user's inbox
             // They should only appear in "All Communications" view
-            if (!viewAllInboxes && targetUserId) {
+            // EXCEPTION: When searching, show ALL matching results
+            if (!viewAllInboxes && targetUserId && !isActivelySearching) {
               const isExplicitlyAssigned = 
                 comm.assigned_to === targetUserId || 
                 comm.recipient_user_id === targetUserId || 
