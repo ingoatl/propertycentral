@@ -97,6 +97,29 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
     }
   }, [open, projectData?.id]);
 
+  // Auto-sync tasks when dialog opens and there are empty tasks
+  useEffect(() => {
+    const autoSync = async () => {
+      if (!projectData?.id || !propertyId || !isAdmin) return;
+      if (loading || tasks.length === 0) return;
+      
+      // Check if there are empty tasks that could benefit from sync
+      const hasEmptyTasks = tasks.some(t => 
+        !t.field_value || t.field_value.trim() === ""
+      );
+      
+      if (hasEmptyTasks && !isSyncing) {
+        console.log("Auto-syncing tasks on dialog open...");
+        const result = await syncTasks(projectData.id, propertyId);
+        if (result.success && result.synced > 0) {
+          await handleTaskUpdate();
+        }
+      }
+    };
+    
+    autoSync();
+  }, [projectData?.id, propertyId, loading, tasks.length, isAdmin]);
+
   useEffect(() => {
     // Filter tasks based on search query, "my tasks" filter, and admin status
     let filtered = tasks;
