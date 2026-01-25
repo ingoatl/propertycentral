@@ -33,6 +33,7 @@ export const AllTasksCard = () => {
   const [allTasks, setAllTasks] = useState<TaskWithProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [hasInitializedExpansion, setHasInitializedExpansion] = useState(false);
 
   const loadAllTasks = async () => {
     try {
@@ -62,6 +63,15 @@ export const AllTasksCard = () => {
   useEffect(() => {
     loadAllTasks();
   }, []);
+
+  // Initialize expanded state with all projects when tasks first load
+  useEffect(() => {
+    if (allTasks.length > 0 && !hasInitializedExpansion) {
+      const grouped = groupTasksByProject();
+      setExpandedProjects(new Set(Object.keys(grouped)));
+      setHasInitializedExpansion(true);
+    }
+  }, [allTasks, hasInitializedExpansion]);
 
   const getDaysUntilDue = (dueDate: string) => {
     return differenceInDays(new Date(dueDate), new Date());

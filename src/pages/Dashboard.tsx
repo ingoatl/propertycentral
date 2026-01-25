@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { AdminDashboard } from "@/components/dashboard/AdminDashboard";
 import { UserTasksDashboard } from "@/components/dashboard/UserTasksDashboard";
+import { TodaysFocusCard } from "@/components/dashboard/TodaysFocusCard";
 import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
 import { MyBugReportsCard } from "@/components/dashboard/MyBugReportsCard";
 import { DailyPerformanceEntry } from "@/components/dashboard/DailyPerformanceEntry";
@@ -481,7 +482,10 @@ const Dashboard = () => {
 
   // Non-admin users get simplified view with calendar at top
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-8 max-md:p-4 space-y-6">
+      {/* TODAY'S FOCUS - Personalized greeting and daily summary */}
+      <TodaysFocusCard />
+      
       {/* Discovery Call Calendar - Prominent at top */}
       <DiscoveryCallCalendar />
       
