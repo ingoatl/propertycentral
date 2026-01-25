@@ -23,6 +23,7 @@ import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsC
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { SystemHealthPanel } from "@/components/admin/SystemHealthPanel";
 import { SyncStatusBar } from "@/components/admin/SyncStatusBar";
+import { RoleFocusSection } from "./RoleFocusSection";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -388,6 +389,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         
         {/* TODAY'S FOCUS - Personalized greeting and daily summary */}
         <TodaysFocusCard />
+        
+        {/* Role-Based Focus Section */}
+        <RoleFocusSection />
         
         {/* Discovery Call Calendar - Directly after welcome */}
         <DiscoveryCallCalendar />
