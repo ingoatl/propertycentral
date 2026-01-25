@@ -9,8 +9,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { InspectionCard } from "./InspectionCard";
 import { Input } from "@/components/ui/input";
-import { Building2, DollarSign, User, Users } from "lucide-react";
+import { Building2, DollarSign, User, Users, RefreshCw } from "lucide-react";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useSyncOnboardingTasks } from "@/hooks/useSyncOnboardingTasks";
 
 interface WorkflowDialogProps {
   open: boolean;
@@ -32,6 +33,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
   const [filteredTasks, setFilteredTasks] = useState<OnboardingTask[]>([]);
   const [creatingProject, setCreatingProject] = useState(false);
   const { isAdmin } = useAdminCheck();
+  const { syncTasks, isSyncing } = useSyncOnboardingTasks();
   const [showMyTasksOnly, setShowMyTasksOnly] = useState(!isAdmin); // Admins see all by default
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userRoleIds, setUserRoleIds] = useState<string[]>([]);
@@ -483,6 +485,24 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
                   </>
                 )}
               </Button>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const result = await syncTasks(projectData.id, propertyId);
+                    if (result.success && result.synced > 0) {
+                      await handleTaskUpdate();
+                    }
+                  }}
+                  disabled={isSyncing}
+                  className="gap-2 whitespace-nowrap max-md:w-full max-md:h-12"
+                  title="Sync empty tasks with existing property data"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
+                  {isSyncing ? "Syncing..." : "Sync Data"}
+                </Button>
+              )}
             </div>
 
             <ScrollArea className="h-[calc(90vh-280px)] pr-4 max-md:h-[calc(100dvh-180px)] max-md:pr-1">
