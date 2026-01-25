@@ -1258,6 +1258,37 @@ export const TaskItem = ({ task, onUpdate, assignedUserName: preloadedUserName }
                 </div>
                 
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* Quick Mark Complete for admins on collapsed tasks */}
+                  {isCollapsed && isAdmin && taskStatus !== 'completed' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const { data: { user } } = await supabase.auth.getUser();
+                          await supabase
+                            .from("onboarding_tasks")
+                            .update({
+                              status: 'completed',
+                              completed_date: new Date().toISOString(),
+                              completed_by: user?.id,
+                            })
+                            .eq("id", task.id);
+                          
+                          setTaskStatus('completed');
+                          toast.success("Task marked complete");
+                        } catch (error) {
+                          console.error("Failed to mark as complete:", error);
+                          toast.error("Failed to update task");
+                        }
+                      }}
+                      className="h-7 px-2 text-xs gap-1 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      Complete
+                    </Button>
+                  )}
                   {isCollapsed && (
                     <Button
                       variant="ghost"
