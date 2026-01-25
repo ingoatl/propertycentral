@@ -18,6 +18,7 @@ import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle } f
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { TodaysFocusCard } from "./TodaysFocusCard";
+import { NinjaFocusPanel } from "./NinjaFocusPanel";
 import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
 import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
@@ -389,6 +390,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         
         {/* TODAY'S FOCUS - Personalized greeting and daily summary */}
         <TodaysFocusCard />
+        
+        {/* AI-Powered Ninja Focus Plan */}
+        <NinjaFocusPanel />
         
         {/* Role-Based Focus Section */}
         <RoleFocusSection />
