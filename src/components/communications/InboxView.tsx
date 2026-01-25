@@ -1201,10 +1201,8 @@ export function InboxView() {
               is_low_importance: isLowImportance,
             };
 
-            if (search) {
-              const searchLower = search.toLowerCase();
-              if (!item.contact_name.toLowerCase().includes(searchLower) && !item.body.toLowerCase().includes(searchLower)) continue;
-            }
+            // REMOVED: Search filtering here - let groupedByContact handle it with getSearchScore
+            // This allows searching by contact_name, contact_email, contact_phone, body, and subject
             results.push(item);
           }
         }
@@ -1246,10 +1244,7 @@ export function InboxView() {
               owner_id: comm.owner_id || undefined,
             };
 
-            if (search) {
-              const searchLower = search.toLowerCase();
-              if (!item.contact_name.toLowerCase().includes(searchLower) && !item.body.toLowerCase().includes(searchLower)) continue;
-            }
+            // REMOVED: Search filtering here - let groupedByContact handle it with getSearchScore
             results.push(item);
           }
         }
@@ -1270,7 +1265,7 @@ export function InboxView() {
               contact_email: draft.to_email, contact_type: "draft", contact_id: draft.id,
               status: draft.ai_generated ? "AI Draft" : "Draft", is_draft: true, draft_id: draft.id,
             };
-            if (search && !item.contact_name.toLowerCase().includes(search.toLowerCase()) && !item.body.toLowerCase().includes(search.toLowerCase())) continue;
+            // REMOVED: Search filtering here - let groupedByContact handle it with getSearchScore
             results.push(item);
           }
         }
@@ -2583,7 +2578,14 @@ export function InboxView() {
         const latest = sortedMsgs[0];
         // Override name with best name from all messages in thread
         const bestName = selectBestName(sortedMsgs);
-        return { ...latest, contact_name: bestName };
+        
+        // CRITICAL: Compute is_resolved based on the latest message in thread
+        // If we (outbound) responded last, it's resolved
+        // If they (inbound) sent the last message, we need to respond → not resolved
+        const latestIsInbound = latest.direction === "inbound";
+        const isResolved = !latestIsInbound; // Outbound = resolved, Inbound = not resolved
+        
+        return { ...latest, contact_name: bestName, is_resolved: isResolved };
       });
     
     // SMART SORTING with SEARCH RELEVANCE:
