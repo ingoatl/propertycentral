@@ -388,17 +388,17 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* Sync Status Bar - Always visible at top */}
         <SyncStatusBar />
         
-        {/* TODAY'S FOCUS - Personalized greeting and daily summary */}
+        {/* TODAY'S FOCUS - Personalized greeting and daily summary - FIRST */}
         <TodaysFocusCard />
         
-        {/* AI-Powered Ninja Focus Plan */}
+        {/* AI-Powered Ninja Focus Plan (Daily Planner) - SECOND */}
         <NinjaFocusPanel />
         
-        {/* Role-Based Focus Section */}
-        <RoleFocusSection />
-        
-        {/* Discovery Call Calendar - Directly after welcome */}
+        {/* Discovery Call Calendar - THIRD */}
         <DiscoveryCallCalendar />
+        
+        {/* Role-Based Focus Section - After calendar */}
+        <RoleFocusSection />
         
         {/* ACTION REQUIRED - Questions & Bugs */}
         <div className="p-4 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/20">
