@@ -2570,7 +2570,7 @@ export function InboxView() {
       return candidateNames[0];
     };
     
-    const sorted = Array.from(contactMap.values())
+    const mapped = Array.from(contactMap.values())
       .map(messages => {
         const sortedMsgs = messages.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -2588,13 +2588,19 @@ export function InboxView() {
         return { ...latest, contact_name: bestName, is_resolved: isResolved };
       });
     
+    // CRITICAL FIX: When searching, FILTER OUT items with zero relevance score
+    // This ensures only matching contacts appear in search results
+    const filtered = searchTerms.length > 0
+      ? mapped.filter(item => getSearchScore(item, searchTerms) > 0)
+      : mapped;
+    
     // SMART SORTING with SEARCH RELEVANCE:
     // When searching: sort by relevance score first
     // Otherwise: priority-based sorting
     const priorityOrder: Record<ConversationPriority, number> = { urgent: 0, important: 1, normal: 2, low: 4 };
     const statusOrder: Record<string, number> = { open: 0, awaiting: 1, snoozed: 2, done: 3, archived: 4 };
     
-    return sorted.sort((a, b) => {
+    return filtered.sort((a, b) => {
       // SEARCH MODE: Sort by relevance when searching
       if (searchTerms.length > 0) {
         const aScore = getSearchScore(a, searchTerms);
