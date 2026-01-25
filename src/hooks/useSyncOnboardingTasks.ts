@@ -19,7 +19,7 @@ export const useSyncOnboardingTasks = () => {
 
       if (error) throw error;
 
-      const syncedCount = data?.synced || 0;
+      const syncedCount = data?.syncedCount || 0;
       if (syncedCount > 0) {
         toast.success(`Synced ${syncedCount} task${syncedCount > 1 ? "s" : ""} from existing data`);
       } else {

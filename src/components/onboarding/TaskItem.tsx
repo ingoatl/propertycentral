@@ -1286,7 +1286,7 @@ export const TaskItem = ({ task, onUpdate, assignedUserName: preloadedUserName }
                       className="h-7 px-2 text-xs gap-1 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
                     >
                       <CheckCircle2 className="w-3 h-3" />
-                      Complete
+                      Mark Complete
                     </Button>
                   )}
                   {isCollapsed && (

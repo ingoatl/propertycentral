@@ -8,9 +8,9 @@ const corsHeaders = {
 
 // Mapping from task titles to owner_onboarding_submissions fields
 const TASK_FIELD_MAPPING: Record<string, string[]> = {
-  "Owner Name": ["owner_name"],
-  "Owner Email": ["owner_email"],
-  "Owner Phone": ["owner_phone"],
+  "Owner Name": ["owner_name", "name"],
+  "Owner Email": ["owner_email", "email"],
+  "Owner Phone": ["owner_phone", "phone"],
   "WiFi Details": ["wifi_ssid", "wifi_password"],
   "Smart lock master PIN code": ["smart_lock_code"],
   "Lockbox Code for Emergencies": ["lockbox_code"],
@@ -29,6 +29,13 @@ const TASK_FIELD_MAPPING: Record<string, string[]> = {
   "Backup Cleaner": ["backup_cleaner"],
   "Insurance Provider": ["insurance_provider"],
   "STR Permit Number": ["str_permit_number"],
+};
+
+// Direct mappings for owner fields (highest priority)
+const OWNER_DIRECT_FIELDS: Record<string, string> = {
+  "Owner Name": "name",
+  "Owner Email": "email", 
+  "Owner Phone": "phone",
 };
 
 serve(async (req) => {
@@ -161,24 +168,37 @@ serve(async (req) => {
     for (const task of pendingTasks || []) {
       let newValue: string | null = null;
 
-      // Priority 1: Check completed tasks from other projects
+      // Priority 1: Check completed tasks from other projects (same property)
       if (completedTasksData[task.title]) {
         newValue = completedTasksData[task.title];
+        console.log(`Task "${task.title}" found in completed tasks from other projects: ${newValue}`);
       }
 
-      // Priority 2: Check owner_onboarding_submissions
+      // Priority 2: Check property_owners table directly for owner-related fields
+      if (!newValue && OWNER_DIRECT_FIELDS[task.title]) {
+        const ownerField = OWNER_DIRECT_FIELDS[task.title];
+        const ownerValue = ownerData[`owner_${ownerField}`] || ownerData[ownerField];
+        if (ownerValue && typeof ownerValue === "string" && ownerValue.trim() !== "") {
+          newValue = ownerValue;
+          console.log(`Task "${task.title}" found in property_owners: ${newValue}`);
+        }
+      }
+
+      // Priority 3: Check owner_onboarding_submissions using field mappings
       if (!newValue) {
         const mappedFields = TASK_FIELD_MAPPING[task.title];
         if (mappedFields) {
           const values: string[] = [];
           for (const field of mappedFields) {
-            const val = submissionData[field] || ownerData[field];
+            // Check submission data first, then owner data
+            const val = submissionData[field] || ownerData[field] || ownerData[`owner_${field}`];
             if (val && typeof val === "string" && val.trim() !== "") {
               values.push(val);
             }
           }
           if (values.length > 0) {
             newValue = values.join(" / ");
+            console.log(`Task "${task.title}" found via field mapping: ${newValue}`);
           }
         }
       }
