@@ -183,6 +183,7 @@ function getServiceLabel(service: string | null): string {
 export function DiscoveryCallCalendar() {
   const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
   const [selectedCall, setSelectedCall] = useState<DiscoveryCall | null>(null);
   const [selectedOwnerCall, setSelectedOwnerCall] = useState<OwnerCall | null>(null);
   const [selectedGhlEvent, setSelectedGhlEvent] = useState<GhlAppointment | null>(null);
@@ -281,6 +282,12 @@ export function DiscoveryCallCalendar() {
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  // Current week days for week view
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+  const currentWeekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   // Filter out optimistically deleted calls
   const filteredCalls = calls.filter(call => !deletedCallIds.has(call.id));
@@ -385,24 +392,36 @@ export function DiscoveryCallCalendar() {
             >
               Today
             </Button>
+            {calendarView === 'month' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-medium min-w-[120px] sm:min-w-[140px] text-center text-sm sm:text-base">
+                  {format(currentMonth, "MMM yyyy")}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </>
+            )}
             <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              variant={calendarView === 'week' ? 'default' : 'outline'}
+              size="sm"
+              className="h-9 px-3 text-xs font-medium"
+              onClick={() => setCalendarView(calendarView === 'week' ? 'month' : 'week')}
             >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="font-medium min-w-[120px] sm:min-w-[140px] text-center text-sm sm:text-base">
-              {format(currentMonth, "MMM yyyy")}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            >
-              <ChevronRight className="h-4 w-4" />
+              {calendarView === 'week' ? 'Show Full Calendar' : 'This Week'}
             </Button>
           </div>
         </div>
@@ -662,10 +681,156 @@ export function DiscoveryCallCalendar() {
           </div>
         </div>
 
-        {/* Desktop: Full calendar (no sidebar since events are shown above) */}
+        {/* Desktop: Week or Full calendar based on view toggle */}
         <div className="hidden lg:block">
-          {/* Calendar Grid */}
-          <div>
+          {calendarView === 'week' ? (
+            /* Week View - Compact current week only */
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium text-sm text-muted-foreground">
+                  This Week: {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+                </h4>
+              </div>
+              
+              {/* Day headers */}
+              <div className="grid grid-cols-7 mb-2">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                  <div
+                    key={day}
+                    className="text-center text-sm font-medium text-muted-foreground py-2"
+                  >
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Week days */}
+              <div className="grid grid-cols-7 gap-2">
+                {currentWeekDays.map((day) => {
+                  const dayEvents = getAllEventsForDay(day);
+                  const isCurrentDay = isToday(day);
+
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className={cn(
+                        "min-h-[140px] p-2 border rounded-lg transition-colors",
+                        isCurrentDay && "ring-2 ring-primary bg-primary/5"
+                      )}
+                    >
+                      <div className="text-center mb-2">
+                        <div className="text-xs text-muted-foreground">{format(day, "EEE")}</div>
+                        <div className={cn(
+                          "text-lg font-bold",
+                          isCurrentDay && "text-primary"
+                        )}>
+                          {format(day, "d")}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        {dayEvents.slice(0, 4).map((event) => {
+                          if (event.type === 'discovery') {
+                            const call = event.data as DiscoveryCall;
+                            return (
+                              <button
+                                key={call.id}
+                                onClick={() => setSelectedCall(call)}
+                                className={cn(
+                                  "w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02]",
+                                  call.meeting_type === "video"
+                                    ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+                                    : "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                                )}
+                              >
+                                <div className="flex items-center gap-1">
+                                  {call.meeting_type === "video" ? (
+                                    <Video className="h-3 w-3 shrink-0" />
+                                  ) : (
+                                    <Phone className="h-3 w-3 shrink-0" />
+                                  )}
+                                  <span className="truncate font-medium">
+                                    {formatInEST(call.scheduled_at, "h:mm a")}
+                                  </span>
+                                </div>
+                                <div className="truncate opacity-80">
+                                  {call.leads?.name || "Unknown"}
+                                </div>
+                              </button>
+                            );
+                          } else if (event.type === 'inspection') {
+                            const call = event.data as DiscoveryCall;
+                            return (
+                              <button
+                                key={call.id}
+                                onClick={() => setSelectedCall(call)}
+                                className="w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02] bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <Home className="h-3 w-3 shrink-0" />
+                                  <span className="truncate font-medium">
+                                    {formatInEST(call.scheduled_at, "h:mm a")}
+                                  </span>
+                                </div>
+                                <div className="truncate opacity-80">
+                                  {call.leads?.name || "Unknown"}
+                                </div>
+                              </button>
+                            );
+                          } else if (event.type === 'ghl') {
+                            const apt = event.data as GhlAppointment;
+                            return (
+                              <button
+                                key={apt.ghl_event_id}
+                                onClick={() => setSelectedGhlEvent(apt)}
+                                className="w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02] bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <CalendarCheck className="h-3 w-3 shrink-0" />
+                                  <span className="truncate font-medium">
+                                    {formatInEST(apt.scheduled_at, "h:mm a")}
+                                  </span>
+                                </div>
+                                <div className="truncate opacity-80">
+                                  {apt.contact_name || "Appointment"}
+                                </div>
+                              </button>
+                            );
+                          } else if (event.type === 'owner_call') {
+                            const ownerCall = event.data as OwnerCall;
+                            return (
+                              <button
+                                key={ownerCall.id}
+                                onClick={() => setSelectedOwnerCall(ownerCall)}
+                                className="w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02] bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <User className="h-3 w-3 shrink-0" />
+                                  <span className="truncate font-medium">
+                                    {formatInEST(ownerCall.scheduled_at, "h:mm a")}
+                                  </span>
+                                </div>
+                                <div className="truncate opacity-80">
+                                  {ownerCall.property_owners?.name || "Owner"}
+                                </div>
+                              </button>
+                            );
+                          }
+                          return null;
+                        })}
+                        {dayEvents.length > 4 && (
+                          <div className="text-xs text-muted-foreground text-center">
+                            +{dayEvents.length - 4} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* Full Month View - Original calendar */
+            <div>
             {/* Day headers */}
             <div className="grid grid-cols-7 mb-2">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
@@ -832,7 +997,8 @@ export function DiscoveryCallCalendar() {
                 );
               })}
             </div>
-          </div>
+            </div>
+          )}
         </div>
       </CardContent>
 
