@@ -258,8 +258,8 @@ ${messageType === "email" ? `Return JSON: {"subject": "...", "body": "..."}` : `
 
 ${messageType === "sms" ? "SMS RULES: Max 300 chars. No formal greeting/closing. Jump right in." : "EMAIL RULES: 2-3 short paragraphs max. Clear subject line."}`;
 
-    // Try multiple models with fallback - using Gemini 3.0 pro for better context understanding
-    const models = ["google/gemini-3-pro-preview", "google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
+    // Try multiple models with fallback - using Gemini 3.0 flash for cost efficiency
+    const models = ["google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
     let content = "";
     let lastError = "";
 

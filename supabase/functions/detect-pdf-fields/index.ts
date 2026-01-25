@@ -317,7 +317,7 @@ CRITICAL POSITIONING RULES:
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "google/gemini-3-pro-preview",
+              model: "google/gemini-3-flash-preview",
               messages: [
                 { role: "user", content: prompt }
               ],
@@ -581,7 +581,7 @@ Return JSON:
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-3-pro-preview",
+      model: "google/gemini-3-flash-preview",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 4000,
     }),
