@@ -1037,6 +1037,75 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // 13. Auto-advance lead to insurance_requested stage
+    // Find lead by matching email or property address
+    try {
+      console.log("Looking for associated lead to advance stage...");
+      const ownerEmail = formData.owner_email?.toLowerCase();
+      const propertyAddress = formData.property_address;
+      
+      // Find lead that is in ach_form_signed stage with matching email or property
+      const { data: matchingLead } = await supabase
+        .from('leads')
+        .select('id, stage, email, property_address')
+        .eq('stage', 'ach_form_signed')
+        .or(`email.ilike.${ownerEmail},property_address.ilike.%${propertyAddress?.split(',')[0] || ''}%`)
+        .limit(1)
+        .maybeSingle();
+      
+      if (matchingLead) {
+        console.log(`Found lead ${matchingLead.id} to advance to insurance_requested`);
+        
+        // Update lead stage
+        await supabase
+          .from('leads')
+          .update({
+            stage: 'insurance_requested',
+            stage_changed_at: new Date().toISOString(),
+          })
+          .eq('id', matchingLead.id);
+        
+        // Add timeline entry
+        await supabase.from('lead_timeline').insert({
+          lead_id: matchingLead.id,
+          action: 'Onboarding form submitted - Auto-advanced to Insurance Request stage',
+          previous_stage: 'ach_form_signed',
+          new_stage: 'insurance_requested',
+          metadata: { 
+            trigger: 'onboarding_form_submission',
+            property_id: property.id,
+            project_id: project.id
+          }
+        });
+        
+        // Trigger stage change processing to send insurance email
+        try {
+          const stageChangeResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-lead-stage-change`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              leadId: matchingLead.id,
+              newStage: "insurance_requested",
+              previousStage: "ach_form_signed",
+              autoTriggered: true,
+              triggerSource: "onboarding_form_submission",
+            }),
+          });
+          const stageResult = await stageChangeResponse.json();
+          console.log("Stage change processing result:", stageResult);
+        } catch (stageError) {
+          console.error("Error triggering stage change (non-blocking):", stageError);
+        }
+      } else {
+        console.log("No matching lead found in ach_form_signed stage");
+      }
+    } catch (leadError) {
+      console.error("Error auto-advancing lead (non-blocking):", leadError);
+    }
+
     console.log("Onboarding processing complete");
 
     return new Response(
