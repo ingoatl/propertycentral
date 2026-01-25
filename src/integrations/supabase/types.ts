@@ -8539,6 +8539,47 @@ export type Database = {
           },
         ]
       }
+      role_inbox_preferences: {
+        Row: {
+          created_at: string | null
+          excluded_categories: string[] | null
+          excluded_phone_purposes: string[] | null
+          focus_description: string | null
+          id: string
+          priority_categories: string[] | null
+          role_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          excluded_categories?: string[] | null
+          excluded_phone_purposes?: string[] | null
+          focus_description?: string | null
+          id?: string
+          priority_categories?: string[] | null
+          role_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          excluded_categories?: string[] | null
+          excluded_phone_purposes?: string[] | null
+          focus_description?: string | null
+          id?: string
+          priority_categories?: string[] | null
+          role_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_inbox_preferences_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: true
+            referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_communications: {
         Row: {
           ai_category: string | null
@@ -11457,6 +11498,15 @@ export type Database = {
           is_active: boolean
           listing_url: string
           platform_name: string
+        }[]
+      }
+      get_user_inbox_exclusions: {
+        Args: { p_user_id: string }
+        Returns: {
+          excluded_categories: string[]
+          excluded_phone_purposes: string[]
+          focus_description: string
+          priority_categories: string[]
         }[]
       }
       has_role: {

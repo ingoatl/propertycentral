@@ -106,6 +106,7 @@ import { useGhlAutoSync } from "@/hooks/useGhlAutoSync";
 import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 import { usePhoneLookup } from "@/hooks/usePhoneLookup";
 import { useAIDraftReplies, usePendingDrafts } from "@/hooks/useAIDraftReplies";
+import { useRoleInboxPreferences, shouldExcludeEmail } from "@/hooks/useRoleInboxPreferences";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -31,6 +31,51 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Get user from auth header
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+    let userRoleContext = "";
+    let focusDescription = "";
+    let priorityCategories: string[] = [];
+    let excludedCategories: string[] = [];
+
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user } } = await supabase.auth.getUser(token);
+      userId = user?.id || null;
+
+      if (userId) {
+        // Get user's role preferences
+        const { data: rolePrefs } = await supabase
+          .rpc("get_user_inbox_exclusions", { p_user_id: userId });
+        
+        if (rolePrefs && rolePrefs.length > 0) {
+          const prefs = rolePrefs[0];
+          focusDescription = prefs.focus_description || "";
+          priorityCategories = prefs.priority_categories || [];
+          excludedCategories = prefs.excluded_categories || [];
+        }
+
+        // Get user's team roles for context
+        const { data: userRoles } = await supabase
+          .from("user_team_roles")
+          .select("team_roles(role_name)")
+          .eq("user_id", userId);
+
+        const roleNames = userRoles?.map((r: any) => r.team_roles?.role_name).filter(Boolean) || [];
+        
+        if (roleNames.includes("Leadership")) {
+          userRoleContext = "Leadership/Executive: Focus on strategic decisions, owner relationships, business development, and team oversight. Exclude guest-related operational items.";
+        } else if (roleNames.includes("Bookkeeper")) {
+          userRoleContext = "Bookkeeper/Finance: Focus on expense verification, reconciliation, payments, invoices, and financial reporting. Exclude guest communications and maintenance tickets.";
+        } else if (roleNames.includes("Ops Manager") || roleNames.includes("Cleaner Coordinator")) {
+          userRoleContext = "Operations Manager: Focus on property visits, maintenance, guest issues, cleaning coordination, and day-to-day operations.";
+        } else if (roleNames.includes("Marketing VA")) {
+          userRoleContext = "Marketing: Focus on reviews, listing optimization, photography, and marketing materials.";
+        }
+      }
+    }
+
     const today = new Date().toISOString().split("T")[0];
     const now = new Date();
     const hour = now.getHours();
@@ -43,14 +88,14 @@ serve(async (req) => {
       ownerCallsResult,
       visitsResult,
     ] = await Promise.all([
-      // Email insights requiring action
+      // Email insights requiring action - filter by role if available
       supabase
         .from("email_insights")
         .select("id, subject, summary, sender_email, priority, sentiment, category, suggested_actions")
         .eq("action_required", true)
         .eq("status", "new")
         .order("created_at", { ascending: false })
-        .limit(10),
+        .limit(15),
       
       // Overdue tasks
       supabase
@@ -84,8 +129,17 @@ serve(async (req) => {
         .eq("date", today),
     ]);
 
-    // Build context for AI
-    const emailInsights = emailInsightsResult.data || [];
+    // Build context for AI - filter emails by role exclusions
+    let emailInsights = emailInsightsResult.data || [];
+    
+    // Apply role-based filtering if user has exclusions
+    if (excludedCategories.length > 0) {
+      emailInsights = emailInsights.filter((email: any) => {
+        const category = (email.category || "").toLowerCase();
+        return !excludedCategories.some(exc => category.includes(exc.toLowerCase()));
+      });
+    }
+
     const overdueTasks = overdueTasksResult.data || [];
     const discoveryCalls = discoveryCallsResult.data || [];
     const ownerCalls = ownerCallsResult.data || [];
@@ -112,8 +166,18 @@ serve(async (req) => {
     if (hour >= 12 && hour < 17) greeting = "Good afternoon";
     if (hour >= 17) greeting = "Good evening";
 
-    // Build AI prompt
+    // Build AI prompt with role context
+    const roleSection = userRoleContext 
+      ? `\n## Your Role Focus:\n${userRoleContext}\n${focusDescription ? `\nRole Description: ${focusDescription}` : ""}` 
+      : "";
+
+    const priorityCategoriesSection = priorityCategories.length > 0
+      ? `\n## Priority Categories for Your Role:\n${priorityCategories.join(", ")}`
+      : "";
+
     const prompt = `You are a property management efficiency expert and coach. Based on the following data, create a prioritized daily action plan for a property manager.
+${roleSection}
+${priorityCategoriesSection}
 
 ## Today's Context:
 - Time: ${greeting.replace("Good ", "")}
@@ -130,11 +194,12 @@ ${emailSummaries || "No urgent emails"}
 ${taskSummary || "No overdue tasks"}
 
 ## Guidelines:
-1. Prioritize revenue-impacting items (owner calls, booking issues)
-2. Address urgent maintenance before it escalates
-3. Suggest proactive owner communication based on email sentiment
-4. Include quick wins that can be completed in 5 minutes
-5. Be specific and actionable - no vague suggestions
+1. Focus on items relevant to the user's role (if specified above)
+2. Prioritize revenue-impacting items (owner calls, booking issues)
+3. Address urgent maintenance before it escalates
+4. Suggest proactive owner communication based on email sentiment
+5. Include quick wins that can be completed in 5 minutes
+6. Be specific and actionable - no vague suggestions
 
 Return ONLY a valid JSON object (no markdown, no code blocks) with this structure:
 {

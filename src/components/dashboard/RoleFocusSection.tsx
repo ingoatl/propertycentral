@@ -10,10 +10,13 @@ interface UserRoleInfo {
   primaryRole: string | null;
   userId: string;
   userName: string;
+  isSystemAdmin: boolean;
 }
 
 // Role priority order for determining which panel to show
+// Leadership is highest priority - always shows AdminFocusPanel
 const ROLE_PRIORITY = [
+  "Leadership",
   "Bookkeeper",
   "Ops Manager", 
   "Cleaner Coordinator",
@@ -36,6 +39,16 @@ export const RoleFocusSection = () => {
         .eq("id", user.id)
         .maybeSingle();
 
+      // Check if user is a system admin (in user_roles table)
+      const { data: adminRole } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      const isSystemAdmin = !!adminRole;
+
       // Get user's team roles
       const { data: userRoles } = await supabase
         .from("user_team_roles")
@@ -55,6 +68,7 @@ export const RoleFocusSection = () => {
         primaryRole,
         userId: user.id,
         userName: profile?.first_name || profile?.email?.split("@")[0] || "there",
+        isSystemAdmin,
       };
     },
   });
@@ -68,13 +82,20 @@ export const RoleFocusSection = () => {
     );
   }
 
+  // System admins always see the AdminFocusPanel (Leadership Overview)
+  if (roleInfo?.isSystemAdmin) {
+    return <AdminFocusPanel />;
+  }
+
   if (!roleInfo || !roleInfo.primaryRole) {
-    // Fall back to admin panel for users without specific roles (likely admins)
+    // Fall back to admin panel for users without specific roles
     return <AdminFocusPanel />;
   }
 
   // Render the appropriate focus panel based on role
   switch (roleInfo.primaryRole) {
+    case "Leadership":
+      return <AdminFocusPanel />;
     case "Bookkeeper":
       return <BookkeeperFocusPanel userName={roleInfo.userName} />;
     case "Ops Manager":
