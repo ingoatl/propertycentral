@@ -37,7 +37,7 @@ serve(async (req) => {
   }
 
   try {
-    const { projectId } = await req.json();
+    const { projectId, propertyId: passedPropertyId } = await req.json();
     
     if (!projectId) {
       throw new Error("projectId is required");
@@ -60,27 +60,34 @@ serve(async (req) => {
       throw new Error(`Project not found: ${projectError?.message}`);
     }
 
-    // Get all pending tasks for this project
-    const { data: pendingTasks, error: tasksError } = await supabase
+    // Use passed propertyId or fall back to project's property_id
+    const propertyId = passedPropertyId || project.property_id;
+
+    // Get ALL tasks for this project (not just pending ones with empty values)
+    // We want to sync any task that doesn't have data yet
+    const { data: allTasks, error: tasksError } = await supabase
       .from("onboarding_tasks")
       .select("id, title, field_value, status")
-      .eq("project_id", projectId)
-      .or("field_value.is.null,field_value.eq.")
-      .neq("status", "completed");
+      .eq("project_id", projectId);
 
     if (tasksError) {
       throw new Error(`Failed to fetch tasks: ${tasksError.message}`);
     }
 
-    console.log(`Found ${pendingTasks?.length || 0} pending tasks without values`);
+    // Filter to tasks that need syncing (empty field_value or null)
+    const pendingTasks = (allTasks || []).filter(task => 
+      !task.field_value || task.field_value.trim() === ""
+    );
+
+    console.log(`Found ${pendingTasks.length} tasks without values out of ${allTasks?.length || 0} total`);
 
     // Source 1: Get data from owner_onboarding_submissions for this property
     let submissionData: Record<string, unknown> = {};
-    if (project.property_id) {
+    if (propertyId) {
       const { data: submission } = await supabase
         .from("owner_onboarding_submissions")
         .select("*")
-        .eq("property_id", project.property_id)
+        .eq("property_id", propertyId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -93,24 +100,12 @@ serve(async (req) => {
 
     // Source 2: Get completed tasks from OTHER projects for the same property
     let completedTasksData: Record<string, string> = {};
-    if (project.property_id) {
-      const { data: otherTasks } = await supabase
-        .from("onboarding_tasks")
-        .select("title, field_value")
-        .neq("project_id", projectId)
-        .eq("status", "completed")
-        .not("field_value", "is", null)
-        .in("project_id", 
-          supabase.from("onboarding_projects")
-            .select("id")
-            .eq("property_id", project.property_id)
-        );
-
+    if (propertyId) {
       // Get tasks from other projects with same property_id
       const { data: otherProjects } = await supabase
         .from("onboarding_projects")
         .select("id")
-        .eq("property_id", project.property_id)
+        .eq("property_id", propertyId)
         .neq("id", projectId);
 
       if (otherProjects && otherProjects.length > 0) {
@@ -135,11 +130,11 @@ serve(async (req) => {
 
     // Source 3: Get property owner data
     let ownerData: Record<string, unknown> = {};
-    if (project.property_id) {
+    if (propertyId) {
       const { data: property } = await supabase
         .from("properties")
-        .select("owner_id")
-        .eq("id", project.property_id)
+        .select("owner_id, name")
+        .eq("id", propertyId)
         .single();
 
       if (property?.owner_id) {
@@ -155,7 +150,7 @@ serve(async (req) => {
             owner_email: owner.email,
             owner_phone: owner.phone,
           };
-          console.log("Found property owner data");
+          console.log("Found property owner data:", JSON.stringify(ownerData));
         }
       }
     }
