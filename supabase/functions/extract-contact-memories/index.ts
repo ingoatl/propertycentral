@@ -145,7 +145,7 @@ Return ONLY the JSON array, no explanation.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "You are a memory extraction assistant. Extract key facts and preferences from conversations. Return valid JSON only." },
           { role: "user", content: extractionPrompt },

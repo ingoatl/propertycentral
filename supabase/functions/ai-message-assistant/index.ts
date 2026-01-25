@@ -617,8 +617,8 @@ ${messageType === "sms" ? "Target under 160 characters." : ""}`;
         throw new Error(`Unknown action: ${action}`);
     }
 
-    // Try primary model first (Gemini 3 Pro for better context understanding), then fallback
-    const models = ["google/gemini-3-pro-preview", "google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
+    // Try primary model first (Gemini 3 Flash for cost efficiency), then fallback
+    const models = ["google/gemini-3-flash-preview", "google/gemini-2.5-flash"];
     let generatedMessage = "";
     let lastError = "";
 

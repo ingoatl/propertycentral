@@ -561,7 +561,7 @@ Return the 5 sections with the bold headers as shown above.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "You are a thorough business conversation analyst. Provide actionable, specific summaries that help the team understand the full picture of each client relationship." },
           { role: "user", content: summaryPrompt },
