@@ -17,8 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { OverdueTasksCard } from "./OverdueTasksCard";
-import { AllTasksCard } from "./AllTasksCard";
 import { TodaysFocusCard } from "./TodaysFocusCard";
 import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
 import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
@@ -408,9 +406,6 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         
         {/* Onboarding Properties Timeline - Always visible */}
         <OnboardingTimelineSection />
-        
-        {/* Overdue Tasks - Collapsible, CLOSED by default */}
-        <OverdueTasksCard />
 
         {/* Gmail Integration */}
         <EmailInsightsCard />
@@ -494,9 +489,6 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
             />
           </CardContent>
         </Card>
-
-        {/* All Tasks Section - Full Width */}
-        <AllTasksCard />
 
         {/* Activity and Enhanced Team Performance */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:gap-4">
