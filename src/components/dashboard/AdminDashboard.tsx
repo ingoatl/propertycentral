@@ -11,10 +11,10 @@ import { SendTestTeamDigestButton } from "./SendTestTeamDigestButton";
 import { DiscoveryCallCalendar } from "./DiscoveryCallCalendar";
 import { OnboardingPropertiesTimeline } from "./OnboardingPropertiesTimeline";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Presentation } from "lucide-react";
+import { Presentation, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle, MessageCircleQuestion, Bug } from "lucide-react";
+import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { OverdueTasksCard } from "./OverdueTasksCard";
@@ -312,29 +312,18 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
     }
   };
 
-  // Collapsible wrapper for onboarding timeline
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
-
-  const OnboardingTimelineCollapsible = () => (
-    <Collapsible open={onboardingOpen} onOpenChange={setOnboardingOpen}>
-      <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden">
-        <CollapsibleTrigger className="w-full p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🏗️</span>
-            <div className="text-left">
-              <h3 className="font-semibold text-lg">Properties Onboarding</h3>
-              <p className="text-sm text-muted-foreground">Track onboarding progress for new properties</p>
-            </div>
-          </div>
-          <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${onboardingOpen ? 'rotate-180' : ''}`} />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="border-t border-primary/10">
-            <OnboardingPropertiesTimeline />
-          </div>
-        </CollapsibleContent>
+  // Onboarding timeline - always visible (no collapsible)
+  const OnboardingTimelineSection = () => (
+    <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden">
+      <div className="p-4 flex items-center gap-3 border-b border-primary/10">
+        <span className="text-2xl">🏗️</span>
+        <div>
+          <h3 className="font-semibold text-lg">Properties Onboarding</h3>
+          <p className="text-sm text-muted-foreground">Track onboarding progress for new properties</p>
+        </div>
       </div>
-    </Collapsible>
+      <OnboardingPropertiesTimeline />
+    </div>
   );
 
   return (
@@ -398,40 +387,28 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* Sync Status Bar - Always visible at top */}
         <SyncStatusBar />
         
+        {/* ACTION REQUIRED - Top Priority */}
+        <div className="p-4 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/20">
+          <h3 className="text-lg font-semibold flex items-center gap-2 text-orange-700 dark:text-orange-300 mb-4">
+            <AlertTriangle className="h-5 w-5" />
+            Action Required
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <PendingQuestionsCard />
+            <DashboardBugReportsCard />
+          </div>
+        </div>
+        
         {/* Discovery Call Calendar - Prominent at top */}
         <DiscoveryCallCalendar />
         
-        {/* Onboarding Properties Timeline - Collapsible */}
-        <OnboardingTimelineCollapsible />
+        {/* Onboarding Properties Timeline - Always visible */}
+        <OnboardingTimelineSection />
         
-        {/* Alert Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-md:gap-4">
-          <div className="lg:col-span-2">
-            <OverdueTasksCard />
-          </div>
-          <div>
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg max-md:text-base flex items-center gap-2">
-                  <MessageCircleQuestion className="h-5 w-5 max-md:h-4 max-md:w-4 text-primary" />
-                  Quick Stats
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 max-md:space-y-3">
-                <div className="flex items-center justify-between p-3 max-md:p-2.5 rounded-lg bg-muted/50">
-                  <span className="text-sm max-md:text-base text-muted-foreground">Pending Questions</span>
-                  <span className="text-lg max-md:text-xl font-bold text-foreground">--</span>
-                </div>
-                <div className="flex items-center justify-between p-3 max-md:p-2.5 rounded-lg bg-muted/50">
-                  <span className="text-sm max-md:text-base text-muted-foreground">Open Bug Reports</span>
-                  <span className="text-lg max-md:text-xl font-bold text-foreground">--</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        {/* Overdue Tasks - Full width, expanded by default */}
+        <OverdueTasksCard />
 
-        {/* Gmail Integration - Prominent Position */}
+        {/* Gmail Integration */}
         <EmailInsightsCard />
 
         {/* KPI Cards - Horizontal scroll on mobile */}
@@ -527,11 +504,6 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           />
         </div>
 
-        {/* Admin Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:gap-4">
-          <PendingQuestionsCard />
-          <DashboardBugReportsCard />
-        </div>
       </div>
       </TabsContent>
 
