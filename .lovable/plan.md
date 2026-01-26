@@ -1,197 +1,120 @@
 
-# Direct Conversation Routing from Ninja Panel
+# Fix Call Recording Player Display and Transcript Collapsing
 
-## Overview
+## Problem Analysis
 
-This plan implements intelligent routing that opens the specific conversation thread when clicking on a Ninja panel card, rather than just navigating to the communications inbox. It also confirms the Google Review SMS automation status.
+Based on the screenshot and code review, I identified several issues:
 
-## Google Review SMS Verification
+1. **Transcript Always Visible**: The `forceMount` prop on `CollapsibleContent` keeps the content in the DOM, and while CSS grid animation should hide it, it's not properly collapsing
+2. **Player Inside Message Bubble**: The `CallRecordingPlayer` is rendered inside the colored message bubble, causing awkward layout
+3. **Design Not Matching OpenPhone/GHL**: Current design is bulky and doesn't have the clean, compact look of professional communication tools
 
-### Status Summary
-- **25 SMS sent** since January 25th with review-related content
-- **All messages showing `status: sent`** with `delivery_status: queued` (normal - Twilio updates this asynchronously)
-- **No failed deliveries detected** in the recent batch
-- **New review requests created**: 5 new entries on Jan 26 (workflow_status: pending)
-- **Follow-up cron active**: Running every 15 minutes, last execution at 18:15:03
+## Solution Overview
 
-### Recent Recipients
-Nudge messages sent to: Stacey, debbie, Alison, Yvonne, Harry
-Permission requests sent to: Jonathan H, John, Brenda, Vanesha, Simone, Amber
+### 1. Fix Collapsible CSS (src/index.css)
 
-The automation is working correctly. The `queued` delivery status is expected - Twilio updates this to `delivered` or `failed` via the status callback webhook (`twilio-status-callback`).
+Add `visibility: hidden` to closed state to ensure content is truly hidden:
 
-## Technical Implementation
-
-### Step 1: Add Query Parameter Support to Communications Page
-
-Update `src/pages/Communications.tsx` to extract and pass query parameters:
-
-```typescript
-// Add useSearchParams hook
-const [searchParams] = useSearchParams();
-const targetPhone = searchParams.get('phone');
-const targetLeadId = searchParams.get('leadId');
-const targetOwnerId = searchParams.get('ownerId');
-const targetContactName = searchParams.get('name');
-
-// Pass to InboxView
-<InboxView 
-  initialTargetPhone={targetPhone}
-  initialTargetLeadId={targetLeadId}
-  initialTargetOwnerId={targetOwnerId}
-  initialTargetName={targetContactName}
-/>
-```
-
-### Step 2: Update InboxView to Accept Initial Target Props
-
-Modify `src/components/communications/InboxView.tsx`:
-
-```typescript
-interface InboxViewProps {
-  initialTargetPhone?: string | null;
-  initialTargetLeadId?: string | null;
-  initialTargetOwnerId?: string | null;
-  initialTargetName?: string | null;
+```css
+.collapsible-content[data-state="closed"] {
+  grid-template-rows: 0fr;
+  pointer-events: none;
+  visibility: hidden;
 }
 
-export function InboxView({ 
-  initialTargetPhone,
-  initialTargetLeadId,
-  initialTargetOwnerId,
-  initialTargetName
-}: InboxViewProps) {
-  // Add effect to auto-select conversation on mount
-  useEffect(() => {
-    if (!initialTargetPhone && !initialTargetLeadId && !initialTargetOwnerId) return;
-    
-    // Find matching conversation in communications list
-    const findAndSelectConversation = () => {
-      const normalizedTarget = initialTargetPhone ? normalizePhone(initialTargetPhone) : null;
-      
-      const match = allCommunications.find(comm => {
-        // Match by lead ID
-        if (initialTargetLeadId && comm.contact_type === 'lead' && comm.contact_id === initialTargetLeadId) {
-          return true;
-        }
-        // Match by owner ID
-        if (initialTargetOwnerId && comm.owner_id === initialTargetOwnerId) {
-          return true;
-        }
-        // Match by phone number
-        if (normalizedTarget && comm.contact_phone && normalizePhone(comm.contact_phone) === normalizedTarget) {
-          return true;
-        }
-        return false;
-      });
-      
-      if (match) {
-        setSelectedMessage(match);
-        setActiveFilter('all'); // Show all to ensure match is visible
-        // Toast notification
-        toast.success(`Opened conversation with ${match.contact_name}`);
-      } else if (initialTargetName) {
-        // If no match found, search by name
-        setSearch(initialTargetName);
-        toast.info(`Searching for ${initialTargetName}`);
-      }
-    };
-    
-    // Wait for communications to load
-    if (allCommunications.length > 0) {
-      findAndSelectConversation();
-    }
-  }, [initialTargetPhone, initialTargetLeadId, initialTargetOwnerId, initialTargetName, allCommunications]);
-```
-
-### Step 3: Update NinjaFocusPanel Navigation
-
-Modify the `handleActionClick` function in `src/components/dashboard/NinjaFocusPanel.tsx`:
-
-```typescript
-// When navigating to communications, include contact identifiers as query params
-if (item.source === 'email' || item.source === 'lead' || item.source === 'owner') {
-  const params = new URLSearchParams();
-  
-  if (item.contactPhone) {
-    params.set('phone', item.contactPhone);
-  }
-  if (item.contactId) {
-    if (item.contactType === 'lead') {
-      params.set('leadId', item.contactId);
-    } else if (item.contactType === 'owner') {
-      params.set('ownerId', item.contactId);
-    }
-  }
-  if (item.contactName) {
-    params.set('name', item.contactName);
-  }
-  
-  const queryString = params.toString();
-  navigate(`/communications${queryString ? `?${queryString}` : ''}`);
-  return;
+.collapsible-content[data-state="open"] {
+  visibility: visible;
 }
 ```
 
-### Step 4: Handle External/Unknown Contacts
+### 2. Redesign CallRecordingPlayer (src/components/communications/CallRecordingPlayer.tsx)
 
-For contacts not in leads or owners tables, the system will:
+Create a cleaner, more compact design inspired by OpenPhone:
 
-1. First try to match by phone number across all communication sources
-2. If no match, use the contact name to search
-3. Display appropriate feedback to the user
+**Key Design Changes:**
+- Compact inline player with waveform-style progress bar
+- Transcript toggle as a subtle link/button, not a large section header
+- Transcript appears in a clean, contained area when expanded
+- Remove redundant borders and reduce padding
 
-```typescript
-// Fallback for unmatched contacts
-if (!match && initialTargetPhone) {
-  // Create a temporary external contact view
-  setSelectedMessage({
-    id: 'external-' + normalizePhone(initialTargetPhone),
-    type: 'sms',
-    direction: 'outbound',
-    body: '',
-    created_at: new Date().toISOString(),
-    contact_name: initialTargetName || 'Unknown Contact',
-    contact_phone: initialTargetPhone,
-    contact_type: 'external',
-    contact_id: '',
-  });
-}
+**New Layout Structure:**
+```text
+┌─────────────────────────────────────────┐
+│ ▶  ═══════●══════════  0:10 / 14:40  1x │
+│                                    📄 ⬇️ │
+└─────────────────────────────────────────┘
+     ↓ (only when "Show Transcript" clicked)
+┌─────────────────────────────────────────┐
+│ Transcript text here...                 │
+│ (max-height with scroll)                │
+└─────────────────────────────────────────┘
 ```
+
+### 3. Update InboxView Call Display (src/components/communications/InboxView.tsx)
+
+Move the `CallRecordingPlayer` outside the colored message bubble:
+
+```tsx
+{/* Call Recording - Render OUTSIDE the bubble for clean layout */}
+{msg.type === "call" && msg.call_recording_url && (
+  <div className="mt-2 w-full">
+    <CallRecordingPlayer
+      recordingUrl={msg.call_recording_url}
+      duration={msg.call_duration}
+      transcript={msg.body}
+      isOutbound={isOutbound}
+    />
+  </div>
+)}
+
+{/* Call bubble - only show duration info */}
+<div className={`rounded-2xl px-4 py-3 ...`}>
+  {msg.type === "call" && (
+    <div className="flex items-center gap-2 text-sm">
+      <Phone className="h-3.5 w-3.5" />
+      <span>{isOutbound ? "Outgoing" : "Incoming"} call</span>
+      {msg.call_duration && <span>· {formatDuration}</span>}
+    </div>
+  )}
+</div>
+```
+
+## Detailed Implementation
+
+### File 1: src/index.css
+
+Add visibility control to collapsible states to ensure proper hiding.
+
+### File 2: src/components/communications/CallRecordingPlayer.tsx
+
+**Complete Redesign:**
+- Single-line player controls: Play button, progress bar, time, speed, download
+- Small "Transcript" toggle button in the corner (not a full-width bar)
+- Transcript content in a clean card below when expanded
+- Remove excessive borders and nested containers
+- Use subtle background colors instead of heavy borders
+- Max-height of 200px for transcript with scroll
+
+### File 3: src/components/communications/InboxView.tsx
+
+- Move `CallRecordingPlayer` outside the colored message bubble
+- Ensure it's rendered in a full-width container below the call indicator
+- Keep the call bubble simple with just call direction and duration
+
+## Visual Comparison
+
+| Current | New (OpenPhone-style) |
+|---------|----------------------|
+| Player inside bubble | Player below bubble |
+| Large "Show Transcript" header | Small icon button |
+| Transcript always takes space | Transcript truly hidden when collapsed |
+| Multiple borders | Clean, minimal borders |
+| Heavy padding | Compact, efficient layout |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/pages/Communications.tsx` | Add `useSearchParams`, pass props to InboxView |
-| `src/components/communications/InboxView.tsx` | Add props interface, auto-select logic, fallback handling |
-| `src/components/dashboard/NinjaFocusPanel.tsx` | Update navigation to include query params |
-
-## User Experience Flow
-
-1. User clicks Ninja card with contact info (e.g., "Follow up with Sonia Brar")
-2. System navigates to `/communications?phone=4123390382&leadId=xxx&name=Sonia%20Brar`
-3. InboxView loads, parses query params
-4. Auto-selects matching conversation thread
-5. Conversation detail panel opens showing full thread history
-6. User can immediately reply via SMS/email/call
-
-## Error Handling
-
-- **No match found**: Falls back to search by name, shows info toast
-- **Invalid phone format**: Normalizes phone before matching
-- **Missing contact data**: Gracefully degrades to standard inbox view
-- **Multiple matches**: Selects most recent conversation
-
-## Intelligent Routing Logic
-
-The routing considers contact type and available identifiers:
-
-```text
-Contact Type     Priority Order
-------------     ---------------
-Lead             leadId > phone > name
-Owner            ownerId > phone > name  
-Vendor           phone > name
-Guest/External   phone > name
-```
+| `src/index.css` | Add visibility control to collapsible CSS |
+| `src/components/communications/CallRecordingPlayer.tsx` | Complete redesign with compact player |
+| `src/components/communications/InboxView.tsx` | Move player outside message bubble |
