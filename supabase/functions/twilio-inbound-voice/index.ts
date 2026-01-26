@@ -30,6 +30,74 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/twilio-call-status`;
+
+    // First, check if this number is assigned to a team member
+    // If someone calls that team member's number, forward to their browser
+    const { data: phoneAssignment } = await supabase
+      .from('user_phone_assignments')
+      .select('user_id, display_name')
+      .eq('phone_number', toNumber)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (phoneAssignment) {
+      console.log('Call to team member number:', toNumber, 'assigned to:', phoneAssignment.display_name);
+
+      // Try to identify the caller
+      let callerName = fromNumber;
+      
+      // Check if caller is a lead
+      const { data: leadData } = await supabase
+        .from('leads')
+        .select('id, name')
+        .or(`phone.eq.${fromNumber},phone.ilike.%${fromNumber.replace('+1', '')}%`)
+        .maybeSingle();
+
+      if (leadData) {
+        callerName = leadData.name;
+      } else {
+        // Check if caller is a property owner
+        const { data: ownerData } = await supabase
+          .from('property_owners')
+          .select('id, name')
+          .or(`phone.eq.${fromNumber},phone.ilike.%${fromNumber.replace('+1', '')}%`)
+          .maybeSingle();
+        
+        if (ownerData) {
+          callerName = ownerData.name;
+        }
+      }
+
+      // Log the inbound call
+      await supabase.from('lead_communications').insert({
+        communication_type: 'call',
+        direction: 'inbound',
+        body: `Inbound call from ${callerName} to ${phoneAssignment.display_name}`,
+        external_id: callSid,
+        status: 'ringing',
+        lead_id: leadData?.id || null,
+        metadata: { 
+          from_number: fromNumber,
+          to_number: toNumber,
+          assigned_user_id: phoneAssignment.user_id,
+        }
+      });
+
+      // Forward to the assigned user's browser client
+      // Falls back to voicemail if no answer after 30 seconds
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Matthew">Incoming call from ${callerName.replace(/[^a-zA-Z0-9\s]/g, '')}. Please hold.</Say>
+  <Dial record="record-from-answer-dual" recordingStatusCallback="${statusCallbackUrl}" recordingStatusCallbackEvent="completed" timeout="30" action="${SUPABASE_URL}/functions/v1/twilio-voicemail">
+    <Client statusCallback="${statusCallbackUrl}" statusCallbackEvent="initiated ringing answered completed">${phoneAssignment.user_id}</Client>
+  </Dial>
+</Response>`;
+      
+      console.log('Forwarding to browser client:', phoneAssignment.user_id);
+      return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
+    }
+
     // Check if this call is forwarded from a GHL team member number
     // If so, route to IVR operator instead of AI agent
     if (forwardedFrom) {
@@ -68,7 +136,6 @@ serve(async (req) => {
       .or(`phone.eq.${fromNumber},phone.eq.${normalizedPhone},phone.eq.+1${normalizedPhone},phone.ilike.%${normalizedPhone}%`)
       .maybeSingle();
 
-    const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/twilio-call-status`;
     // Convert https:// to wss:// for WebSocket URL
     const bridgeUrl = SUPABASE_URL?.replace('https://', 'wss://') + '/functions/v1/twilio-elevenlabs-bridge';
 

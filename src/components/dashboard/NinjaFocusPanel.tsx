@@ -158,6 +158,20 @@ export function NinjaFocusPanel() {
 
     // If there's a link, navigate to it
     if (item.link) {
+      // Skip invalid routes
+      const invalidRoutes = ['/contacts', '/contact'];
+      if (invalidRoutes.some(r => item.link?.startsWith(r))) {
+        // Redirect to appropriate route based on contact type
+        if (item.contactType === 'lead') {
+          navigate('/leads');
+        } else if (item.contactType === 'owner') {
+          navigate('/owners');
+        } else {
+          navigate('/inbox');
+        }
+        return;
+      }
+      
       if (item.link.startsWith("http")) {
         window.open(item.link, "_blank");
       } else {
@@ -173,6 +187,9 @@ export function NinjaFocusPanel() {
       navigate("/tasks");
     } else if (item.source === "call") {
       navigate("/");
+    } else {
+      // Default to inbox for unknown sources
+      navigate("/inbox");
     }
   };
 
