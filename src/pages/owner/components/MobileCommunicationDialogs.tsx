@@ -54,14 +54,15 @@ export function MobileCommunicationDialogs({
   const [isSending, setIsSending] = useState(false);
   const [voiceSent, setVoiceSent] = useState(false);
   
-  // Voice recording state
+  // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [duration, setDuration] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -72,25 +73,42 @@ export function MobileCommunicationDialogs({
     };
   }, []);
 
-  const startRecording = async () => {
+  const startRecording = async (isVideo = false) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const constraints = isVideo 
+        ? { audio: true, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }
+        : { audio: true };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       
-      const mediaRecorder = new MediaRecorder(stream);
+      // Show video preview if recording video
+      if (isVideo && videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+        videoPreviewRef.current.play();
+      }
+      
+      const mimeType = isVideo 
+        ? (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4')
+        : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+          chunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setRecordedBlob(audioBlob);
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        setRecordedBlob(blob);
         stream.getTracks().forEach(track => track.stop());
+        if (videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = null;
+        }
       };
 
       mediaRecorder.start();
@@ -107,8 +125,11 @@ export function MobileCommunicationDialogs({
         });
       }, 1000);
     } catch (error) {
-      console.error("Microphone access denied:", error);
-      toast.error("Microphone access denied. Please allow microphone access.");
+      console.error("Media access denied:", error);
+      toast.error(isVideo 
+        ? "Camera access denied. Please allow camera and microphone access."
+        : "Microphone access denied. Please allow microphone access."
+      );
     }
   };
 
@@ -120,11 +141,23 @@ export function MobileCommunicationDialogs({
         clearInterval(timerRef.current);
       }
     }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = null;
+    }
   };
 
   const resetRecording = () => {
     setRecordedBlob(null);
     setDuration(0);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = null;
+    }
   };
 
   const handleSendVoice = async (isVideo = false) => {
@@ -215,51 +248,64 @@ export function MobileCommunicationDialogs({
   };
 
   const RecordingUI = ({ isVideo = false }: { isVideo?: boolean }) => (
-    <div className="space-y-6 py-4">
-      <div className="flex flex-col items-center gap-4">
+    <div className="space-y-4 py-2">
+      <div className="flex flex-col items-center gap-3">
+        {/* Video Preview */}
+        {isVideo && (
+          <div className={cn(
+            "w-full aspect-video bg-muted rounded-xl overflow-hidden",
+            !isRecording && !recordedBlob && "hidden"
+          )}>
+            <video 
+              ref={videoPreviewRef}
+              className="w-full h-full object-cover"
+              muted
+              playsInline
+            />
+          </div>
+        )}
+        
         {!recordedBlob ? (
-          <>
+          <div className="flex flex-col items-center gap-3">
             <button
-              onClick={isRecording ? stopRecording : startRecording}
+              onClick={() => isRecording ? stopRecording() : startRecording(isVideo)}
               className={cn(
-                "w-24 h-24 rounded-full flex items-center justify-center transition-all",
+                "w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-lg",
                 isRecording 
                   ? "bg-destructive text-destructive-foreground animate-pulse" 
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
               )}
             >
-              {isRecording ? <Square className="h-10 w-10" /> : (isVideo ? <Video className="h-10 w-10" /> : <Mic className="h-10 w-10" />)}
+              {isRecording ? <Square className="h-8 w-8" /> : (isVideo ? <Video className="h-8 w-8" /> : <Mic className="h-8 w-8" />)}
             </button>
-            <p className="text-sm text-muted-foreground">
-              {isRecording ? `Recording... ${formatDuration(duration)}` : "Tap to start recording"}
+            <p className="text-sm text-muted-foreground text-center">
+              {isRecording ? `Recording... ${formatDuration(duration)}` : `Tap to start ${isVideo ? 'video' : 'voice'} recording`}
             </p>
             {isRecording && (
-              <p className="text-xs text-muted-foreground">
-                Max: 2 minutes
-              </p>
+              <p className="text-xs text-muted-foreground">Max: 2 minutes</p>
             )}
-          </>
+          </div>
         ) : (
-          <>
+          <div className="flex flex-col items-center gap-3 w-full">
             <div className="text-center">
-              <p className="font-medium">Recording Complete</p>
+              <p className="font-medium text-foreground">Recording Complete</p>
               <p className="text-sm text-muted-foreground">{formatDuration(duration)}</p>
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={resetRecording}>
-                <RotateCcw className="h-4 w-4 mr-2" />
+            <div className="flex gap-2 w-full">
+              <Button variant="outline" onClick={resetRecording} className="flex-1">
+                <RotateCcw className="h-4 w-4 mr-1.5" />
                 Re-record
               </Button>
-              <Button onClick={() => handleSendVoice(isVideo)} disabled={isSending}>
+              <Button onClick={() => handleSendVoice(isVideo)} disabled={isSending} className="flex-1">
                 {isSending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
                 ) : (
-                  <Send className="h-4 w-4 mr-2" />
+                  <Send className="h-4 w-4 mr-1.5" />
                 )}
                 Send
               </Button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -273,23 +319,23 @@ export function MobileCommunicationDialogs({
         if (!open) resetRecording();
       }}>
         <DialogContent className="sm:max-w-md mx-4">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
               <Mic className="h-5 w-5 text-primary" />
               Leave a Voice Message
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm">
               Record a message for your property manager.
             </DialogDescription>
           </DialogHeader>
           
           {voiceSent ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-8 w-8 text-accent" />
+            <div className="text-center py-6">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle className="h-7 w-7 text-emerald-600" />
               </div>
-              <p className="font-semibold text-lg">Message Sent!</p>
-              <p className="text-muted-foreground">We'll get back to you soon.</p>
+              <p className="font-semibold text-base">Message Sent!</p>
+              <p className="text-sm text-muted-foreground">We'll get back to you soon.</p>
             </div>
           ) : (
             <RecordingUI isVideo={false} />
@@ -303,23 +349,23 @@ export function MobileCommunicationDialogs({
         if (!open) resetRecording();
       }}>
         <DialogContent className="sm:max-w-md mx-4">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
               <Video className="h-5 w-5 text-primary" />
               Record Video Message
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm">
               Record a video message for your property manager.
             </DialogDescription>
           </DialogHeader>
           
           {voiceSent ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-8 w-8 text-accent" />
+            <div className="text-center py-6">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle className="h-7 w-7 text-emerald-600" />
               </div>
-              <p className="font-semibold text-lg">Video Sent!</p>
-              <p className="text-muted-foreground">We'll get back to you soon.</p>
+              <p className="font-semibold text-base">Video Sent!</p>
+              <p className="text-sm text-muted-foreground">We'll get back to you soon.</p>
             </div>
           ) : (
             <RecordingUI isVideo={true} />
@@ -330,42 +376,42 @@ export function MobileCommunicationDialogs({
       {/* Text Message Modal */}
       <Dialog open={showTextModal} onOpenChange={setShowTextModal}>
         <DialogContent className="sm:max-w-md mx-4">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
               <MessageCircle className="h-5 w-5 text-primary" />
               Send a Message
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm">
               Send a quick message about {propertyName || "your property"}.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
-              <Label htmlFor="textMessage">Your Message</Label>
+              <Label htmlFor="textMessage" className="text-sm font-medium">Your Message</Label>
               <Textarea
                 id="textMessage"
                 value={textMessage}
                 onChange={(e) => setTextMessage(e.target.value)}
                 placeholder="Hi, I have a question about..."
-                rows={4}
-                className="mt-1.5"
+                rows={3}
+                className="mt-1.5 min-h-[100px]"
               />
             </div>
             
             <Button 
               onClick={handleSendText} 
               disabled={isSending || !textMessage.trim()}
-              className="w-full"
+              className="w-full h-11"
             >
               {isSending ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
                   Sending...
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4 mr-2" />
+                  <Send className="h-4 w-4 mr-1.5" />
                   Send Message
                 </>
               )}
