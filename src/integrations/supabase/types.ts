@@ -96,6 +96,71 @@ export type Database = {
           },
         ]
       }
+      admin_call_alerts: {
+        Row: {
+          admin_phone: string | null
+          admin_user_id: string | null
+          alert_type: string
+          call_id: string
+          call_type: string
+          contact_name: string | null
+          created_at: string | null
+          dismissed: boolean | null
+          dismissed_at: string | null
+          id: string
+          meeting_link: string | null
+          phone_call_sent: boolean | null
+          phone_call_sid: string | null
+          phone_number: string | null
+          property_address: string | null
+          scheduled_at: string
+        }
+        Insert: {
+          admin_phone?: string | null
+          admin_user_id?: string | null
+          alert_type: string
+          call_id: string
+          call_type: string
+          contact_name?: string | null
+          created_at?: string | null
+          dismissed?: boolean | null
+          dismissed_at?: string | null
+          id?: string
+          meeting_link?: string | null
+          phone_call_sent?: boolean | null
+          phone_call_sid?: string | null
+          phone_number?: string | null
+          property_address?: string | null
+          scheduled_at: string
+        }
+        Update: {
+          admin_phone?: string | null
+          admin_user_id?: string | null
+          alert_type?: string
+          call_id?: string
+          call_type?: string
+          contact_name?: string | null
+          created_at?: string | null
+          dismissed?: boolean | null
+          dismissed_at?: string | null
+          id?: string
+          meeting_link?: string | null
+          phone_call_sent?: boolean | null
+          phone_call_sid?: string | null
+          phone_number?: string | null
+          property_address?: string | null
+          scheduled_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_call_alerts_admin_user_id_fkey"
+            columns: ["admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_draft_replies: {
         Row: {
           communication_id: string | null
@@ -1419,6 +1484,7 @@ export type Database = {
           reminder_1h_sent: boolean | null
           reminder_24h_sent: boolean | null
           reminder_48h_sent: boolean | null
+          reminder_5min_sent: boolean | null
           reminder_sent: boolean | null
           rental_strategy: string | null
           reschedule_count: number | null
@@ -1448,6 +1514,7 @@ export type Database = {
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
           reminder_48h_sent?: boolean | null
+          reminder_5min_sent?: boolean | null
           reminder_sent?: boolean | null
           rental_strategy?: string | null
           reschedule_count?: number | null
@@ -1477,6 +1544,7 @@ export type Database = {
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
           reminder_48h_sent?: boolean | null
+          reminder_5min_sent?: boolean | null
           reminder_sent?: boolean | null
           rental_strategy?: string | null
           reschedule_count?: number | null
@@ -5209,6 +5277,7 @@ export type Database = {
           reminder_1h_sent: boolean | null
           reminder_24h_sent: boolean | null
           reminder_48h_sent: boolean | null
+          reminder_5min_sent: boolean | null
           reschedule_count: number | null
           rescheduled_at: string | null
           scheduled_at: string
@@ -5235,6 +5304,7 @@ export type Database = {
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
           reminder_48h_sent?: boolean | null
+          reminder_5min_sent?: boolean | null
           reschedule_count?: number | null
           rescheduled_at?: string | null
           scheduled_at: string
@@ -5261,6 +5331,7 @@ export type Database = {
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
           reminder_48h_sent?: boolean | null
+          reminder_5min_sent?: boolean | null
           reschedule_count?: number | null
           rescheduled_at?: string | null
           scheduled_at?: string

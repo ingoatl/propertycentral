@@ -626,3 +626,6 @@ verify_jwt = true
 
 [functions.ai-suggest-maintenance-schedule]
 verify_jwt = true
+
+[functions.call-reminder-5min-cron]
+verify_jwt = false
