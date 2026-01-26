@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-export type ContactType = 'lead' | 'owner' | 'vendor';
+export type ContactType = 'lead' | 'owner' | 'vendor' | 'other';
 
 export interface UnifiedAIRequest {
   action: 'compose' | 'reply' | 'improve' | 'shorten' | 'professional' | 'friendly';

@@ -10,15 +10,18 @@ async function fetchFromGooglePlaces(address: string, googleApiKey: string): Pro
   console.log("[get-property-photos] Trying Google Places fallback for:", address);
   
   try {
-    // First, search for the place
-    const searchUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(address)}&inputtype=textquery&fields=place_id,photos&key=${googleApiKey}`;
+    // First, search for the place - request more fields
+    const searchUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(address)}&inputtype=textquery&fields=place_id,name,photos,formatted_address&key=${googleApiKey}`;
     const searchResponse = await fetch(searchUrl);
     const searchData = await searchResponse.json();
     
     console.log("[get-property-photos] Google Places search result:", searchData.status);
+    console.log("[get-property-photos] Candidates found:", searchData.candidates?.length || 0);
     
     if (searchData.candidates && searchData.candidates.length > 0) {
       const candidate = searchData.candidates[0];
+      console.log("[get-property-photos] Candidate:", candidate.name || 'unnamed', "place_id:", candidate.place_id);
+      console.log("[get-property-photos] Direct photos count:", candidate.photos?.length || 0);
       
       if (candidate.photos && candidate.photos.length > 0) {
         // Get photo URLs using photo_reference
@@ -31,9 +34,13 @@ async function fetchFromGooglePlaces(address: string, googleApiKey: string): Pro
       
       // If we have a place_id but no photos from search, try place details
       if (candidate.place_id) {
-        const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${candidate.place_id}&fields=photos&key=${googleApiKey}`;
+        console.log("[get-property-photos] Fetching place details for:", candidate.place_id);
+        const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${candidate.place_id}&fields=photos,name,formatted_address&key=${googleApiKey}`;
         const detailsResponse = await fetch(detailsUrl);
         const detailsData = await detailsResponse.json();
+        
+        console.log("[get-property-photos] Place details status:", detailsData.status);
+        console.log("[get-property-photos] Detail photos count:", detailsData.result?.photos?.length || 0);
         
         if (detailsData.result?.photos && detailsData.result.photos.length > 0) {
           const photos = detailsData.result.photos.slice(0, 5).map((photo: any) => 
@@ -45,7 +52,13 @@ async function fetchFromGooglePlaces(address: string, googleApiKey: string): Pro
       }
     }
     
-    return [];
+    // If no photos from exact address, try a broader Street View approach
+    console.log("[get-property-photos] No photos from Places API, trying Street View fallback");
+    const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=800x600&location=${encodeURIComponent(address)}&key=${googleApiKey}`;
+    // We can't verify if Street View exists without fetching, so just return it as a possibility
+    // The frontend will handle if the image fails to load
+    return [streetViewUrl];
+    
   } catch (error) {
     console.error("[get-property-photos] Google Places error:", error);
     return [];

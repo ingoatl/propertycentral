@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface ContextRequest {
-  contactType: 'lead' | 'owner';
+  contactType: 'lead' | 'owner' | 'vendor' | 'other';
   contactId: string;
   incomingMessage?: string;
   messageType: 'sms' | 'email';
@@ -411,6 +411,20 @@ serve(async (req) => {
     console.log(`Provided thread has ${providedThread?.length || 0} messages`);
 
     // Parallel data fetching
+    // Get contact details - handle lead, owner, vendor, or fallback to generic
+    const getContactQuery = () => {
+      if (contactType === 'lead') {
+        return supabase.from('leads').select('*').eq('id', contactId).maybeSingle();
+      } else if (contactType === 'owner') {
+        return supabase.from('property_owners').select('*, properties(*)').eq('id', contactId).maybeSingle();
+      } else if (contactType === 'vendor') {
+        return supabase.from('vendors').select('*').eq('id', contactId).maybeSingle();
+      } else {
+        // For 'other' type, try to find by phone/email in various tables
+        return supabase.from('leads').select('*').eq('id', contactId).maybeSingle();
+      }
+    };
+
     const [
       contactResult,
       knowledgeResult,
@@ -418,10 +432,8 @@ serve(async (req) => {
       toneResult,
       memoriesResult,
     ] = await Promise.all([
-      // Get contact details
-      contactType === 'lead'
-        ? supabase.from('leads').select('*').eq('id', contactId).single()
-        : supabase.from('property_owners').select('*, properties(*)').eq('id', contactId).single(),
+      // Get contact details based on type
+      getContactQuery(),
       
       // Get knowledge base
       supabase

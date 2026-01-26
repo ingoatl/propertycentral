@@ -30,7 +30,7 @@ interface NinjaFocusItem {
   priority: "critical" | "high" | "medium";
   action: string;
   reason: string;
-  source: "email" | "task" | "call" | "system";
+  source: "email" | "task" | "call" | "system" | "onboarding" | "document" | "lead" | "owner";
   link?: string;
   // Actionable fields
   actionType?: "call" | "email" | "sms" | "view";
@@ -156,12 +156,53 @@ export function NinjaFocusPanel() {
       return;
     }
 
-    // If there's a link, navigate to it
+    // If there's a link, validate and navigate to it
     if (item.link) {
-      // Skip invalid routes
-      const invalidRoutes = ['/contacts', '/contact'];
-      if (invalidRoutes.some(r => item.link?.startsWith(r))) {
-        // Redirect to appropriate route based on contact type
+      // Define valid internal routes
+      const validRoutes = [
+        '/leads', '/owners', '/inbox', '/tasks', '/properties', '/bookings',
+        '/maintenance', '/documents', '/analytics', '/settings', '/onboarding',
+        '/vendors', '/team', '/calendar', '/reports', '/knowledge', '/'
+      ];
+      
+      // Skip invalid routes - redirect to appropriate valid page
+      const invalidRoutes = ['/contacts', '/contact', '/view'];
+      if (invalidRoutes.some(r => item.link?.startsWith(r)) || 
+          item.link?.includes('/undefined') || 
+          item.link?.includes('/null')) {
+        // Redirect to appropriate route based on contact type or source
+        if (item.contactType === 'lead' || item.source === 'lead') {
+          navigate('/leads');
+        } else if (item.contactType === 'owner' || item.source === 'owner') {
+          navigate('/owners');
+        } else if (item.source === 'email') {
+          navigate('/inbox');
+        } else if (item.source === 'task' || item.source === 'onboarding') {
+          navigate('/tasks');
+        } else if (item.source === 'document') {
+          navigate('/documents');
+        } else {
+          navigate('/inbox');
+        }
+        return;
+      }
+      
+      // External links
+      if (item.link.startsWith("http")) {
+        window.open(item.link, "_blank");
+        return;
+      }
+      
+      // Validate internal route exists - check if it starts with a valid route prefix
+      const isValidRoute = validRoutes.some(route => 
+        item.link === route || item.link?.startsWith(`${route}/`)
+      );
+      
+      if (isValidRoute) {
+        navigate(item.link);
+      } else {
+        // Unknown route - redirect based on context
+        console.warn(`[NinjaFocusPanel] Invalid link detected: ${item.link}`);
         if (item.contactType === 'lead') {
           navigate('/leads');
         } else if (item.contactType === 'owner') {
@@ -169,13 +210,6 @@ export function NinjaFocusPanel() {
         } else {
           navigate('/inbox');
         }
-        return;
-      }
-      
-      if (item.link.startsWith("http")) {
-        window.open(item.link, "_blank");
-      } else {
-        navigate(item.link);
       }
       return;
     }
@@ -183,10 +217,16 @@ export function NinjaFocusPanel() {
     // Fallback: navigate to relevant section based on source
     if (item.source === "email") {
       navigate("/inbox");
-    } else if (item.source === "task") {
+    } else if (item.source === "task" || item.source === "onboarding") {
       navigate("/tasks");
     } else if (item.source === "call") {
       navigate("/");
+    } else if (item.source === "document") {
+      navigate("/documents");
+    } else if (item.source === "lead") {
+      navigate("/leads");
+    } else if (item.source === "owner") {
+      navigate("/owners");
     } else {
       // Default to inbox for unknown sources
       navigate("/inbox");
