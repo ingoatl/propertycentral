@@ -19,8 +19,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { TodaysFocusCard } from "./TodaysFocusCard";
 import { NinjaFocusPanel } from "./NinjaFocusPanel";
-import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
-import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
+import { ActionRequiredSection } from "@/components/admin/ActionRequiredSection";
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { SystemHealthPanel } from "@/components/admin/SystemHealthPanel";
 import { SyncStatusBar } from "@/components/admin/SyncStatusBar";
@@ -402,18 +401,8 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* Discovery Call Calendar - THIRD */}
         <DiscoveryCallCalendar />
         
-        {/* Role-Based Focus Section - REMOVED per user request */}
-        {/* ACTION REQUIRED - Questions & Bugs */}
-        <div className="p-4 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/20">
-          <h3 className="text-lg font-semibold flex items-center gap-2 text-orange-700 dark:text-orange-300 mb-4">
-            <AlertTriangle className="h-5 w-5" />
-            Action Required
-          </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <PendingQuestionsCard />
-            <DashboardBugReportsCard />
-          </div>
-        </div>
+        {/* ACTION REQUIRED - Only shows when there are pending questions or bugs */}
+        <ActionRequiredSection />
         
         {/* Onboarding Properties Timeline - Always visible */}
         <OnboardingTimelineSection />
