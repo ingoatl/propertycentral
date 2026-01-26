@@ -97,6 +97,19 @@ export function NinjaFocusPanel() {
   const handleActionClick = (item: NinjaFocusItem) => {
     const contactType = item.contactType === "lead" ? "lead" : item.contactType === "owner" ? "owner" : "lead";
     
+    // Helper to build communications URL with contact query params
+    const buildCommunicationsUrl = () => {
+      const params = new URLSearchParams();
+      if (item.contactPhone) params.set('phone', item.contactPhone);
+      if (item.contactId) {
+        if (item.contactType === 'lead') params.set('leadId', item.contactId);
+        else if (item.contactType === 'owner') params.set('ownerId', item.contactId);
+      }
+      if (item.contactName) params.set('name', item.contactName);
+      const queryString = params.toString();
+      return `/communications${queryString ? `?${queryString}` : ''}`;
+    };
+    
     // If there's a specific action type, handle it
     if (item.actionType === "call" && item.contactPhone) {
       setSelectedContact({
@@ -239,22 +252,20 @@ export function NinjaFocusPanel() {
       return;
     }
 
-    // Fallback: navigate to relevant section based on source
-    if (item.source === "email") {
-      navigate("/communications");
+    // Fallback: navigate to relevant section based on source with smart routing
+    // Include contact identifiers as query params for communications routing
+    if (item.source === "email" || item.source === "lead" || item.source === "owner") {
+      navigate(buildCommunicationsUrl());
     } else if (item.source === "task" || item.source === "onboarding") {
       navigate("/");
     } else if (item.source === "call") {
-      navigate("/");
+      // Calls also route to communications with contact info
+      navigate(buildCommunicationsUrl());
     } else if (item.source === "document") {
       navigate("/documents");
-    } else if (item.source === "lead") {
-      navigate("/leads");
-    } else if (item.source === "owner") {
-      navigate("/owners");
     } else {
-      // Default to communications for unknown sources
-      navigate("/communications");
+      // Default to communications with any available contact info
+      navigate(buildCommunicationsUrl());
     }
   };
 
