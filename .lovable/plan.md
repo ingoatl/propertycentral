@@ -1,460 +1,237 @@
 
-
-# Property Central: SMB SaaS Transformation & Ninja Improvements Plan
+# Property Central SMB Completion & Team Hub Integration Plan
 
 ## Executive Summary
 
-After thoroughly auditing the codebase, I've identified **17 high-impact optimizations** that will transform Property Central from a single-tenant tool into a production-grade SMB SaaS platform. These improvements focus on **performance, code quality, security, and scalability** rather than adding new features.
+After thorough code review, the "ninja improvements" created excellent infrastructure that is **not yet integrated** into the app. This plan completes the SMB transformation by:
+1. Activating the unused improvements
+2. Enhancing the Team Hub for seamless team communication
+3. Adding the final SMB-critical features
 
 ---
 
-## Part 1: Critical Performance Optimizations
+## Phase 1: Activate Existing Improvements (Day 1)
 
-### 1.1 InboxView.tsx Refactoring (4,448 lines → ~800 lines)
+### 1.1 Integrate ErrorBoundary into App.tsx
 
-**Current State**: The `InboxView.tsx` file is 4,448 lines - a massive monolith handling:
-- 30+ useState hooks
-- 15+ useQuery calls
-- 10+ useMutation calls
-- Multiple inline business logic functions
-- Complex filtering/grouping logic
+The ErrorBoundary component exists but isn't imported. We need to wrap the app to prevent crashes:
 
-**Improvement Plan**:
 ```text
-┌─────────────────────────────────────────────────────────┐
-│                    BEFORE (Monolith)                    │
-│                    InboxView.tsx                        │
-│                    4,448 lines                          │
-└─────────────────────────────────────────────────────────┘
-                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                   AFTER (Modular)                       │
-├─────────────────────────────────────────────────────────┤
-│ hooks/                                                  │
-│   useInboxFiltering.ts       (~150 lines)              │
-│   useConversationThread.ts   (~100 lines)              │
-│   useInboxKeyboard.ts        (existing, enhanced)      │
-│   useInboxRealtime.ts        (~80 lines)               │
-│                                                         │
-│ components/inbox/                                       │
-│   InboxList.tsx              (~200 lines)              │
-│   ConversationPanel.tsx      (~300 lines)              │
-│   MessageBubble.tsx          (~100 lines)              │
-│   InboxToolbar.tsx           (~150 lines)              │
-│                                                         │
-│ InboxView.tsx                (~300 lines - orchestrator)│
-└─────────────────────────────────────────────────────────┘
+App.tsx changes:
+├── Import ErrorBoundary from '@/components/ErrorBoundary'
+├── Wrap QueryClientProvider with ErrorBoundary
+├── Add section-specific boundaries around Layout
+└── Add QueryErrorResetBoundary for React Query errors
 ```
 
-**Impact**: 60% faster initial render, easier debugging, reduced bundle size
+This prevents the entire app from crashing when a single component fails.
+
+### 1.2 Add ErrorBoundary to Critical Sections
+
+Wrap high-risk areas:
+- InboxView (4,448 lines - most likely to have issues)
+- Dashboard (complex data fetching)
+- TeamHub (real-time features)
+- Maintenance (file uploads, vendor portal)
 
 ---
 
-### 1.2 Query Optimization & Caching Strategy
+## Phase 2: Team Hub SMB Enhancements (Days 2-3)
 
-**Current Issues**:
-- 1,010 `useQuery` calls across 109 files
-- Many redundant queries for same data
-- Missing query deduplication
-- Default 5-minute stale time may be too aggressive for some data
+### 2.1 Deep Integration with Business Entities
 
-**Improvements**:
-1. **Centralized Query Keys Factory**
-```typescript
-// src/lib/queryKeys.ts
-export const queryKeys = {
-  properties: {
-    all: ['properties'] as const,
-    list: () => [...queryKeys.properties.all, 'list'] as const,
-    detail: (id: string) => [...queryKeys.properties.all, id] as const,
-  },
-  communications: {
-    all: ['communications'] as const,
-    inbox: (userId: string) => [...queryKeys.communications.all, 'inbox', userId] as const,
-    thread: (contactId: string) => [...queryKeys.communications.all, 'thread', contactId] as const,
-  },
-  // ... other domains
-};
+Currently Team Hub messages can reference properties/leads/work orders, but the UI doesn't display this well.
+
+**Enhancements:**
+```text
+Message Context Cards:
+├── When message has property_id → Show property card with photo, address
+├── When message has lead_id → Show lead card with status, contact info
+├── When message has work_order_id → Show work order status, vendor, photos
+└── When message has owner_id → Show owner card with properties
 ```
 
-2. **Shared Data Providers**
-```typescript
-// Create PropertiesProvider that fetches once and shares via context
-// Eliminates 47 duplicate property queries across components
+### 2.2 Quick Actions from Team Hub
+
+Add ability to take action directly from messages:
+- "Create task from this message"
+- "Forward to owner"
+- "Convert to work order"
+- "Schedule follow-up"
+
+### 2.3 Channel Templates for SMB Teams
+
+Pre-configured channels for property management:
+```text
+Default Channels:
+├── #general (announcements)
+├── #maintenance-alerts (auto-posts from work orders)
+├── #owner-updates (owner portal activity)
+├── #urgent (high-priority items)
+└── #daily-standup (AI-generated daily summary)
 ```
 
-3. **Intelligent Stale Time Configuration**
-```typescript
-const queryConfig = {
-  properties: { staleTime: 1000 * 60 * 10 },      // 10 min (rarely changes)
-  communications: { staleTime: 1000 * 30 },       // 30 sec (frequently updated)
-  bookings: { staleTime: 1000 * 60 * 5 },         // 5 min
-  staticData: { staleTime: 1000 * 60 * 60 },      // 1 hour (templates, roles)
-};
-```
+### 2.4 AI-Powered Team Features
 
-**Impact**: ~40% reduction in API calls, faster perceived performance
+- **Daily Digest Bot**: Posts morning summary of today's tasks, visits, calls
+- **Smart @mentions**: "@alex re: Sunset Blvd leak" auto-links to the property
+- **Message Summarization**: Catch up on long threads with AI summary
 
 ---
 
-### 1.3 Bundle Splitting & Lazy Loading Enhancement
+## Phase 3: Mobile-First Team Communication (Day 4)
 
-**Current State**: Good lazy loading in App.tsx, but:
-- Components within pages aren't lazy loaded
-- Heavy modals load with parent pages
-- No vendor chunk optimization
+### 3.1 Push Notifications
 
-**Improvements**:
-
-1. **Vite Config Enhancement**
-```typescript
-// vite.config.ts
-build: {
-  rollupOptions: {
-    output: {
-      manualChunks: {
-        'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', ...],
-        'vendor-charts': ['recharts'],
-        'vendor-pdf': ['pdfjs-dist', 'react-pdf'],
-        'vendor-stripe': ['@stripe/stripe-js', '@stripe/react-stripe-js'],
-      }
-    }
-  }
-}
+The `send-team-notification` edge function exists. Enable browser push:
+```text
+Components needed:
+├── Service Worker registration
+├── VAPID key generation (one-time admin setup)
+├── Permission request UI
+└── Background notification handling
 ```
 
-2. **Modal Lazy Loading**
-```typescript
-// Heavy modals should be lazy loaded
-const PropertyDetailsModal = lazy(() => import('./PropertyDetailsModal'));
-const ReconciliationReviewModal = lazy(() => import('./ReconciliationReviewModal'));
-```
+### 3.2 Quick Reply from Mobile Header
 
-**Impact**: Initial bundle size reduction of ~30%, faster first contentful paint
+The mobile header already has Team Hub button. Enhance with:
+- Quick compose floating action
+- Voice-to-text for messages
+- Swipe gestures for channel switching
 
 ---
 
-## Part 2: Code Quality & Maintainability
+## Phase 4: Adopt Shared Utilities (Days 5-6)
 
-### 2.1 Replace `.single()` with `.maybeSingle()` Pattern
+### 4.1 Update High-Traffic Edge Functions
 
-**Current Risk**: 590 occurrences of `.single()` - crashes when no row found
-
-**Fix Pattern**:
-```typescript
-// BEFORE - crashes if no data
-const { data } = await supabase.from("profiles").select().eq("id", userId).single();
-
-// AFTER - handles missing data gracefully  
-const { data } = await supabase.from("profiles").select().eq("id", userId).maybeSingle();
-if (!data) {
-  // Handle missing data gracefully
-}
+Priority functions to update with shared utilities:
+```text
+High Priority (most used):
+├── ghl-send-sms/index.ts
+├── send-voicemail/index.ts
+├── owner-portal-data/index.ts
+├── fetch-gmail-inbox/index.ts
+├── ai-assistant/index.ts
+└── sync-ownerrez/index.ts
 ```
 
-**Priority Files** (most critical):
-- `src/components/ProtectedRoute.tsx` (line 45)
-- `src/hooks/useInboxData.ts` (line 90)
-- `src/pages/VendorJobPortal.tsx` (line 109)
+Each update:
+1. Import from `../_shared/cors.ts`
+2. Import from `../_shared/response.ts`
+3. Import from `../_shared/auth.ts` (where applicable)
+4. Import from `../_shared/logging.ts`
+5. Replace inline patterns with helpers
 
----
+### 4.2 Add Rate Limiting Table
 
-### 2.2 Centralized Error Boundary System
-
-**Current State**: No error boundaries - React app crashes completely on errors
-
-**Implementation**:
-```typescript
-// src/components/ErrorBoundary.tsx
-class ErrorBoundary extends React.Component {
-  componentDidCatch(error, errorInfo) {
-    // Log to monitoring service
-    // Show user-friendly error UI
-    // Provide recovery action
-  }
-}
-
-// src/components/QueryErrorBoundary.tsx  
-// Specific for React Query errors with retry functionality
-```
-
-**Usage**:
-```typescript
-// Wrap critical sections
-<ErrorBoundary fallback={<InboxErrorState onRetry={refetch} />}>
-  <InboxView />
-</ErrorBoundary>
-```
-
----
-
-### 2.3 Edge Function Consolidation
-
-**Current State**: 170+ edge functions with duplicated patterns
-
-**Optimization**:
-1. **Shared Utilities Expansion**
-```
-supabase/functions/_shared/
-├── cors.ts              (new - standardized CORS)
-├── auth.ts              (new - auth helper)
-├── response.ts          (new - response helpers)
-├── email-templates.ts   (new - Fortune 500 templates)
-├── phone-config.ts      (existing)
-├── sms.ts               (new - GHL SMS wrapper)
-└── logging.ts           (new - structured logging)
-```
-
-2. **Response Helper Pattern**
-```typescript
-// _shared/response.ts
-export const jsonResponse = (data: any, status = 200) => 
-  new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" }
-  });
-
-export const errorResponse = (message: string, status = 400) =>
-  jsonResponse({ error: message }, status);
-```
-
-**Impact**: ~20% reduction in edge function code, consistent error handling
-
----
-
-## Part 3: Security Hardening
-
-### 3.1 Admin Role Check Enhancement
-
-**Current Implementation** (Good):
-```typescript
-// useAdminCheck.tsx - uses server-side role table ✓
-const { data } = await supabase
-  .from("user_roles")
-  .select("role")
-  .eq("user_id", user.id)
-  .eq("role", "admin")
-  .maybeSingle();
-```
-
-**Improvement**: Add request-level role validation in edge functions
-
-```typescript
-// _shared/auth.ts
-export async function requireAdmin(req: Request, supabase: any) {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) throw new Error('Unauthorized');
-  
-  const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-  if (!user) throw new Error('Unauthorized');
-  
-  const { data: role } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('role', 'admin')
-    .maybeSingle();
-    
-  if (!role) throw new Error('Forbidden: Admin access required');
-  return user;
-}
-```
-
----
-
-### 3.2 Rate Limiting for Edge Functions
-
-**Implementation**:
-```typescript
-// Add to critical edge functions (ghl-send-sms, send-email, etc.)
-const RATE_LIMITS = {
-  sms: { max: 100, window: 3600 },    // 100/hour
-  email: { max: 50, window: 3600 },   // 50/hour
-};
-
-async function checkRateLimit(userId: string, action: string, supabase: any) {
-  const windowStart = new Date(Date.now() - RATE_LIMITS[action].window * 1000);
-  const { count } = await supabase
-    .from('rate_limit_logs')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('action', action)
-    .gte('created_at', windowStart.toISOString());
-    
-  if (count >= RATE_LIMITS[action].max) {
-    throw new Error('Rate limit exceeded');
-  }
-}
-```
-
----
-
-## Part 4: Database & Query Optimizations
-
-### 4.1 Add Missing Indexes
-
-**Analysis of slow queries**:
+Protect API endpoints from abuse:
 ```sql
--- lead_communications: frequently filtered by owner_id, lead_id, direction
-CREATE INDEX IF NOT EXISTS idx_lead_comms_owner_direction 
-ON lead_communications(owner_id, direction, created_at DESC);
+CREATE TABLE rate_limit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID,
+  action TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
--- conversation_status: lookup by contact identifiers
-CREATE INDEX IF NOT EXISTS idx_conv_status_phone 
-ON conversation_status(contact_phone) WHERE contact_phone IS NOT NULL;
-
--- properties: filter by type and offboarded status
-CREATE INDEX IF NOT EXISTS idx_properties_active 
-ON properties(property_type) WHERE offboarded_at IS NULL;
+CREATE INDEX idx_rate_limits_lookup ON rate_limit_logs(user_id, action, created_at);
 ```
 
 ---
 
-### 4.2 Pagination for Large Datasets
+## Phase 5: SMB Multi-Tenant Preparation (Day 7)
 
-**Current Issue**: Supabase 1000 row limit may truncate results
+### 5.1 Tenant API Credentials Table
 
-**Fix Pattern**:
-```typescript
-// Implement cursor-based pagination for communications
-const fetchAllCommunications = async (cursor?: string) => {
-  const query = supabase
-    .from('lead_communications')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(100);
-    
-  if (cursor) {
-    query.lt('created_at', cursor);
-  }
-  
-  return query;
-};
+Allow different clients to use their own GHL/Twilio:
+```sql
+CREATE TABLE tenant_api_credentials (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID REFERENCES auth.users(id),
+  provider TEXT NOT NULL, -- 'ghl', 'twilio', 'telnyx'
+  credentials JSONB NOT NULL, -- encrypted
+  phone_numbers JSONB DEFAULT '[]',
+  is_verified BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### 5.2 Credential Lookup in Edge Functions
+
+Update communication functions to check for tenant credentials:
+```text
+Logic flow:
+1. Get user's tenant_id
+2. Check tenant_api_credentials for custom credentials
+3. If found → Use their credentials
+4. If not → Use platform defaults (with rate limiting)
 ```
 
 ---
 
-## Part 5: Developer Experience Improvements
+## Technical Implementation Details
 
-### 5.1 TypeScript Strict Mode Enablement
+### Files to Create
 
-**Current**: Standard TypeScript config
+| File | Purpose |
+|------|---------|
+| `src/components/team-hub/MessageContextCard.tsx` | Display linked entities in messages |
+| `src/components/team-hub/QuickActions.tsx` | Action buttons on messages |
+| `src/components/team-hub/DailyDigestBot.tsx` | AI summary component |
+| `src/hooks/usePushNotifications.ts` | Push notification registration |
+| `public/sw.js` | Service worker for background notifications |
 
-**Improvement**: Enable strict checks gradually
-```json
-// tsconfig.json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noUncheckedIndexedAccess": true
-  }
-}
-```
+### Files to Modify
 
----
+| File | Changes |
+|------|---------|
+| `src/App.tsx` | Add ErrorBoundary wrapping |
+| `src/components/Layout.tsx` | Add ErrorBoundary around main content |
+| `src/hooks/useTeamHub.ts` | Add context card data fetching |
+| `src/pages/TeamHub.tsx` | Add quick actions, enhance mobile UX |
+| 6+ edge functions | Adopt shared utilities |
 
-### 5.2 Component Documentation Standards
+### Database Changes
 
-**Create Storybook-style documentation** for complex components:
-```typescript
-/**
- * InboxView - Unified communications hub
- * 
- * @description Main inbox component handling SMS, email, calls across all contacts
- * 
- * @features
- * - Real-time message updates via Supabase subscription
- * - Role-based inbox filtering (see useRoleInboxPreferences)
- * - Keyboard navigation (j/k/r/d shortcuts)
- * - AI draft reply generation
- * 
- * @dependencies
- * - useConversationStatuses: Inbox Zero workflow state
- * - usePhoneLookup: Contact name resolution
- * - useGhlAutoSync: Background data sync
- */
-```
+1. **Add rate_limit_logs table** - API protection
+2. **Add tenant_api_credentials table** - Multi-tenant readiness
+3. **Add team_channel_templates table** - Pre-configured channels
+4. **Add team_daily_digests table** - Store generated summaries
 
 ---
 
-## Part 6: Multi-Tenant SaaS Preparation
+## Before vs After Summary
 
-### 6.1 Tenant Context Architecture
-
-For future multi-tenant support, prepare the architecture:
-
-```typescript
-// src/context/TenantContext.tsx
-interface TenantConfig {
-  id: string;
-  name: string;
-  apiKeys: {
-    ghl?: string;
-    twilio?: string;
-  };
-  branding: {
-    logo: string;
-    primaryColor: string;
-  };
-  features: string[];
-}
-
-const TenantContext = createContext<TenantConfig | null>(null);
-```
-
-### 6.2 Feature Flags System
-
-```typescript
-// src/lib/featureFlags.ts
-export const features = {
-  AI_DRAFT_REPLIES: 'ai_draft_replies',
-  PREDICTIVE_MAINTENANCE: 'predictive_maintenance',
-  OWNER_PORTAL: 'owner_portal',
-  VOICE_AI: 'voice_ai',
-};
-
-export function useFeatureFlag(flag: string): boolean {
-  const tenant = useTenant();
-  return tenant?.features?.includes(flag) ?? false;
-}
-```
+| Aspect | Before (Fragile) | After (SMB-Ready) |
+|--------|------------------|-------------------|
+| Error Handling | App crashes on JS errors | Graceful recovery with retry |
+| Team Communication | Basic Slack-clone | Deeply integrated with business entities |
+| Edge Functions | 235 functions with duplicated code | Shared utilities, consistent patterns |
+| Mobile Experience | Functional but basic | Push notifications, quick actions |
+| Multi-Tenant | Single-tenant hardcoded | Credential isolation ready |
+| Query Management | Scattered keys | Centralized factory (partially adopted) |
 
 ---
 
-## Implementation Priority Matrix
+## Recommended Implementation Order
 
-| Priority | Improvement | Effort | Impact | Risk |
-|----------|------------|--------|--------|------|
-| **P0** | Replace `.single()` with `.maybeSingle()` | Low | High | Prevents crashes |
-| **P0** | Add Error Boundaries | Medium | High | UX stability |
-| **P1** | InboxView refactoring | High | High | Major perf gains |
-| **P1** | Query key standardization | Medium | Medium | Reduces API calls |
-| **P1** | Edge function shared utilities | Medium | Medium | Code maintainability |
-| **P2** | Bundle splitting optimization | Low | Medium | Faster loads |
-| **P2** | Rate limiting | Medium | High | Security/stability |
-| **P2** | Database indexes | Low | Medium | Query performance |
-| **P3** | TypeScript strict mode | High | Medium | Code quality |
-| **P3** | Multi-tenant preparation | High | Future | SaaS readiness |
+1. **Immediate** (prevents crashes): Integrate ErrorBoundary
+2. **Day 1-2**: Team Hub entity integration (property/lead/work order cards)
+3. **Day 3**: Push notification infrastructure
+4. **Day 4-5**: Adopt shared utilities in top 10 edge functions
+5. **Day 6**: Add tenant_api_credentials table
+6. **Day 7**: Update communication functions for multi-tenant
 
 ---
 
-## Technical Debt Inventory
+## Team Hub Decision: Keep Integrated ✅
 
-1. **Dashboard.tsx**: Hardcoded property mappings (lines 133-163) should be database-driven
-2. **Phone number formatting**: Duplicated across 20+ files - needs single utility
-3. **Date formatting**: Inconsistent timezone handling - standardize to EST
-4. **CORS headers**: Duplicated in every edge function - should be shared
+The Team Hub should remain part of Property Central because:
 
----
+1. **Shared Context**: Messages can directly reference properties, leads, work orders
+2. **Single Auth**: Team members use same login for everything
+3. **Unified Notifications**: One bell icon, one notification system
+4. **Mobile Simplicity**: One app to bookmark/install
+5. **Existing Infrastructure**: Already 13 components built and working
 
-## Estimated Timeline
-
-- **Week 1**: P0 items (error handling, .single() fixes)
-- **Week 2-3**: P1 items (InboxView refactor, query optimization)
-- **Week 4**: P2 items (security hardening, performance)
-- **Ongoing**: P3 items (TypeScript, documentation)
-
-This plan transforms Property Central from a powerful single-tenant tool into a scalable, maintainable SMB SaaS platform without adding new features - purely through architectural and code quality improvements.
-
+Separating it would require duplicating auth, creating API bridges, and fragmenting the user experience.
