@@ -418,7 +418,7 @@ serve(async (req) => {
         }
       };
 
-      elevenLabsSocket.onmessage = (event) => {
+      elevenLabsSocket.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
           
@@ -492,14 +492,169 @@ serve(async (req) => {
             console.log("User interrupted agent");
           }
 
-          // Handle client tool calls (like transfer to human)
+          // Handle client tool calls (transfer to team member, check availability, voicemail)
           if (data.type === 'client_tool_call') {
             const toolCall = data.client_tool_call;
-            console.log("Client tool call received:", toolCall?.tool_name);
+            const toolName = toolCall?.tool_name;
+            const toolCallId = toolCall?.tool_call_id;
+            const parameters = toolCall?.parameters || {};
             
-            if (toolCall?.tool_name === 'transfer_to_human') {
-              console.log("Transfer to human requested");
-              // TODO: Implement call transfer logic
+            console.log("Client tool call received:", toolName, "params:", parameters);
+            
+            // Handle transfer_to_team_member tool
+            if (toolName === 'transfer_to_team_member' || toolName === 'transfer_to_human') {
+              const teamMemberName = parameters.team_member_name || parameters.name;
+              console.log("Transfer requested to:", teamMemberName);
+              
+              // Call the transfer edge function
+              if (callSid && teamMemberName) {
+                try {
+                  const transferResponse = await fetch(`${SUPABASE_URL}/functions/v1/twilio-call-transfer`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                    },
+                    body: JSON.stringify({
+                      callSid,
+                      teamMemberName,
+                      transferType: 'browser',
+                      announcementText: `Transferring you to ${teamMemberName}. Please hold.`,
+                    }),
+                  });
+
+                  const transferResult = await transferResponse.json();
+                  console.log("Transfer result:", transferResult);
+
+                  // Send tool result back to ElevenLabs
+                  if (elevenLabsSocket?.readyState === WebSocket.OPEN && toolCallId) {
+                    const toolResponse = {
+                      type: "client_tool_result",
+                      tool_call_id: toolCallId,
+                      result: transferResult.success 
+                        ? `Successfully initiating transfer to ${teamMemberName}. The caller will be connected shortly.`
+                        : `I'm unable to transfer right now. ${transferResult.error || 'Please try again later.'}`,
+                      is_error: !transferResult.success,
+                    };
+                    elevenLabsSocket.send(JSON.stringify(toolResponse));
+                  }
+                } catch (transferError) {
+                  console.error("Transfer error:", transferError);
+                  if (elevenLabsSocket?.readyState === WebSocket.OPEN && toolCallId) {
+                    const toolResponse = {
+                      type: "client_tool_result",
+                      tool_call_id: toolCallId,
+                      result: "I'm having trouble connecting you right now. Let me take a message instead.",
+                      is_error: true,
+                    };
+                    elevenLabsSocket.send(JSON.stringify(toolResponse));
+                  }
+                }
+              }
+            }
+            
+            // Handle check_team_availability tool
+            else if (toolName === 'check_team_availability') {
+              console.log("Checking team availability...");
+              try {
+                const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+                
+                // Get all active team members and their presence status
+                const { data: teamMembers } = await supabase
+                  .from('team_routing')
+                  .select(`
+                    user_id,
+                    display_name,
+                    department,
+                    skills
+                  `)
+                  .eq('is_active', true);
+
+                const { data: presenceData } = await supabase
+                  .from('user_presence')
+                  .select('user_id, is_available, status')
+                  .in('user_id', teamMembers?.map(t => t.user_id) || []);
+
+                // Build availability response
+                const availabilityInfo = teamMembers?.map(member => {
+                  const presence = presenceData?.find(p => p.user_id === member.user_id);
+                  const isAvailable = presence?.is_available && presence?.status !== 'dnd' && presence?.status !== 'offline';
+                  return {
+                    name: member.display_name,
+                    department: member.department,
+                    available: isAvailable,
+                    status: presence?.status || 'offline',
+                  };
+                }) || [];
+
+                const availableMembers = availabilityInfo.filter(m => m.available);
+                let resultText = '';
+                
+                if (availableMembers.length > 0) {
+                  resultText = `Available team members: ${availableMembers.map(m => `${m.name} (${m.department || 'general'})`).join(', ')}.`;
+                } else {
+                  resultText = 'No team members are currently available. I can take a message and have someone call you back.';
+                }
+
+                if (elevenLabsSocket?.readyState === WebSocket.OPEN && toolCallId) {
+                  elevenLabsSocket.send(JSON.stringify({
+                    type: "client_tool_result",
+                    tool_call_id: toolCallId,
+                    result: resultText,
+                    is_error: false,
+                  }));
+                }
+              } catch (availError) {
+                console.error("Availability check error:", availError);
+                if (elevenLabsSocket?.readyState === WebSocket.OPEN && toolCallId) {
+                  elevenLabsSocket.send(JSON.stringify({
+                    type: "client_tool_result",
+                    tool_call_id: toolCallId,
+                    result: "I'm having trouble checking availability. Let me try to help you directly.",
+                    is_error: true,
+                  }));
+                }
+              }
+            }
+            
+            // Handle leave_voicemail tool
+            else if (toolName === 'leave_voicemail') {
+              const teamMemberName = parameters.team_member_name || parameters.name || 'the team';
+              const reason = parameters.reason || 'general inquiry';
+              console.log("Voicemail requested for:", teamMemberName, "reason:", reason);
+              
+              if (callSid) {
+                try {
+                  const voicemailResponse = await fetch(`${SUPABASE_URL}/functions/v1/twilio-call-transfer`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                    },
+                    body: JSON.stringify({
+                      callSid,
+                      teamMemberName,
+                      transferType: 'voicemail',
+                    }),
+                  });
+
+                  const voicemailResult = await voicemailResponse.json();
+                  console.log("Voicemail result:", voicemailResult);
+
+                  if (elevenLabsSocket?.readyState === WebSocket.OPEN && toolCallId) {
+                    elevenLabsSocket.send(JSON.stringify({
+                      type: "client_tool_result",
+                      tool_call_id: toolCallId,
+                      result: voicemailResult.success 
+                        ? `Connecting you to voicemail for ${teamMemberName}. Please leave your message after the beep.`
+                        : "I'm having trouble connecting to voicemail. Please try calling back later.",
+                      is_error: !voicemailResult.success,
+                    }));
+                  }
+                } catch (vmError) {
+                  console.error("Voicemail error:", vmError);
+                }
+              }
             }
           }
 
