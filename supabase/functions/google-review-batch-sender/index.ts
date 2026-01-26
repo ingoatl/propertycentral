@@ -26,9 +26,9 @@ function getCurrentESTHour(): number {
   return Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
 }
 
-// Best practice: Max 5 SMS per run
-const MAX_SMS_PER_RUN = 5;
-const MIN_DELAY_BETWEEN_SMS_MS = 30000; // 30 seconds between each SMS
+// Removed daily limit - process all pending reviews
+const MAX_SMS_PER_RUN = 100; // Process up to 100 at a time
+const MIN_DELAY_BETWEEN_SMS_MS = 5000; // 5 seconds between each SMS for reliability
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -77,34 +77,9 @@ serve(async (req) => {
       console.error("Failed to sync OwnerRez reviews:", syncErr);
     }
 
-    // Check how many SMS have already been sent TODAY to enforce daily limit
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    
-    const { data: todaySent, error: todayError } = await supabase
-      .from("google_review_requests")
-      .select("id")
-      .gte("permission_asked_at", todayStart.toISOString())
-      .not("permission_asked_at", "is", null);
-    
-    const sentToday = todaySent?.length || 0;
-    const remainingToday = Math.max(0, MAX_SMS_PER_RUN - sentToday);
-    
-    console.log(`Already sent ${sentToday} SMS today. Remaining quota: ${remainingToday}`);
-    
-    if (remainingToday === 0) {
-      console.log("Daily limit of 5 SMS reached. No more messages will be sent today.");
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: `Daily limit reached: ${sentToday} SMS already sent today. Max is ${MAX_SMS_PER_RUN}/day.`,
-          sentCount: 0,
-          sentToday,
-          maxPerDay: MAX_SMS_PER_RUN
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Skip daily limit checks - process all pending reviews immediately
+    console.log(`Daily limits disabled - processing all pending reviews`);
+    const maxToProcess = MAX_SMS_PER_RUN; // Use the batch limit, not daily limit
 
     // PRIORITY 1: Get pending google_review_requests that never got sent (permission_asked_at is null)
     const { data: pendingRequests, error: pendingError } = await supabase
@@ -128,7 +103,7 @@ serve(async (req) => {
       .eq("workflow_status", "pending")
       .is("permission_asked_at", null)
       .eq("opted_out", false)
-      .limit(remainingToday);
+      .limit(maxToProcess);
 
     if (pendingError) {
       console.error("Error fetching pending requests:", pendingError);
@@ -154,7 +129,7 @@ serve(async (req) => {
       });
 
     // Calculate how many more we can add from new reviews
-    const remainingAfterPending = Math.max(0, remainingToday - pendingReviewsToContact.length);
+    const remainingAfterPending = Math.max(0, maxToProcess - pendingReviewsToContact.length);
 
     // Get all reviews with phone numbers (for new ones)
     const { data: allReviews, error: reviewError } = await supabase
@@ -235,10 +210,12 @@ serve(async (req) => {
     
     // Also check lead_communications for phones that received Google review messages today
     // to prevent race conditions where batch runs multiple times
+    const todayStartCheck = new Date();
+    todayStartCheck.setHours(0, 0, 0, 0);
     const { data: todayGoogleReviewComms } = await supabase
       .from("lead_communications")
       .select("body, metadata")
-      .gte("created_at", todayStart.toISOString())
+      .gte("created_at", todayStartCheck.toISOString())
       .eq("direction", "outbound")
       .ilike("body", "%Google reviews%");
     
@@ -270,16 +247,15 @@ serve(async (req) => {
     });
 
     // Combine: PRIORITY 1 = pending requests that never got SMS, then new reviews
-    // CRITICAL: Respect the remaining daily quota
+    // Process up to maxToProcess total
     const reviewsToContact = [
-      ...pendingReviewsToContact.slice(0, remainingToday),
-      ...filteredTodayReviews.slice(0, Math.max(0, remainingToday - pendingReviewsToContact.length)),
-      ...filteredOlderReviews.slice(0, Math.max(0, remainingToday - pendingReviewsToContact.length - filteredTodayReviews.length))
-    ].slice(0, remainingToday);
+      ...pendingReviewsToContact.slice(0, maxToProcess),
+      ...filteredTodayReviews.slice(0, Math.max(0, maxToProcess - pendingReviewsToContact.length)),
+      ...filteredOlderReviews.slice(0, Math.max(0, maxToProcess - pendingReviewsToContact.length - filteredTodayReviews.length))
+    ].slice(0, maxToProcess);
 
     console.log(`Found ${pendingReviewsToContact.length} pending (never sent), ${filteredTodayReviews.length} new from today, ${filteredOlderReviews.length} older reviews`);
-    console.log(`Processing ${reviewsToContact.length} reviews in this batch (limited by remaining quota: ${remainingToday})`);
-    console.log(`Daily send stats: ${sentToday} already sent + ${reviewsToContact.length} this batch = ${sentToday + reviewsToContact.length} total`);
+    console.log(`Processing ${reviewsToContact.length} reviews in this batch (max: ${maxToProcess})`);
 
     // Provide detailed status if no reviews to contact
     if (reviewsToContact.length === 0) {
@@ -324,7 +300,7 @@ serve(async (req) => {
 
         console.log(`[${i + 1}/${reviewsToContact.length}] Sending permission ask to ${formattedPhone} (${review.guest_name}) for review ${review.id}`);
 
-        // Find or create GHL contact
+        // Search for existing GHL contact ONLY - do NOT create new contacts
         const searchResponse = await fetch(
           `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${ghlLocationId}&phone=${encodeURIComponent(formattedPhone)}`,
           {
@@ -345,38 +321,17 @@ serve(async (req) => {
           }
         }
 
+        // Skip if no existing GHL contact - do NOT create new contacts
         if (!ghlContactId) {
-          console.log(`Creating new GHL contact for ${formattedPhone}`);
-          const createResponse = await fetch(
-            `https://services.leadconnectorhq.com/contacts/`,
-            {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${ghlApiKey}`,
-                "Version": "2021-07-28",
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                locationId: ghlLocationId,
-                phone: formattedPhone,
-                name: review.guest_name || "Guest",
-                source: "GoogleReviews",
-              }),
-            }
-          );
-
-          if (createResponse.ok) {
-            const createData = await createResponse.json();
-            ghlContactId = createData.contact?.id;
-            console.log(`Created new GHL contact: ${ghlContactId}`);
-          } else {
-            const errorText = await createResponse.text();
-            console.error(`Failed to create contact: ${errorText}`);
-          }
-        }
-
-        if (!ghlContactId) {
-          throw new Error("Failed to find or create GHL contact");
+          console.log(`No existing GHL contact for ${formattedPhone} - skipping (not creating contact)`);
+          results.push({ 
+            reviewId: review.id, 
+            guestName: review.guest_name, 
+            phone: formattedPhone, 
+            success: false, 
+            error: "No existing GHL contact found" 
+          });
+          continue;
         }
 
         // Send SMS
