@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +65,8 @@ import { cn } from "@/lib/utils";
 import { PropertyPhotos } from "@/components/ui/property-photos";
 import { toast } from "sonner";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
+import { SendVoicemailDialog } from "@/components/communications/SendVoicemailDialog";
+import { QuickSMSDialog } from "@/components/communications/QuickSMSDialog";
 import { useGhlCalendarSync, GhlAppointment } from "@/hooks/useGhlCalendarSync";
 import { AdminRescheduleDialog } from "@/components/scheduling/AdminRescheduleDialog";
 import { OwnerCallDetailModal } from "@/components/calendar/OwnerCallDetailModal";
@@ -1615,8 +1617,30 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [showIncomeReportSMS, setShowIncomeReportSMS] = useState(false);
+  const [showVoicemailDialog, setShowVoicemailDialog] = useState(false);
+  const [incomeReportSMSMessage, setIncomeReportSMSMessage] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
+
+  // Generate the income report SMS message
+  const generateIncomeReportSMS = () => {
+    const firstName = call?.leads?.name?.split(' ')[0] || 'there';
+    const propertyAddress = call?.leads?.property_address || 'your property';
+    return `Hi ${firstName}, this is Ingo from PeachHaus. I just emailed you an income report for ${propertyAddress} in preparation for our call tomorrow. Looking forward to speaking with you!`;
+  };
+
+  // Handle Income Report Prepared button click
+  const handleIncomeReportPrepared = () => {
+    setIncomeReportSMSMessage(generateIncomeReportSMS());
+    setShowIncomeReportSMS(true);
+  };
+
+  // After SMS is sent, show voicemail dialog
+  const handleSMSSent = () => {
+    setShowIncomeReportSMS(false);
+    setShowVoicemailDialog(true);
+  };
 
   if (!call) return null;
 
@@ -1911,6 +1935,28 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
                 </Button>
               )}
 
+              {/* Income Report Prepared Section */}
+              {call.leads?.phone && (
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 space-y-2">
+                  <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    Income Report
+                  </h4>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full h-8 text-xs bg-amber-600 hover:bg-amber-700"
+                    onClick={handleIncomeReportPrepared}
+                  >
+                    <FileText className="h-3 w-3 mr-1" />
+                    Income Report Prepared
+                  </Button>
+                  <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                    Sends SMS + opens voice message
+                  </p>
+                </div>
+              )}
+
               {/* Reschedule & Delete Buttons */}
               <div className="flex gap-2">
                 <Button 
@@ -2020,6 +2066,152 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
           onClose();
         }}
       />
+
+      {/* Income Report SMS Dialog - Pre-filled for review */}
+      {call.leads?.phone && (
+        <IncomeReportSMSDialog
+          open={showIncomeReportSMS}
+          onOpenChange={setShowIncomeReportSMS}
+          recipientPhone={call.leads.phone}
+          recipientName={call.leads.name || "Lead"}
+          leadId={call.leads.id}
+          initialMessage={incomeReportSMSMessage}
+          onSent={handleSMSSent}
+        />
+      )}
+
+      {/* Voicemail Dialog - Opens after SMS sent */}
+      {call.leads?.phone && (
+        <SendVoicemailDialog
+          open={showVoicemailDialog}
+          onOpenChange={setShowVoicemailDialog}
+          recipientPhone={call.leads.phone}
+          recipientName={call.leads.name || "Lead"}
+          leadId={call.leads.id}
+        />
+      )}
     </>
+  );
+}
+
+// Custom SMS Dialog with pre-filled message for Income Report
+interface IncomeReportSMSDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  recipientPhone: string;
+  recipientName: string;
+  leadId?: string;
+  initialMessage: string;
+  onSent: () => void;
+}
+
+function IncomeReportSMSDialog({
+  open,
+  onOpenChange,
+  recipientPhone,
+  recipientName,
+  leadId,
+  initialMessage,
+  onSent,
+}: IncomeReportSMSDialogProps) {
+  const [message, setMessage] = useState(initialMessage);
+  const [isSending, setIsSending] = useState(false);
+
+  // Update message when initialMessage changes or dialog opens
+  useEffect(() => {
+    if (open && initialMessage) {
+      setMessage(initialMessage);
+    }
+  }, [open, initialMessage]);
+
+  const handleSend = async () => {
+    if (!message.trim()) {
+      toast.error("Please enter a message");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
+        body: {
+          to: recipientPhone,
+          message: message.trim(),
+          leadId,
+          recipientName,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
+
+      toast.success("SMS sent successfully");
+      onSent(); // This will close SMS dialog and open voicemail
+    } catch (error: any) {
+      console.error("SMS send error:", error);
+      toast.error(error.message || "Failed to send SMS");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-amber-600" />
+            Income Report SMS
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Recipient info */}
+          <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <User className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium">{recipientName}</p>
+              <p className="text-sm text-muted-foreground">{recipientPhone}</p>
+            </div>
+          </div>
+
+          {/* Pre-filled message for review */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Review & Edit Message</label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={5}
+              className="w-full p-3 rounded-lg border bg-background resize-none text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              disabled={isSending}
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {message.length} / 160 characters
+            </p>
+          </div>
+
+          <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              After sending, a voice message dialog will open so you can record a follow-up voicemail.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSending}>
+            Cancel
+          </Button>
+          <Button onClick={handleSend} disabled={isSending || !message.trim()}>
+            {isSending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Mail className="h-4 w-4 mr-2" />
+            )}
+            Send & Continue
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
