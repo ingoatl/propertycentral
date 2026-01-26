@@ -1,162 +1,197 @@
 
-# Voice Call Routing with ElevenLabs AI Agent
+# Direct Conversation Routing from Ninja Panel
 
 ## Overview
 
-This plan implements a sophisticated voice routing system where the ElevenLabs AI agent (Ava) acts as the intelligent front door for all inbound calls, with the ability to route callers to specific team members.
+This plan implements intelligent routing that opens the specific conversation thread when clicking on a Ninja panel card, rather than just navigating to the communications inbox. It also confirms the Google Review SMS automation status.
 
-## ✅ IMPLEMENTATION COMPLETE
+## Google Review SMS Verification
 
-### What Was Built
+### Status Summary
+- **25 SMS sent** since January 25th with review-related content
+- **All messages showing `status: sent`** with `delivery_status: queued` (normal - Twilio updates this asynchronously)
+- **No failed deliveries detected** in the recent batch
+- **New review requests created**: 5 new entries on Jan 26 (workflow_status: pending)
+- **Follow-up cron active**: Running every 15 minutes, last execution at 18:15:03
 
-#### 1. Database Schema
-- **`user_presence`** table created for real-time availability tracking
-- Added `mobile_number`, `department`, `skills` columns to `team_routing`
-- Realtime enabled for presence updates
+### Recent Recipients
+Nudge messages sent to: Stacey, debbie, Alison, Yvonne, Harry
+Permission requests sent to: Jonathan H, John, Brenda, Vanesha, Simone, Amber
 
-#### 2. New Edge Function: `twilio-call-transfer`
-Handles live call transfers via Twilio REST API:
-- Resolves team members by name from `team_routing` table
-- Checks user availability from `user_presence`
-- Supports browser, phone, and voicemail transfer types
-- Updates call with new TwiML dynamically
+The automation is working correctly. The `queued` delivery status is expected - Twilio updates this to `delivered` or `failed` via the status callback webhook (`twilio-status-callback`).
 
-#### 3. Updated: `twilio-elevenlabs-bridge`
-Added client tool handling for:
-- **`transfer_to_team_member`** - Initiates transfer to specific team member
-- **`check_team_availability`** - Returns who is online/available
-- **`leave_voicemail`** - Routes to voicemail for specific team member
+## Technical Implementation
 
-#### 4. Updated: `twilio-inbound-voice`
-Hybrid routing logic:
-- **GHL Number Calls** → Ring team member's browser directly, AI backup if unavailable
-- **Main Twilio Number** → All calls go to ElevenLabs AI Agent
-- **Forwarded from GHL** → Route to IVR operator (existing behavior)
+### Step 1: Add Query Parameter Support to Communications Page
 
-## Architecture
+Update `src/pages/Communications.tsx` to extract and pass query parameters:
+
+```typescript
+// Add useSearchParams hook
+const [searchParams] = useSearchParams();
+const targetPhone = searchParams.get('phone');
+const targetLeadId = searchParams.get('leadId');
+const targetOwnerId = searchParams.get('ownerId');
+const targetContactName = searchParams.get('name');
+
+// Pass to InboxView
+<InboxView 
+  initialTargetPhone={targetPhone}
+  initialTargetLeadId={targetLeadId}
+  initialTargetOwnerId={targetOwnerId}
+  initialTargetName={targetContactName}
+/>
+```
+
+### Step 2: Update InboxView to Accept Initial Target Props
+
+Modify `src/components/communications/InboxView.tsx`:
+
+```typescript
+interface InboxViewProps {
+  initialTargetPhone?: string | null;
+  initialTargetLeadId?: string | null;
+  initialTargetOwnerId?: string | null;
+  initialTargetName?: string | null;
+}
+
+export function InboxView({ 
+  initialTargetPhone,
+  initialTargetLeadId,
+  initialTargetOwnerId,
+  initialTargetName
+}: InboxViewProps) {
+  // Add effect to auto-select conversation on mount
+  useEffect(() => {
+    if (!initialTargetPhone && !initialTargetLeadId && !initialTargetOwnerId) return;
+    
+    // Find matching conversation in communications list
+    const findAndSelectConversation = () => {
+      const normalizedTarget = initialTargetPhone ? normalizePhone(initialTargetPhone) : null;
+      
+      const match = allCommunications.find(comm => {
+        // Match by lead ID
+        if (initialTargetLeadId && comm.contact_type === 'lead' && comm.contact_id === initialTargetLeadId) {
+          return true;
+        }
+        // Match by owner ID
+        if (initialTargetOwnerId && comm.owner_id === initialTargetOwnerId) {
+          return true;
+        }
+        // Match by phone number
+        if (normalizedTarget && comm.contact_phone && normalizePhone(comm.contact_phone) === normalizedTarget) {
+          return true;
+        }
+        return false;
+      });
+      
+      if (match) {
+        setSelectedMessage(match);
+        setActiveFilter('all'); // Show all to ensure match is visible
+        // Toast notification
+        toast.success(`Opened conversation with ${match.contact_name}`);
+      } else if (initialTargetName) {
+        // If no match found, search by name
+        setSearch(initialTargetName);
+        toast.info(`Searching for ${initialTargetName}`);
+      }
+    };
+    
+    // Wait for communications to load
+    if (allCommunications.length > 0) {
+      findAndSelectConversation();
+    }
+  }, [initialTargetPhone, initialTargetLeadId, initialTargetOwnerId, initialTargetName, allCommunications]);
+```
+
+### Step 3: Update NinjaFocusPanel Navigation
+
+Modify the `handleActionClick` function in `src/components/dashboard/NinjaFocusPanel.tsx`:
+
+```typescript
+// When navigating to communications, include contact identifiers as query params
+if (item.source === 'email' || item.source === 'lead' || item.source === 'owner') {
+  const params = new URLSearchParams();
+  
+  if (item.contactPhone) {
+    params.set('phone', item.contactPhone);
+  }
+  if (item.contactId) {
+    if (item.contactType === 'lead') {
+      params.set('leadId', item.contactId);
+    } else if (item.contactType === 'owner') {
+      params.set('ownerId', item.contactId);
+    }
+  }
+  if (item.contactName) {
+    params.set('name', item.contactName);
+  }
+  
+  const queryString = params.toString();
+  navigate(`/communications${queryString ? `?${queryString}` : ''}`);
+  return;
+}
+```
+
+### Step 4: Handle External/Unknown Contacts
+
+For contacts not in leads or owners tables, the system will:
+
+1. First try to match by phone number across all communication sources
+2. If no match, use the contact name to search
+3. Display appropriate feedback to the user
+
+```typescript
+// Fallback for unmatched contacts
+if (!match && initialTargetPhone) {
+  // Create a temporary external contact view
+  setSelectedMessage({
+    id: 'external-' + normalizePhone(initialTargetPhone),
+    type: 'sms',
+    direction: 'outbound',
+    body: '',
+    created_at: new Date().toISOString(),
+    contact_name: initialTargetName || 'Unknown Contact',
+    contact_phone: initialTargetPhone,
+    contact_type: 'external',
+    contact_id: '',
+  });
+}
+```
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/pages/Communications.tsx` | Add `useSearchParams`, pass props to InboxView |
+| `src/components/communications/InboxView.tsx` | Add props interface, auto-select logic, fallback handling |
+| `src/components/dashboard/NinjaFocusPanel.tsx` | Update navigation to include query params |
+
+## User Experience Flow
+
+1. User clicks Ninja card with contact info (e.g., "Follow up with Sonia Brar")
+2. System navigates to `/communications?phone=4123390382&leadId=xxx&name=Sonia%20Brar`
+3. InboxView loads, parses query params
+4. Auto-selects matching conversation thread
+5. Conversation detail panel opens showing full thread history
+6. User can immediately reply via SMS/email/call
+
+## Error Handling
+
+- **No match found**: Falls back to search by name, shows info toast
+- **Invalid phone format**: Normalizes phone before matching
+- **Missing contact data**: Gracefully degrades to standard inbox view
+- **Multiple matches**: Selects most recent conversation
+
+## Intelligent Routing Logic
+
+The routing considers contact type and available identifiers:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                        INBOUND CALL FLOW                            │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│   Caller Dials Number                                              │
-│                    │                                                │
-│         ┌─────────┴─────────┐                                      │
-│         ▼                   ▼                                      │
-│   User's GHL Number    Main Number (+17709885286)                  │
-│         │                   │                                      │
-│         ▼                   ▼                                      │
-│   ┌─────────────┐    ┌─────────────────────┐                      │
-│   │ Ring Browser │    │ ElevenLabs AI Agent │                      │
-│   │ (30s timeout)│    │ - Greets with context│                      │
-│   └─────────────┘    │ - Handles queries    │                      │
-│         │            │ - Can transfer       │                      │
-│         ▼            └─────────────────────┘                      │
-│   No Answer?               │                                       │
-│         │         ┌────────┼────────┐                              │
-│         ▼         ▼        ▼        ▼                              │
-│   AI Voicemail  Handle   Transfer   Voicemail                      │
-│     Backup      Directly  to Team   Recording                      │
-│                            │                                       │
-│                   ┌────────┴────────┐                              │
-│                   ▼                 ▼                              │
-│             Browser Client    Mobile Number                        │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+Contact Type     Priority Order
+------------     ---------------
+Lead             leadId > phone > name
+Owner            ownerId > phone > name  
+Vendor           phone > name
+Guest/External   phone > name
 ```
-
-## Manual Configuration Required
-
-### ElevenLabs Dashboard Setup
-
-Add these client tools to your ElevenLabs agent:
-
-**1. `transfer_to_team_member`**
-```json
-{
-  "name": "transfer_to_team_member",
-  "description": "Transfer the call to a specific team member",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "team_member_name": {
-        "type": "string",
-        "description": "Name of the team member (Alex, Anja, or Ingo)"
-      }
-    },
-    "required": ["team_member_name"]
-  }
-}
-```
-
-**2. `check_team_availability`**
-```json
-{
-  "name": "check_team_availability",
-  "description": "Check which team members are currently available",
-  "parameters": {
-    "type": "object",
-    "properties": {}
-  }
-}
-```
-
-**3. `leave_voicemail`**
-```json
-{
-  "name": "leave_voicemail",
-  "description": "Leave a voicemail for a specific team member",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "team_member_name": {
-        "type": "string",
-        "description": "Name of the team member"
-      },
-      "reason": {
-        "type": "string",
-        "description": "Brief reason for the voicemail"
-      }
-    },
-    "required": ["team_member_name"]
-  }
-}
-```
-
-### Agent Prompt Addition
-
-Add this to your ElevenLabs agent prompt:
-```
-TRANSFER CAPABILITIES:
-When a caller wants to speak with someone specific or has a complex issue:
-1. Ask who they'd like to speak with (Alex, Anja, or Ingo)
-2. Use transfer_to_team_member tool with their name
-3. If transfer fails, offer to take a voicemail
-
-Team Directory:
-- Alex: Sales inquiries, new leads, property tours
-- Anja: Operations, current owners, maintenance
-- Ingo: Leadership, contracts, escalations
-
-Before transferring, always use check_team_availability to see who is online.
-```
-
-## Testing
-
-1. **Call main number** → Verify AI answers with personalized greeting
-2. **Say "Transfer me to Alex"** → Verify transfer tool triggers
-3. **Call user's GHL number** → Verify direct browser ring
-4. **No answer on browser** → Verify AI voicemail fallback
-
-## Files Modified/Created
-
-| File | Action |
-|------|--------|
-| `supabase/functions/twilio-call-transfer/index.ts` | ✅ Created |
-| `supabase/functions/twilio-elevenlabs-bridge/index.ts` | ✅ Modified |
-| `supabase/functions/twilio-inbound-voice/index.ts` | ✅ Modified |
-| `supabase/config.toml` | ✅ Modified |
-| Database: `user_presence` table | ✅ Created |
-| Database: `team_routing` columns | ✅ Added |
-
