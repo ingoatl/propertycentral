@@ -222,8 +222,21 @@ const normalizePhone = (phone: string | number | null | undefined): string => {
   return String(phone).replace(/[^\d]/g, '').slice(-10);
 };
 
-export function InboxView() {
+interface InboxViewProps {
+  initialTargetPhone?: string | null;
+  initialTargetLeadId?: string | null;
+  initialTargetOwnerId?: string | null;
+  initialTargetName?: string | null;
+}
+
+export function InboxView({ 
+  initialTargetPhone,
+  initialTargetLeadId,
+  initialTargetOwnerId,
+  initialTargetName
+}: InboxViewProps = {}) {
   const [search, setSearch] = useState("");
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("all");
@@ -1876,6 +1889,48 @@ export function InboxView() {
       return enhanced;
     });
   }, [communications, lookupCache, statusLookup, localStatusOverrides]);
+
+  // Auto-select conversation from URL query parameters (for Ninja panel routing)
+  useEffect(() => {
+    // Only run once when data is available and hasn't auto-selected yet
+    if (hasAutoSelected) return;
+    if (!initialTargetPhone && !initialTargetLeadId && !initialTargetOwnerId) return;
+    if (enhancedCommunications.length === 0) return;
+    
+    const normalizedTarget = initialTargetPhone ? normalizePhone(initialTargetPhone) : null;
+    
+    // Find matching conversation with priority: leadId > ownerId > phone
+    const match = enhancedCommunications.find(comm => {
+      // Match by lead ID first (highest priority)
+      if (initialTargetLeadId && comm.contact_type === 'lead' && comm.contact_id === initialTargetLeadId) {
+        return true;
+      }
+      // Match by owner ID
+      if (initialTargetOwnerId && (comm.owner_id === initialTargetOwnerId || (comm.contact_type === 'owner' && comm.contact_id === initialTargetOwnerId))) {
+        return true;
+      }
+      // Match by phone number
+      if (normalizedTarget && comm.contact_phone && normalizePhone(comm.contact_phone) === normalizedTarget) {
+        return true;
+      }
+      return false;
+    });
+    
+    if (match) {
+      setSelectedMessage(match);
+      setActiveFilter('all'); // Show all to ensure match is visible
+      setHasAutoSelected(true);
+      toast.success(`Opened conversation with ${match.contact_name}`);
+    } else if (initialTargetName) {
+      // If no match found, search by name
+      setSearch(initialTargetName);
+      setHasAutoSelected(true);
+      toast.info(`Searching for ${initialTargetName}`);
+    } else {
+      // Mark as attempted even if no match to prevent repeated tries
+      setHasAutoSelected(true);
+    }
+  }, [initialTargetPhone, initialTargetLeadId, initialTargetOwnerId, initialTargetName, enhancedCommunications, hasAutoSelected]);
 
   // Selected Gmail email state
   const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
