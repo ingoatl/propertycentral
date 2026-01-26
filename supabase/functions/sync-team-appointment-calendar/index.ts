@@ -30,8 +30,7 @@ serve(async (req) => {
       .from("team_appointments")
       .select(`
         *,
-        property:properties(id, name, address),
-        assigned_profile:profiles(id, first_name, email)
+        property:properties(id, name, address)
       `)
       .eq("id", appointmentId)
       .single();
@@ -42,6 +41,17 @@ serve(async (req) => {
         JSON.stringify({ error: "Appointment not found" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
       );
+    }
+
+    // Fetch assigned user profile separately (no FK relationship)
+    let assignedProfile = null;
+    if (appointment.assigned_to) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, first_name, email")
+        .eq("id", appointment.assigned_to)
+        .single();
+      assignedProfile = profile;
     }
 
     // If no assigned user, skip calendar sync
@@ -142,7 +152,7 @@ serve(async (req) => {
     }
 
     // Build event details
-    const assigneeName = appointment.assigned_profile?.first_name || "Team Member";
+    const assigneeName = assignedProfile?.first_name || "Team Member";
     const propertyName = appointment.property?.name || "";
     const propertyAddress = appointment.property?.address || appointment.location_address || "";
 
@@ -184,9 +194,9 @@ serve(async (req) => {
     };
 
     // Include assigned user as attendee if we have their email
-    if (appointment.assigned_profile?.email) {
+    if (assignedProfile?.email) {
       (calendarEvent as any).attendees = [
-        { email: appointment.assigned_profile.email },
+        { email: assignedProfile.email },
       ];
     }
 
