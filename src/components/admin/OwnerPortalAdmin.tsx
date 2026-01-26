@@ -294,15 +294,24 @@ export function OwnerPortalAdmin() {
       
       const portalUrl = `/owner?token=${token}`;
       
-      // On mobile, use same-tab navigation (window.open can be blocked)
+      // Check if mobile device
       const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
       if (isMobileDevice) {
-        window.location.href = portalUrl;
+        // For mobile: use anchor click simulation (most reliable method)
+        // Create and click a temporary anchor element
+        const link = document.createElement('a');
+        link.href = portalUrl;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return; // Exit immediately - no toast needed, page will navigate
       } else {
-        // On desktop, open in new tab
+        // Desktop: open in new tab
         window.open(portalUrl, "_blank");
+        toast.success(`Opening portal for ${property.name}`);
       }
-      toast.success(`Opening portal for ${property.name}`);
     } catch (error) {
       console.error("Error opening portal:", error);
       toast.error("Failed to open portal");
@@ -312,14 +321,22 @@ export function OwnerPortalAdmin() {
   const openDemoPortal = () => {
     const portalUrl = '/owner?token=demo-portal-token-3069-rita-way';
     
-    // On mobile, use same-tab navigation (window.open can be blocked)
+    // Check if mobile device
     const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
     if (isMobileDevice) {
-      window.location.href = portalUrl;
+      // For mobile: use anchor click simulation (most reliable method)
+      const link = document.createElement('a');
+      link.href = portalUrl;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return; // Exit immediately
     } else {
       window.open(portalUrl, '_blank');
+      toast.success('Opening Sara Thompson demo portal');
     }
-    toast.success('Opening Sara Thompson demo portal');
   };
 
   // Send monthly recap
