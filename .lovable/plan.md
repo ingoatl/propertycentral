@@ -1,433 +1,499 @@
 
+# Fair Housing Compliance & AI Reliability Enhancement Plan
 
-# Premium Mobile-First Owner Portal Redesign
+## Executive Summary
 
-## Overview
-
-Transform the Owner Portal into a stunning, $1M-quality mobile experience that leaves owners impressed. This includes fixing invite email links, redesigning the mobile navigation, fixing the Generate Insights function, and creating a premium native-app feel.
-
----
-
-## Part 1: Fix Invite Email Links
-
-### Issue Analysis
-The invite email links in `owner-magic-link/index.ts` use `VITE_APP_URL` environment variable with fallback to `https://propertycentral.lovable.app`. The links ARE correctly formatted as:
-```
-https://propertycentral.lovable.app/owner?token={uuid-uuid}
-```
-
-### Verification Needed
-The `owner-portal-data` edge function properly validates tokens from `owner_portal_sessions` table. The links should work correctly. However, we should verify:
-
-1. The `VITE_APP_URL` environment variable is correctly set
-2. Token expiration is working (currently set to 100 years - essentially never expires)
-3. The session lookup in `owner-portal-data` is robust
-
-### Fix: Add Logging & Error Handling
-Update `supabase/functions/owner-magic-link/index.ts`:
-- Add explicit URL logging to verify correct link generation
-- Ensure the published URL `https://propertycentral.lovable.app` is always used (hardcode instead of relying on env variable)
-
-```typescript
-// Line 340: Change from:
-const appUrl = Deno.env.get("VITE_APP_URL") || "https://propertycentral.lovable.app";
-
-// To:
-const appUrl = "https://propertycentral.lovable.app"; // Always use published URL for owner invites
-```
+This plan implements three critical systems:
+1. **Fair Housing Compliance Layer** - AI-powered screening of all outbound messages against Fair Housing Act rules
+2. **Georgia Real Estate License Compliance** - Validation that operations managers can send specific message types under GA law
+3. **Self-Healing AI Watchdog** - Prevents edge function failures and auto-recovers from errors
 
 ---
 
-## Part 2: Premium Mobile Navigation Redesign
+## Part 1: Fair Housing Compliance System
 
-### Current Issues
-- Bottom navigation is functional but basic
-- "More" dropdown requires extra tap for secondary tabs
-- Header actions cramped on mobile
-- No visual hierarchy for active states
+### Background Research
 
-### New Design: Native App-Quality Navigation
+The **Fair Housing Act** prohibits discrimination in housing-related communications based on 7 protected classes:
+- Race
+- Color
+- National Origin
+- Religion
+- Sex (including gender identity and sexual orientation)
+- Familial Status (families with children under 18)
+- Disability
 
-#### 2.1 Redesigned Bottom Navigation Bar
+### Prohibited Language Categories
+
+Messages will be screened for:
+
+| Category | Examples to Block |
+|----------|------------------|
+| **Race/Color** | "no Section 8", "professionals only", neighborhood demographics |
+| **National Origin** | "must speak English", "Americans only", citizenship requirements |
+| **Religion** | "Christian community", "near churches", religious holidays as criteria |
+| **Sex/Gender** | "perfect for single men", gender-specific pronouns for property |
+| **Familial Status** | "adult community", "no children", "quiet building", school references as negative |
+| **Disability** | "must be able to climb stairs", "no wheelchairs", mental health references |
+
+### Implementation: Compliance Validation Edge Function
+
+**New file: `supabase/functions/validate-fair-housing/index.ts`**
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐ │
-│  │   📊   │  │   💬   │  │   📅   │  │   🏠   │  │   ⚙️   │ │
-│  │Overview│  │Messages│  │Bookings│  │Property│  │  More  │ │
-│  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘ │
-│  ────────────────────────────────────────────────────────── │
-│       ●                                                     │ (active indicator dot)
-└──────────────────────────────────────────────────────────────┘
-```
+POST /validate-fair-housing
+{
+  "message": "The message to validate",
+  "messageType": "sms" | "email",
+  "senderRole": "admin" | "operations_manager" | "agent",
+  "recipientType": "lead" | "owner" | "tenant" | "vendor"
+}
 
-**Enhancements:**
-- Larger touch targets (min 56px height)
-- Active tab has gradient background pill + dot indicator
-- Subtle spring animation on tap
-- Glass morphism backdrop blur effect
-- Haptic-style visual feedback (scale down on press)
-
-#### 2.2 Enhanced "More" Menu → Full Screen Modal
-
-Replace dropdown with a beautiful full-screen modal:
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                        ✕                                     │
-│                                                              │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  ✨ Insights         AI-powered market analysis      │  │
-│    └─────────────────────────────────────────────────────┘  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  📄 Statements       Monthly financial reports       │  │
-│    └─────────────────────────────────────────────────────┘  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  🧾 Expenses         Receipts & purchases            │  │
-│    └─────────────────────────────────────────────────────┘  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  🔧 Repairs          Maintenance requests            │  │
-│    └─────────────────────────────────────────────────────┘  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  📆 Scheduled        Upcoming maintenance            │  │
-│    └─────────────────────────────────────────────────────┘  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  🛡️ Screenings       Guest verification              │  │
-│    └─────────────────────────────────────────────────────┘  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  📢 Marketing        Promotion & outreach            │  │
-│    └─────────────────────────────────────────────────────┘  │
-│                                                              │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  📞 Schedule Call    Talk to your manager            │  │
-│    └─────────────────────────────────────────────────────┘  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  🔄 Refresh Data     Update dashboard                │  │
-│    └─────────────────────────────────────────────────────┘  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │  🚪 Log Out          Sign out of portal              │  │
-│    └─────────────────────────────────────────────────────┘  │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Features:**
-- Smooth slide-up animation from bottom
-- Card-style menu items with icons + descriptions
-- Active item highlighted with primary color
-- Actions grouped by category (Navigation / Actions)
-
----
-
-## Part 3: Premium Mobile Header Redesign
-
-### Current Issues
-- Property name can be truncated
-- Welcome message takes space
-- Actions cramped in dropdown
-
-### New Design: Compact Premium Header
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ ┌──────┐                                           ┌──────┐ │
-│ │ 🏠   │  3069 Rita Way Retreat          ⭐ 4.9    │ Menu │ │
-│ │ logo │  Welcome, Sara & Michael          (47)    │  ☰   │ │
-│ └──────┘                                           └──────┘ │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Enhancements:**
-- PeachHaus mini logo (40x40) on left
-- Property name + owner greeting stacked
-- Star rating with review count badge
-- Single menu button for all header actions
-
----
-
-## Part 4: Fix Generate Insights on Mobile
-
-### Issue Analysis
-The `loadMarketInsights` function in `OwnerDashboard.tsx` (line 534-607) calls the edge function and displays progress. Potential mobile issues:
-
-1. **UI blocking**: Progress indicators may not update smoothly on slower mobile connections
-2. **State management**: The `setInterval` for progress steps may conflict with React state updates
-3. **Touch responsiveness**: The "Generate Insights" button may not be easily accessible
-
-### Fixes
-
-#### 4.1 Add Loading State to Insights Tab Header
-When accessing the Insights tab on mobile, show a clear loading state:
-
-```typescript
-// In Insights tab - make button more prominent on mobile
-<Button
-  variant="default"
-  size="lg"  // Larger on mobile
-  className="w-full md:w-auto gap-2 h-14 text-lg"  // Full width, larger height
-  onClick={() => property && loadMarketInsights(property.id)}
->
-  <Sparkles className="h-5 w-5" />
-  Generate AI Insights
-</Button>
-```
-
-#### 4.2 Improve Progress Animation for Mobile
-Update `OwnerMarketInsightsEnhanced.tsx` loading state:
-- Reduce animation complexity for better mobile performance
-- Use CSS animations instead of JS intervals where possible
-- Add touch-friendly refresh button
-
-#### 4.3 Add Error Recovery
-If insights fail to load, show a friendly retry button:
-
-```typescript
-{insightsError && (
-  <Card className="border-destructive/50">
-    <CardContent className="py-8 text-center">
-      <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-4" />
-      <p className="text-lg font-medium mb-2">Couldn't load insights</p>
-      <p className="text-sm text-muted-foreground mb-4">
-        This sometimes happens on slower connections
-      </p>
-      <Button onClick={() => loadMarketInsights(property.id)} className="gap-2">
-        <RefreshCw className="h-4 w-4" />
-        Try Again
-      </Button>
-    </CardContent>
-  </Card>
-)}
-```
-
----
-
-## Part 5: Premium Visual Upgrades
-
-### 5.1 Enhanced Loading Screen
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                                                              │
-│                                                              │
-│                    ┌─────────────────┐                       │
-│                    │   PeachHaus     │                       │
-│                    │     Logo        │                       │
-│                    └─────────────────┘                       │
-│                                                              │
-│                 Your Owner Portal                            │
-│                                                              │
-│         ┌──────────────────────────────┐                     │
-│         │  ████████████░░░░░░░░░░░░░░  │                     │
-│         └──────────────────────────────┘                     │
-│                                                              │
-│              Loading your property data...                   │
-│                                                              │
-│                    ✓ Performance metrics                     │
-│                    ✓ Recent bookings                         │
-│                    ○ Guest reviews                           │
-│                    ○ Market insights                         │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### 5.2 Premium Card Styles
-
-All cards get upgraded styling:
-- Subtle gradient backgrounds
-- Refined shadows with color tinting
-- Animated hover/press states
-- Glass morphism effects on overlays
-
-```css
-/* Premium card style */
-.premium-card {
-  background: linear-gradient(135deg, 
-    hsl(var(--card)) 0%, 
-    hsl(var(--card) / 0.9) 100%);
-  box-shadow: 
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -2px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(var(--primary), 0.05);
-  transition: all 0.2s ease;
+Response:
+{
+  "compliant": true | false,
+  "issues": [
+    {
+      "phrase": "detected phrase",
+      "category": "familial_status",
+      "severity": "block" | "warn",
+      "suggestion": "alternative phrasing"
+    }
+  ],
+  "riskScore": 0-100,
+  "canSend": true | false
 }
 ```
 
-### 5.3 Floating Quick Actions
+### Detection Strategy
 
-Add floating action buttons for key actions:
+1. **Keyword Pattern Matching** - Fast first-pass filter for known prohibited terms
+2. **AI Context Analysis** - Lovable AI analyzes message context for subtle discrimination
+3. **Phrase Substitution Suggestions** - Provides compliant alternatives when possible
 
-```text
-                                              ┌──────────┐
-                                              │   📞    │
-                                              │  Call   │
-                                              └──────────┘
-                                              ┌──────────┐
-                                              │   📄    │
-                                              │ Report  │
-                                              └──────────┘
+---
+
+## Part 2: Georgia Real Estate License Compliance
+
+### Background Research
+
+Under **Georgia Code Title 43, Chapter 40** and GREC rules:
+
+| Communication Type | Broker Only | Operations Manager Allowed |
+|-------------------|-------------|---------------------------|
+| **Property marketing** | Requires licensure | Yes, if under broker supervision |
+| **Lease negotiations** | Broker oversight needed | Yes, for existing clients |
+| **Maintenance coordination** | N/A | Yes |
+| **Owner financial discussions** | Broker/licensee | With broker approval |
+| **Rental pricing discussions** | Licensee required | Must defer to broker |
+
+### Implementation: Sender Authorization Check
+
+The compliance layer will validate:
+1. **Message topic classification** - Uses AI to detect if message involves licensed activities
+2. **Sender role verification** - Checks if current user has appropriate role
+3. **Escalation routing** - Flags messages that require broker review
+
+### New Database Table: `compliance_message_log`
+
+```sql
+CREATE TABLE compliance_message_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id UUID,
+  original_message TEXT NOT NULL,
+  message_type TEXT NOT NULL,
+  sender_user_id UUID REFERENCES auth.users(id),
+  sender_role TEXT,
+  recipient_type TEXT,
+  
+  -- Fair Housing Analysis
+  fh_compliant BOOLEAN NOT NULL,
+  fh_risk_score INTEGER,
+  fh_issues JSONB DEFAULT '[]',
+  fh_blocked_phrases TEXT[],
+  
+  -- GA License Compliance
+  ga_compliant BOOLEAN NOT NULL,
+  requires_broker_review BOOLEAN DEFAULT false,
+  topic_classification TEXT,
+  
+  -- Action taken
+  action_taken TEXT CHECK (action_taken IN ('sent', 'blocked', 'modified', 'escalated')),
+  modified_message TEXT,
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMPTZ,
+  
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
 ---
 
-## Part 6: Component Updates
+## Part 3: Self-Healing AI Watchdog
 
-### Files to Create
+### Problem Analysis
+
+The user reported an edge function error during AI response generation. Common failure modes:
+1. **Rate limiting (429)** - Too many requests to Lovable AI
+2. **Credit depletion (402)** - AI usage exceeded
+3. **Timeout** - Long-running AI requests
+4. **Context engine failure** - Missing or invalid contact data
+5. **Network issues** - Transient connectivity problems
+
+### Solution: AI Reliability Watchdog
+
+**New file: `supabase/functions/ai-reliability-watchdog/index.ts`**
+
+This watchdog will:
+
+1. **Monitor AI Response Quality table** for failed generations
+2. **Retry failed requests** with exponential backoff
+3. **Circuit breaker pattern** to prevent cascade failures
+4. **Automatic degradation** to simpler prompts when complex ones fail
+5. **Alert on persistent failures** via team notifications
+
+### Self-Healing Mechanisms
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    AI REQUEST FLOW                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Message Input                                              │
+│       │                                                     │
+│       ▼                                                     │
+│  ┌──────────────────┐                                       │
+│  │ Fair Housing     │ ──Block──> Return Error               │
+│  │ Compliance Check │                                       │
+│  └────────┬─────────┘                                       │
+│           │ Pass                                            │
+│           ▼                                                 │
+│  ┌──────────────────┐                                       │
+│  │ GA License       │ ──Escalate──> Route to Broker        │
+│  │ Authorization    │                                       │
+│  └────────┬─────────┘                                       │
+│           │ Authorized                                      │
+│           ▼                                                 │
+│  ┌──────────────────┐                                       │
+│  │ Circuit Breaker  │ ──Open──> Use Cached/Template        │
+│  │ Check            │                                       │
+│  └────────┬─────────┘                                       │
+│           │ Closed                                          │
+│           ▼                                                 │
+│  ┌──────────────────┐     ┌──────────────────┐             │
+│  │ Primary AI Call  │ ──Fail──> Retry Queue  │             │
+│  │ (gemini-3-flash) │          │              │             │
+│  └────────┬─────────┘          │              │             │
+│           │ Success            │ Retry        │             │
+│           │                    ▼              │             │
+│           │            ┌──────────────────┐   │             │
+│           │            │ Fallback AI Call │   │             │
+│           │            │ (simpler prompt) │   │             │
+│           │            └────────┬─────────┘   │             │
+│           │                     │             │             │
+│           ▼                     ▼             │             │
+│  ┌──────────────────────────────────────────┐│             │
+│  │           Compliance Validation          ││             │
+│  │      (re-check generated response)       ││             │
+│  └────────────────────┬─────────────────────┘│             │
+│                       │                       │             │
+│                       ▼                       │             │
+│                  Send Message                 │             │
+│                                               │             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Circuit Breaker State Table
+
+```sql
+CREATE TABLE ai_circuit_breaker (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  service_name TEXT UNIQUE NOT NULL,
+  state TEXT CHECK (state IN ('closed', 'open', 'half_open')) DEFAULT 'closed',
+  failure_count INTEGER DEFAULT 0,
+  last_failure_at TIMESTAMPTZ,
+  last_success_at TIMESTAMPTZ,
+  opened_at TIMESTAMPTZ,
+  half_open_at TIMESTAMPTZ,
+  failure_threshold INTEGER DEFAULT 5,
+  reset_timeout_seconds INTEGER DEFAULT 60,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+---
+
+## Part 4: Integration with Existing Message Flow
+
+### Modified Message Sending Flow
+
+All message sending functions will be updated to include compliance checks:
+
+**Files to modify:**
+- `supabase/functions/ghl-send-sms/index.ts`
+- `supabase/functions/send-lead-email/index.ts`
+- `supabase/functions/unified-ai-compose/index.ts`
+
+### Pre-Send Validation Hook
+
+```typescript
+// Before sending any message:
+const compliance = await validateCompliance({
+  message: messageContent,
+  messageType: 'sms',
+  senderUserId: userId,
+  recipientType: contactType
+});
+
+if (!compliance.canSend) {
+  if (compliance.requiresBrokerReview) {
+    // Queue for broker approval
+    await queueForBrokerReview(messageContent, compliance);
+    return { success: false, reason: 'requires_broker_review' };
+  }
+  
+  // Return with violations
+  return { 
+    success: false, 
+    reason: 'compliance_violation',
+    issues: compliance.issues,
+    suggestions: compliance.suggestions
+  };
+}
+```
+
+### Frontend Warning UI
+
+When compliance issues are detected, the UI will show:
+
+```text
+┌─────────────────────────────────────────────────────┐
+│  ⚠️ Fair Housing Compliance Alert                   │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  Your message contains language that may violate    │
+│  the Fair Housing Act:                              │
+│                                                     │
+│  ❌ "no children" → familial status discrimination  │
+│                                                     │
+│  Suggested alternative:                             │
+│  ✓ "All applicants welcome"                         │
+│                                                     │
+│  ┌────────────┐  ┌────────────────────────────┐    │
+│  │  Edit      │  │  Request Broker Review     │    │
+│  └────────────┘  └────────────────────────────┘    │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Part 5: Watchdog Dashboard Integration
+
+### New Admin Panel Section
+
+Add compliance monitoring to the existing `SystemHealthPanel.tsx`:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  System Health                                              │
+├─────────────────────────────────────────────────────────────┤
+│  [Integrations] [Email] [Finance] [Visits] [Partner]        │
+│                                                             │
+│  + [Compliance] ← NEW TAB                                   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Fair Housing Compliance          Last 24h            │   │
+│  │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │   │
+│  │ Messages Scanned: 247                                │   │
+│  │ Blocked: 3  │  Modified: 12  │  Escalated: 1        │   │
+│  │                                                      │   │
+│  │ Most Common Issues:                                  │   │
+│  │ • "quiet building" (familial status) - 8 times      │   │
+│  │ • "professionals" (race/income proxy) - 4 times     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ AI Service Health                 ● Healthy         │   │
+│  │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │   │
+│  │ Circuit Breaker: CLOSED                              │   │
+│  │ Success Rate: 99.2%                                  │   │
+│  │ Avg Response Time: 2.3s                              │   │
+│  │ Failed (auto-recovered): 2                           │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation Summary
+
+### New Files to Create
 
 | File | Purpose |
 |------|---------|
-| `src/pages/owner/components/MobileMoreMenu.tsx` | Full-screen modal for secondary navigation |
-| `src/pages/owner/components/PremiumBottomNav.tsx` | Enhanced bottom navigation bar |
-| `src/pages/owner/components/FloatingActions.tsx` | Quick action FAB buttons |
-| `src/pages/owner/components/PremiumLoadingScreen.tsx` | Animated loading with progress steps |
+| `supabase/functions/validate-fair-housing/index.ts` | Fair Housing compliance validation |
+| `supabase/functions/ai-reliability-watchdog/index.ts` | Self-healing AI monitoring |
+| `src/components/admin/ComplianceWatchdogCard.tsx` | Dashboard for compliance monitoring |
+| `src/components/communications/ComplianceAlert.tsx` | UI warning for violations |
+| `src/lib/compliance/fairHousingRules.ts` | Prohibited phrase patterns |
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/pages/owner/OwnerDashboard.tsx` | New navigation components, premium styling, insights error handling |
-| `src/pages/owner/components/OwnerMarketInsightsEnhanced.tsx` | Mobile-optimized loading, touch-friendly buttons |
-| `supabase/functions/owner-magic-link/index.ts` | Hardcode published URL, add logging |
-| `src/index.css` | Add premium card styles, animations |
+| `supabase/functions/ghl-send-sms/index.ts` | Add pre-send compliance check |
+| `supabase/functions/send-lead-email/index.ts` | Add pre-send compliance check |
+| `supabase/functions/unified-ai-compose/index.ts` | Add circuit breaker, retry logic, compliance validation |
+| `src/components/admin/SystemHealthPanel.tsx` | Add Compliance tab |
+| `src/components/communications/SendSMSDialog.tsx` | Show compliance warnings |
+| `src/components/communications/ComposeEmailDialog.tsx` | Show compliance warnings |
+
+### Database Migrations
+
+1. Create `compliance_message_log` table
+2. Create `ai_circuit_breaker` table
+3. Add compliance-related columns to `watchdog_logs`
 
 ---
 
-## Part 7: Technical Implementation Details
+## Technical Details
 
-### 7.1 New Bottom Navigation Component
-
-```typescript
-// PremiumBottomNav.tsx
-const PremiumBottomNav = ({ activeTab, onTabChange, onMoreClick }) => (
-  <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t safe-area-inset">
-    <div className="flex h-20 px-2">
-      {PRIMARY_TABS.map((tab) => (
-        <button
-          key={tab.value}
-          onClick={() => onTabChange(tab.value)}
-          className={cn(
-            "flex-1 flex flex-col items-center justify-center gap-1 relative transition-all",
-            "active:scale-95 touch-manipulation",
-            activeTab === tab.value && "text-primary"
-          )}
-        >
-          {activeTab === tab.value && (
-            <motion.div 
-              layoutId="activeTab"
-              className="absolute inset-x-2 -top-1 h-1 bg-primary rounded-full"
-            />
-          )}
-          <tab.icon className={cn(
-            "h-6 w-6 transition-all",
-            activeTab === tab.value && "scale-110"
-          )} />
-          <span className="text-xs font-medium">{tab.label}</span>
-        </button>
-      ))}
-      <button onClick={onMoreClick} className="flex-1 flex flex-col items-center justify-center">
-        <MoreHorizontal className="h-6 w-6" />
-        <span className="text-xs font-medium">More</span>
-      </button>
-    </div>
-  </nav>
-);
-```
-
-### 7.2 Full-Screen More Menu
+### Fair Housing Prohibited Patterns
 
 ```typescript
-// MobileMoreMenu.tsx
-const MobileMoreMenu = ({ open, onClose, activeTab, onTabChange, onAction }) => (
-  <motion.div
-    initial={{ y: "100%" }}
-    animate={{ y: open ? 0 : "100%" }}
-    className="fixed inset-0 z-50 bg-background"
-  >
-    <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between p-4 border-b">
-        <h2 className="text-lg font-semibold">Menu</h2>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-5 w-5" />
-        </Button>
-      </header>
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {SECONDARY_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => { onTabChange(tab.value); onClose(); }}
-            className={cn(
-              "w-full flex items-center gap-4 p-4 rounded-xl transition-all",
-              "hover:bg-muted active:scale-98",
-              activeTab === tab.value && "bg-primary/10 border border-primary/20"
-            )}
-          >
-            <div className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center",
-              activeTab === tab.value ? "bg-primary text-primary-foreground" : "bg-muted"
-            )}>
-              <tab.icon className="h-5 w-5" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium">{tab.label}</p>
-              <p className="text-sm text-muted-foreground">{tab.description}</p>
-            </div>
-          </button>
-        ))}
-        
-        <div className="border-t my-4 pt-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 px-2">Actions</p>
-          {/* Schedule Call, Refresh, Logout buttons */}
-        </div>
-      </div>
-    </div>
-  </motion.div>
-);
-```
-
-### 7.3 Insights Error State
-
-```typescript
-// Add to OwnerDashboard.tsx state
-const [insightsError, setInsightsError] = useState(false);
-
-// Update loadMarketInsights error handling
-const loadMarketInsights = async (propertyId: string) => {
-  setInsightsError(false);
-  setLoadingInsights(true);
-  // ... existing code ...
-  
-  try {
-    const { data, error } = await supabase.functions.invoke("generate-market-insights", {
-      body: { propertyId },
-    });
-    
-    if (error) {
-      console.error("Error loading market insights:", error);
-      setInsightsError(true);  // Set error state
-      return;
-    }
-    // ... rest of success handling
-  } catch (err) {
-    console.error("Error loading market insights:", err);
-    setInsightsError(true);  // Set error state
-  } finally {
-    setLoadingInsights(false);
-  }
+// src/lib/compliance/fairHousingRules.ts
+export const FAIR_HOUSING_PATTERNS = {
+  familial_status: [
+    { pattern: /\b(no|not? allow(ed)?|without) (kids?|children|minors?|families)\b/i, severity: 'block' },
+    { pattern: /\b(adult[s]? only|seniors? only|55\+|over 55)\b/i, severity: 'warn', context: 'May be valid for HOPA-qualified communities' },
+    { pattern: /\bquiet (building|community|neighborhood)\b/i, severity: 'warn' },
+    { pattern: /\b(school|playground) (district|nearby)\b/i, severity: 'context', note: 'OK for marketing, not for screening' },
+  ],
+  race_color: [
+    { pattern: /\bno section ?8\b/i, severity: 'block', note: 'Disparate impact on protected classes' },
+    { pattern: /\b(professionals? only|executive|white[- ]collar)\b/i, severity: 'warn' },
+  ],
+  national_origin: [
+    { pattern: /\b(must|need to|required) speak english\b/i, severity: 'block' },
+    { pattern: /\b(americans?|citizens?) only\b/i, severity: 'block' },
+    { pattern: /\b(no|without) (immigrants?|foreigners?)\b/i, severity: 'block' },
+  ],
+  religion: [
+    { pattern: /\b(christian|muslim|jewish|catholic|protestant) (community|neighborhood|values)\b/i, severity: 'block' },
+  ],
+  disability: [
+    { pattern: /\b(must|able to|can) (walk|climb|use stairs)\b/i, severity: 'block' },
+    { pattern: /\bno (wheelchair|disability|handicap)\b/i, severity: 'block' },
+    { pattern: /\bmental(ly)? (ill|health|stable)\b/i, severity: 'warn' },
+  ],
+  sex_gender: [
+    { pattern: /\b(perfect for|ideal for|great for) (single )?(men|women|guys?|girls?|ladies|gentlemen)\b/i, severity: 'block' },
+    { pattern: /\b(man|woman|male|female) only\b/i, severity: 'block' },
+  ],
 };
 ```
 
+### AI Circuit Breaker Logic
+
+```typescript
+async function checkCircuitBreaker(serviceName: string): Promise<{
+  canProceed: boolean;
+  state: 'closed' | 'open' | 'half_open';
+}> {
+  const { data: breaker } = await supabase
+    .from('ai_circuit_breaker')
+    .select('*')
+    .eq('service_name', serviceName)
+    .single();
+  
+  if (!breaker) {
+    return { canProceed: true, state: 'closed' };
+  }
+  
+  const now = new Date();
+  
+  if (breaker.state === 'open') {
+    const openedAt = new Date(breaker.opened_at);
+    const elapsedSeconds = (now.getTime() - openedAt.getTime()) / 1000;
+    
+    if (elapsedSeconds >= breaker.reset_timeout_seconds) {
+      // Move to half-open, allow one request
+      await supabase
+        .from('ai_circuit_breaker')
+        .update({ state: 'half_open', half_open_at: now.toISOString() })
+        .eq('id', breaker.id);
+      
+      return { canProceed: true, state: 'half_open' };
+    }
+    
+    return { canProceed: false, state: 'open' };
+  }
+  
+  return { canProceed: true, state: breaker.state };
+}
+```
+
+### Error Recovery in unified-ai-compose
+
+```typescript
+// Enhanced error handling with retry and fallback
+try {
+  const aiResponse = await fetchWithRetry(
+    "https://ai.gateway.lovable.dev/v1/chat/completions",
+    {
+      method: "POST",
+      headers: { ... },
+      body: JSON.stringify({ ... }),
+    },
+    { maxRetries: 3, backoffMs: 1000 }
+  );
+  
+  // Success - update circuit breaker
+  await recordSuccess('unified-ai-compose');
+  
+} catch (error) {
+  // Record failure
+  await recordFailure('unified-ai-compose', error);
+  
+  // Check if circuit should open
+  const shouldOpen = await shouldOpenCircuit('unified-ai-compose');
+  if (shouldOpen) {
+    await openCircuit('unified-ai-compose');
+  }
+  
+  // Attempt fallback
+  return await generateFallbackResponse(context, messageType);
+}
+```
+
 ---
 
-## Summary
+## Testing Plan
 
-This redesign transforms the Owner Portal into a premium, $1M-quality mobile experience with:
+1. **Fair Housing Detection Tests**
+   - Test each protected class pattern
+   - Verify false positive handling
+   - Test edge cases (legitimate uses)
 
-1. **Fixed invite links** - Hardcoded published URL ensures links always work
-2. **Premium navigation** - Native app-quality bottom bar with smooth animations
-3. **Full-screen More menu** - Beautiful modal replacing cramped dropdown
-4. **Fixed Generate Insights** - Error handling, retry functionality, mobile-optimized UI
-5. **Premium visual upgrades** - Glass morphism, gradient backgrounds, refined shadows
-6. **Floating actions** - Quick access to key features
+2. **GA License Compliance Tests**
+   - Test message topic classification
+   - Verify escalation routing
+   - Test broker approval workflow
 
-The result will be a portal that impresses owners from the moment they open it, reinforcing the professional value of PeachHaus management.
+3. **AI Reliability Tests**
+   - Simulate rate limiting (429)
+   - Simulate credit depletion (402)
+   - Test circuit breaker state transitions
+   - Verify retry logic with exponential backoff
 
+---
+
+## Rollout Plan
+
+1. **Phase 1**: Deploy compliance validation function (monitor-only mode)
+2. **Phase 2**: Enable warnings in UI (no blocking)
+3. **Phase 3**: Enable blocking for high-severity violations
+4. **Phase 4**: Add broker escalation workflow
+5. **Phase 5**: Deploy AI watchdog with auto-recovery
