@@ -61,6 +61,7 @@ import { OwnerOnboardingTimeline } from "./components/OwnerOnboardingTimeline";
 import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfButton";
 import { OwnerMessagesTab } from "./components/OwnerMessagesTab";
 import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
+import { OwnerScheduledMaintenanceTab } from "./components/OwnerScheduledMaintenanceTab";
 import { OwnerGuestScreeningsTab } from "./components/OwnerGuestScreeningsTab";
 import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
 import { ScheduleOwnerCallModal } from "./components/ScheduleOwnerCallModal";
@@ -182,6 +183,7 @@ const SECONDARY_TABS = [
   { value: "statements", label: "Statements", icon: FileText },
   { value: "receipts", label: "Expenses", icon: Receipt },
   { value: "maintenance", label: "Repairs", icon: Wrench },
+  { value: "scheduled", label: "Scheduled", icon: Calendar },
   { value: "screenings", label: "Screenings", icon: Shield },
   { value: "marketing", label: "Marketing", icon: Megaphone },
 ];
@@ -1353,6 +1355,15 @@ export default function OwnerDashboard() {
           <TabsContent value="maintenance">
             {session && (
               <OwnerMaintenanceTab 
+                ownerId={session.ownerId} 
+                propertyId={property?.id}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="scheduled">
+            {session && (
+              <OwnerScheduledMaintenanceTab 
                 ownerId={session.ownerId} 
                 propertyId={property?.id}
               />

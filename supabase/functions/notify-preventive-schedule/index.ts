@@ -433,7 +433,7 @@ You'll receive a job link when each task is due. Reply with questions.
             Authorization: `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: "PeachHaus <noreply@peachhausgroup.com>",
+            from: "PeachHaus <info@peachhausgroup.com>",
             to: owner.email,
             subject: `Preventive Maintenance Scheduled - ${property.name || property.address}`,
             html: emailHtml,
