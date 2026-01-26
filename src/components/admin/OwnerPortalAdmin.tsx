@@ -292,8 +292,16 @@ export function OwnerPortalAdmin() {
         return;
       }
       
-      // Open the owner portal with the token in URL
-      window.open(`/owner?token=${token}`, "_blank");
+      const portalUrl = `/owner?token=${token}`;
+      
+      // On mobile, use same-tab navigation (window.open can be blocked)
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobileDevice) {
+        window.location.href = portalUrl;
+      } else {
+        // On desktop, open in new tab
+        window.open(portalUrl, "_blank");
+      }
       toast.success(`Opening portal for ${property.name}`);
     } catch (error) {
       console.error("Error opening portal:", error);
@@ -302,8 +310,15 @@ export function OwnerPortalAdmin() {
   };
 
   const openDemoPortal = () => {
-    // Use the dedicated Sara Thompson demo portal with pre-configured token
-    window.open('/owner?token=demo-portal-token-3069-rita-way', '_blank');
+    const portalUrl = '/owner?token=demo-portal-token-3069-rita-way';
+    
+    // On mobile, use same-tab navigation (window.open can be blocked)
+    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobileDevice) {
+      window.location.href = portalUrl;
+    } else {
+      window.open(portalUrl, '_blank');
+    }
     toast.success('Opening Sara Thompson demo portal');
   };
 
