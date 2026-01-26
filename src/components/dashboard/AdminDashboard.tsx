@@ -28,6 +28,8 @@ import { RoleFocusSection } from "./RoleFocusSection";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCallReminders } from "@/hooks/useCallReminders";
+import { ImminentCallModal } from "./ImminentCallModal";
 
 interface AdminDashboardProps {
   summaries: PropertySummary[];
@@ -43,6 +45,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
   const [propertyExpenses, setPropertyExpenses] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const [teamData, setTeamData] = useState<any>({ members: [], totalTasks: 0, completedTasks: 0 });
+  
+  // Call reminder system for admins
+  const { imminentCall, showModal, setShowModal, dismissAlert } = useCallReminders();
 
   // Calculate KPIs - separate managed vs owned
   const managedProperties = summaries.filter(s => s.isManaged);
@@ -608,6 +613,14 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Imminent Call Modal - Premium full-screen alert */}
+      <ImminentCallModal
+        call={imminentCall}
+        open={showModal}
+        onOpenChange={setShowModal}
+        onDismiss={dismissAlert}
+      />
     </div>
   );
 };
