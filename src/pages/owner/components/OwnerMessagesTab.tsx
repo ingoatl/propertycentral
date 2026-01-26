@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -504,6 +505,8 @@ function CommunicationCard({
   getChannelIcon: (channel: string | null) => React.ReactNode;
   getDirectionIcon: (direction: string | null) => React.ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  
   // Determine if this message is from the owner (inbound) or property manager (outbound)
   const isFromOwner = communication.direction === "inbound";
   
@@ -511,14 +514,20 @@ function CommunicationCard({
   const senderLabel = isFromOwner 
     ? (communication.from_name || "You")
     : "PeachHaus";
+
+  // Check if message is long enough to need expansion
+  const needsExpansion = (communication.body?.length || 0) > 120;
   
   return (
-    <Card className={cn(
-      "border shadow-sm hover:shadow-md transition-shadow",
-      isFromOwner 
-        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-l-4 border-l-emerald-400"
-        : "bg-sky-50/50 dark:bg-sky-950/20 border-l-4 border-l-sky-400"
-    )}>
+    <Card 
+      className={cn(
+        "border shadow-sm hover:shadow-md transition-all cursor-pointer",
+        isFromOwner 
+          ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-l-4 border-l-emerald-400"
+          : "bg-sky-50/50 dark:bg-sky-950/20 border-l-4 border-l-sky-400"
+      )}
+      onClick={() => setExpanded(!expanded)}
+    >
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-start gap-3 sm:gap-4">
           <div className={cn(
@@ -562,16 +571,24 @@ function CommunicationCard({
             )}
 
             {communication.body && (
-              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
+              <p className={cn(
+                "text-xs sm:text-sm text-muted-foreground transition-all",
+                !expanded && "line-clamp-2"
+              )}>
                 {communication.body}
               </p>
             )}
 
-            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground mt-2">
-              <span className="flex items-center gap-1">
+            <div className="flex items-center justify-between gap-2 mt-2">
+              <span className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 {format(new Date(communication.sent_at || communication.created_at), "MMM d 'at' h:mm a")}
               </span>
+              {needsExpansion && (
+                <span className="text-[10px] sm:text-xs text-primary font-medium">
+                  {expanded ? "Show less" : "Tap to expand"}
+                </span>
+              )}
             </div>
           </div>
         </div>
