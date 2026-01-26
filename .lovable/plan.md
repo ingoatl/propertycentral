@@ -1,120 +1,270 @@
 
-# Fix Call Recording Player Display and Transcript Collapsing
+# Add Property "On Hold" Status and Table List View
 
-## Problem Analysis
+## Overview
 
-Based on the screenshot and code review, I identified several issues:
+This plan implements two key features:
+1. **Property Hold Status** - Allow placing properties on hold, pausing all syncs and onboarding tasks
+2. **Property Table View** - Add an aesthetic table list similar to the leads table view
 
-1. **Transcript Always Visible**: The `forceMount` prop on `CollapsibleContent` keeps the content in the DOM, and while CSS grid animation should hide it, it's not properly collapsing
-2. **Player Inside Message Bubble**: The `CallRecordingPlayer` is rendered inside the colored message bubble, causing awkward layout
-3. **Design Not Matching OpenPhone/GHL**: Current design is bulky and doesn't have the clean, compact look of professional communication tools
+---
 
-## Solution Overview
+## Part 1: Database Changes
 
-### 1. Fix Collapsible CSS (src/index.css)
+### 1.1 Add "On-Hold" to property_type enum
 
-Add `visibility: hidden` to closed state to ensure content is truly hidden:
+```sql
+ALTER TYPE property_type ADD VALUE 'On-Hold' BEFORE 'Inactive';
+```
 
-```css
-.collapsible-content[data-state="closed"] {
-  grid-template-rows: 0fr;
-  pointer-events: none;
-  visibility: hidden;
-}
+### 1.2 Add hold tracking columns
 
-.collapsible-content[data-state="open"] {
-  visibility: visible;
+```sql
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS on_hold_at timestamp with time zone;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS on_hold_reason text;
+```
+
+### 1.3 Update sync trigger to exclude On-Hold properties
+
+Modify `trigger_comms_hub_sync()` function to skip properties with `property_type = 'On-Hold'`:
+
+```sql
+-- Only sync active properties (not on hold, not offboarded)
+IF NEW.property_type IN ('Client-Managed', 'Company-Owned') 
+   AND NEW.offboarded_at IS NULL 
+THEN ...
+```
+
+The "On-Hold" type will automatically be excluded since it's not in the allowed list.
+
+---
+
+## Part 2: TypeScript Types
+
+### Update src/types/index.ts
+
+```typescript
+export interface Property {
+  id: string;
+  // ... existing fields
+  propertyType?: "Client-Managed" | "Company-Owned" | "Inactive" | "On-Hold" | "Partner";
+  onHoldAt?: string;
+  onHoldReason?: string;
 }
 ```
 
-### 2. Redesign CallRecordingPlayer (src/components/communications/CallRecordingPlayer.tsx)
+---
 
-Create a cleaner, more compact design inspired by OpenPhone:
+## Part 3: Properties Table View Component
 
-**Key Design Changes:**
-- Compact inline player with waveform-style progress bar
-- Transcript toggle as a subtle link/button, not a large section header
-- Transcript appears in a clean, contained area when expanded
-- Remove redundant borders and reduce padding
+### Create src/components/properties/PropertyTableView.tsx
 
-**New Layout Structure:**
-```text
-┌─────────────────────────────────────────┐
-│ ▶  ═══════●══════════  0:10 / 14:40  1x │
-│                                    📄 ⬇️ │
-└─────────────────────────────────────────┘
-     ↓ (only when "Show Transcript" clicked)
-┌─────────────────────────────────────────┐
-│ Transcript text here...                 │
-│ (max-height with scroll)                │
-└─────────────────────────────────────────┘
-```
+A new table view component matching the aesthetic of `LeadTableView.tsx`:
 
-### 3. Update InboxView Call Display (src/components/communications/InboxView.tsx)
+**Columns:**
+| Column | Description |
+|--------|-------------|
+| Property | Name + image thumbnail + address |
+| Type | Badge showing Client-Managed/Company-Owned/On-Hold |
+| Rental Type | Hybrid/Mid-term/Long-term badge |
+| Owner | Owner name (if linked) |
+| Progress | Onboarding progress bar |
+| Visit Price | Formatted currency |
+| Actions | Quick action buttons |
 
-Move the `CallRecordingPlayer` outside the colored message bubble:
+**Features:**
+- Click row to open Property Details modal
+- Hover reveals action buttons (Edit, Details, Offboard)
+- Status badges with appropriate colors
+- Sortable columns
+- Search highlighting
+
+---
+
+## Part 4: Hold/Reactivate Dialog
+
+### Create src/components/properties/HoldPropertyDialog.tsx
+
+Similar to `OffboardPropertyDialog.tsx` but for placing properties on hold:
+
+**Fields:**
+- Reason for hold (dropdown): "Awaiting owner response", "Contract negotiation", "Seasonal pause", "Pending repairs", "Other"
+- Additional notes (optional textarea)
+
+**Behavior:**
+- Sets `property_type` to 'On-Hold'
+- Records `on_hold_at` timestamp
+- Stores `on_hold_reason`
+
+### Reactivate Logic
+
+When reactivating, the system will:
+- Restore previous `property_type` (Client-Managed or Company-Owned)
+- Clear `on_hold_at` and `on_hold_reason`
+- Re-trigger sync to Communications Hub
+
+---
+
+## Part 5: Properties Page Updates
+
+### Modify src/pages/Properties.tsx
+
+#### 5.1 Add View Toggle
 
 ```tsx
-{/* Call Recording - Render OUTSIDE the bubble for clean layout */}
-{msg.type === "call" && msg.call_recording_url && (
-  <div className="mt-2 w-full">
-    <CallRecordingPlayer
-      recordingUrl={msg.call_recording_url}
-      duration={msg.call_duration}
-      transcript={msg.body}
-      isOutbound={isOutbound}
-    />
-  </div>
-)}
+const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
 
-{/* Call bubble - only show duration info */}
-<div className={`rounded-2xl px-4 py-3 ...`}>
-  {msg.type === "call" && (
-    <div className="flex items-center gap-2 text-sm">
-      <Phone className="h-3.5 w-3.5" />
-      <span>{isOutbound ? "Outgoing" : "Incoming"} call</span>
-      {msg.call_duration && <span>· {formatDuration}</span>}
-    </div>
-  )}
+// In header:
+<div className="flex gap-1 bg-muted rounded-lg p-1">
+  <Button variant={viewMode === "cards" ? "secondary" : "ghost"} size="sm">
+    <LayoutGrid className="h-4 w-4" />
+  </Button>
+  <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm">
+    <List className="h-4 w-4" />
+  </Button>
 </div>
 ```
 
-## Detailed Implementation
+#### 5.2 Add "On-Hold" to Filter Dropdown
 
-### File 1: src/index.css
+```tsx
+<SelectItem value="On-Hold">On Hold</SelectItem>
+```
 
-Add visibility control to collapsible states to ensure proper hiding.
+#### 5.3 Update Property Type Filter
 
-### File 2: src/components/communications/CallRecordingPlayer.tsx
+```typescript
+const onHoldProperties = filteredProperties.filter(p => p.propertyType === "On-Hold");
+```
 
-**Complete Redesign:**
-- Single-line player controls: Play button, progress bar, time, speed, download
-- Small "Transcript" toggle button in the corner (not a full-width bar)
-- Transcript content in a clean card below when expanded
-- Remove excessive borders and nested containers
-- Use subtle background colors instead of heavy borders
-- Max-height of 200px for transcript with scroll
+#### 5.4 Display Order
 
-### File 3: src/components/communications/InboxView.tsx
+Properties will display in this order:
+1. **Under Management** (Client-Managed)
+2. **PeachHaus Portfolio** (Company-Owned)
+3. **On Hold** (new section - amber/yellow styling)
+4. **Partner Inventory** (MidTermNation)
+5. **Offboarded Properties** (at bottom)
 
-- Move `CallRecordingPlayer` outside the colored message bubble
-- Ensure it's rendered in a full-width container below the call indicator
-- Keep the call bubble simple with just call direction and duration
+#### 5.5 On-Hold Section Styling
 
-## Visual Comparison
+```tsx
+{onHoldProperties.length > 0 && (
+  <div className="space-y-4">
+    <div className="flex items-center gap-2 pb-2 border-b border-amber-300/40">
+      <PauseCircle className="w-5 h-5 text-amber-500" />
+      <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400">
+        ON HOLD
+      </h2>
+      <span className="text-sm text-muted-foreground">({onHoldProperties.length})</span>
+    </div>
+    {/* Property cards with amber tint */}
+  </div>
+)}
+```
 
-| Current | New (OpenPhone-style) |
-|---------|----------------------|
-| Player inside bubble | Player below bubble |
-| Large "Show Transcript" header | Small icon button |
-| Transcript always takes space | Transcript truly hidden when collapsed |
-| Multiple borders | Clean, minimal borders |
-| Heavy padding | Compact, efficient layout |
+#### 5.6 Add Hold Button to Property Cards
 
-## Files to Modify
+In the hover overlay, add a "Hold" button (amber color) for active properties:
 
-| File | Changes |
-|------|---------|
-| `src/index.css` | Add visibility control to collapsible CSS |
-| `src/components/communications/CallRecordingPlayer.tsx` | Complete redesign with compact player |
-| `src/components/communications/InboxView.tsx` | Move player outside message bubble |
+```tsx
+{property.propertyType !== "Inactive" && property.propertyType !== "On-Hold" && (
+  <Button
+    size="sm"
+    className="shadow-lg bg-amber-500 hover:bg-amber-600"
+    onClick={() => setHoldingProperty(property)}
+  >
+    <PauseCircle className="w-4 h-4 mr-1" />
+    Hold
+  </Button>
+)}
+```
+
+---
+
+## Part 6: Card Display for On-Hold Properties
+
+### Visual Distinctions
+
+- Slight amber tint overlay on image
+- "On Hold" badge in amber color
+- Shows hold reason and date
+- "Reactivate" button instead of "Hold"
+
+```tsx
+{property.propertyType === "On-Hold" && (
+  <div className="absolute inset-0 bg-amber-500/10" />
+)}
+```
+
+---
+
+## Part 7: Sync Protection
+
+### Edge Functions to Update
+
+The following edge functions check for active properties:
+
+1. **sync-properties-to-comms-hub** - Already respects property_type
+2. **process-comms-hub-sync** - Uses the sync queue trigger
+
+No changes needed since the DB trigger already filters by property_type.
+
+### Onboarding Tasks Protection
+
+When a property goes on hold, onboarding tasks for that property will remain but:
+- The Ninja AI plan generator will skip tasks for on-hold properties
+- Tasks won't trigger automation emails
+
+This is handled by updating the NinjaFocusPanel query to filter:
+```sql
+.not('property.property_type', 'eq', 'On-Hold')
+```
+
+---
+
+## File Summary
+
+| File | Action |
+|------|--------|
+| Database migration | Add enum value + columns + update trigger |
+| `src/types/index.ts` | Add On-Hold type + new fields |
+| `src/components/properties/PropertyTableView.tsx` | **CREATE** - New table view |
+| `src/components/properties/HoldPropertyDialog.tsx` | **CREATE** - Hold confirmation dialog |
+| `src/pages/Properties.tsx` | Add view toggle, On-Hold section, hold button |
+| `src/components/dashboard/NinjaFocusPanel.tsx` | Filter out on-hold properties |
+
+---
+
+## Visual Reference
+
+### Table View Design
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Property          │ Type    │ Rental   │ Owner    │ Progress │ Actions      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ 🏠 The Alpine     │ Managed │ Hybrid   │ J. Smith │ ████░ 78%│ Details Edit │
+│    4241 Osburn Ct │         │          │          │          │              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ 🏠 Neely Ave      │ On Hold │ Mid-term │ C. Greene│ ██░░░ 42%│ Reactivate   │
+│    2008 Neely Ave │  ⏸️     │          │          │          │              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### On-Hold Section (Card View)
+
+```text
+═══════════════════════════════════════════════════════════════════
+⏸️  ON HOLD (2)
+───────────────────────────────────────────────────────────────────
+┌─────────────┐  ┌─────────────┐
+│ [Image]     │  │ [Image]     │
+│  ⏸️ On Hold │  │  ⏸️ On Hold │
+│ Neely Ave   │  │ Durham Ridge│
+│ Since Jan 15│  │ Since Dec 20│
+│ Reason: ... │  │ Reason: ... │
+│[Reactivate] │  │[Reactivate] │
+└─────────────┘  └─────────────┘
+═══════════════════════════════════════════════════════════════════
+```
