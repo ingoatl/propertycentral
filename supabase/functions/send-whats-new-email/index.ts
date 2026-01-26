@@ -268,7 +268,7 @@ function generateWhatsNewEmail(
                 <tr>
                   <td align="center">
                     <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #0f172a, #1e293b); color: #ffffff; padding: 18px 56px; border-radius: 12px; font-size: 16px; font-weight: 600; text-decoration: none; letter-spacing: -0.01em; box-shadow: 0 4px 14px rgba(15,23,42,0.25);">
-                      Explore Your Portal →
+                      Access Your Owner Portal →
                     </a>
                   </td>
                 </tr>
@@ -291,7 +291,7 @@ function generateWhatsNewEmail(
                     <table cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td style="padding-right: 10px;">
-                          <a href="${portalUrl}#messages" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none;">
+                          <a href="${portalUrl}" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none;">
                             🎤 Voicemail
                           </a>
                         </td>
@@ -301,8 +301,8 @@ function generateWhatsNewEmail(
                           </a>
                         </td>
                         <td>
-                          <a href="${portalUrl}#schedule" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none;">
-                            📞 Call
+                          <a href="${portalUrl}" style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none;">
+                            📞 Schedule Call
                           </a>
                         </td>
                       </tr>

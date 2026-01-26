@@ -182,10 +182,18 @@ serve(async (req) => {
     const completedDocuments = completedDocumentsResult.data || [];
     const onboardingProjects = recentOnboardingProjectsResult.data || [];
 
-    // Build list of owners with completed documents (to exclude from "needs signature" suggestions)
-    const completedOwnerNames = completedDocuments
-      .map((d: any) => d.recipient_name?.toLowerCase())
-      .filter(Boolean);
+    // Build list of completed owner emails to filter out old pending docs that were superseded
+    const completedOwnerEmails = new Set(
+      completedDocuments
+        .map((d: any) => d.recipient_email?.toLowerCase())
+        .filter(Boolean)
+    );
+
+    // Filter out pending documents for people who already have a completed document
+    const trulyPendingDocuments = pendingDocuments.filter((doc: any) => {
+      const email = doc.recipient_email?.toLowerCase();
+      return email && !completedOwnerEmails.has(email);
+    });
 
     // Build email summaries for AI context
     const emailSummaries = emailInsights
@@ -203,13 +211,13 @@ serve(async (req) => {
       .map(([cat, count]) => `${cat}: ${count}`)
       .join(", ");
 
-    // Build document status summary
-    const documentStatusSummary = pendingDocuments.length > 0
-      ? `Pending signatures: ${pendingDocuments.map((d: any) => d.recipient_name).filter(Boolean).join(", ")}`
+    // Build document status summary - only truly pending (excludes those with newer completed docs)
+    const documentStatusSummary = trulyPendingDocuments.length > 0
+      ? `Truly pending signatures (no completed docs for these contacts): ${trulyPendingDocuments.map((d: any) => `${d.recipient_name} (${d.recipient_email})`).filter(Boolean).join(", ")}`
       : "No documents awaiting signature";
 
     const completedDocsSummary = completedDocuments.length > 0
-      ? `Recently completed: ${completedDocuments.slice(0, 5).map((d: any) => d.recipient_name).filter(Boolean).join(", ")}`
+      ? `Recently completed (DO NOT suggest document actions for these people): ${completedDocuments.slice(0, 10).map((d: any) => `${d.recipient_name} (${d.recipient_email})`).filter(Boolean).join(", ")}`
       : "";
 
     // Generate greeting based on time
@@ -239,10 +247,14 @@ ${priorityCategoriesSection}
 - Property visits: ${visits.length}
 - Properties onboarding: ${onboardingProjects.length}
 
-## Document Signing Status (IMPORTANT - use this to avoid incorrect suggestions):
+## Document Signing Status (CRITICAL - carefully check before suggesting any document-related actions):
 ${documentStatusSummary}
 ${completedDocsSummary}
-NOTE: Do NOT suggest resolving agreement/document issues for people who have already completed signing. Check the "Recently completed" list above.
+
+CRITICAL RULES FOR DOCUMENT SUGGESTIONS:
+1. NEVER suggest sending/resending agreements to anyone in the "Recently completed" list above - they have ALREADY signed.
+2. Only suggest document actions for contacts in "Truly pending" who have NO completed documents.
+3. If someone has BOTH pending AND completed documents, they've already signed (the pending ones are old/stale) - DO NOT suggest action.
 
 ## Email Insights Requiring Action:
 ${emailSummaries || "No urgent emails"}
