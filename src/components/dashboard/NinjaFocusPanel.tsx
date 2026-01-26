@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
+import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import { useNavigate } from "react-router-dom";
 
 interface NinjaFocusItem {
@@ -71,12 +72,14 @@ export function NinjaFocusPanel() {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showCallDialog, setShowCallDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showSMSDialog, setShowSMSDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState<{
     name: string;
     phone?: string;
     email?: string;
     leadId?: string;
     ownerId?: string;
+    contactType?: "lead" | "owner" | "vendor";
   } | null>(null);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
@@ -92,13 +95,17 @@ export function NinjaFocusPanel() {
   });
 
   const handleActionClick = (item: NinjaFocusItem) => {
+    const contactType = item.contactType === "lead" ? "lead" : item.contactType === "owner" ? "owner" : "lead";
+    
     // If there's a specific action type, handle it
     if (item.actionType === "call" && item.contactPhone) {
       setSelectedContact({
         name: item.contactName || "Unknown",
         phone: item.contactPhone,
+        email: item.contactEmail,
         leadId: item.contactType === "lead" ? item.contactId : undefined,
         ownerId: item.contactType === "owner" ? item.contactId : undefined,
+        contactType,
       });
       setShowCallDialog(true);
       return;
@@ -108,10 +115,44 @@ export function NinjaFocusPanel() {
       setSelectedContact({
         name: item.contactName || "Unknown",
         email: item.contactEmail,
+        phone: item.contactPhone,
         leadId: item.contactType === "lead" ? item.contactId : undefined,
         ownerId: item.contactType === "owner" ? item.contactId : undefined,
+        contactType,
       });
       setShowEmailDialog(true);
+      return;
+    }
+
+    if (item.actionType === "sms" && item.contactPhone) {
+      setSelectedContact({
+        name: item.contactName || "Unknown",
+        phone: item.contactPhone,
+        email: item.contactEmail,
+        leadId: item.contactType === "lead" ? item.contactId : undefined,
+        ownerId: item.contactType === "owner" ? item.contactId : undefined,
+        contactType,
+      });
+      setShowSMSDialog(true);
+      return;
+    }
+
+    // If we have contact info but no specific action type, default to the most appropriate action
+    if (item.contactName && (item.contactEmail || item.contactPhone)) {
+      setSelectedContact({
+        name: item.contactName,
+        email: item.contactEmail,
+        phone: item.contactPhone,
+        leadId: item.contactType === "lead" ? item.contactId : undefined,
+        ownerId: item.contactType === "owner" ? item.contactId : undefined,
+        contactType,
+      });
+      // Prefer email for owners, SMS for leads
+      if (item.contactEmail) {
+        setShowEmailDialog(true);
+      } else if (item.contactPhone) {
+        setShowSMSDialog(true);
+      }
       return;
     }
 
@@ -353,7 +394,7 @@ export function NinjaFocusPanel() {
           onOpenChange={setShowCallDialog}
           contactPhone={selectedContact.phone}
           contactName={selectedContact.name}
-          contactType={selectedContact.leadId ? "lead" : selectedContact.ownerId ? "owner" : "lead"}
+          contactType={selectedContact.contactType || "lead"}
           leadId={selectedContact.leadId || null}
           ownerId={selectedContact.ownerId || null}
         />
@@ -366,7 +407,19 @@ export function NinjaFocusPanel() {
           onOpenChange={setShowEmailDialog}
           contactEmail={selectedContact.email}
           contactName={selectedContact.name}
-          contactType={selectedContact.leadId ? "lead" : "owner"}
+          contactType={selectedContact.contactType === "owner" ? "owner" : "lead"}
+          contactId={selectedContact.leadId || selectedContact.ownerId || ""}
+        />
+      )}
+
+      {/* SMS Dialog */}
+      {showSMSDialog && selectedContact && selectedContact.phone && (
+        <SendSMSDialog
+          open={showSMSDialog}
+          onOpenChange={setShowSMSDialog}
+          contactPhone={selectedContact.phone}
+          contactName={selectedContact.name}
+          contactType={selectedContact.contactType || "lead"}
           contactId={selectedContact.leadId || selectedContact.ownerId || ""}
         />
       )}

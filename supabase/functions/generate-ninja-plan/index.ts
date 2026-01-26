@@ -87,13 +87,16 @@ serve(async (req) => {
     const now = new Date();
     const hour = now.getHours();
 
-    // Fetch data in parallel
+    // Fetch data in parallel - including document status for accuracy
     const [
       emailInsightsResult,
       overdueTasksResult,
       discoveryCallsResult,
       ownerCallsResult,
       visitsResult,
+      pendingDocumentsResult,
+      completedDocumentsResult,
+      recentOnboardingProjectsResult,
     ] = await Promise.all([
       // Email insights requiring action - filter by role if available
       supabase
@@ -134,6 +137,30 @@ serve(async (req) => {
         .from("visits")
         .select("id, date, time, property_id, purpose, properties(name)")
         .eq("date", today),
+      
+      // Documents pending signature (NOT completed) - for accurate suggestions
+      supabase
+        .from("booking_documents")
+        .select("id, document_name, status, recipient_name, recipient_email, created_at")
+        .in("status", ["pending", "sent", "awaiting_signature"])
+        .order("created_at", { ascending: false })
+        .limit(10),
+      
+      // Recently completed documents - to avoid suggesting already done items
+      supabase
+        .from("booking_documents")
+        .select("id, document_name, status, recipient_name, recipient_email, all_signed_at")
+        .eq("status", "completed")
+        .order("all_signed_at", { ascending: false })
+        .limit(20),
+      
+      // Recent onboarding projects with status - for accurate property status
+      supabase
+        .from("onboarding_projects")
+        .select("id, owner_name, property_address, status, progress, property_id")
+        .in("status", ["pending", "in-progress"])
+        .order("updated_at", { ascending: false })
+        .limit(10),
     ]);
 
     // Build context for AI - filter emails by role exclusions
@@ -151,6 +178,14 @@ serve(async (req) => {
     const discoveryCalls = discoveryCallsResult.data || [];
     const ownerCalls = ownerCallsResult.data || [];
     const visits = visitsResult.data || [];
+    const pendingDocuments = pendingDocumentsResult.data || [];
+    const completedDocuments = completedDocumentsResult.data || [];
+    const onboardingProjects = recentOnboardingProjectsResult.data || [];
+
+    // Build list of owners with completed documents (to exclude from "needs signature" suggestions)
+    const completedOwnerNames = completedDocuments
+      .map((d: any) => d.recipient_name?.toLowerCase())
+      .filter(Boolean);
 
     // Build email summaries for AI context
     const emailSummaries = emailInsights
@@ -167,6 +202,15 @@ serve(async (req) => {
     const taskSummary = Object.entries(tasksByCategory)
       .map(([cat, count]) => `${cat}: ${count}`)
       .join(", ");
+
+    // Build document status summary
+    const documentStatusSummary = pendingDocuments.length > 0
+      ? `Pending signatures: ${pendingDocuments.map((d: any) => d.recipient_name).filter(Boolean).join(", ")}`
+      : "No documents awaiting signature";
+
+    const completedDocsSummary = completedDocuments.length > 0
+      ? `Recently completed: ${completedDocuments.slice(0, 5).map((d: any) => d.recipient_name).filter(Boolean).join(", ")}`
+      : "";
 
     // Generate greeting based on time
     let greeting = "Good morning";
@@ -193,6 +237,12 @@ ${priorityCategoriesSection}
 - Scheduled discovery calls: ${discoveryCalls.length}
 - Scheduled owner calls: ${ownerCalls.length}
 - Property visits: ${visits.length}
+- Properties onboarding: ${onboardingProjects.length}
+
+## Document Signing Status (IMPORTANT - use this to avoid incorrect suggestions):
+${documentStatusSummary}
+${completedDocsSummary}
+NOTE: Do NOT suggest resolving agreement/document issues for people who have already completed signing. Check the "Recently completed" list above.
 
 ## Email Insights Requiring Action:
 ${emailSummaries || "No urgent emails"}
