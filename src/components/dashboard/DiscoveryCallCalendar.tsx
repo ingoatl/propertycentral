@@ -57,6 +57,8 @@ import {
   isToday,
   startOfWeek,
   endOfWeek,
+  addWeeks,
+  subWeeks,
 } from "date-fns";
 import { formatInEST, formatInESTWithLabel } from "@/lib/timezone-utils";
 import { cn } from "@/lib/utils";
@@ -189,6 +191,7 @@ function getServiceLabel(service: string | null): string {
 export function DiscoveryCallCalendar() {
   const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
   const [selectedCall, setSelectedCall] = useState<DiscoveryCall | null>(null);
   const [selectedOwnerCall, setSelectedOwnerCall] = useState<OwnerCall | null>(null);
@@ -199,6 +202,11 @@ export function DiscoveryCallCalendar() {
   // Local state for optimistic deletion
   const [deletedCallIds, setDeletedCallIds] = useState<Set<string>>(new Set());
   const [deletedOwnerCallIds, setDeletedOwnerCallIds] = useState<Set<string>>(new Set());
+
+  // Week navigation helpers
+  const goToPrevWeek = () => setCurrentWeekStart(subWeeks(currentWeekStart, 1));
+  const goToNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
+  const goToThisWeek = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
 
   // Fetch team members for filter dropdown
   const { data: teamMembers = [] } = useQuery({
@@ -314,11 +322,10 @@ export function DiscoveryCallCalendar() {
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
-  // Current week days for week view
+  // Current week days for week view - using selected week start
   const today = new Date();
-  const weekStart = startOfWeek(today, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
-  const currentWeekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
+  const currentWeekDays = eachDayOfInterval({ start: currentWeekStart, end: weekEnd });
 
   // Filter out optimistically deleted calls
   const filteredCalls = calls.filter(call => !deletedCallIds.has(call.id));
@@ -458,10 +465,41 @@ export function DiscoveryCallCalendar() {
               variant="outline"
               size="sm"
               className="h-9 px-3 text-xs font-medium"
-              onClick={() => setCurrentMonth(new Date())}
+              onClick={() => {
+                if (calendarView === 'week') {
+                  goToThisWeek();
+                } else {
+                  setCurrentMonth(new Date());
+                }
+              }}
             >
               Today
             </Button>
+            {/* Week view navigation */}
+            {calendarView === 'week' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={goToPrevWeek}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-medium min-w-[160px] text-center text-sm">
+                  {format(currentWeekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={goToNextWeek}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            {/* Month view navigation */}
             {calendarView === 'month' && (
               <>
                 <Button
@@ -796,7 +834,7 @@ export function DiscoveryCallCalendar() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-medium text-sm text-muted-foreground">
-                  This Week: {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+                  {format(currentWeekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
                 </h4>
               </div>
               
