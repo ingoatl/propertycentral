@@ -161,6 +161,60 @@ export type Database = {
           },
         ]
       }
+      ai_circuit_breaker: {
+        Row: {
+          created_at: string | null
+          failure_count: number | null
+          failure_threshold: number | null
+          half_open_at: string | null
+          id: string
+          last_error_message: string | null
+          last_failure_at: string | null
+          last_success_at: string | null
+          opened_at: string | null
+          reset_timeout_seconds: number | null
+          service_name: string
+          state: string | null
+          success_count: number | null
+          success_threshold: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          failure_count?: number | null
+          failure_threshold?: number | null
+          half_open_at?: string | null
+          id?: string
+          last_error_message?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          opened_at?: string | null
+          reset_timeout_seconds?: number | null
+          service_name: string
+          state?: string | null
+          success_count?: number | null
+          success_threshold?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          failure_count?: number | null
+          failure_threshold?: number | null
+          half_open_at?: string | null
+          id?: string
+          last_error_message?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          opened_at?: string | null
+          reset_timeout_seconds?: number | null
+          service_name?: string
+          state?: string | null
+          success_count?: number | null
+          success_threshold?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ai_draft_replies: {
         Row: {
           communication_id: string | null
@@ -1064,6 +1118,72 @@ export type Database = {
           title?: string
           updated_at?: string | null
           use_in_contexts?: string[] | null
+        }
+        Relationships: []
+      }
+      compliance_message_log: {
+        Row: {
+          action_taken: string | null
+          created_at: string | null
+          fh_blocked_phrases: string[] | null
+          fh_compliant: boolean
+          fh_issues: Json | null
+          fh_risk_score: number | null
+          ga_compliant: boolean
+          id: string
+          message_id: string | null
+          message_type: string
+          modified_message: string | null
+          original_message: string
+          recipient_type: string | null
+          requires_broker_review: boolean | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sender_role: string | null
+          sender_user_id: string | null
+          topic_classification: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          created_at?: string | null
+          fh_blocked_phrases?: string[] | null
+          fh_compliant?: boolean
+          fh_issues?: Json | null
+          fh_risk_score?: number | null
+          ga_compliant?: boolean
+          id?: string
+          message_id?: string | null
+          message_type: string
+          modified_message?: string | null
+          original_message: string
+          recipient_type?: string | null
+          requires_broker_review?: boolean | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sender_role?: string | null
+          sender_user_id?: string | null
+          topic_classification?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          created_at?: string | null
+          fh_blocked_phrases?: string[] | null
+          fh_compliant?: boolean
+          fh_issues?: Json | null
+          fh_risk_score?: number | null
+          ga_compliant?: boolean
+          id?: string
+          message_id?: string | null
+          message_type?: string
+          modified_message?: string | null
+          original_message?: string
+          recipient_type?: string | null
+          requires_broker_review?: boolean | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sender_role?: string | null
+          sender_user_id?: string | null
+          topic_classification?: string | null
         }
         Relationships: []
       }
