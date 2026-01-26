@@ -1,237 +1,191 @@
 
-# Property Central SMB Completion & Team Hub Integration Plan
+# Voice Call Routing with ElevenLabs AI Agent
 
-## Executive Summary
+## Overview
 
-After thorough code review, the "ninja improvements" created excellent infrastructure that is **not yet integrated** into the app. This plan completes the SMB transformation by:
-1. Activating the unused improvements
-2. Enhancing the Team Hub for seamless team communication
-3. Adding the final SMB-critical features
+This plan implements a sophisticated voice routing system where the ElevenLabs AI agent (Ava) acts as the intelligent front door for all inbound calls, with the ability to route callers to specific team members.
 
----
-
-## Phase 1: Activate Existing Improvements (Day 1)
-
-### 1.1 Integrate ErrorBoundary into App.tsx
-
-The ErrorBoundary component exists but isn't imported. We need to wrap the app to prevent crashes:
+## Recommended Architecture: AI-First with Smart Routing
 
 ```text
-App.tsx changes:
-├── Import ErrorBoundary from '@/components/ErrorBoundary'
-├── Wrap QueryClientProvider with ErrorBoundary
-├── Add section-specific boundaries around Layout
-└── Add QueryErrorResetBoundary for React Query errors
+┌─────────────────────────────────────────────────────────────────────┐
+│                        INBOUND CALL FLOW                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   Caller Dials Main Number (+17709885286)                          │
+│                    │                                                │
+│                    ▼                                                │
+│   ┌────────────────────────────────┐                               │
+│   │   twilio-inbound-voice         │                               │
+│   │   (Initial Routing Decision)    │                               │
+│   └────────────────────────────────┘                               │
+│                    │                                                │
+│         ┌─────────┴─────────┐                                      │
+│         ▼                   ▼                                      │
+│   Known Lead/Owner?    Unknown Caller                              │
+│         │                   │                                      │
+│         └─────────┬─────────┘                                      │
+│                   ▼                                                │
+│   ┌────────────────────────────────┐                               │
+│   │   ElevenLabs AI Agent (Ava)    │                               │
+│   │   - Context-aware greeting     │                               │
+│   │   - Answer questions           │                               │
+│   │   - Qualify needs              │                               │
+│   └────────────────────────────────┘                               │
+│                   │                                                │
+│         ┌─────────┼─────────┐                                      │
+│         ▼         ▼         ▼                                      │
+│   Handle Call   Transfer   Voicemail                               │
+│   Directly      to Team    Recording                               │
+│                   │                                                │
+│         ┌─────────┴─────────┐                                      │
+│         ▼                   ▼                                      │
+│   Browser Client      Mobile/GHL Number                            │
+│   (Real-time)         (Fallback)                                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-This prevents the entire app from crashing when a single component fails.
+## Implementation Steps
 
-### 1.2 Add ErrorBoundary to Critical Sections
+### Step 1: Configure ElevenLabs Agent with Transfer Tools
 
-Wrap high-risk areas:
-- InboxView (4,448 lines - most likely to have issues)
-- Dashboard (complex data fetching)
-- TeamHub (real-time features)
-- Maintenance (file uploads, vendor portal)
+Update the ElevenLabs agent in the ElevenLabs dashboard to include client tools:
 
----
+**Tools to Configure:**
+- `transfer_to_team_member` - Parameters: `team_member_name` (string)
+- `check_team_availability` - Returns who is online/available
+- `leave_voicemail` - Parameters: `team_member_name` (string), `reason` (string)
 
-## Phase 2: Team Hub SMB Enhancements (Days 2-3)
+**Agent Prompt Enhancement:**
+```
+When a caller wants to speak with someone specific or has a complex issue:
+1. Ask who they'd like to speak with (Alex, Anja, or Ingo)
+2. Use transfer_to_team_member tool with their name
+3. If transfer fails, offer to take a voicemail
 
-### 2.1 Deep Integration with Business Entities
-
-Currently Team Hub messages can reference properties/leads/work orders, but the UI doesn't display this well.
-
-**Enhancements:**
-```text
-Message Context Cards:
-├── When message has property_id → Show property card with photo, address
-├── When message has lead_id → Show lead card with status, contact info
-├── When message has work_order_id → Show work order status, vendor, photos
-└── When message has owner_id → Show owner card with properties
+Team Directory:
+- Alex: Sales inquiries, new leads, property tours
+- Anja: Operations, current owners, maintenance
+- Ingo: Leadership, contracts, escalations
 ```
 
-### 2.2 Quick Actions from Team Hub
+### Step 2: Update twilio-elevenlabs-bridge with Transfer Logic
 
-Add ability to take action directly from messages:
-- "Create task from this message"
-- "Forward to owner"
-- "Convert to work order"
-- "Schedule follow-up"
+**File: `supabase/functions/twilio-elevenlabs-bridge/index.ts`**
 
-### 2.3 Channel Templates for SMB Teams
+Add a new function to handle call transfers when the AI agent triggers the tool:
 
-Pre-configured channels for property management:
-```text
-Default Channels:
-├── #general (announcements)
-├── #maintenance-alerts (auto-posts from work orders)
-├── #owner-updates (owner portal activity)
-├── #urgent (high-priority items)
-└── #daily-standup (AI-generated daily summary)
+```typescript
+// Handle transfer_to_team_member tool call
+if (toolCall?.tool_name === 'transfer_to_team_member') {
+  const teamMemberName = toolCall.parameters?.team_member_name?.toLowerCase();
+  
+  // Look up team member from team_routing table
+  const { data: teamMember } = await supabase
+    .from('team_routing')
+    .select('*')
+    .ilike('display_name', `%${teamMemberName}%`)
+    .eq('is_active', true)
+    .maybeSingle();
+  
+  if (teamMember) {
+    // Send transfer TwiML back to Twilio
+    // This requires a different approach - use Twilio REST API to modify the call
+  }
+}
 ```
 
-### 2.4 AI-Powered Team Features
+### Step 3: Create Call Transfer Edge Function
 
-- **Daily Digest Bot**: Posts morning summary of today's tasks, visits, calls
-- **Smart @mentions**: "@alex re: Sunset Blvd leak" auto-links to the property
-- **Message Summarization**: Catch up on long threads with AI summary
+**File: `supabase/functions/twilio-call-transfer/index.ts`**
 
----
+New function to handle live call transfers:
 
-## Phase 3: Mobile-First Team Communication (Day 4)
-
-### 3.1 Push Notifications
-
-The `send-team-notification` edge function exists. Enable browser push:
-```text
-Components needed:
-├── Service Worker registration
-├── VAPID key generation (one-time admin setup)
-├── Permission request UI
-└── Background notification handling
+```typescript
+// Receives: callSid, targetNumber, targetUserId
+// Uses Twilio REST API to:
+// 1. Update the call with new TwiML (Dial to team member)
+// 2. Or use <Conference> for warm transfer
 ```
 
-### 3.2 Quick Reply from Mobile Header
+### Step 4: Update twilio-inbound-voice for GHL Number Handling
 
-The mobile header already has Team Hub button. Enhance with:
-- Quick compose floating action
-- Voice-to-text for messages
-- Swipe gestures for channel switching
+**Decision for GHL Numbers:**
 
----
+| Scenario | Routing |
+|----------|---------|
+| Call to Main Twilio → AI Agent first, then transfer if needed |
+| Call to User's GHL Number → Ring browser directly, AI as voicemail backup |
+| Call forwarded FROM GHL → IVR operator (existing behavior) |
 
-## Phase 4: Adopt Shared Utilities (Days 5-6)
+**Updates needed:**
+- Add check for `toNumber` matching user's GHL number
+- Route GHL number calls to user's browser client directly
+- Fallback to AI voicemail if no answer after 30 seconds
 
-### 4.1 Update High-Traffic Edge Functions
+### Step 5: Implement Team Availability Checking
 
-Priority functions to update with shared utilities:
-```text
-High Priority (most used):
-├── ghl-send-sms/index.ts
-├── send-voicemail/index.ts
-├── owner-portal-data/index.ts
-├── fetch-gmail-inbox/index.ts
-├── ai-assistant/index.ts
-└── sync-ownerrez/index.ts
-```
+Create a real-time presence system:
 
-Each update:
-1. Import from `../_shared/cors.ts`
-2. Import from `../_shared/response.ts`
-3. Import from `../_shared/auth.ts` (where applicable)
-4. Import from `../_shared/logging.ts`
-5. Replace inline patterns with helpers
+**Database table**: `user_presence` (already may exist or needs creation)
+- `user_id`, `is_available`, `last_seen`, `status` (online/away/dnd)
 
-### 4.2 Add Rate Limiting Table
+**Browser integration**: Update TwilioProvider to report presence
 
-Protect API endpoints from abuse:
-```sql
-CREATE TABLE rate_limit_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID,
-  action TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+### Step 6: Update Voicemail Handling
 
-CREATE INDEX idx_rate_limits_lookup ON rate_limit_logs(user_id, action, created_at);
-```
+When AI takes a voicemail for a specific team member:
+- Tag the recording with the intended recipient
+- Send notification to that team member
+- Add to their inbox specifically
 
----
+## GHL Number Strategy Recommendation
 
-## Phase 5: SMB Multi-Tenant Preparation (Day 7)
+**Option A: AI Gateway (Recommended)**
+- All GHL numbers forward to main Twilio number
+- AI handles all initial calls, transfers as needed
+- Pro: Consistent experience, AI qualification
+- Con: Extra step for known contacts
 
-### 5.1 Tenant API Credentials Table
+**Option B: Direct Ring with AI Backup**
+- GHL numbers ring user's browser directly
+- If no answer in 30 seconds → AI takes over
+- Pro: Faster for direct contacts
+- Con: Requires GHL forwarding configuration
 
-Allow different clients to use their own GHL/Twilio:
-```sql
-CREATE TABLE tenant_api_credentials (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID REFERENCES auth.users(id),
-  provider TEXT NOT NULL, -- 'ghl', 'twilio', 'telnyx'
-  credentials JSONB NOT NULL, -- encrypted
-  phone_numbers JSONB DEFAULT '[]',
-  is_verified BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
+**Option C: Hybrid (Best of Both)**
+- Known contacts (leads/owners in DB) → Ring team member directly
+- Unknown callers → AI agent first
+- Pro: Personalized for known contacts, qualification for new
 
-### 5.2 Credential Lookup in Edge Functions
+## Files to Create/Modify
 
-Update communication functions to check for tenant credentials:
-```text
-Logic flow:
-1. Get user's tenant_id
-2. Check tenant_api_credentials for custom credentials
-3. If found → Use their credentials
-4. If not → Use platform defaults (with rate limiting)
-```
+| File | Action | Purpose |
+|------|--------|---------|
+| `supabase/functions/twilio-elevenlabs-bridge/index.ts` | Modify | Add transfer tool handling |
+| `supabase/functions/twilio-call-transfer/index.ts` | Create | Handle live call transfers via Twilio API |
+| `supabase/functions/twilio-inbound-voice/index.ts` | Modify | Add GHL direct routing option |
+| Database migration | Create | Add `user_presence` table if needed |
+| ElevenLabs Dashboard | Configure | Add client tools for transfer/availability |
 
----
+## Technical Requirements
 
-## Technical Implementation Details
+1. **Twilio Configuration**: Ensure `TWILIO_API_KEY` and `TWILIO_API_SECRET` are set (already exist)
+2. **ElevenLabs Agent**: Configure tools in ElevenLabs web UI (manual step)
+3. **GHL Setup**: Configure call forwarding rules in GoHighLevel dashboard
 
-### Files to Create
+## Testing Plan
 
-| File | Purpose |
-|------|---------|
-| `src/components/team-hub/MessageContextCard.tsx` | Display linked entities in messages |
-| `src/components/team-hub/QuickActions.tsx` | Action buttons on messages |
-| `src/components/team-hub/DailyDigestBot.tsx` | AI summary component |
-| `src/hooks/usePushNotifications.ts` | Push notification registration |
-| `public/sw.js` | Service worker for background notifications |
+1. Call main number → Verify AI answers with context
+2. Say "I want to speak with Alex" → Verify transfer initiates
+3. Call user's GHL number → Verify direct browser ring
+4. No answer on browser → Verify AI voicemail fallback
+5. Unknown caller → Verify AI qualification flow
 
-### Files to Modify
+## Questions for Configuration
 
-| File | Changes |
-|------|---------|
-| `src/App.tsx` | Add ErrorBoundary wrapping |
-| `src/components/Layout.tsx` | Add ErrorBoundary around main content |
-| `src/hooks/useTeamHub.ts` | Add context card data fetching |
-| `src/pages/TeamHub.tsx` | Add quick actions, enhance mobile UX |
-| 6+ edge functions | Adopt shared utilities |
-
-### Database Changes
-
-1. **Add rate_limit_logs table** - API protection
-2. **Add tenant_api_credentials table** - Multi-tenant readiness
-3. **Add team_channel_templates table** - Pre-configured channels
-4. **Add team_daily_digests table** - Store generated summaries
-
----
-
-## Before vs After Summary
-
-| Aspect | Before (Fragile) | After (SMB-Ready) |
-|--------|------------------|-------------------|
-| Error Handling | App crashes on JS errors | Graceful recovery with retry |
-| Team Communication | Basic Slack-clone | Deeply integrated with business entities |
-| Edge Functions | 235 functions with duplicated code | Shared utilities, consistent patterns |
-| Mobile Experience | Functional but basic | Push notifications, quick actions |
-| Multi-Tenant | Single-tenant hardcoded | Credential isolation ready |
-| Query Management | Scattered keys | Centralized factory (partially adopted) |
-
----
-
-## Recommended Implementation Order
-
-1. **Immediate** (prevents crashes): Integrate ErrorBoundary
-2. **Day 1-2**: Team Hub entity integration (property/lead/work order cards)
-3. **Day 3**: Push notification infrastructure
-4. **Day 4-5**: Adopt shared utilities in top 10 edge functions
-5. **Day 6**: Add tenant_api_credentials table
-6. **Day 7**: Update communication functions for multi-tenant
-
----
-
-## Team Hub Decision: Keep Integrated ✅
-
-The Team Hub should remain part of Property Central because:
-
-1. **Shared Context**: Messages can directly reference properties, leads, work orders
-2. **Single Auth**: Team members use same login for everything
-3. **Unified Notifications**: One bell icon, one notification system
-4. **Mobile Simplicity**: One app to bookmark/install
-5. **Existing Infrastructure**: Already 13 components built and working
-
-Separating it would require duplicating auth, creating API bridges, and fragmenting the user experience.
+Before implementation, please confirm:
+1. Should all GHL numbers forward to main Twilio, or should they ring directly?
+2. For transfer failures, should we: (a) leave voicemail, (b) try mobile number, (c) both?
+3. Should the AI announce "transferring you now" or silently transfer?
