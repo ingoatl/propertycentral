@@ -9,9 +9,10 @@ import { toast } from "sonner";
 import { 
   Calendar, ChevronLeft, ChevronRight, Loader2, 
   Snowflake, Droplets, Zap, Bug, Leaf, Wrench, 
-  Send, SkipForward, CheckCircle, Clock, AlertCircle
+  Send, SkipForward, CheckCircle, Clock, AlertCircle, Plus
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addWeeks, subWeeks, addMonths, subMonths, isToday } from "date-fns";
+import { SchedulePredictiveMaintenanceModal } from "./SchedulePredictiveMaintenanceModal";
 
 interface ScheduledTask {
   id: string;
@@ -51,6 +52,7 @@ export function PredictiveMaintenanceCalendar() {
   const [selectedTask, setSelectedTask] = useState<ScheduledTask | null>(null);
   const [isDispatching, setIsDispatching] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const dateRange = useMemo(() => {
@@ -191,6 +193,14 @@ export function PredictiveMaintenanceCalendar() {
               Predictive Maintenance Calendar
             </CardTitle>
             <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => setScheduleModalOpen(true)}
+                className="gap-2"
+                size="sm"
+              >
+                <Plus className="h-4 w-4" />
+                Schedule Maintenance
+              </Button>
               <Button variant="outline" size="icon" onClick={() => navigate("prev")}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -405,6 +415,12 @@ export function PredictiveMaintenanceCalendar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Schedule Maintenance Modal */}
+      <SchedulePredictiveMaintenanceModal 
+        open={scheduleModalOpen} 
+        onOpenChange={setScheduleModalOpen} 
+      />
     </>
   );
 }
