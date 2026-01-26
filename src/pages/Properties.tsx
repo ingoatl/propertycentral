@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database, PowerOff, Archive, ListChecks, Download, Loader2 } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database, PowerOff, Archive, ListChecks, Download, Loader2, LayoutGrid, List, PauseCircle, PlayCircle } from "lucide-react";
 import villa14Image from "@/assets/villa14.jpg";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
@@ -20,7 +20,9 @@ import { Badge } from "@/components/ui/badge";
 import { BulkUpdateListingURLs } from "@/components/onboarding/BulkUpdateListingURLs";
 import { PartnerPropertiesSection } from "@/components/properties/PartnerPropertiesSection";
 import { OffboardPropertyDialog } from "@/components/properties/OffboardPropertyDialog";
+import { HoldPropertyDialog } from "@/components/properties/HoldPropertyDialog";
 import { InitialSetupTasksModal } from "@/components/properties/InitialSetupTasksModal";
+import PropertyTableView from "@/components/properties/PropertyTableView";
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
@@ -47,7 +49,10 @@ const Properties = () => {
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
   const [fetchingImage, setFetchingImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [propertyTypeFilter, setPropertyTypeFilter] = useState<"All" | "Client-Managed" | "Company-Owned" | "Inactive">("All");
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState<"All" | "Client-Managed" | "Company-Owned" | "Inactive" | "On-Hold">("All");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [holdingProperty, setHoldingProperty] = useState<{ id: string; name: string; address: string; propertyType?: string } | null>(null);
+  const [reactivatingProperty, setReactivatingProperty] = useState<{ id: string; name: string; address: string; propertyType?: string } | null>(null);
   const [offboardingProperty, setOffboardingProperty] = useState<{ id: string; name: string; address: string } | null>(null);
   const [selectedPropertyForSetupTasks, setSelectedPropertyForSetupTasks] = useState<{ id: string; name: string; ownerEmail?: string | null } | null>(null);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
@@ -216,7 +221,9 @@ const Properties = () => {
         rentalType: p.rental_type as "hybrid" | "mid_term" | "long_term" | undefined,
         createdAt: p.created_at,
         image_path: p.image_path || (p.name.includes("Villa") && p.name.includes("14") ? villa14Image : undefined),
-        propertyType: p.property_type as "Client-Managed" | "Company-Owned" | "Inactive" | undefined,
+        propertyType: p.property_type as "Client-Managed" | "Company-Owned" | "Inactive" | "On-Hold" | undefined,
+        onHoldAt: p.on_hold_at || undefined,
+        onHoldReason: p.on_hold_reason || undefined,
         managementFeePercentage: Number(p.management_fee_percentage),
         offboardedAt: p.offboarded_at || undefined,
         offboardingReason: p.offboarding_reason || undefined,
@@ -582,7 +589,8 @@ const Properties = () => {
     if (propertyTypeFilter !== "All") {
       if (property.propertyType !== propertyTypeFilter) return false;
     } else {
-      if (property.propertyType === "Inactive") return false;
+      // Hide Inactive and On-Hold from "All" view unless explicitly filtered
+      if (property.propertyType === "Inactive" || property.propertyType === "On-Hold") return false;
     }
 
     if (searchQuery.trim()) {
@@ -601,11 +609,16 @@ const Properties = () => {
 
   const clientManagedProperties = filteredProperties.filter(p => p.propertyType === "Client-Managed");
   const companyOwnedProperties = filteredProperties.filter(p => p.propertyType === "Company-Owned");
+  const onHoldProperties = properties.filter(p => p.propertyType === "On-Hold");
   const offboardedProperties = properties.filter(p => p.propertyType === "Inactive" && p.offboardedAt);
+  
+  // All properties for table view (excluding partner properties)
+  const allPropertiesForTable = [...clientManagedProperties, ...companyOwnedProperties, ...onHoldProperties];
 
   const getPropertyTypeTag = (type?: string) => {
     if (type === "Client-Managed") return "[Managed]";
     if (type === "Company-Owned") return "[Owned]";
+    if (type === "On-Hold") return "[On Hold]";
     if (type === "Inactive") return "[Inactive]";
     return "";
   };
@@ -613,6 +626,7 @@ const Properties = () => {
   const getPropertyTypeColor = (type?: string) => {
     if (type === "Client-Managed") return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     if (type === "Company-Owned") return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    if (type === "On-Hold") return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
     if (type === "Inactive") return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
     return "";
   };
@@ -715,23 +729,58 @@ const Properties = () => {
             <FileText className="w-4 h-4 mr-1" />
             Details
           </Button>
-          {property.propertyType !== "Inactive" && (
+          {property.propertyType === "On-Hold" ? (
             <Button
               size="sm"
-              variant="destructive"
-              className="shadow-lg"
+              className="shadow-lg bg-green-600 hover:bg-green-700"
               onClick={(e) => {
                 e.stopPropagation();
-                setOffboardingProperty({
+                setReactivatingProperty({
                   id: property.id,
                   name: property.name,
                   address: property.address,
+                  propertyType: property.propertyType,
                 });
               }}
             >
-              <PowerOff className="w-4 h-4 mr-1" />
-              Offboard
+              <PlayCircle className="w-4 h-4 mr-1" />
+              Reactivate
             </Button>
+          ) : property.propertyType !== "Inactive" && (
+            <>
+              <Button
+                size="sm"
+                className="shadow-lg bg-amber-500 hover:bg-amber-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHoldingProperty({
+                    id: property.id,
+                    name: property.name,
+                    address: property.address,
+                    propertyType: property.propertyType,
+                  });
+                }}
+              >
+                <PauseCircle className="w-4 h-4 mr-1" />
+                Hold
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="shadow-lg"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOffboardingProperty({
+                    id: property.id,
+                    name: property.name,
+                    address: property.address,
+                  });
+                }}
+              >
+                <PowerOff className="w-4 h-4 mr-1" />
+                Offboard
+              </Button>
+            </>
           )}
           {canDeleteProperties && (
             <Button
@@ -907,7 +956,7 @@ const Properties = () => {
         </div>
         <Select
           value={propertyTypeFilter}
-          onValueChange={(value: "All" | "Client-Managed" | "Company-Owned" | "Inactive") =>
+          onValueChange={(value: "All" | "Client-Managed" | "Company-Owned" | "Inactive" | "On-Hold") =>
             setPropertyTypeFilter(value)
           }
         >
@@ -915,12 +964,33 @@ const Properties = () => {
             <SelectValue placeholder="Filter by Type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="All">All</SelectItem>
+            <SelectItem value="All">All Active</SelectItem>
             <SelectItem value="Client-Managed">Client-Managed</SelectItem>
             <SelectItem value="Company-Owned">Company-Owned</SelectItem>
+            <SelectItem value="On-Hold">On Hold</SelectItem>
             <SelectItem value="Inactive">Inactive</SelectItem>
           </SelectContent>
         </Select>
+        
+        {/* View Toggle */}
+        <div className="flex gap-1 bg-muted rounded-lg p-1">
+          <Button 
+            variant={viewMode === "cards" ? "secondary" : "ghost"} 
+            size="sm"
+            className="h-9 px-3"
+            onClick={() => setViewMode("cards")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant={viewMode === "list" ? "secondary" : "ghost"} 
+            size="sm"
+            className="h-9 px-3"
+            onClick={() => setViewMode("list")}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -1153,7 +1223,49 @@ const Properties = () => {
         </DialogContent>
       </Dialog>
 
-      {clientManagedProperties.length > 0 && (
+      {/* Table View */}
+      {viewMode === "list" && (
+        <PropertyTableView
+          properties={allPropertiesForTable}
+          propertyProjects={propertyProjects}
+          propertyProjectsProgress={propertyProjectsProgress}
+          searchQuery={searchQuery}
+          onSelectProperty={(property) => {
+            setSelectedPropertyForDetails({
+              id: property.id,
+              name: property.name,
+              projectId: propertyProjects[property.id] || null
+            });
+          }}
+          onEditProperty={handleEdit}
+          onOffboardProperty={(property) => {
+            setOffboardingProperty({
+              id: property.id,
+              name: property.name,
+              address: property.address,
+            });
+          }}
+          onHoldProperty={(property) => {
+            setHoldingProperty({
+              id: property.id,
+              name: property.name,
+              address: property.address,
+              propertyType: property.propertyType,
+            });
+          }}
+          onReactivateProperty={(property) => {
+            setReactivatingProperty({
+              id: property.id,
+              name: property.name,
+              address: property.address,
+              propertyType: property.propertyType,
+            });
+          }}
+        />
+      )}
+
+      {/* Cards View */}
+      {viewMode === "cards" && clientManagedProperties.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-border/40">
             <Building2 className="w-5 h-5 text-primary" />
@@ -1168,7 +1280,7 @@ const Properties = () => {
         </div>
       )}
 
-      {companyOwnedProperties.length > 0 && (
+      {viewMode === "cards" && companyOwnedProperties.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-border/40">
             <Building2 className="w-5 h-5 text-primary" />
@@ -1179,6 +1291,112 @@ const Properties = () => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
             {companyOwnedProperties.map(renderPropertyCard)}
+          </div>
+        </div>
+      )}
+
+      {/* On-Hold Properties Section */}
+      {onHoldProperties.length > 0 && viewMode === "cards" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-amber-300/40">
+            <PauseCircle className="w-5 h-5 text-amber-500" />
+            <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400">
+              ON HOLD
+            </h2>
+            <span className="text-sm text-muted-foreground">({onHoldProperties.length})</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            {onHoldProperties.map((property, index) => (
+              <Card 
+                key={property.id}
+                className="shadow-card border-amber-200 dark:border-amber-800/50 overflow-hidden group"
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
+                <div 
+                  className="relative w-full aspect-[16/9] bg-muted overflow-hidden cursor-pointer"
+                  onClick={() => {
+                    if (propertyProjects[property.id]) {
+                      setSelectedPropertyForDetails({
+                        id: property.id,
+                        name: property.name,
+                        projectId: propertyProjects[property.id]
+                      });
+                    }
+                  }}
+                >
+                  {property.image_path ? (
+                    <img 
+                      src={property.image_path} 
+                      alt={property.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-subtle">
+                      <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  {/* Amber overlay */}
+                  <div className="absolute inset-0 bg-amber-500/10" />
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-amber-500 text-white text-[10px]">
+                      <PauseCircle className="w-3 h-3 mr-1" />
+                      On Hold
+                    </Badge>
+                  </div>
+                  
+                  {/* Hover overlay with reactivate */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                    <Button
+                      size="sm"
+                      className="shadow-lg bg-green-600 hover:bg-green-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReactivatingProperty({
+                          id: property.id,
+                          name: property.name,
+                          address: property.address,
+                          propertyType: property.propertyType,
+                        });
+                      }}
+                    >
+                      <PlayCircle className="w-4 h-4 mr-1" />
+                      Reactivate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="shadow-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedPropertyForDetails({
+                          id: property.id,
+                          name: property.name,
+                          projectId: propertyProjects[property.id]
+                        });
+                      }}
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      Details
+                    </Button>
+                  </div>
+                </div>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-base text-foreground line-clamp-2">
+                    {property.name}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                    <MapPin className="w-3 h-3 flex-shrink-0" />
+                    <span className="line-clamp-1">{property.address}</span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 pb-3 space-y-2">
+                  <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-md">
+                    <p><strong>Since:</strong> {property.onHoldAt ? new Date(property.onHoldAt).toLocaleDateString() : "N/A"}</p>
+                    {property.onHoldReason && <p><strong>Reason:</strong> {property.onHoldReason}</p>}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       )}
@@ -1307,6 +1525,28 @@ const Properties = () => {
           loadProperties();
           loadPropertyProjects();
         }}
+      />
+
+      <HoldPropertyDialog
+        open={!!holdingProperty}
+        onOpenChange={(open) => !open && setHoldingProperty(null)}
+        property={holdingProperty}
+        onSuccess={() => {
+          loadProperties();
+          loadPropertyProjects();
+        }}
+        mode="hold"
+      />
+
+      <HoldPropertyDialog
+        open={!!reactivatingProperty}
+        onOpenChange={(open) => !open && setReactivatingProperty(null)}
+        property={reactivatingProperty}
+        onSuccess={() => {
+          loadProperties();
+          loadPropertyProjects();
+        }}
+        mode="reactivate"
       />
 
       {selectedPropertyForSetupTasks && (

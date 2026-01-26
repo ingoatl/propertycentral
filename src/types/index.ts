@@ -6,13 +6,15 @@ export interface Property {
   rentalType?: "hybrid" | "mid_term" | "long_term";
   createdAt: string;
   image_path?: string;
-  propertyType?: "Client-Managed" | "Company-Owned" | "Inactive" | "Partner";
+  propertyType?: "Client-Managed" | "Company-Owned" | "Inactive" | "On-Hold" | "Partner";
   managementFeePercentage?: number;
   nightlyRate?: number;
   orderMinimumFee?: number;
   offboardedAt?: string;
   offboardingReason?: string;
   offboardingNotes?: string;
+  onHoldAt?: string;
+  onHoldReason?: string;
 }
 
 export interface PartnerProperty {

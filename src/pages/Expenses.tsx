@@ -74,7 +74,7 @@ const Expenses = () => {
         address: p.address,
         visitPrice: Number(p.visit_price),
         createdAt: p.created_at,
-        propertyType: p.property_type,
+        propertyType: p.property_type as "Client-Managed" | "Company-Owned" | "Inactive" | "On-Hold" | "Partner" | undefined,
       })));
 
       const { data: expensesData, error: expensesError } = await supabase

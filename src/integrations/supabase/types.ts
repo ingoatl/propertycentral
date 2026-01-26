@@ -7507,6 +7507,8 @@ export type Database = {
           offboarded_at: string | null
           offboarding_notes: string | null
           offboarding_reason: string | null
+          on_hold_at: string | null
+          on_hold_reason: string | null
           onboarding_fee_amount: number | null
           onboarding_fee_charged_at: string | null
           order_minimum_fee: number | null
@@ -7533,6 +7535,8 @@ export type Database = {
           offboarded_at?: string | null
           offboarding_notes?: string | null
           offboarding_reason?: string | null
+          on_hold_at?: string | null
+          on_hold_reason?: string | null
           onboarding_fee_amount?: number | null
           onboarding_fee_charged_at?: string | null
           order_minimum_fee?: number | null
@@ -7559,6 +7563,8 @@ export type Database = {
           offboarded_at?: string | null
           offboarding_notes?: string | null
           offboarding_reason?: string | null
+          on_hold_at?: string | null
+          on_hold_reason?: string | null
           onboarding_fee_amount?: number | null
           onboarding_fee_charged_at?: string | null
           order_minimum_fee?: number | null
@@ -12352,7 +12358,7 @@ export type Database = {
         | "photos_walkthrough"
         | "ops_handoff"
       message_sender_type: "owner" | "pm" | "vendor" | "guest" | "ai" | "system"
-      property_type: "Client-Managed" | "Company-Owned" | "Inactive"
+      property_type: "Client-Managed" | "Company-Owned" | "On-Hold" | "Inactive"
       vendor_status: "active" | "inactive" | "preferred" | "blocked"
       work_order_status:
         | "new"
@@ -12528,7 +12534,7 @@ export const Constants = {
         "ops_handoff",
       ],
       message_sender_type: ["owner", "pm", "vendor", "guest", "ai", "system"],
-      property_type: ["Client-Managed", "Company-Owned", "Inactive"],
+      property_type: ["Client-Managed", "Company-Owned", "On-Hold", "Inactive"],
       vendor_status: ["active", "inactive", "preferred", "blocked"],
       work_order_status: [
         "new",
