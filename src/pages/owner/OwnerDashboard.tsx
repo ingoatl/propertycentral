@@ -70,6 +70,7 @@ import { AudioPropertySummary } from "./components/AudioPropertySummary";
 import { PremiumLoadingScreen } from "./components/PremiumLoadingScreen";
 import { MobileTopNav } from "./components/MobileTopNav";
 import { MobileHeader } from "./components/MobileHeader";
+import { MobileCommunicationDialogs } from "./components/MobileCommunicationDialogs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
@@ -211,6 +212,9 @@ export default function OwnerDashboard() {
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [revenueBreakdown, setRevenueBreakdown] = useState<any>(null);
   const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [showTextModal, setShowTextModal] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const [marketingStats, setMarketingStats] = useState<any[]>([]);
   const [peachHausData, setPeachHausData] = useState<any>(null);
   const [insightsError, setInsightsError] = useState(false);
@@ -838,6 +842,9 @@ export default function OwnerDashboard() {
             onScheduleCall={() => setShowScheduleCallModal(true)}
             onRefresh={() => refreshData(true)}
             onLogout={handleLogout}
+            onVoiceMessage={() => setShowVoiceModal(true)}
+            onTextMessage={() => setShowTextModal(true)}
+            onVideoMessage={() => setShowVideoModal(true)}
             isRefreshing={isRefreshing}
           />
           
@@ -1439,6 +1446,23 @@ export default function OwnerDashboard() {
           onOpenChange={setShowScheduleCallModal}
           ownerEmail={session.email}
           ownerName={session.ownerName}
+        />
+      )}
+
+      {/* Mobile Communication Dialogs */}
+      {session && (
+        <MobileCommunicationDialogs
+          ownerId={session.ownerId}
+          ownerName={session.ownerName}
+          ownerEmail={session.email}
+          propertyId={property?.id}
+          propertyName={property?.name}
+          showVoiceModal={showVoiceModal}
+          setShowVoiceModal={setShowVoiceModal}
+          showTextModal={showTextModal}
+          setShowTextModal={setShowTextModal}
+          showVideoModal={showVideoModal}
+          setShowVideoModal={setShowVideoModal}
         />
       )}
     </div>

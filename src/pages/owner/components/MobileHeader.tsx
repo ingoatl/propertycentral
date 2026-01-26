@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, Star, Phone, RefreshCw, LogOut, MoreVertical, Mic, MessageSquare, Video, Calendar } from "lucide-react";
+import { Building2, Star, RefreshCw, LogOut, MoreVertical, Mic, MessageSquare, Video, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,6 +20,9 @@ interface MobileHeaderProps {
   onScheduleCall: () => void;
   onRefresh: () => void;
   onLogout: () => void;
+  onVoiceMessage: () => void;
+  onTextMessage: () => void;
+  onVideoMessage: () => void;
   isRefreshing: boolean;
   ownerPhone?: string | null;
   ownerEmail?: string | null;
@@ -35,12 +38,23 @@ export function MobileHeader({
   onScheduleCall,
   onRefresh,
   onLogout,
+  onVoiceMessage,
+  onTextMessage,
+  onVideoMessage,
   isRefreshing,
   ownerPhone,
   ownerEmail,
 }: MobileHeaderProps) {
-  const firstName = ownerName?.split(' ')[0] || 'Owner';
-  const secondFirstName = secondOwnerName?.split(' ')[0];
+  // Build proper greeting with both owner names
+  const getGreeting = () => {
+    const firstName = ownerName?.split(' ')[0] || 'Owner';
+    const secondFirstName = secondOwnerName?.split(' ')[0];
+    
+    if (secondFirstName) {
+      return `Hi, ${firstName} & ${secondFirstName}`;
+    }
+    return `Hi, ${firstName}`;
+  };
 
   return (
     <div className={cn(
@@ -76,8 +90,7 @@ export function MobileHeader({
                 hasPropertyImage ? "text-white/80" : "text-muted-foreground"
               )}>
                 <span className="truncate">
-                  Hi, {firstName}
-                  {secondFirstName && ` & ${secondFirstName}`}
+                  {getGreeting()}
                 </span>
                 {averageRating && (
                   <>
@@ -173,11 +186,8 @@ export function MobileHeader({
                 ? "text-white hover:bg-white/20" 
                 : "text-foreground hover:bg-muted"
             )}
-            onClick={() => {
-              // Navigate to messages tab - voice section
-              const event = new CustomEvent('ownerPortalAction', { detail: { action: 'voicemail' } });
-              window.dispatchEvent(event);
-            }}
+            onClick={onVoiceMessage}
+            title="Send Voice Message"
           >
             <Mic className="h-5 w-5" />
           </Button>
@@ -192,10 +202,8 @@ export function MobileHeader({
                 ? "text-white hover:bg-white/20" 
                 : "text-foreground hover:bg-muted"
             )}
-            onClick={() => {
-              const event = new CustomEvent('ownerPortalAction', { detail: { action: 'sms' } });
-              window.dispatchEvent(event);
-            }}
+            onClick={onTextMessage}
+            title="Send Text Message"
           >
             <MessageSquare className="h-5 w-5" />
           </Button>
@@ -210,10 +218,8 @@ export function MobileHeader({
                 ? "text-white hover:bg-white/20" 
                 : "text-foreground hover:bg-muted"
             )}
-            onClick={() => {
-              const event = new CustomEvent('ownerPortalAction', { detail: { action: 'video' } });
-              window.dispatchEvent(event);
-            }}
+            onClick={onVideoMessage}
+            title="Send Video Message"
           >
             <Video className="h-5 w-5" />
           </Button>
