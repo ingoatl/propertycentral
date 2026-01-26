@@ -10,6 +10,8 @@ import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
 import { MyBugReportsCard } from "@/components/dashboard/MyBugReportsCard";
 import { DailyPerformanceEntry } from "@/components/dashboard/DailyPerformanceEntry";
 import { DiscoveryCallCalendar } from "@/components/dashboard/DiscoveryCallCalendar";
+import { RoleFocusSection } from "@/components/dashboard/RoleFocusSection";
+import { NinjaFocusPanel } from "@/components/dashboard/NinjaFocusPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -480,14 +482,20 @@ const Dashboard = () => {
     );
   }
 
-  // Non-admin users get simplified view with calendar at top
+  // Non-admin users get role-personalized dashboard view
   return (
     <div className="p-8 max-md:p-4 space-y-6">
       {/* TODAY'S FOCUS - Personalized greeting and daily summary */}
       <TodaysFocusCard />
       
+      {/* AI-Powered Ninja Focus Plan (Personalized Daily Planner) */}
+      <NinjaFocusPanel />
+      
       {/* Discovery Call Calendar - Prominent at top */}
       <DiscoveryCallCalendar />
+      
+      {/* Role-Based Focus Section - Shows personalized tasks based on user role */}
+      <RoleFocusSection />
       
       {/* Daily Performance Entry */}
       <DailyPerformanceEntry />
