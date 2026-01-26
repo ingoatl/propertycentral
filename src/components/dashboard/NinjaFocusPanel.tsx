@@ -158,14 +158,28 @@ export function NinjaFocusPanel() {
 
     // If there's a link, validate and navigate to it
     if (item.link) {
-      // Define valid internal routes
+      // Define valid internal routes (must match App.tsx routes exactly)
       const validRoutes = [
-        '/leads', '/owners', '/inbox', '/tasks', '/properties', '/bookings',
-        '/maintenance', '/documents', '/analytics', '/settings', '/onboarding-presentation',
-        '/owner-onboarding', '/vendors', '/team', '/calendar', '/reports', '/knowledge', 
-        '/admin', '/communications', '/mid-term-bookings', '/expenses', '/visits',
-        '/utilities', '/monthly-charges', '/team-hub', '/'
+        '/leads', '/owners', '/properties', '/bookings', '/maintenance', 
+        '/documents', '/vendors', '/admin', '/communications', '/expenses', 
+        '/visits', '/utilities', '/charges', '/team-hub', '/owner-conversations',
+        '/owner-portal-management', '/onboarding-presentation', '/tax-1099', '/'
       ];
+      
+      // Route aliases for AI-generated links that don't match actual routes
+      const routeAliases: Record<string, string> = {
+        '/inbox': '/communications',
+        '/tasks': '/',
+        '/onboarding': '/onboarding-presentation',
+        '/owner-onboarding': '/onboard/existing-str',
+        '/monthly-charges': '/charges',
+        '/team': '/team-hub',
+        '/analytics': '/admin',
+        '/settings': '/admin',
+        '/calendar': '/',
+        '/reports': '/admin',
+        '/knowledge': '/admin',
+      };
       
       // Skip invalid routes - redirect to appropriate valid page
       const invalidRoutes = ['/contacts', '/contact', '/view'];
@@ -178,13 +192,13 @@ export function NinjaFocusPanel() {
         } else if (item.contactType === 'owner' || item.source === 'owner') {
           navigate('/owners');
         } else if (item.source === 'email') {
-          navigate('/inbox');
+          navigate('/communications');
         } else if (item.source === 'task' || item.source === 'onboarding') {
-          navigate('/tasks');
+          navigate('/');
         } else if (item.source === 'document') {
           navigate('/documents');
         } else {
-          navigate('/inbox');
+          navigate('/communications');
         }
         return;
       }
@@ -195,22 +209,31 @@ export function NinjaFocusPanel() {
         return;
       }
       
+      // Check if link needs to be aliased
+      let targetLink = item.link;
+      for (const [alias, target] of Object.entries(routeAliases)) {
+        if (item.link === alias || item.link.startsWith(`${alias}/`)) {
+          targetLink = item.link.replace(alias, target);
+          break;
+        }
+      }
+      
       // Validate internal route exists - check if it starts with a valid route prefix
       const isValidRoute = validRoutes.some(route => 
-        item.link === route || item.link?.startsWith(`${route}/`)
+        targetLink === route || targetLink.startsWith(`${route}/`)
       );
       
       if (isValidRoute) {
-        navigate(item.link);
+        navigate(targetLink);
       } else {
         // Unknown route - redirect based on context
-        console.warn(`[NinjaFocusPanel] Invalid link detected: ${item.link}`);
+        console.warn(`[NinjaFocusPanel] Invalid link detected: ${item.link}, redirecting based on context`);
         if (item.contactType === 'lead') {
           navigate('/leads');
         } else if (item.contactType === 'owner') {
           navigate('/owners');
         } else {
-          navigate('/inbox');
+          navigate('/communications');
         }
       }
       return;
@@ -218,9 +241,9 @@ export function NinjaFocusPanel() {
 
     // Fallback: navigate to relevant section based on source
     if (item.source === "email") {
-      navigate("/inbox");
+      navigate("/communications");
     } else if (item.source === "task" || item.source === "onboarding") {
-      navigate("/tasks");
+      navigate("/");
     } else if (item.source === "call") {
       navigate("/");
     } else if (item.source === "document") {
@@ -230,8 +253,8 @@ export function NinjaFocusPanel() {
     } else if (item.source === "owner") {
       navigate("/owners");
     } else {
-      // Default to inbox for unknown sources
-      navigate("/inbox");
+      // Default to communications for unknown sources
+      navigate("/communications");
     }
   };
 
