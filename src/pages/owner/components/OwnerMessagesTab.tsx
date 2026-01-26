@@ -194,27 +194,42 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <MessageCircle className="h-5 w-5" />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+          <MessageCircle className="h-5 w-5 text-primary" />
           Messages
         </h2>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetchCommunications()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetchCommunications()}
+            className="h-8 px-3 text-xs"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
             Refresh
           </Button>
-          <Badge variant="secondary">
+          <Badge variant="secondary" className="h-6 text-xs">
             {allVoicemails.length + regularCommunications.length} total
           </Badge>
         </div>
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="all">All ({allVoicemails.length + regularCommunications.length})</TabsTrigger>
-          <TabsTrigger value="communications">Communications ({regularCommunications.length})</TabsTrigger>
-          <TabsTrigger value="voicemails">Voicemails ({allVoicemails.length})</TabsTrigger>
+        <TabsList className="w-full flex overflow-x-auto scrollbar-hide">
+          <TabsTrigger value="all" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">
+            All ({allVoicemails.length + regularCommunications.length})
+          </TabsTrigger>
+          <TabsTrigger value="communications" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">
+            <span className="hidden sm:inline">Communications</span>
+            <span className="sm:hidden">Comms</span>
+            <span className="ml-1">({regularCommunications.length})</span>
+          </TabsTrigger>
+          <TabsTrigger value="voicemails" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">
+            <span className="hidden sm:inline">Voicemails</span>
+            <span className="sm:hidden">Voice</span>
+            <span className="ml-1">({allVoicemails.length})</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-4 space-y-3">
@@ -307,47 +322,47 @@ function VoicemailCard({ message }: { message: any }) {
 
   return (
     <Card className="border shadow-sm hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-4">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-start gap-3 sm:gap-4">
           <div className={cn(
-            "h-12 w-12 rounded-xl flex items-center justify-center shrink-0",
+            "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0",
             isVideo 
               ? "bg-accent" 
               : "bg-primary/10"
           )}>
             {isVideo ? (
-              <Video className="h-6 w-6 text-accent-foreground" />
+              <Video className="h-5 w-5 text-accent-foreground" />
             ) : (
-              <Mic className="h-6 w-6 text-primary" />
+              <Mic className="h-5 w-5 text-primary" />
             )}
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-medium">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+              <span className="font-medium text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
                 {message.sender_name || message.recipient_name || "Property Manager"}
               </span>
-              <Badge variant="outline" className="text-xs">
-                {isVideo ? "Video" : "Voicemail"}
+              <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5">
+                {isVideo ? "Video" : "Voice"}
               </Badge>
               {message.status === "listened" && (
-                <Badge variant="secondary" className="text-xs">Played</Badge>
+                <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5">Played</Badge>
               )}
               {message.direction === "outbound" && (
-                <Badge variant="secondary" className="text-xs text-emerald-600">Sent</Badge>
+                <Badge variant="secondary" className="text-[10px] sm:text-xs text-emerald-600 px-1.5">Sent</Badge>
               )}
             </div>
 
             {message.message_text && message.message_text !== "(Voice recording)" && message.message_text !== "(Video message)" && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
                 "{message.message_text}"
               </p>
             )}
 
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                {format(new Date(message.created_at), "MMM d, yyyy 'at' h:mm a")}
+                {format(new Date(message.created_at), "MMM d 'at' h:mm a")}
               </span>
               {message.duration_seconds && (
                 <span>
@@ -361,26 +376,27 @@ function VoicemailCard({ message }: { message: any }) {
             variant="outline"
             size="sm"
             asChild
-            className="shrink-0 gap-2"
+            className="shrink-0 gap-1.5 h-8 px-2.5 sm:px-3 text-xs sm:text-sm"
           >
             <a
               href={getPlaybackUrl()}
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Play className="h-4 w-4" />
-              {isVideo ? "Watch" : "Listen"}
+              <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">{isVideo ? "Watch" : "Listen"}</span>
+              <span className="sm:hidden">{isVideo ? "▶" : "▶"}</span>
             </a>
           </Button>
         </div>
 
         {message.reply_audio_url && (
           <div className="mt-3 pt-3 border-t">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
               <User className="h-4 w-4" />
               <span>You replied</span>
               {message.reply_transcript && (
-                <span className="text-xs">• "{message.reply_transcript.substring(0, 50)}..."</span>
+                <span className="text-xs">• "{message.reply_transcript.substring(0, 40)}..."</span>
               )}
             </div>
           </div>
@@ -408,49 +424,49 @@ function VoicemailFromCommCard({
   
   return (
     <Card className="border shadow-sm hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-4">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-start gap-3 sm:gap-4">
           <div className={cn(
-            "h-12 w-12 rounded-xl flex items-center justify-center shrink-0",
+            "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0",
             isVideo ? "bg-accent" : "bg-primary/10"
           )}>
             {isVideo ? (
-              <Video className="h-6 w-6 text-accent-foreground" />
+              <Video className="h-5 w-5 text-accent-foreground" />
             ) : (
-              <Mic className="h-6 w-6 text-primary" />
+              <Mic className="h-5 w-5 text-primary" />
             )}
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-medium">Property Manager</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+              <span className="font-medium text-sm sm:text-base">Property Manager</span>
               <Badge variant="outline" className={cn(
-                "text-xs",
+                "text-[10px] sm:text-xs px-1.5",
                 isVideo 
                   ? "bg-sky-50 text-sky-700 border-sky-200" 
                   : "bg-amber-50 text-amber-700 border-amber-200"
               )}>
-                {isVideo ? "Video" : "Voicemail"}
+                {isVideo ? "Video" : "Voice"}
               </Badge>
-              <Badge variant="secondary" className="text-xs">Sent</Badge>
+              <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5">Sent</Badge>
             </div>
 
             {!isVideo && transcript && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
                 "{transcript}"
               </p>
             )}
 
             {isVideo && (
-              <p className="text-sm text-muted-foreground mb-2">
-                "(Video message)"
+              <p className="text-xs sm:text-sm text-muted-foreground mb-2">
+                (Video message)
               </p>
             )}
 
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                {format(new Date(communication.sent_at || communication.created_at), "MMM d, yyyy 'at' h:mm a")}
+                {format(new Date(communication.sent_at || communication.created_at), "MMM d 'at' h:mm a")}
               </span>
             </div>
           </div>
@@ -460,15 +476,16 @@ function VoicemailFromCommCard({
               variant={isVideo ? "outline" : "default"}
               size="sm"
               asChild
-              className="shrink-0 gap-2"
+              className="shrink-0 gap-1.5 h-8 px-2.5 sm:px-3 text-xs sm:text-sm"
             >
               <a
                 href={voicemailUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Play className="h-4 w-4" />
-                {isVideo ? "Watch" : "Listen"}
+                <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">{isVideo ? "Watch" : "Listen"}</span>
+                <span className="sm:hidden">▶</span>
               </a>
             </Button>
           )}
@@ -502,60 +519,58 @@ function CommunicationCard({
         ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-l-4 border-l-emerald-400"
         : "bg-sky-50/50 dark:bg-sky-950/20 border-l-4 border-l-sky-400"
     )}>
-      <CardContent className="p-4">
-        <div className="flex items-start gap-4">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-start gap-3 sm:gap-4">
           <div className={cn(
-            "h-12 w-12 rounded-xl flex items-center justify-center shrink-0",
+            "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0",
             isFromOwner 
               ? "bg-emerald-100 dark:bg-emerald-900/30" 
               : "bg-sky-100 dark:bg-sky-900/30"
           )}>
             {isFromOwner ? (
-              <User className="h-5 w-5 text-emerald-600" />
+              <User className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
             ) : (
-              <Building2 className="h-5 w-5 text-sky-600" />
+              <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-sky-600" />
             )}
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
               {/* Clear sender badge */}
               <Badge className={cn(
-                "text-xs font-medium",
+                "text-[10px] sm:text-xs font-medium px-1.5 sm:px-2",
                 isFromOwner
                   ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300"
                   : "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/50 dark:text-sky-300"
               )}>
                 {senderLabel}
               </Badge>
-              <div className="flex items-center gap-1">
-                <Badge variant="outline" className="text-xs capitalize">
-                  {communication.communication_type || "message"}
-                </Badge>
-              </div>
+              <Badge variant="outline" className="text-[10px] sm:text-xs capitalize px-1.5 sm:px-2">
+                {communication.communication_type || "message"}
+              </Badge>
               {communication.status && (
-                <Badge variant="secondary" className="text-xs capitalize">
+                <Badge variant="secondary" className="text-[10px] sm:text-xs capitalize px-1.5 sm:px-2">
                   {communication.status}
                 </Badge>
               )}
             </div>
 
             {communication.subject && (
-              <p className="text-sm font-medium text-foreground mb-1">
+              <p className="text-xs sm:text-sm font-medium text-foreground mb-1 line-clamp-1">
                 {communication.subject}
               </p>
             )}
 
             {communication.body && (
-              <p className="text-sm text-muted-foreground line-clamp-2">
+              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                 {communication.body}
               </p>
             )}
 
-            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground mt-2">
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                {format(new Date(communication.sent_at || communication.created_at), "MMM d, yyyy 'at' h:mm a")}
+                {format(new Date(communication.sent_at || communication.created_at), "MMM d 'at' h:mm a")}
               </span>
             </div>
           </div>

@@ -817,17 +817,17 @@ export default function OwnerDashboard() {
         <div className="sticky top-0 z-50">
           {/* Property Image Background for header */}
           {propertyImageUrl && (
-            <div className="absolute inset-0 h-24 overflow-hidden">
+            <div className="absolute inset-0 h-36 overflow-hidden">
               <img
                 src={propertyImageUrl}
                 alt={property?.name || "Property"}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-background" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-background" />
             </div>
           )}
           
-          {/* Mobile Header */}
+          {/* Mobile Header with Quick Actions */}
           <MobileHeader
             propertyName={property?.name}
             ownerName={session?.ownerName}
