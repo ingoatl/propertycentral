@@ -383,7 +383,7 @@ You'll receive a job link when each task is due. Reply with questions.
           <!-- CTA Button -->
           <tr>
             <td style="padding: 0 40px 40px 40px; text-align: center;">
-              <a href="https://propertycentral.lovable.app/owner-portal" 
+              <a href="https://propertycentral.lovable.app/owner" 
                  style="display: inline-block; background: linear-gradient(135deg, #1E3A5F 0%, #2D5A87 100%); color: #FFFFFF; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);">
                 View Your Owner Portal
               </a>
