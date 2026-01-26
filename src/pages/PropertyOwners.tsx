@@ -144,8 +144,16 @@ const PropertyOwners = () => {
         return;
       }
       
-      // Open the owner portal with the token in URL
-      window.open(`/owner?token=${token}`, "_blank");
+      const portalUrl = `/owner?token=${token}`;
+      
+      // On mobile, use same-tab navigation (window.open can be blocked)
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobileDevice) {
+        window.location.href = portalUrl;
+      } else {
+        // On desktop, open in new tab
+        window.open(portalUrl, "_blank");
+      }
       toast.success(`Opening portal for ${property.name}`);
     } catch (error) {
       console.error("Error opening portal:", error);
