@@ -611,3 +611,9 @@ verify_jwt = false
 
 [functions.sync-team-appointment-calendar]
 verify_jwt = true
+
+[functions.auto-assign-preventive-vendor]
+verify_jwt = true
+
+[functions.generate-preventive-tasks]
+verify_jwt = false

@@ -7187,6 +7187,57 @@ export type Database = {
           },
         ]
       }
+      preventive_maintenance_templates: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          estimated_cost_high: number | null
+          estimated_cost_low: number | null
+          estimated_duration_minutes: number | null
+          frequency_months: number
+          frequency_type: string
+          id: string
+          is_active: boolean | null
+          name: string
+          preferred_months: number[] | null
+          requires_vacancy: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          estimated_cost_high?: number | null
+          estimated_cost_low?: number | null
+          estimated_duration_minutes?: number | null
+          frequency_months: number
+          frequency_type: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          preferred_months?: number[] | null
+          requires_vacancy?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          estimated_cost_high?: number | null
+          estimated_cost_low?: number | null
+          estimated_duration_minutes?: number | null
+          frequency_months?: number
+          frequency_type?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          preferred_months?: number[] | null
+          requires_vacancy?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           assigned_phone_number: string | null
@@ -7863,6 +7914,80 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: true
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_maintenance_schedules: {
+        Row: {
+          created_at: string | null
+          custom_frequency_months: number | null
+          id: string
+          is_enabled: boolean | null
+          last_completed_at: string | null
+          next_due_at: string | null
+          notes: string | null
+          owner_approved: boolean | null
+          preferred_vendor_id: string | null
+          property_id: string
+          template_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          custom_frequency_months?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          last_completed_at?: string | null
+          next_due_at?: string | null
+          notes?: string | null
+          owner_approved?: boolean | null
+          preferred_vendor_id?: string | null
+          property_id: string
+          template_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          custom_frequency_months?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          last_completed_at?: string | null
+          next_due_at?: string | null
+          notes?: string | null
+          owner_approved?: boolean | null
+          preferred_vendor_id?: string | null
+          property_id?: string
+          template_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_maintenance_schedules_preferred_vendor_id_fkey"
+            columns: ["preferred_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_maintenance_schedules_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_maintenance_schedules_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_maintenance_schedules_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "preventive_maintenance_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -8730,6 +8855,106 @@ export type Database = {
             columns: ["saved_communication_id"]
             isOneToOne: false
             referencedRelation: "saved_communications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_maintenance_tasks: {
+        Row: {
+          assigned_vendor_id: string | null
+          assignment_reason: string | null
+          auto_assigned: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          owner_notified_at: string | null
+          property_id: string
+          schedule_id: string | null
+          scheduled_date: string
+          scheduled_time_window: string | null
+          skipped_reason: string | null
+          status: string | null
+          template_id: string
+          vendor_notified_at: string | null
+          work_order_id: string | null
+        }
+        Insert: {
+          assigned_vendor_id?: string | null
+          assignment_reason?: string | null
+          auto_assigned?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          owner_notified_at?: string | null
+          property_id: string
+          schedule_id?: string | null
+          scheduled_date: string
+          scheduled_time_window?: string | null
+          skipped_reason?: string | null
+          status?: string | null
+          template_id: string
+          vendor_notified_at?: string | null
+          work_order_id?: string | null
+        }
+        Update: {
+          assigned_vendor_id?: string | null
+          assignment_reason?: string | null
+          auto_assigned?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          owner_notified_at?: string | null
+          property_id?: string
+          schedule_id?: string | null
+          scheduled_date?: string
+          scheduled_time_window?: string | null
+          skipped_reason?: string | null
+          status?: string | null
+          template_id?: string
+          vendor_notified_at?: string | null
+          work_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_maintenance_tasks_assigned_vendor_id_fkey"
+            columns: ["assigned_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_maintenance_tasks_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_maintenance_tasks_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_maintenance_tasks_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "property_maintenance_schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_maintenance_tasks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "preventive_maintenance_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_maintenance_tasks_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
         ]
