@@ -395,57 +395,57 @@ export function OwnerPortalAdmin() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Users className="h-5 w-5 text-primary" />
+          <CardContent className="p-4 md:pt-6">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Users className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Owners</p>
-                <p className="text-2xl font-bold">{stats.totalOwners}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Total</p>
+                <p className="text-lg md:text-2xl font-bold">{stats.totalOwners}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-blue-600" />
+          <CardContent className="p-4 md:pt-6">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Building2 className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">With Properties</p>
-                <p className="text-2xl font-bold">{stats.withProperties}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">With Properties</p>
+                <p className="text-lg md:text-2xl font-bold">{stats.withProperties}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                <Send className="h-5 w-5 text-emerald-600" />
+          <CardContent className="p-4 md:pt-6">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <Send className="h-4 w-4 md:h-5 md:w-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Invited (Month)</p>
-                <p className="text-2xl font-bold">{stats.invitedThisMonth}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Invited</p>
+                <p className="text-lg md:text-2xl font-bold">{stats.invitedThisMonth}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-purple-600" />
+          <CardContent className="p-4 md:pt-6">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Active (Month)</p>
-                <p className="text-2xl font-bold">{stats.activeThisMonth}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Active</p>
+                <p className="text-lg md:text-2xl font-bold">{stats.activeThisMonth}</p>
               </div>
             </div>
           </CardContent>
@@ -453,17 +453,19 @@ export function OwnerPortalAdmin() {
       </div>
 
       {/* Search and Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3">
+        <div className="relative w-full">
           <Input
             placeholder="Search owners..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button 
             variant="outline" 
+            size="sm"
             className="gap-2 bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200 hover:border-blue-300 text-blue-700"
             onClick={syncPaymentMethods}
             disabled={syncingPayments}
@@ -473,234 +475,375 @@ export function OwnerPortalAdmin() {
             ) : (
               <RotateCw className="h-4 w-4" />
             )}
-            Sync Payments
+            <span className="hidden sm:inline">Sync Payments</span>
           </Button>
           <Button 
             variant="outline" 
+            size="sm"
             className="gap-2 bg-gradient-to-r from-amber-100 to-orange-100 border-amber-400 hover:border-amber-500 text-amber-700 font-semibold"
             onClick={openDemoPortal}
           >
             <Sparkles className="h-4 w-4" />
-            <Play className="h-3 w-3" />
-            DEMO PORTAL (Sara Thompson)
+            <span className="hidden sm:inline">DEMO</span>
+            <span className="sm:hidden">Demo</span>
           </Button>
-          <Button variant="outline" onClick={loadOwners}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+          <Button variant="outline" size="sm" onClick={loadOwners}>
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline ml-2">Refresh</span>
           </Button>
         </div>
       </div>
 
-      {/* Owners Table */}
+      {/* Owners List - Mobile Cards + Desktop Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Owner Portal Management</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-3 md:pb-6">
+          <CardTitle className="text-base md:text-lg">Owner Portal Management</CardTitle>
+          <CardDescription className="text-xs md:text-sm">
             Send portal invites, monthly recaps, and preview owner dashboards
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Owner</TableHead>
-                <TableHead>Property</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Last Invite</TableHead>
-                <TableHead>Last Access</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {activeOwners.map((owner) => (
-                owner.properties.length > 0 ? (
-                  owner.properties.map((property, idx) => (
-                    <TableRow key={`${owner.id}-${property.id}`}>
-                      <TableCell>
-                        {idx === 0 && (
-                          <div>
-                            <p className="font-medium">{owner.name}</p>
-                            <p className="text-sm text-muted-foreground">{owner.email}</p>
+        <CardContent className="p-0 md:p-6 md:pt-0">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Owner</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Payment</TableHead>
+                  <TableHead>Last Invite</TableHead>
+                  <TableHead>Last Access</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activeOwners.map((owner) => (
+                  owner.properties.length > 0 ? (
+                    owner.properties.map((property, idx) => (
+                      <TableRow key={`${owner.id}-${property.id}`}>
+                        <TableCell>
+                          {idx === 0 && (
+                            <div>
+                              <p className="font-medium">{owner.name}</p>
+                              <p className="text-sm text-muted-foreground">{owner.email}</p>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-[200px]">
+                            <p className="font-medium truncate" title={property.name}>{property.name}</p>
+                            <p className="text-xs text-muted-foreground truncate" title={property.address || ''}>{property.address}</p>
                           </div>
-                        )}
-                      </TableCell>
+                        </TableCell>
+                        <TableCell>
+                          {idx === 0 && (
+                            owner.has_payment_method ? (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                <CreditCard className="h-3 w-3 mr-1" />
+                                {owner.payment_method === 'ach' ? 'ACH' : 'Card'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                No Payment
+                              </Badge>
+                            )
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {idx === 0 && owner.last_invite_sent ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Mail className="h-3 w-3" />
+                              {format(new Date(owner.last_invite_sent), "MMM d, yyyy")}
+                            </div>
+                          ) : idx === 0 ? (
+                            <span className="text-muted-foreground text-sm">Never</span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          {idx === 0 && owner.last_portal_access ? (
+                            <div className="flex items-center gap-1 text-sm text-emerald-600">
+                              <CheckCircle className="h-3 w-3" />
+                              {format(new Date(owner.last_portal_access), "MMM d, yyyy")}
+                            </div>
+                          ) : idx === 0 ? (
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              Not accessed
+                            </div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openReportModal(owner, property)}
+                              title="Generate PDF Report"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSendMonthlyRecap(owner, property)}
+                              disabled={sendingRecap === `${owner.id}-${property.id}`}
+                              title="Send Monthly Recap"
+                            >
+                              {sendingRecap === `${owner.id}-${property.id}` ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Megaphone className="h-4 w-4 text-blue-600" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSendWhatsNew(owner, property)}
+                              disabled={sendingWhatsNew === `${owner.id}-${property.id}`}
+                              title="Send What's New Email"
+                            >
+                              {sendingWhatsNew === `${owner.id}-${property.id}` ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-4 w-4 text-purple-600" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openPortalAsOwner(owner, property)}
+                              title={`Open portal for ${property.name}`}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              Open
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => sendInvite(owner, property.id)}
+                              disabled={sendingInvite === `${owner.id}-${property.id}`}
+                            >
+                              {sendingInvite === `${owner.id}-${property.id}` ? (
+                                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4 mr-1" />
+                              )}
+                              Send
+                            </Button>
+                            {idx === 0 && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-popover">
+                                  <DropdownMenuItem 
+                                    onClick={() => handleToggleArchive(owner)}
+                                    disabled={archiving === owner.id}
+                                  >
+                                    <Archive className="h-4 w-4 mr-2" />
+                                    Archive Owner
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow key={owner.id}>
                       <TableCell>
-                        <div className="max-w-[200px]">
-                          <p className="font-medium truncate" title={property.name}>{property.name}</p>
-                          <p className="text-xs text-muted-foreground truncate" title={property.address || ''}>{property.address}</p>
+                        <div>
+                          <p className="font-medium">{owner.name}</p>
+                          <p className="text-sm text-muted-foreground">{owner.email}</p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {idx === 0 && (
-                          owner.has_payment_method ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              <CreditCard className="h-3 w-3 mr-1" />
-                              {owner.payment_method === 'ach' ? 'ACH' : 'Card'}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">
-                              No Payment
-                            </Badge>
-                          )
+                        <Badge variant="outline" className="text-amber-600">
+                          No Property
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {owner.has_payment_method ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <CreditCard className="h-3 w-3 mr-1" />
+                            {owner.payment_method === 'ach' ? 'ACH' : 'Card'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-muted text-muted-foreground">
+                            No Payment
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>
-                        {idx === 0 && owner.last_invite_sent ? (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Mail className="h-3 w-3" />
-                            {format(new Date(owner.last_invite_sent), "MMM d, yyyy")}
-                          </div>
-                        ) : idx === 0 ? (
-                          <span className="text-muted-foreground text-sm">Never</span>
-                        ) : null}
+                        <span className="text-muted-foreground text-sm">-</span>
                       </TableCell>
                       <TableCell>
-                        {idx === 0 && owner.last_portal_access ? (
-                          <div className="flex items-center gap-1 text-sm text-emerald-600">
-                            <CheckCircle className="h-3 w-3" />
-                            {format(new Date(owner.last_portal_access), "MMM d, yyyy")}
-                          </div>
-                        ) : idx === 0 ? (
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            Not accessed
-                          </div>
-                        ) : null}
+                        <span className="text-muted-foreground text-sm">-</span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openReportModal(owner, property)}
-                            title="Generate PDF Report"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSendMonthlyRecap(owner, property)}
-                            disabled={sendingRecap === `${owner.id}-${property.id}`}
-                            title="Send Monthly Recap (Voice + SMS)"
-                          >
-                            {sendingRecap === `${owner.id}-${property.id}` ? (
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Megaphone className="h-4 w-4 text-blue-600" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSendWhatsNew(owner, property)}
-                            disabled={sendingWhatsNew === `${owner.id}-${property.id}`}
-                            title="Send What's New Email"
-                          >
-                            {sendingWhatsNew === `${owner.id}-${property.id}` ? (
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-4 w-4 text-purple-600" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openPortalAsOwner(owner, property)}
-                            title={`Open portal for ${property.name}`}
-                          >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Open
-                          </Button>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => sendInvite(owner, property.id)}
-                            disabled={sendingInvite === `${owner.id}-${property.id}`}
-                          >
-                            {sendingInvite === `${owner.id}-${property.id}` ? (
-                              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                            ) : (
-                              <Send className="h-4 w-4 mr-1" />
-                            )}
-                            Send
-                          </Button>
-                          {idx === 0 && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem 
-                                  onClick={() => handleToggleArchive(owner)}
-                                  disabled={archiving === owner.id}
-                                >
-                                  <Archive className="h-4 w-4 mr-2" />
-                                  Archive Owner
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-popover">
+                            <DropdownMenuItem 
+                              onClick={() => handleToggleArchive(owner)}
+                              disabled={archiving === owner.id}
+                            >
+                              <Archive className="h-4 w-4 mr-2" />
+                              Archive Owner
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow key={owner.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{owner.name}</p>
-                        <p className="text-sm text-muted-foreground">{owner.email}</p>
+                  )
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y">
+            {activeOwners.map((owner) => (
+              owner.properties.length > 0 ? (
+                owner.properties.map((property, idx) => (
+                  <div key={`${owner.id}-${property.id}`} className="p-4 space-y-3">
+                    {idx === 0 && (
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-semibold">{owner.name}</p>
+                          <p className="text-xs text-muted-foreground">{owner.email}</p>
+                        </div>
+                        {owner.has_payment_method ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                            <CreditCard className="h-3 w-3 mr-1" />
+                            {owner.payment_method === 'ach' ? 'ACH' : 'Card'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-muted text-muted-foreground text-xs">
+                            No Payment
+                          </Badge>
+                        )}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-amber-600">
-                        No Property
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {owner.has_payment_method ? (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          <CreditCard className="h-3 w-3 mr-1" />
-                          {owner.payment_method === 'ach' ? 'ACH' : 'Card'}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">
-                          No Payment
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground text-sm">-</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground text-sm">-</span>
-                    </TableCell>
-                    <TableCell className="text-right">
+                    )}
+                    <div className="bg-muted/30 rounded-lg p-2">
+                      <p className="font-medium text-sm">{property.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{property.address}</p>
+                    </div>
+                    {idx === 0 && (
+                      <div className="flex gap-4 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Invited: </span>
+                          {owner.last_invite_sent ? format(new Date(owner.last_invite_sent), "MMM d") : "Never"}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Accessed: </span>
+                          {owner.last_portal_access ? (
+                            <span className="text-emerald-600">{format(new Date(owner.last_portal_access), "MMM d")}</span>
+                          ) : "Never"}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openPortalAsOwner(owner, property)}
+                        className="flex-1"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Open Portal
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => sendInvite(owner, property.id)}
+                        disabled={sendingInvite === `${owner.id}-${property.id}`}
+                        className="flex-1"
+                      >
+                        {sendingInvite === `${owner.id}-${property.id}` ? (
+                          <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-1" />
+                        )}
+                        Send Invite
+                      </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="bg-popover w-48">
+                          <DropdownMenuItem onClick={() => openReportModal(owner, property)}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Generate Report
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleSendMonthlyRecap(owner, property)}
+                            disabled={sendingRecap === `${owner.id}-${property.id}`}
+                          >
+                            <Megaphone className="h-4 w-4 mr-2" />
+                            Send Recap
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleSendWhatsNew(owner, property)}
+                            disabled={sendingWhatsNew === `${owner.id}-${property.id}`}
+                          >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            What's New
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             onClick={() => handleToggleArchive(owner)}
                             disabled={archiving === owner.id}
                           >
                             <Archive className="h-4 w-4 mr-2" />
-                            Archive Owner
+                            Archive
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                )
-              ))}
-            </TableBody>
-          </Table>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div key={owner.id} className="p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold">{owner.name}</p>
+                      <p className="text-xs text-muted-foreground">{owner.email}</p>
+                    </div>
+                    <Badge variant="outline" className="text-amber-600 text-xs">
+                      No Property
+                    </Badge>
+                  </div>
+                  <div className="flex justify-end">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover">
+                        <DropdownMenuItem 
+                          onClick={() => handleToggleArchive(owner)}
+                          disabled={archiving === owner.id}
+                        >
+                          <Archive className="h-4 w-4 mr-2" />
+                          Archive
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              )
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -710,8 +853,8 @@ export function OwnerPortalAdmin() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <CardTitle className="text-base">Archived Owners</CardTitle>
-                <Badge variant="outline" className="bg-muted">
+                <CardTitle className="text-sm md:text-base">Archived Owners</CardTitle>
+                <Badge variant="outline" className="bg-muted text-xs">
                   {archivedOwners.length}
                 </Badge>
               </div>
@@ -728,63 +871,92 @@ export function OwnerPortalAdmin() {
             </CardDescription>
           </CardHeader>
           {showArchived && (
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Property</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {archivedOwners.map((owner) => (
-                    <TableRow key={owner.id} className="opacity-60">
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{owner.name}</p>
-                          <p className="text-sm text-muted-foreground">{owner.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {owner.properties.length > 0 ? (
-                          <div className="max-w-[200px]">
-                            <p className="font-medium truncate">{owner.properties[0].name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {owner.properties.length > 1 ? `+${owner.properties.length - 1} more` : ''}
-                            </p>
-                          </div>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground">
-                            No Property
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="bg-muted">
-                          Former Client
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleArchive(owner)}
-                          disabled={archiving === owner.id}
-                        >
-                          {archiving === owner.id ? (
-                            <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <ArchiveRestore className="h-4 w-4 mr-1" />
-                          )}
-                          Restore
-                        </Button>
-                      </TableCell>
+            <CardContent className="p-0 md:p-6 md:pt-0">
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Property</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {archivedOwners.map((owner) => (
+                      <TableRow key={owner.id} className="opacity-60">
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{owner.name}</p>
+                            <p className="text-sm text-muted-foreground">{owner.email}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {owner.properties.length > 0 ? (
+                            <div className="max-w-[200px]">
+                              <p className="font-medium truncate">{owner.properties[0].name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {owner.properties.length > 1 ? `+${owner.properties.length - 1} more` : ''}
+                              </p>
+                            </div>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              No Property
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-muted">
+                            Former Client
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleArchive(owner)}
+                            disabled={archiving === owner.id}
+                          >
+                            {archiving === owner.id ? (
+                              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <ArchiveRestore className="h-4 w-4 mr-1" />
+                            )}
+                            Restore
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Mobile List */}
+              <div className="md:hidden divide-y">
+                {archivedOwners.map((owner) => (
+                  <div key={owner.id} className="p-4 flex justify-between items-center opacity-60">
+                    <div>
+                      <p className="font-medium text-sm">{owner.name}</p>
+                      <p className="text-xs text-muted-foreground">{owner.email}</p>
+                      {owner.properties.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">{owner.properties[0].name}</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleArchive(owner)}
+                      disabled={archiving === owner.id}
+                    >
+                      {archiving === owner.id ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ArchiveRestore className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           )}
         </Card>
