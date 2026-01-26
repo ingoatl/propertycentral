@@ -1611,8 +1611,7 @@ interface DiscoveryCallDetailModalProps {
 }
 
 function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertDelete }: DiscoveryCallDetailModalProps) {
-  const [showCallConfirm, setShowCallConfirm] = useState(false);
-  const [isCallingLead, setIsCallingLead] = useState(false);
+  const [showCallDialog, setShowCallDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
@@ -1645,34 +1644,6 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
 
   // Combine all notes
   const allNotes = [call.meeting_notes, call.leads?.notes].filter(Boolean).join("\n\n");
-
-  const handleCallLead = async () => {
-    if (!call.leads?.phone || !call.leads?.id) return;
-    
-    setIsCallingLead(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("elevenlabs-voice-call", {
-        body: {
-          leadId: call.leads.id,
-          message: `Hello ${call.leads.name}, this is PeachHaus calling about your upcoming discovery call. We're looking forward to speaking with you!`,
-        },
-      });
-
-      if (error) throw error;
-
-      toast.success(`Call initiated to ${call.leads.name}`, {
-        description: `Calling ${call.leads.phone}`,
-      });
-    } catch (error: any) {
-      console.error("Error initiating call:", error);
-      toast.error("Failed to initiate call", {
-        description: error.message,
-      });
-    } finally {
-      setIsCallingLead(false);
-      setShowCallConfirm(false);
-    }
-  };
 
   const handleDeleteCall = async () => {
     setIsDeleting(true);
@@ -1873,7 +1844,7 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
                   <Phone className="h-3 w-3 text-muted-foreground" />
                   <span className="text-sm flex-1">{call.leads?.phone || "N/A"}</span>
                   {call.leads?.phone && (
-                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setShowCallConfirm(true)}>
+                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setShowCallDialog(true)}>
                       <Phone className="h-3 w-3" />
                     </Button>
                   )}
@@ -1887,7 +1858,7 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
                     </Button>
                   )}
                   {call.leads?.phone && (
-                    <Button variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setShowCallConfirm(true)}>
+                    <Button variant="outline" size="sm" className="flex-1 h-7 text-xs text-primary border-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowCallDialog(true)}>
                       <Phone className="h-3 w-3 mr-1" /> Call
                     </Button>
                   )}
@@ -1974,44 +1945,18 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
         </DialogContent>
       </Dialog>
 
-      {/* Call Confirmation Dialog */}
-      <AlertDialog open={showCallConfirm} onOpenChange={setShowCallConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Phone className="h-5 w-5 text-primary" />
-              Call {call.leads?.name}?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>You're about to initiate a call to:</p>
-              <div className="p-3 rounded-lg bg-muted mt-2">
-                <p className="font-semibold">{call.leads?.name}</p>
-                <p className="text-primary font-medium">{call.leads?.phone}</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isCallingLead}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCallLead}
-              disabled={isCallingLead}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isCallingLead ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Calling...
-                </>
-              ) : (
-                <>
-                  <Phone className="h-4 w-4 mr-2" />
-                  Yes, Call Now
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Twilio Call Dialog */}
+      {call.leads?.phone && (
+        <CallDialog
+          open={showCallDialog}
+          onOpenChange={setShowCallDialog}
+          contactName={call.leads.name || "Lead"}
+          contactPhone={call.leads.phone}
+          contactType="lead"
+          contactAddress={call.leads.property_address}
+          leadId={call.leads.id}
+        />
+      )}
 
       {/* Email Dialog */}
       {call.leads?.email && call.leads?.id && (
