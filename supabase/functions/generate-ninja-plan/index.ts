@@ -12,6 +12,13 @@ interface NinjaFocusItem {
   reason: string;
   source: "email" | "task" | "call" | "system";
   link?: string;
+  // Actionable fields
+  actionType?: "call" | "email" | "sms" | "view";
+  contactId?: string;
+  contactType?: "lead" | "owner" | "vendor" | "guest";
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
 }
 
 interface NinjaPlan {
@@ -106,18 +113,18 @@ serve(async (req) => {
         .order("due_date", { ascending: true })
         .limit(20),
       
-      // Discovery calls today
+      // Discovery calls today - include phone for actionable items
       supabase
         .from("discovery_calls")
-        .select("id, scheduled_at, lead_id, meeting_type, leads(name, email)")
+        .select("id, scheduled_at, lead_id, meeting_type, leads(id, name, email, phone)")
         .gte("scheduled_at", `${today}T00:00:00`)
         .lt("scheduled_at", `${today}T23:59:59`)
         .eq("status", "scheduled"),
       
-      // Owner calls today
+      // Owner calls today - include phone for actionable items
       supabase
         .from("owner_calls")
-        .select("id, scheduled_at, owner_id, topic, property_owners(name, email)")
+        .select("id, scheduled_at, owner_id, topic, property_owners(id, name, email, phone)")
         .gte("scheduled_at", `${today}T00:00:00`)
         .lt("scheduled_at", `${today}T23:59:59`)
         .in("status", ["scheduled", "confirmed"]),
@@ -207,9 +214,15 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
   "topPriorities": [
     {
       "priority": "critical" | "high" | "medium",
-      "action": "Specific action to take",
+      "action": "Specific action to take (include contact name if relevant)",
       "reason": "Why this matters",
-      "source": "email" | "task" | "call" | "system"
+      "source": "email" | "task" | "call" | "system",
+      "actionType": "call" | "email" | "view" | null,
+      "contactId": "uuid or null",
+      "contactType": "lead" | "owner" | null,
+      "contactName": "Name or null",
+      "contactPhone": "Phone number or null",
+      "contactEmail": "Email or null"
     }
   ],
   "quickWins": [
@@ -217,7 +230,9 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
       "priority": "medium",
       "action": "Quick task description",
       "reason": "Impact of completing",
-      "source": "task" | "system"
+      "source": "task" | "system",
+      "actionType": "view" | null,
+      "link": "/tasks or similar or null"
     }
   ],
   "proactiveSuggestions": [
@@ -226,6 +241,7 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
   ]
 }
 
+When suggesting to call or email someone, include their contact details in the actionable fields.
 Limit to 3 topPriorities, 2 quickWins, and 2 proactiveSuggestions.`;
 
     // Call AI
@@ -299,44 +315,68 @@ function generateFallbackPlan(
   const quickWins: NinjaFocusItem[] = [];
   const proactiveSuggestions: string[] = [];
 
-  // Add owner calls as critical
+  // Add owner calls as critical - with actionable contact info
   if (ownerCalls.length > 0) {
+    const firstOwnerCall = ownerCalls[0] as any;
+    const ownerData = firstOwnerCall.property_owners;
     topPriorities.push({
       priority: "critical",
-      action: `Prepare for ${ownerCalls.length} owner call${ownerCalls.length > 1 ? "s" : ""} today`,
+      action: ownerCalls.length === 1 
+        ? `Call ${ownerData?.name || 'owner'} about ${firstOwnerCall.topic || 'scheduled call'}`
+        : `Prepare for ${ownerCalls.length} owner calls today`,
       reason: "Owner relationships drive retention and referrals",
       source: "call",
+      actionType: ownerData?.phone ? "call" : ownerData?.email ? "email" : undefined,
+      contactId: ownerData?.id,
+      contactType: "owner",
+      contactName: ownerData?.name,
+      contactPhone: ownerData?.phone,
+      contactEmail: ownerData?.email,
     });
   }
 
-  // Add discovery calls
+  // Add discovery calls - with actionable contact info
   if (discoveryCalls.length > 0) {
+    const firstCall = discoveryCalls[0] as any;
+    const leadData = firstCall.leads;
     topPriorities.push({
       priority: "high",
-      action: `${discoveryCalls.length} discovery call${discoveryCalls.length > 1 ? "s" : ""} scheduled - review lead profiles`,
+      action: discoveryCalls.length === 1
+        ? `Discovery call with ${leadData?.name || 'lead'} - review profile`
+        : `${discoveryCalls.length} discovery calls scheduled - review lead profiles`,
       reason: "New business opportunities",
       source: "call",
+      actionType: leadData?.phone ? "call" : leadData?.email ? "email" : undefined,
+      contactId: leadData?.id,
+      contactType: "lead",
+      contactName: leadData?.name,
+      contactPhone: leadData?.phone,
+      contactEmail: leadData?.email,
     });
   }
 
-  // Add urgent emails
-  const urgentEmails = emailInsights.filter((e) => e.priority === "high" || e.sentiment === "negative");
+  // Add urgent emails - with view action
+  const urgentEmails = emailInsights.filter((e: any) => e.priority === "high" || e.sentiment === "negative");
   if (urgentEmails.length > 0) {
     topPriorities.push({
       priority: "critical",
       action: `Address ${urgentEmails.length} urgent email${urgentEmails.length > 1 ? "s" : ""} requiring attention`,
       reason: urgentEmails[0]?.summary || "Time-sensitive communication",
       source: "email",
+      actionType: "view",
+      link: "/inbox",
     });
   }
 
-  // Add overdue tasks as quick wins
+  // Add overdue tasks as quick wins - with view action
   if (overdueTasks.length > 0) {
     quickWins.push({
       priority: "medium",
       action: `Clear ${Math.min(overdueTasks.length, 3)} overdue tasks`,
       reason: "Reduce backlog and prevent escalation",
       source: "task",
+      actionType: "view",
+      link: "/tasks",
     });
   }
 
@@ -347,11 +387,13 @@ function generateFallbackPlan(
       action: `Confirm ${visits.length} property visit${visits.length > 1 ? "s" : ""} for today`,
       reason: "Ensure smooth on-site operations",
       source: "system",
+      actionType: "view",
+      link: "/visits",
     });
   }
 
   // Proactive suggestions
-  if (emailInsights.some((e) => e.sentiment === "positive")) {
+  if (emailInsights.some((e: any) => e.sentiment === "positive")) {
     proactiveSuggestions.push("Positive sentiment detected in recent emails - good time to ask for referrals");
   }
   proactiveSuggestions.push("Review this week's owner communications for follow-up opportunities");
