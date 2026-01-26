@@ -167,6 +167,19 @@ export function useCreateAppointment() {
         throw error;
       }
 
+      // Sync to Google Calendar if assigned to someone
+      if (data.assigned_to) {
+        try {
+          console.log("[Team Appointments] Syncing to Google Calendar...");
+          await supabase.functions.invoke("sync-team-appointment-calendar", {
+            body: { appointmentId: data.id, action: "create" },
+          });
+        } catch (calendarErr) {
+          console.error("[Team Appointments] Calendar sync failed:", calendarErr);
+          // Don't fail the appointment creation if calendar sync fails
+        }
+      }
+
       return data;
     },
     onSuccess: () => {

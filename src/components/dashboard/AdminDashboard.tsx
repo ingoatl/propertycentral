@@ -397,9 +397,7 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* Discovery Call Calendar - THIRD */}
         <DiscoveryCallCalendar />
         
-        {/* Role-Based Focus Section - After calendar */}
-        <RoleFocusSection />
-        
+        {/* Role-Based Focus Section - REMOVED per user request */}
         {/* ACTION REQUIRED - Questions & Bugs */}
         <div className="p-4 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/20">
           <h3 className="text-lg font-semibold flex items-center gap-2 text-orange-700 dark:text-orange-300 mb-4">

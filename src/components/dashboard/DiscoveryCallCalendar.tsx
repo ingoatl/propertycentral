@@ -69,6 +69,7 @@ import { OwnerCallDetailModal } from "@/components/calendar/OwnerCallDetailModal
 import { useTeamAppointments, TeamAppointment, APPOINTMENT_TYPES } from "@/hooks/useTeamAppointments";
 import { CreateAppointmentDialog } from "@/components/calendar/CreateAppointmentDialog";
 import { AppointmentDetailModal } from "@/components/calendar/AppointmentDetailModal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 interface DiscoveryCall {
   id: string;
   scheduled_at: string;
@@ -194,15 +195,31 @@ export function DiscoveryCallCalendar() {
   const [selectedGhlEvent, setSelectedGhlEvent] = useState<GhlAppointment | null>(null);
   const [selectedTeamAppointment, setSelectedTeamAppointment] = useState<TeamAppointment | null>(null);
   const [showCreateAppointment, setShowCreateAppointment] = useState(false);
+  const [selectedTeamMember, setSelectedTeamMember] = useState<string>("all");
   // Local state for optimistic deletion
   const [deletedCallIds, setDeletedCallIds] = useState<Set<string>>(new Set());
   const [deletedOwnerCallIds, setDeletedOwnerCallIds] = useState<Set<string>>(new Set());
 
-  // Fetch team appointments
+  // Fetch team members for filter dropdown
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ["team-members-calendar"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, email")
+        .eq("status", "approved")
+        .order("first_name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch team appointments - filtered by selected team member
   const { data: teamAppointments = [], isLoading: isLoadingTeamAppts } = useTeamAppointments({
     startDate: startOfMonth(currentMonth),
     endDate: endOfMonth(currentMonth),
     status: ["scheduled", "confirmed"],
+    assignedTo: selectedTeamMember !== "all" ? selectedTeamMember : undefined,
   });
 
   // Fetch discovery calls
@@ -421,6 +438,20 @@ export function DiscoveryCallCalendar() {
               <Plus className="h-4 w-4 mr-1" />
               Create
             </Button>
+            {/* Team Member Filter */}
+            <Select value={selectedTeamMember} onValueChange={setSelectedTeamMember}>
+              <SelectTrigger className="h-9 w-36 text-xs">
+                <SelectValue placeholder="View calendar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Team</SelectItem>
+                {teamMembers.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.first_name || member.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
@@ -635,6 +666,41 @@ export function DiscoveryCallCalendar() {
                           )}
                           <span className="truncate">{topicLabels[ownerCall.topic] || ownerCall.topic}</span>
                         </div>
+                      </div>
+                    </button>
+                  );
+                } else if (event.type === 'team') {
+                  const teamAppt = event.data as TeamAppointment;
+                  const typeConfig = APPOINTMENT_TYPES.find(t => t.value === teamAppt.appointment_type);
+                  return (
+                    <button
+                      key={teamAppt.id}
+                      onClick={() => setSelectedTeamAppointment(teamAppt)}
+                      className="flex-shrink-0 w-[280px] snap-start text-left p-3 rounded-lg border border-blue-200 dark:border-blue-800 hover:border-primary active:bg-muted/50 transition-colors bg-blue-50/50 dark:bg-blue-900/10"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm truncate max-w-[180px]">
+                          {teamAppt.title}
+                        </span>
+                        <Badge variant="outline" className="text-xs flex-shrink-0 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                          {typeConfig?.label || "Team"}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 flex-shrink-0" />
+                          {formatInESTWithLabel(event.time, "MMM d, h:mm a")}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <User className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                          <span className="truncate">{teamAppt.assigned_profile?.first_name || "Unassigned"}</span>
+                        </div>
+                        {(teamAppt.property?.address || teamAppt.location_address) && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{teamAppt.property?.address || teamAppt.location_address}</span>
+                          </div>
+                        )}
                       </div>
                     </button>
                   );
@@ -1073,6 +1139,19 @@ export function DiscoveryCallCalendar() {
         onDeleted={() => {
           queryClient.invalidateQueries({ queryKey: ["owner-calls-calendar"] });
         }}
+      />
+
+      {/* Team Appointment Detail Modal */}
+      <AppointmentDetailModal
+        appointment={selectedTeamAppointment}
+        open={!!selectedTeamAppointment}
+        onOpenChange={(open) => !open && setSelectedTeamAppointment(null)}
+      />
+
+      {/* Create Appointment Dialog */}
+      <CreateAppointmentDialog
+        open={showCreateAppointment}
+        onOpenChange={setShowCreateAppointment}
       />
     </Card>
   );
