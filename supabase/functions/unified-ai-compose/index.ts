@@ -9,7 +9,7 @@ const corsHeaders = {
 interface ComposeRequest {
   action: 'compose' | 'reply' | 'improve' | 'shorten' | 'professional' | 'friendly';
   messageType: 'sms' | 'email';
-  contactType: 'lead' | 'owner';
+  contactType: 'lead' | 'owner' | 'vendor' | 'other';
   contactId: string;
   currentMessage?: string;
   incomingMessage?: string;
