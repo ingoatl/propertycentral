@@ -44,19 +44,19 @@ export function VendorQuoteForm({ requestId, vendorToken }: VendorQuoteFormProps
     try {
       // Validate vendor token and get vendor ID
       if (vendorToken) {
-        const { data: vendor } = await (supabase
+        const vendorResult = await (supabase as any)
           .from("vendors")
           .select("id, name")
           .eq("vendor_access_token", vendorToken)
-          .single() as any);
+          .single();
         
-        if (vendor) {
-          setVendorId(vendor.id);
+        if (vendorResult.data) {
+          setVendorId(vendorResult.data.id);
         }
       }
 
       // Fetch quote request details
-      const { data, error } = await (supabase
+      const { data, error } = await (supabase as any)
         .from("maintenance_quote_requests")
         .select(`
           id, property_id, template_id, status, deadline_at,
@@ -64,7 +64,7 @@ export function VendorQuoteForm({ requestId, vendorToken }: VendorQuoteFormProps
           template:preventive_maintenance_templates(name, category, description)
         `)
         .eq("id", requestId)
-        .single() as any);
+        .single();
 
       if (error) throw error;
       setQuoteRequest(data);
@@ -158,7 +158,7 @@ export function VendorQuoteForm({ requestId, vendorToken }: VendorQuoteFormProps
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center space-y-4">
-            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
+            <CheckCircle2 className="h-16 w-16 text-primary mx-auto" />
             <h2 className="text-xl font-semibold">Quote Submitted!</h2>
             <p className="text-muted-foreground">
               Thank you for submitting your quote. We'll notify you if your quote is accepted.
