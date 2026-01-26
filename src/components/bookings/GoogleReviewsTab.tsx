@@ -499,7 +499,7 @@ const GoogleReviewsTab = () => {
       </div>
 
       {/* Quick Stats Bar */}
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-7 gap-2">
         <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-center border border-amber-200 dark:border-amber-800">
           <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{totalReviews}</div>
           <div className="text-xs text-amber-600">5-Star</div>
@@ -515,6 +515,10 @@ const GoogleReviewsTab = () => {
         <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg text-center border border-purple-200 dark:border-purple-800">
           <div className="text-xl font-bold text-purple-700 dark:text-purple-400">{permissionAsked}</div>
           <div className="text-xs text-purple-600">Asked</div>
+        </div>
+        <div className="p-3 bg-cyan-50 dark:bg-cyan-950/30 rounded-lg text-center border border-cyan-200 dark:border-cyan-800">
+          <div className="text-xl font-bold text-cyan-700 dark:text-cyan-400">{allInboundMessages.length}</div>
+          <div className="text-xs text-cyan-600">Responded</div>
         </div>
         <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg text-center border border-emerald-200 dark:border-emerald-800">
           <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{completedCount}</div>
@@ -582,16 +586,18 @@ const GoogleReviewsTab = () => {
                     const associatedReview = reviews.find(r => r.guest_phone === msg.phone_number);
                     
                     return (
-                      <div key={msg.id} className="p-3 bg-muted/50 rounded-lg border">
+                      <div key={msg.id} className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4 text-emerald-600" />
                             <span className="font-medium text-sm">
-                              {associatedReview?.guest_name || formatPhone(msg.phone_number)}
+                              {msg.contact_name || associatedReview?.guest_name || formatPhone(msg.phone_number)}
                             </span>
                             <Badge variant={
                               msg.message_type === "inbound_opt_out" ? "destructive" :
                               msg.message_type === "inbound_reply" ? "default" : "secondary"
-                            } className="text-xs">
+                            } className="text-xs gap-1">
+                              <CheckCircle className="w-3 h-3" />
                               {msg.message_type === "inbound_reply" ? "Reply" :
                                msg.message_type === "inbound_opt_out" ? "Opt Out" :
                                msg.message_type === "inbound_resubscribe" ? "Resubscribed" : "New"}
@@ -601,7 +607,7 @@ const GoogleReviewsTab = () => {
                             {format(new Date(msg.created_at), "MMM d, h:mm a")}
                           </span>
                         </div>
-                        <p className="text-sm bg-background rounded p-2 border">{msg.message_body}</p>
+                        <p className="text-sm bg-background rounded p-2 border font-medium">{msg.message_body}</p>
                         {associatedRequest && (
                           <div className="mt-2 flex items-center gap-2">
                             {getStatusBadge(associatedRequest.workflow_status, associatedRequest.opted_out)}
@@ -674,9 +680,16 @@ const GoogleReviewsTab = () => {
                             </Badge>
                             <Badge 
                               variant={msg.status === "sent" ? "default" : msg.status === "failed" ? "destructive" : "secondary"} 
-                              className="text-xs"
+                              className="text-xs gap-1"
                             >
-                              {msg.status}
+                              {msg.status === "sent" ? (
+                                <CheckCircle className="w-3 h-3" />
+                              ) : msg.status === "failed" ? (
+                                <XCircle className="w-3 h-3" />
+                              ) : (
+                                <Clock className="w-3 h-3" />
+                              )}
+                              {msg.status === "sent" ? "Delivered" : msg.status}
                             </Badge>
                           </div>
                           <span className="text-xs text-muted-foreground">

@@ -26,8 +26,8 @@ function getCurrentESTHour(): number {
   return Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
 }
 
-// Removed daily limit - process all pending reviews
-const MAX_SMS_PER_RUN = 100; // Process up to 100 at a time
+// Daily limit of 20 SMS per scheduled run
+const MAX_SMS_PER_RUN = 20;
 const MIN_DELAY_BETWEEN_SMS_MS = 5000; // 5 seconds between each SMS for reliability
 
 serve(async (req) => {
