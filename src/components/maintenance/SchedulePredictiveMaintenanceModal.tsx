@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -8,11 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Sparkles, Calendar, Wrench, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, Sparkles, Calendar, Wrench, AlertCircle, CheckCircle2, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-
 interface SchedulePredictiveMaintenanceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,6 +43,7 @@ export function SchedulePredictiveMaintenanceModal({
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>(preselectedPropertyId || "");
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [autoAssignVendors, setAutoAssignVendors] = useState(true);
+  const [manualVendorId, setManualVendorId] = useState<string>("");
   const [autoDispatch, setAutoDispatch] = useState(false);
   const [notifyOwner, setNotifyOwner] = useState(true);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
@@ -160,7 +160,7 @@ export function SchedulePredictiveMaintenanceModal({
           template_id: templateId,
           is_enabled: true,
           next_due_at: suggestion?.recommended_date || getDefaultNextDate(template?.frequency_months || 12),
-          preferred_vendor_id: null // Will be auto-assigned if enabled
+          preferred_vendor_id: !autoAssignVendors && manualVendorId ? manualVendorId : null
         };
       });
 
@@ -187,7 +187,7 @@ export function SchedulePredictiveMaintenanceModal({
 
       if (settingsError) throw settingsError;
 
-      // Auto-assign vendors if enabled
+      // Auto-assign vendors if enabled (or use manual selection)
       if (autoAssignVendors) {
         for (const templateId of selectedTasks) {
           const template = templates?.find(t => t.id === templateId);
@@ -200,6 +200,15 @@ export function SchedulePredictiveMaintenanceModal({
               }
             });
           }
+        }
+      } else if (manualVendorId) {
+        // Update schedules with the manually selected vendor
+        for (const templateId of selectedTasks) {
+          await supabase
+            .from("property_maintenance_schedules")
+            .update({ preferred_vendor_id: manualVendorId })
+            .eq("property_id", selectedPropertyId)
+            .eq("template_id", templateId);
         }
       }
 
@@ -282,6 +291,9 @@ export function SchedulePredictiveMaintenanceModal({
             <Sparkles className="h-5 w-5 text-primary" />
             Schedule Predictive Maintenance
           </DialogTitle>
+          <DialogDescription>
+            Set up recurring maintenance schedules with AI-powered recommendations.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
@@ -295,7 +307,7 @@ export function SchedulePredictiveMaintenanceModal({
               <SelectContent>
                 {properties?.map(property => (
                   <SelectItem key={property.id} value={property.id}>
-                    {property.name}
+                    {property.address || property.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -370,7 +382,7 @@ export function SchedulePredictiveMaintenanceModal({
                               <span className="font-medium text-sm">{template.name}</span>
                               {suggestion && getPriorityBadge(suggestion.priority)}
                               {isScheduled && (
-                                <Badge variant="outline" className="text-xs text-green-600">
+                                <Badge variant="outline" className="text-xs text-primary">
                                   <CheckCircle2 className="h-3 w-3 mr-1" />
                                   Already Scheduled
                                 </Badge>
@@ -401,21 +413,51 @@ export function SchedulePredictiveMaintenanceModal({
                 </ScrollArea>
               </div>
 
-              {/* Step 3: Automation Settings */}
+              {/* Step 3: Vendor Assignment */}
               <div className="space-y-3 border-t pt-4">
-                <Label className="text-sm font-medium">Step 3: Automation Settings</Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Label className="text-sm font-medium">Step 3: Vendor Assignment</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                     <div className="flex items-center gap-2">
                       <Wrench className="h-4 w-4 text-muted-foreground" />
-                      <Label htmlFor="auto-assign" className="text-sm">Auto-assign vendors</Label>
+                      <Label htmlFor="auto-assign" className="text-sm">Auto-assign by specialty</Label>
                     </div>
                     <Switch
                       id="auto-assign"
                       checked={autoAssignVendors}
-                      onCheckedChange={setAutoAssignVendors}
+                      onCheckedChange={(checked) => {
+                        setAutoAssignVendors(checked);
+                        if (checked) setManualVendorId("");
+                      }}
                     />
                   </div>
+                  {!autoAssignVendors && (
+                    <div className="p-3 rounded-lg border bg-muted/30">
+                      <Label className="text-sm mb-2 block flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        Select Vendor
+                      </Label>
+                      <Select value={manualVendorId} onValueChange={setManualVendorId}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Choose vendor..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vendors?.map(vendor => (
+                            <SelectItem key={vendor.id} value={vendor.id}>
+                              {vendor.name} {vendor.specialty?.length > 0 && `(${vendor.specialty.join(", ")})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 4: Automation Settings */}
+              <div className="space-y-3 border-t pt-4">
+                <Label className="text-sm font-medium">Step 4: Automation Settings</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
