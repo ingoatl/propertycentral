@@ -163,8 +163,47 @@ export function VoiceDictationButton({
           toast.error("Microphone access denied. Please allow microphone access in your browser settings.");
         } else if (event.error === 'no-speech') {
           toast.info("No speech detected. Try speaking louder or closer to the microphone.");
+        } else if (event.error === 'network') {
+          // Network error - retry with a fresh recognition instance
+          console.log("[WebSpeech] Network error, attempting retry...");
+          if (recognitionRef.current) {
+            recognitionRef.current.abort();
+          }
+          // Give a small delay before retry
+          setTimeout(() => {
+            try {
+              const retryRecognition = new SpeechRecognitionClass();
+              recognitionRef.current = retryRecognition;
+              retryRecognition.continuous = true;
+              retryRecognition.interimResults = true;
+              retryRecognition.lang = 'en-US';
+              retryRecognition.onstart = recognition.onstart;
+              retryRecognition.onresult = recognition.onresult;
+              retryRecognition.onerror = (e) => {
+                console.error("[WebSpeech] Retry also failed:", e.error);
+                toast.error("Speech recognition unavailable. Please try again or use a different browser (Chrome recommended).");
+                setIsListening(false);
+                setIsConnecting(false);
+              };
+              retryRecognition.onend = recognition.onend;
+              retryRecognition.start();
+            } catch (retryError) {
+              console.error("[WebSpeech] Retry failed:", retryError);
+              toast.error("Speech recognition unavailable. Please check your internet connection and try again.");
+              setIsListening(false);
+              setIsConnecting(false);
+            }
+          }, 500);
+          return; // Don't set states yet, wait for retry
+        } else if (event.error === 'aborted') {
+          // User cancelled, don't show error
+          console.log("[WebSpeech] Recognition aborted by user");
+        } else if (event.error === 'audio-capture') {
+          toast.error("No microphone found. Please connect a microphone and try again.");
+        } else if (event.error === 'service-not-allowed') {
+          toast.error("Speech service not available. Please try Chrome or Edge browser.");
         } else {
-          toast.error(`Speech recognition error: ${event.error}`);
+          toast.error(`Speech recognition error: ${event.error}. Please try again.`);
         }
         setIsListening(false);
         setIsConnecting(false);
