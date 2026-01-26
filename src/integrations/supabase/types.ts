@@ -4073,6 +4073,147 @@ export type Database = {
           },
         ]
       }
+      maintenance_quote_requests: {
+        Row: {
+          created_at: string | null
+          deadline_at: string | null
+          description: string | null
+          id: string
+          property_id: string
+          requested_at: string | null
+          requested_by: string | null
+          scheduled_task_id: string | null
+          status: string | null
+          template_id: string | null
+          updated_at: string | null
+          vendors_notified: string[] | null
+          winning_quote_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deadline_at?: string | null
+          description?: string | null
+          id?: string
+          property_id: string
+          requested_at?: string | null
+          requested_by?: string | null
+          scheduled_task_id?: string | null
+          status?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          vendors_notified?: string[] | null
+          winning_quote_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deadline_at?: string | null
+          description?: string | null
+          id?: string
+          property_id?: string
+          requested_at?: string | null
+          requested_by?: string | null
+          scheduled_task_id?: string | null
+          status?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          vendors_notified?: string[] | null
+          winning_quote_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_quote_requests_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_quote_requests_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_quote_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_quote_requests_scheduled_task_id_fkey"
+            columns: ["scheduled_task_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_maintenance_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_quote_requests_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "preventive_maintenance_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_quotes: {
+        Row: {
+          amount: number
+          available_dates: string[] | null
+          created_at: string | null
+          estimated_duration_minutes: number | null
+          id: string
+          notes: string | null
+          request_id: string
+          status: string | null
+          submitted_at: string | null
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          amount: number
+          available_dates?: string[] | null
+          created_at?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          request_id: string
+          status?: string | null
+          submitted_at?: string | null
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          amount?: number
+          available_dates?: string[] | null
+          created_at?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          request_id?: string
+          status?: string | null
+          submitted_at?: string | null
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_quotes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_quote_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_quotes_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maintenance_troubleshooting_guides: {
         Row: {
           category: string
@@ -7988,6 +8129,63 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "preventive_maintenance_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_maintenance_settings: {
+        Row: {
+          auto_approve_under_amount: number | null
+          auto_dispatch_days_before: number | null
+          auto_dispatch_enabled: boolean | null
+          cluster_tasks_same_day: boolean | null
+          created_at: string | null
+          id: string
+          notify_owner_before_maintenance: boolean | null
+          preferred_maintenance_day: string | null
+          property_id: string
+          require_quote_before_dispatch: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_approve_under_amount?: number | null
+          auto_dispatch_days_before?: number | null
+          auto_dispatch_enabled?: boolean | null
+          cluster_tasks_same_day?: boolean | null
+          created_at?: string | null
+          id?: string
+          notify_owner_before_maintenance?: boolean | null
+          preferred_maintenance_day?: string | null
+          property_id: string
+          require_quote_before_dispatch?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_approve_under_amount?: number | null
+          auto_dispatch_days_before?: number | null
+          auto_dispatch_enabled?: boolean | null
+          cluster_tasks_same_day?: boolean | null
+          created_at?: string | null
+          id?: string
+          notify_owner_before_maintenance?: boolean | null
+          preferred_maintenance_day?: string | null
+          property_id?: string
+          require_quote_before_dispatch?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_maintenance_settings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_maintenance_settings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
