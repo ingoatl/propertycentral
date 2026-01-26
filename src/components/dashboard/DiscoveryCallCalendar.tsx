@@ -1935,27 +1935,46 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
                 </Button>
               )}
 
-              {/* Income Report Prepared Section */}
-              {call.leads?.phone && (
-                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 space-y-2">
-                  <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    Income Report
-                  </h4>
+              {/* Income Report Section */}
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 space-y-2">
+                <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  Income Report
+                </h4>
+                <div className="flex gap-2">
                   <Button
-                    variant="default"
+                    variant="outline"
                     size="sm"
-                    className="w-full h-8 text-xs bg-amber-600 hover:bg-amber-700"
-                    onClick={handleIncomeReportPrepared}
+                    className="flex-1 h-8 text-xs border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40"
+                    asChild
                   >
-                    <FileText className="h-3 w-3 mr-1" />
-                    Income Report Prepared
+                    <a 
+                      href="https://www.peachhausgroup.com/embed/income-report" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Generate Report
+                    </a>
                   </Button>
-                  <p className="text-[10px] text-amber-700 dark:text-amber-300">
-                    Sends SMS + opens voice message
-                  </p>
+                  {call.leads?.phone && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1 h-8 text-xs bg-amber-600 hover:bg-amber-700"
+                      onClick={handleIncomeReportPrepared}
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      Report Sent
+                    </Button>
+                  )}
                 </div>
-              )}
+                {call.leads?.phone && (
+                  <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                    "Report Sent" triggers SMS + voicemail
+                  </p>
+                )}
+              </div>
 
               {/* Reschedule & Delete Buttons */}
               <div className="flex gap-2">

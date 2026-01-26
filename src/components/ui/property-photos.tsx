@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ImageIcon, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ImageIcon, Loader2, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ export function PropertyPhotos({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [imageLoadError, setImageLoadError] = useState(false);
 
   useEffect(() => {
     if (!address) {
@@ -30,6 +31,7 @@ export function PropertyPhotos({
     const fetchPhotos = async () => {
       setLoading(true);
       setError(null);
+      setImageLoadError(false);
 
       try {
         const { data, error: fnError } = await supabase.functions.invoke(
@@ -57,10 +59,21 @@ export function PropertyPhotos({
 
   const goNext = () => {
     setCurrentIndex((prev) => (prev + 1) % photos.length);
+    setImageLoadError(false);
   };
 
   const goPrev = () => {
     setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    setImageLoadError(false);
+  };
+
+  const handleImageError = () => {
+    // If this photo fails, try the next one
+    if (photos.length > 1 && currentIndex < photos.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    } else {
+      setImageLoadError(true);
+    }
   };
 
   if (loading) {
@@ -77,16 +90,43 @@ export function PropertyPhotos({
     );
   }
 
-  if (error || photos.length === 0) {
+  // Show fallback if no photos or all images failed to load
+  if (error || photos.length === 0 || imageLoadError) {
+    // Generate a static map as visual fallback
+    const staticMapUrl = address 
+      ? `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(address)}&zoom=17&size=600x400&maptype=hybrid&key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8`
+      : null;
+
     return (
       <div
-        className={`bg-gradient-to-br from-muted to-muted/50 rounded-lg flex flex-col items-center justify-center gap-2 border border-dashed ${className}`}
+        className={`relative bg-gradient-to-br from-muted to-muted/50 rounded-lg overflow-hidden border ${className}`}
         style={{ height }}
       >
-        <ImageIcon className="h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground text-center px-4">
-          {error || "No property photos available"}
-        </p>
+        {staticMapUrl ? (
+          <>
+            <img 
+              src={staticMapUrl} 
+              alt="Property location"
+              className="w-full h-full object-cover opacity-60"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20">
+              <MapPin className="h-8 w-8 text-white drop-shadow-lg" />
+              <p className="text-sm text-white font-medium mt-2 drop-shadow-lg text-center px-4">
+                Satellite View
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full gap-2">
+            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground text-center px-4">
+              {error || "No property photos available"}
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -97,10 +137,7 @@ export function PropertyPhotos({
         src={photos[currentIndex]}
         alt={`Property photo ${currentIndex + 1}`}
         className="w-full h-full object-cover rounded-lg"
-        onError={(e) => {
-          // Handle broken images
-          e.currentTarget.style.display = 'none';
-        }}
+        onError={handleImageError}
       />
 
       {/* Navigation arrows */}
@@ -138,7 +175,10 @@ export function PropertyPhotos({
           {photos.map((_, idx) => (
             <button
               key={idx}
-              onClick={() => setCurrentIndex(idx)}
+              onClick={() => {
+                setCurrentIndex(idx);
+                setImageLoadError(false);
+              }}
               className={cn(
                 "w-2 h-2 rounded-full transition-colors",
                 idx === currentIndex ? "bg-white" : "bg-white/50"
