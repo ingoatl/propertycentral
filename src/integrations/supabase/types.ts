@@ -9159,6 +9159,107 @@ export type Database = {
           },
         ]
       }
+      team_appointments: {
+        Row: {
+          appointment_type: string
+          assigned_to: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          duration_minutes: number | null
+          end_time: string | null
+          google_calendar_event_id: string | null
+          id: string
+          lead_id: string | null
+          location_address: string | null
+          notes: string | null
+          owner_id: string | null
+          property_id: string | null
+          scheduled_at: string
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          appointment_type?: string
+          assigned_to?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          end_time?: string | null
+          google_calendar_event_id?: string | null
+          id?: string
+          lead_id?: string | null
+          location_address?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          property_id?: string | null
+          scheduled_at: string
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          appointment_type?: string
+          assigned_to?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          end_time?: string | null
+          google_calendar_event_id?: string | null
+          id?: string
+          lead_id?: string | null
+          location_address?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          property_id?: string | null
+          scheduled_at?: string
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_appointments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_appointments_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_appointments_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_appointments_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_channel_members: {
         Row: {
           channel_id: string
