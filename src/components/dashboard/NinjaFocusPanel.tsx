@@ -161,8 +161,10 @@ export function NinjaFocusPanel() {
       // Define valid internal routes
       const validRoutes = [
         '/leads', '/owners', '/inbox', '/tasks', '/properties', '/bookings',
-        '/maintenance', '/documents', '/analytics', '/settings', '/onboarding',
-        '/vendors', '/team', '/calendar', '/reports', '/knowledge', '/'
+        '/maintenance', '/documents', '/analytics', '/settings', '/onboarding-presentation',
+        '/owner-onboarding', '/vendors', '/team', '/calendar', '/reports', '/knowledge', 
+        '/admin', '/communications', '/mid-term-bookings', '/expenses', '/visits',
+        '/utilities', '/monthly-charges', '/team-hub', '/'
       ];
       
       // Skip invalid routes - redirect to appropriate valid page
