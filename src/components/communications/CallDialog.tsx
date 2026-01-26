@@ -45,7 +45,7 @@ export function CallDialog({
   const [phoneNumber, setPhoneNumber] = useState("");
   const isMobile = useIsMobile();
   
-  const { isConnecting, isOnCall, callDuration, makeCall, endCall, sendDigits, formatDuration } = useTwilioDevice({
+  const { isConnecting, isOnCall, callStatus, callDuration, makeCall, endCall, sendDigits, formatDuration } = useTwilioDevice({
     leadId,
     ownerId,
     contactPhone,
@@ -159,8 +159,15 @@ export function CallDialog({
           </div>
 
           {isOnCall && (
-            <div className="text-center text-green-600 font-semibold text-lg py-2">
-              Connected • {formatDuration(callDuration)}
+            <div className={cn(
+              "text-center font-semibold text-lg py-2",
+              callStatus === 'ringing' ? 'text-warning' : 'text-primary'
+            )}>
+              {callStatus === 'ringing' ? (
+                <>Ringing... 📞</>
+              ) : (
+                <>Connected • {formatDuration(callDuration)}</>
+              )}
             </div>
           )}
 

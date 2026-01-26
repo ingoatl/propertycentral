@@ -13,9 +13,12 @@ interface UseTwilioDeviceOptions {
   contactPhone?: string;
 }
 
+type CallStatus = 'idle' | 'connecting' | 'ringing' | 'connected' | 'disconnected';
+
 export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isOnCall, setIsOnCall] = useState(false);
+  const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [callDuration, setCallDuration] = useState(0);
   const [currentCallSid, setCurrentCallSid] = useState<string | null>(null);
   
@@ -61,6 +64,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
       });
 
       device.on('registered', () => {
+        console.log('Twilio device registered');
       });
 
       device.on('error', (err) => {
@@ -90,6 +94,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
     }
     setIsOnCall(false);
     setIsConnecting(false);
+    setCallStatus('idle');
     setCallDuration(0);
     setCurrentCallSid(null);
     options.onCallEnd?.();
@@ -109,6 +114,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
     }
 
     setIsConnecting(true);
+    setCallStatus('connecting');
 
     try {
       let device = deviceRef.current;
@@ -129,8 +135,18 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
 
       callRef.current = call;
 
+      // Listen for ringing - this fires when the recipient's phone is ringing
+      call.on('ringing', () => {
+        console.log('Phone is ringing...');
+        setCallStatus('ringing');
+        setIsConnecting(false);
+        setIsOnCall(true); // Show as active but "ringing"
+        toast.info('Ringing...');
+      });
+
       call.on('accept', async () => {
-        console.log('Call accepted');
+        console.log('Call accepted - recipient answered');
+        setCallStatus('connected');
         
         // Get the CallSid from Twilio
         const callSid = call.parameters?.CallSid;
@@ -204,6 +220,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
       console.error('Failed to make call:', error);
       toast.error('Failed to initiate call: ' + (error instanceof Error ? error.message : 'Unknown error'));
       setIsConnecting(false);
+      setCallStatus('idle');
       return false;
     }
   }, [endCall, options]);
@@ -217,6 +234,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
   return {
     isConnecting,
     isOnCall,
+    callStatus,
     callDuration,
     currentCallSid,
     makeCall,
