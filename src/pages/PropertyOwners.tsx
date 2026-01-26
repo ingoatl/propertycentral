@@ -109,6 +109,51 @@ const PropertyOwners = () => {
   const [selectedOwnerForComms, setSelectedOwnerForComms] = useState<PropertyOwner | null>(null);
   const [sendingW9, setSendingW9] = useState<string | null>(null);
   const [requestingW9, setRequestingW9] = useState<string | null>(null);
+  const [openingPortal, setOpeningPortal] = useState<string | null>(null);
+
+  // Open portal with proper session token
+  const handleOpenPortal = async (owner: PropertyOwner) => {
+    // Get owner's first property
+    const ownerProperties = getOwnerProperties(owner.id);
+    const property = ownerProperties[0];
+    
+    if (!property) {
+      toast.error("No property assigned to this owner");
+      return;
+    }
+
+    setOpeningPortal(owner.id);
+    try {
+      // Create a real session token in the database
+      const token = crypto.randomUUID();
+      const { error } = await supabase
+        .from("owner_portal_sessions")
+        .insert({
+          owner_id: owner.id,
+          email: owner.email,
+          token: token,
+          expires_at: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+          is_admin_preview: true,
+          property_id: property.id,
+          property_name: property.name,
+        });
+
+      if (error) {
+        console.error("Error creating session:", error);
+        toast.error("Failed to create portal session");
+        return;
+      }
+      
+      // Open the owner portal with the token in URL
+      window.open(`/owner?token=${token}`, "_blank");
+      toast.success(`Opening portal for ${property.name}`);
+    } catch (error) {
+      console.error("Error opening portal:", error);
+      toast.error("Failed to open portal");
+    } finally {
+      setOpeningPortal(null);
+    }
+  };
   
 
   // Format date helper
@@ -500,19 +545,20 @@ const PropertyOwners = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="pb-4 border-b border-border/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="pb-4 border-b border-border/50 flex flex-col gap-3">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+          <h1 className="text-2xl md:text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
             Property Owners
           </h1>
-          <p className="text-muted-foreground mt-1">Manage owners and their payment methods</p>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">Manage owners and their payment methods</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button size="sm" className="gap-2">
                 <Plus className="w-4 h-4" />
-                Add Owner
+                <span className="hidden sm:inline">Add Owner</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             </DialogTrigger>
           <DialogContent>
@@ -751,9 +797,12 @@ const PropertyOwners = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56 bg-popover">
-                            <DropdownMenuItem onClick={() => window.open(`/owner?owner=${owner.id}`, '_blank')}>
+                            <DropdownMenuItem 
+                              onClick={() => handleOpenPortal(owner)}
+                              disabled={openingPortal === owner.id}
+                            >
                               <Eye className="w-4 h-4 mr-2" />
-                              View Portal
+                              {openingPortal === owner.id ? "Opening..." : "View Portal"}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setSelectedOwnerForComms(owner)}>
                               <MessageSquare className="w-4 h-4 mr-2" />
@@ -890,9 +939,12 @@ const PropertyOwners = () => {
                               <Send className="w-4 h-4 mr-2" />
                               Send Portal Invite
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => window.open(`/owner?owner=${owner.id}`, '_blank')}>
+                            <DropdownMenuItem 
+                              onClick={() => handleOpenPortal(owner)}
+                              disabled={openingPortal === owner.id}
+                            >
                               <Eye className="w-4 h-4 mr-2" />
-                              View Portal
+                              {openingPortal === owner.id ? "Opening..." : "View Portal"}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setSelectedOwnerForComms(owner)}>
                               <MessageSquare className="w-4 h-4 mr-2" />
