@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Sparkles, Loader2, RefreshCw, Zap, MessageSquare, FileText, Calendar, TrendingUp } from "lucide-react";
+import { Sparkles, Loader2, RefreshCw, Zap, MessageSquare, FileText, Calendar, TrendingUp, PenLine, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -8,6 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { useUnifiedAI } from "@/hooks/useUnifiedAI";
+import { extractFirstName } from "@/lib/nameUtils";
 
 const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
 
@@ -19,9 +21,10 @@ interface AIWritingAssistantProps {
   messageType: "sms" | "email";
   contactId?: string;
   contactType?: "lead" | "owner" | "vendor";
+  contactPhone?: string;
 }
 
-type ActionType = "improve" | "shorter" | "professional" | "generate" | "friendly";
+type ActionType = "improve" | "shorter" | "professional" | "generate" | "friendly" | "compose";
 
 export function AIWritingAssistant({
   currentMessage,
@@ -31,8 +34,11 @@ export function AIWritingAssistant({
   messageType,
   contactId,
   contactType,
+  contactPhone,
 }: AIWritingAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showComposeInput, setShowComposeInput] = useState(false);
+  const [composeContext, setComposeContext] = useState("");
   
   // Use the unified AI hook for better context-aware responses
   const { 
@@ -56,6 +62,10 @@ export function AIWritingAssistant({
       const cType = contactType || "lead";
       
       switch (action) {
+        case "compose":
+          // Show the compose input panel instead of immediate action
+          setShowComposeInput(true);
+          return;
         case "generate":
           response = await composeMessage(cType, contactId, messageType);
           break;
@@ -100,6 +110,42 @@ export function AIWritingAssistant({
     }
   };
 
+  const handleComposeWithContext = async () => {
+    if (!composeContext.trim()) {
+      toast.error("Please enter what you want to say");
+      return;
+    }
+    
+    if (!contactId) {
+      toast.error("Contact information is missing");
+      return;
+    }
+
+    try {
+      const cType = contactType || "lead";
+      const response = await composeMessage(
+        cType,
+        contactId,
+        messageType,
+        composeContext.trim(),
+        undefined,
+        contactPhone,
+        undefined
+      );
+
+      if (response?.message) {
+        onMessageGenerated(response.message);
+        toast.success("Message composed!");
+        setShowComposeInput(false);
+        setComposeContext("");
+        setIsOpen(false);
+      }
+    } catch (error: any) {
+      console.error("AI compose error:", error);
+      toast.error(`Failed to compose message: ${error.message}`);
+    }
+  };
+
   // Quick insert actions - these don't use AI, just insert text
   const handleAddScheduleCall = () => {
     const scheduleText = currentMessage 
@@ -121,6 +167,7 @@ export function AIWritingAssistant({
   };
 
   const actions = [
+    { type: "compose" as ActionType, label: "Compose Message", icon: PenLine, description: "Write new with context" },
     { type: "generate" as ActionType, label: "Generate Reply", icon: MessageSquare, description: "Create a contextual reply" },
     { type: "improve" as ActionType, label: "Improve", icon: Sparkles, description: "Make it better" },
     { type: "shorter" as ActionType, label: "Make Shorter", icon: Zap, description: "Condense the message" },
@@ -139,12 +186,59 @@ export function AIWritingAssistant({
           <Sparkles className="h-5 w-5 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 md:w-64 p-3" align="start" side="top" sideOffset={8}>
-        <div className="space-y-1.5">
-          <p className="text-sm md:text-xs font-semibold text-muted-foreground px-2 py-1.5">
-            AI Writing Assistant
-          </p>
-          {actions.map((action) => (
+      <PopoverContent className="w-80 md:w-72 p-3" align="start" side="top" sideOffset={8}>
+        {showComposeInput ? (
+          // Compose with context input view (Gmail-style)
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setShowComposeInput(false)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <p className="text-sm font-semibold text-muted-foreground">
+                Compose Message
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Input
+                placeholder={`What should we tell ${extractFirstName(contactName) || 'them'}?`}
+                value={composeContext}
+                onChange={(e) => setComposeContext(e.target.value)}
+                disabled={isLoading}
+                onKeyDown={(e) => e.key === 'Enter' && handleComposeWithContext()}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground px-1">
+                e.g., "Let him know I sent the management agreement and need it signed"
+              </p>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={handleComposeWithContext}
+              disabled={isLoading || !composeContext.trim()}
+              className="w-full"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <PenLine className="h-4 w-4 mr-2" />
+              )}
+              Generate Message
+            </Button>
+          </div>
+        ) : (
+          // Main menu view
+          <div className="space-y-1.5">
+            <p className="text-sm md:text-xs font-semibold text-muted-foreground px-2 py-1.5">
+              AI Writing Assistant
+            </p>
+            {actions.map((action) => (
             <button
               key={action.type}
               onClick={() => handleAction(action.type)}
@@ -191,8 +285,9 @@ export function AIWritingAssistant({
               <p className="font-medium">+ Income Analysis</p>
               <p className="text-sm md:text-xs text-muted-foreground">Offer free report</p>
             </div>
-          </button>
-        </div>
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
