@@ -8,10 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Sparkles, Calendar, Wrench, AlertCircle, CheckCircle2, User } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Loader2, Sparkles, Calendar as CalendarIcon, Wrench, AlertCircle, CheckCircle2, User, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+
 interface SchedulePredictiveMaintenanceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,14 +46,26 @@ export function SchedulePredictiveMaintenanceModal({
   preselectedPropertyId
 }: SchedulePredictiveMaintenanceModalProps) {
   const queryClient = useQueryClient();
+  const [currentStep, setCurrentStep] = useState(1);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>(preselectedPropertyId || "");
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [lastMaintenanceDates, setLastMaintenanceDates] = useState<Record<string, Date | undefined>>({});
   const [autoAssignVendors, setAutoAssignVendors] = useState(true);
   const [manualVendorId, setManualVendorId] = useState<string>("");
   const [autoDispatch, setAutoDispatch] = useState(false);
   const [notifyOwner, setNotifyOwner] = useState(true);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AIResponse | null>(null);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (open) {
+      setCurrentStep(1);
+      setSelectedTasks(new Set());
+      setLastMaintenanceDates({});
+      setAiSuggestions(null);
+    }
+  }, [open]);
 
   // Fetch properties
   const { data: properties } = useQuery({
@@ -106,20 +124,26 @@ export function SchedulePredictiveMaintenanceModal({
     enabled: !!selectedPropertyId
   });
 
-  // Get AI suggestions when property is selected
-  useEffect(() => {
-    if (selectedPropertyId && templates?.length) {
-      fetchAISuggestions();
-    }
-  }, [selectedPropertyId, templates]);
-
+  // Get AI suggestions when step 3 is reached
   const fetchAISuggestions = async () => {
     if (!selectedPropertyId) return;
     
     setIsLoadingAI(true);
     try {
+      // Build last maintenance data for AI
+      const lastMaintenanceData = Object.entries(lastMaintenanceDates).reduce((acc, [templateId, date]) => {
+        if (date) {
+          const template = templates?.find(t => t.id === templateId);
+          acc[template?.name || templateId] = format(date, "yyyy-MM-dd");
+        }
+        return acc;
+      }, {} as Record<string, string>);
+
       const { data, error } = await supabase.functions.invoke("ai-suggest-maintenance-schedule", {
-        body: { propertyId: selectedPropertyId }
+        body: { 
+          propertyId: selectedPropertyId,
+          lastMaintenanceDates: lastMaintenanceData
+        }
       });
       
       if (error) throw error;
@@ -137,7 +161,6 @@ export function SchedulePredictiveMaintenanceModal({
       }
     } catch (err) {
       console.error("Failed to get AI suggestions:", err);
-      // Fall back to showing all templates without suggestions
       setAiSuggestions(null);
     } finally {
       setIsLoadingAI(false);
@@ -233,7 +256,6 @@ export function SchedulePredictiveMaintenanceModal({
           }
         } catch (notifyErr) {
           console.error("Failed to send notifications:", notifyErr);
-          // Don't throw - scheduling was successful, notifications are secondary
         }
       }
 
@@ -305,8 +327,31 @@ export function SchedulePredictiveMaintenanceModal({
     return icons[category] || "🔧";
   };
 
+  const handleNextStep = () => {
+    if (currentStep === 2) {
+      // Moving to step 3, fetch AI suggestions
+      fetchAISuggestions();
+    }
+    setCurrentStep(prev => Math.min(prev + 1, 5));
+  };
+
+  const handlePrevStep = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
   const selectedProperty = properties?.find(p => p.id === selectedPropertyId);
   const alreadyScheduledIds = new Set(existingSchedules?.filter(s => s.is_enabled).map(s => s.template_id));
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1: return !!selectedPropertyId;
+      case 2: return true; // Last maintenance dates are optional
+      case 3: return selectedTasks.size > 0;
+      case 4: return autoAssignVendors || !!manualVendorId;
+      case 5: return true;
+      default: return false;
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -317,36 +362,131 @@ export function SchedulePredictiveMaintenanceModal({
             Schedule Predictive Maintenance
           </DialogTitle>
           <DialogDescription>
-            Set up recurring maintenance schedules with AI-powered recommendations.
+            Step {currentStep} of 5: {
+              currentStep === 1 ? "Select Property" :
+              currentStep === 2 ? "Last Maintenance Dates" :
+              currentStep === 3 ? "Select Tasks" :
+              currentStep === 4 ? "Vendor Assignment" :
+              "Automation Settings"
+            }
           </DialogDescription>
         </DialogHeader>
 
+        {/* Progress Indicator */}
+        <div className="flex items-center gap-2 mb-4">
+          {[1, 2, 3, 4, 5].map((step) => (
+            <div
+              key={step}
+              className={cn(
+                "flex-1 h-2 rounded-full transition-colors",
+                step <= currentStep ? "bg-primary" : "bg-muted"
+              )}
+            />
+          ))}
+        </div>
+
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
           {/* Step 1: Property Selection */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Step 1: Select Property</Label>
-            <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a property..." />
-              </SelectTrigger>
-              <SelectContent>
-                {properties?.map(property => (
-                  <SelectItem key={property.id} value={property.id}>
-                    {property.address || property.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {currentStep === 1 && (
+            <div className="space-y-4">
+              <Label className="text-sm font-medium">Select Property</Label>
+              <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a property..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {properties?.map(property => (
+                    <SelectItem key={property.id} value={property.id}>
+                      {property.address || property.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedProperty && (
+                <Card className="bg-muted/30">
+                  <CardContent className="p-4">
+                    <p className="text-sm font-medium">{selectedProperty.address || selectedProperty.name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Property since {format(new Date(selectedProperty.created_at), "MMM yyyy")}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
 
-          {selectedPropertyId && (
+          {/* Step 2: Last Maintenance Dates */}
+          {currentStep === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <History className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">When was the last maintenance performed?</Label>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Enter dates for any maintenance that has been done. This helps AI schedule tasks appropriately.
+              </p>
+              <ScrollArea className="h-[350px] border rounded-lg p-3">
+                <div className="space-y-3">
+                  {templates?.map(template => (
+                    <div
+                      key={template.id}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{getCategoryIcon(template.category)}</span>
+                        <div>
+                          <p className="text-sm font-medium">{template.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Recommended every {template.frequency_months} month{template.frequency_months > 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "w-[140px] justify-start text-left font-normal",
+                              !lastMaintenanceDates[template.id] && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {lastMaintenanceDates[template.id]
+                              ? format(lastMaintenanceDates[template.id]!, "MMM d, yyyy")
+                              : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                          <Calendar
+                            mode="single"
+                            selected={lastMaintenanceDates[template.id]}
+                            onSelect={(date) => setLastMaintenanceDates(prev => ({
+                              ...prev,
+                              [template.id]: date
+                            }))}
+                            disabled={(date) => date > new Date()}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Step 3: Task Selection */}
+          {currentStep === 3 && (
             <>
               {/* AI Insights */}
               {isLoadingAI ? (
                 <Card className="border-primary/20 bg-primary/5">
                   <CardContent className="p-4 flex items-center gap-3">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <span className="text-sm">AI analyzing property for optimal schedule...</span>
+                    <span className="text-sm">AI analyzing property and maintenance history...</span>
                   </CardContent>
                 </Card>
               ) : aiSuggestions?.property_insights ? (
@@ -368,10 +508,9 @@ export function SchedulePredictiveMaintenanceModal({
                 </Card>
               ) : null}
 
-              {/* Step 2: Task Selection */}
               <div className="space-y-2 flex-1 min-h-0">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Step 2: Select Maintenance Tasks</Label>
+                  <Label className="text-sm font-medium">Select Maintenance Tasks</Label>
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={selectAllTasks}>
                       Select All
@@ -415,7 +554,7 @@ export function SchedulePredictiveMaintenanceModal({
                             </div>
                             <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
+                                <CalendarIcon className="h-3 w-3" />
                                 Every {template.frequency_months} month{template.frequency_months > 1 ? "s" : ""}
                               </span>
                               {suggestion && (
@@ -437,105 +576,147 @@ export function SchedulePredictiveMaintenanceModal({
                   </div>
                 </ScrollArea>
               </div>
-
-              {/* Step 3: Vendor Assignment */}
-              <div className="space-y-3 border-t pt-4">
-                <Label className="text-sm font-medium">Step 3: Vendor Assignment</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <Wrench className="h-4 w-4 text-muted-foreground" />
-                      <Label htmlFor="auto-assign" className="text-sm">Auto-assign by specialty</Label>
-                    </div>
-                    <Switch
-                      id="auto-assign"
-                      checked={autoAssignVendors}
-                      onCheckedChange={(checked) => {
-                        setAutoAssignVendors(checked);
-                        if (checked) setManualVendorId("");
-                      }}
-                    />
-                  </div>
-                  {!autoAssignVendors && (
-                    <div className="p-3 rounded-lg border bg-muted/30">
-                      <Label className="text-sm mb-2 block flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        Select Vendor
-                      </Label>
-                      <Select value={manualVendorId} onValueChange={setManualVendorId}>
-                        <SelectTrigger className="h-9">
-                          <SelectValue placeholder="Choose vendor..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vendors?.map(vendor => (
-                            <SelectItem key={vendor.id} value={vendor.id}>
-                              {vendor.name} {vendor.specialty?.length > 0 && `(${vendor.specialty.join(", ")})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Step 4: Automation Settings */}
-              <div className="space-y-3 border-t pt-4">
-                <Label className="text-sm font-medium">Step 4: Automation Settings</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <Label htmlFor="auto-dispatch" className="text-sm">Auto-dispatch (7 days prior)</Label>
-                    </div>
-                    <Switch
-                      id="auto-dispatch"
-                      checked={autoDispatch}
-                      onCheckedChange={setAutoDispatch}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                      <Label htmlFor="notify-owner" className="text-sm">Notify owner</Label>
-                    </div>
-                    <Switch
-                      id="notify-owner"
-                      checked={notifyOwner}
-                      onCheckedChange={setNotifyOwner}
-                    />
-                  </div>
-                </div>
-              </div>
             </>
+          )}
+
+          {/* Step 4: Vendor Assignment */}
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <Label className="text-sm font-medium">Vendor Assignment</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-muted-foreground" />
+                    <Label htmlFor="auto-assign" className="text-sm">Auto-assign by specialty</Label>
+                  </div>
+                  <Switch
+                    id="auto-assign"
+                    checked={autoAssignVendors}
+                    onCheckedChange={(checked) => {
+                      setAutoAssignVendors(checked);
+                      if (checked) setManualVendorId("");
+                    }}
+                  />
+                </div>
+                {!autoAssignVendors && (
+                  <div className="p-3 rounded-lg border bg-muted/30">
+                    <Label className="text-sm mb-2 block flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      Select Vendor
+                    </Label>
+                    <Select value={manualVendorId} onValueChange={setManualVendorId}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Choose vendor..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vendors?.map(vendor => (
+                          <SelectItem key={vendor.id} value={vendor.id}>
+                            {vendor.name} {vendor.specialty?.length > 0 && `(${vendor.specialty.join(", ")})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <p className="text-sm text-muted-foreground">
+                    {autoAssignVendors 
+                      ? "The system will automatically assign the best-rated vendor for each task category."
+                      : manualVendorId 
+                        ? `All selected tasks will be assigned to ${vendors?.find(v => v.id === manualVendorId)?.name}.`
+                        : "Please select a vendor to assign all tasks to."}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Step 5: Automation Settings */}
+          {currentStep === 5 && (
+            <div className="space-y-4">
+              <Label className="text-sm font-medium">Automation Settings</Label>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <Label htmlFor="auto-dispatch" className="text-sm font-medium">Auto-dispatch</Label>
+                      <p className="text-xs text-muted-foreground">Automatically notify vendor 7 days before due date</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="auto-dispatch"
+                    checked={autoDispatch}
+                    onCheckedChange={setAutoDispatch}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <Label htmlFor="notify-owner" className="text-sm font-medium">Owner notifications</Label>
+                      <p className="text-xs text-muted-foreground">Send email to property owner about scheduled maintenance</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="notify-owner"
+                    checked={notifyOwner}
+                    onCheckedChange={setNotifyOwner}
+                  />
+                </div>
+              </div>
+
+              {/* Summary */}
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="p-4">
+                  <h4 className="font-medium text-sm mb-2">Summary</h4>
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <p>📍 Property: {selectedProperty?.address || selectedProperty?.name}</p>
+                    <p>📋 Tasks: {selectedTasks.size} maintenance task{selectedTasks.size !== 1 ? "s" : ""}</p>
+                    <p>👷 Vendor: {autoAssignVendors ? "Auto-assigned by specialty" : vendors?.find(v => v.id === manualVendorId)?.name}</p>
+                    <p>📧 Owner notification: {notifyOwner ? "Enabled" : "Disabled"}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="flex justify-between items-center border-t pt-4 mt-4">
           <div className="text-sm text-muted-foreground">
-            {selectedTasks.size} task{selectedTasks.size !== 1 ? "s" : ""} selected
+            {currentStep === 3 && `${selectedTasks.size} task${selectedTasks.size !== 1 ? "s" : ""} selected`}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => createSchedulesMutation.mutate()}
-              disabled={!selectedPropertyId || selectedTasks.size === 0 || createSchedulesMutation.isPending}
-            >
-              {createSchedulesMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Scheduling...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Schedule {selectedTasks.size} Task{selectedTasks.size !== 1 ? "s" : ""}
-                </>
-              )}
-            </Button>
+            {currentStep > 1 && (
+              <Button variant="outline" onClick={handlePrevStep}>
+                Back
+              </Button>
+            )}
+            {currentStep < 5 ? (
+              <Button onClick={handleNextStep} disabled={!canProceed()}>
+                Continue
+              </Button>
+            ) : (
+              <Button
+                onClick={() => createSchedulesMutation.mutate()}
+                disabled={!canProceed() || createSchedulesMutation.isPending}
+              >
+                {createSchedulesMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Scheduling...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Schedule {selectedTasks.size} Task{selectedTasks.size !== 1 ? "s" : ""}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
