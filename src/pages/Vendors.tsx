@@ -26,6 +26,7 @@ import DeleteVendorDialog from "@/components/maintenance/DeleteVendorDialog";
 import { StartWorkOrderDialog } from "@/components/maintenance/StartWorkOrderDialog";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import PremiumWorkOrderModal from "@/components/maintenance/PremiumWorkOrderModal";
+import PredictiveMaintenanceCalendar from "@/components/maintenance/PredictiveMaintenanceCalendar";
 
 const Vendors = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -235,6 +236,9 @@ const Vendors = () => {
 
         {/* Vendor Communications Tab */}
         <VendorCommunicationsTab />
+
+        {/* Predictive Maintenance Calendar */}
+        <PredictiveMaintenanceCalendar />
 
         {/* Vendor Payment Dashboard */}
         <VendorPaymentDashboard />
