@@ -84,23 +84,23 @@ export function MobileTopNav({ activeTab, onTabChange }: MobileTopNavProps) {
   };
 
   return (
-    <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50">
-      {/* Top gradient line */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+    <div className="sticky top-0 z-40 bg-background/98 backdrop-blur-xl border-b border-border/30 shadow-sm">
+      {/* Subtle gradient accent */}
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/5 via-primary/20 to-primary/5" />
       
       <div className="relative">
         {/* Left fade & scroll button */}
         <div 
           className={cn(
-            "absolute left-0 top-0 bottom-0 w-12 z-10 flex items-center justify-start pl-1",
-            "bg-gradient-to-r from-background via-background/80 to-transparent",
+            "absolute left-0 top-0 bottom-0 w-10 z-10 flex items-center justify-start pl-1",
+            "bg-gradient-to-r from-background via-background/90 to-transparent",
             "transition-opacity duration-200",
             showLeftFade ? "opacity-100" : "opacity-0 pointer-events-none"
           )}
         >
           <button
             onClick={() => scrollToDirection('left')}
-            className="w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center active:scale-95 transition-transform"
+            className="w-7 h-7 rounded-full bg-muted/90 border border-border/50 flex items-center justify-center active:scale-95 transition-transform shadow-sm"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -109,15 +109,15 @@ export function MobileTopNav({ activeTab, onTabChange }: MobileTopNavProps) {
         {/* Right fade & scroll button */}
         <div 
           className={cn(
-            "absolute right-0 top-0 bottom-0 w-12 z-10 flex items-center justify-end pr-1",
-            "bg-gradient-to-l from-background via-background/80 to-transparent",
+            "absolute right-0 top-0 bottom-0 w-10 z-10 flex items-center justify-end pr-1",
+            "bg-gradient-to-l from-background via-background/90 to-transparent",
             "transition-opacity duration-200",
             showRightFade ? "opacity-100" : "opacity-0 pointer-events-none"
           )}
         >
           <button
             onClick={() => scrollToDirection('right')}
-            className="w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center active:scale-95 transition-transform"
+            className="w-7 h-7 rounded-full bg-muted/90 border border-border/50 flex items-center justify-center active:scale-95 transition-transform shadow-sm"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -127,7 +127,7 @@ export function MobileTopNav({ activeTab, onTabChange }: MobileTopNavProps) {
         <div 
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex overflow-x-auto scrollbar-hide py-2 px-3 gap-1"
+          className="flex overflow-x-auto scrollbar-hide py-2.5 px-3 gap-1.5"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {ALL_TABS.map((tab) => {
@@ -138,21 +138,21 @@ export function MobileTopNav({ activeTab, onTabChange }: MobileTopNavProps) {
                 ref={isActive ? activeTabRef : null}
                 onClick={() => onTabChange(tab.value)}
                 className={cn(
-                  "relative flex items-center gap-1.5 px-3 py-2 rounded-full whitespace-nowrap",
+                  "relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl whitespace-nowrap",
                   "transition-all duration-200 touch-manipulation shrink-0",
-                  "active:scale-95 text-sm font-medium",
+                  "active:scale-[0.97] text-[13px] font-medium",
                   isActive 
-                    ? "text-primary-foreground" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ? "text-primary-foreground shadow-md" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 )}
               >
-                {/* Active background */}
+                {/* Active background with gradient */}
                 {isActive && (
                   <motion.div
                     layoutId="mobileActiveTab"
-                    className="absolute inset-0 bg-primary rounded-full"
+                    className="absolute inset-0 bg-gradient-to-r from-primary to-primary/90 rounded-xl"
                     initial={false}
-                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
                 
