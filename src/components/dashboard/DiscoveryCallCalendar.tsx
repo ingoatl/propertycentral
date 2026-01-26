@@ -445,11 +445,13 @@ export function DiscoveryCallCalendar() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Team</SelectItem>
-                {teamMembers.map((member) => (
-                  <SelectItem key={member.id} value={member.id}>
-                    {member.first_name || member.email}
-                  </SelectItem>
-                ))}
+                {teamMembers
+                  .filter((member) => member.id && member.id.trim() !== "")
+                  .map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.first_name || member.email}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Button
