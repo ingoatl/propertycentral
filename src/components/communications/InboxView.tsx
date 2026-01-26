@@ -4145,19 +4145,8 @@ export function InboxView({
                                       ? "bg-primary text-primary-foreground" 
                                       : "bg-muted"
                                   }`}>
-                                    {/* Call Recording Player - render OUTSIDE the colored bubble */}
-                                    {msg.type === "call" && msg.call_recording_url && (
-                                      <div className="mb-2">
-                                        <CallRecordingPlayer
-                                          recordingUrl={msg.call_recording_url}
-                                          duration={msg.call_duration}
-                                          transcript={msg.body}
-                                          isOutbound={isOutbound}
-                                        />
-                                      </div>
-                                    )}
-                                    {/* Simple call indicator when no recording */}
-                                    {msg.type === "call" && !msg.call_recording_url && (
+                                    {/* Simple call indicator */}
+                                    {msg.type === "call" && (
                                       <div className={`flex items-center gap-2 text-sm mb-2 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
                                         <Phone className="h-3.5 w-3.5" />
                                         <span>{isOutbound ? "Outgoing call" : "Incoming call"}</span>
@@ -4280,6 +4269,17 @@ export function InboxView({
                                     )}
                                     <span>{format(new Date(msg.created_at), "h:mm a")}</span>
                                   </div>
+                                  {/* Call Recording Player - OUTSIDE the bubble */}
+                                  {msg.type === "call" && msg.call_recording_url && (
+                                    <div className="mt-2">
+                                      <CallRecordingPlayer
+                                        recordingUrl={msg.call_recording_url}
+                                        duration={msg.call_duration}
+                                        transcript={msg.body}
+                                        isOutbound={isOutbound}
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>

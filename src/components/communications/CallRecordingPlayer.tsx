@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Play, Pause, Volume2, Download, FileText, ChevronDown } from "lucide-react";
+import { Play, Pause, Download, FileText, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -21,7 +21,7 @@ export function CallRecordingPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(duration || 0);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [showTranscript, setShowTranscript] = useState(false); // COLLAPSED by default
+  const [showTranscript, setShowTranscript] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
@@ -100,7 +100,7 @@ export function CallRecordingPlayer({
   const displayDuration = audioDuration > 0 && isFinite(audioDuration) ? formatTime(audioDuration) : "--:--";
 
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
+    <div className="space-y-2">
       {/* Audio element */}
       <audio
         ref={audioRef}
@@ -111,42 +111,42 @@ export function CallRecordingPlayer({
         preload="metadata"
       />
 
-      {/* Player Controls */}
-      <div className="p-3 flex items-center gap-3">
+      {/* Compact Player Controls */}
+      <div className="bg-muted/50 rounded-lg p-2.5 flex items-center gap-2.5">
         {/* Play Button */}
         <button
           onClick={handlePlayPause}
           className={cn(
-            "h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0",
+            "h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0",
             "bg-primary text-primary-foreground",
             "hover:bg-primary/90 transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
           )}
         >
           {isPlaying ? (
-            <Pause className="h-4 w-4" />
+            <Pause className="h-3.5 w-3.5" />
           ) : (
-            <Play className="h-4 w-4 ml-0.5" />
+            <Play className="h-3.5 w-3.5 ml-0.5" />
           )}
         </button>
 
         {/* Progress Bar */}
-        <div className="flex-1 flex items-center gap-3">
+        <div className="flex-1 flex items-center gap-2">
           <div 
             ref={progressRef}
-            className="flex-1 h-1.5 bg-muted rounded-full cursor-pointer relative group"
+            className="flex-1 h-1 bg-border rounded-full cursor-pointer relative group"
             onClick={handleProgressClick}
           >
             <div 
               className="h-full bg-primary rounded-full transition-all relative"
               style={{ width: `${progress}%` }}
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm" />
             </div>
           </div>
           
           {/* Time */}
-          <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+          <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
             {formatTime(currentTime)} / {displayDuration}
           </span>
         </div>
@@ -156,7 +156,7 @@ export function CallRecordingPlayer({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="h-7 px-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
             onClick={handlePlaybackRateChange}
           >
             {playbackRate}x
@@ -164,51 +164,47 @@ export function CallRecordingPlayer({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title="Volume"
-          >
-            <Volume2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={handleDownload}
             title="Download recording"
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-3.5 w-3.5" />
           </Button>
+          {transcript && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-7 w-7 text-muted-foreground hover:text-foreground",
+                showTranscript && "bg-accent text-foreground"
+              )}
+              onClick={() => setShowTranscript(!showTranscript)}
+              title={showTranscript ? "Hide transcript" : "Show transcript"}
+            >
+              <FileText className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Transcript Section - COLLAPSED by default */}
+      {/* Transcript Section - Only visible when toggled */}
       {transcript && (
         <Collapsible open={showTranscript} onOpenChange={setShowTranscript}>
-          <CollapsibleTrigger asChild>
-            <button className="w-full px-3 py-2 flex items-center justify-between hover:bg-muted/50 transition-colors border-t border-border">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">
-                  {showTranscript ? "Hide Transcript" : "Show Transcript"}
-                </span>
-              </div>
-              <ChevronDown className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform",
-                showTranscript && "rotate-180"
-              )} />
-            </button>
-          </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="border-t border-border">
-              <div className="px-3 py-2 flex justify-end border-b border-border bg-muted/30">
+            <div className="bg-muted/30 rounded-lg border border-border/50">
+              <div className="px-3 py-2 flex items-center justify-between border-b border-border/50">
+                <div className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Transcript</span>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
                   onClick={handleDownloadTranscript}
                 >
                   <Download className="h-3 w-3 mr-1" />
-                  Download Transcript
+                  Download
                 </Button>
               </div>
               <div className="p-3 max-h-48 overflow-y-auto">

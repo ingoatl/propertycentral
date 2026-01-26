@@ -374,6 +374,11 @@ All colors MUST be HSL.
 .collapsible-content[data-state="closed"] {
   grid-template-rows: 0fr;
   pointer-events: none;
+  visibility: hidden;
+}
+
+.collapsible-content[data-state="open"] {
+  visibility: visible;
 }
 
 .collapsible-content > .collapsible-content-inner {
