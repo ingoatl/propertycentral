@@ -337,7 +337,9 @@ const handler = async (req: Request): Promise<Response> => {
       .is("offboarded_at", null)
       .single();
 
-    const appUrl = Deno.env.get("VITE_APP_URL") || "https://propertycentral.lovable.app";
+    // Always use the published URL for owner invite emails - ensures links work regardless of env
+    const appUrl = "https://propertycentral.lovable.app";
+    console.log(`[owner-magic-link] Using app URL: ${appUrl}`);
     // Token never expires - set to 100 years from now
     const expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
     

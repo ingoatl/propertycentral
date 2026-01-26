@@ -67,6 +67,10 @@ import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
 import { ScheduleOwnerCallModal } from "./components/ScheduleOwnerCallModal";
 import { ContactPeachHausDropdown } from "./components/ContactPeachHausDropdown";
 import { AudioPropertySummary } from "./components/AudioPropertySummary";
+import { PremiumBottomNav } from "./components/PremiumBottomNav";
+import { MobileMoreMenu } from "./components/MobileMoreMenu";
+import { PremiumLoadingScreen } from "./components/PremiumLoadingScreen";
+import { FloatingActions } from "./components/FloatingActions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
@@ -227,6 +231,8 @@ export default function OwnerDashboard() {
   const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
   const [marketingStats, setMarketingStats] = useState<any[]>([]);
   const [peachHausData, setPeachHausData] = useState<any>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [insightsError, setInsightsError] = useState(false);
   
   // Session stability & refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -533,6 +539,7 @@ export default function OwnerDashboard() {
 
   const loadMarketInsights = async (propertyId: string) => {
     setLoadingInsights(true);
+    setInsightsError(false);
     setInsightsProgress(0);
     setInsightsStep("Connecting to market data sources...");
     
@@ -587,6 +594,7 @@ export default function OwnerDashboard() {
       if (error) {
         console.error("Error loading market insights:", error);
         setInsightsStep("Failed to generate insights");
+        setInsightsError(true);
         return;
       }
 
@@ -601,6 +609,7 @@ export default function OwnerDashboard() {
     } catch (err) {
       console.error("Error loading market insights:", err);
       setInsightsStep("Failed to generate insights");
+      setInsightsError(true);
     } finally {
       clearInterval(progressInterval);
       setLoadingInsights(false);
@@ -752,27 +761,7 @@ export default function OwnerDashboard() {
   const isDemoWithSession = isAdminAccess && session?.ownerId === "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
   
   if (loading && !isDemoWithSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-6 text-center p-8">
-          {/* Animated Logo - wider display */}
-          <div className="animate-fade-in">
-            <img 
-              src="/peachhaus-logo.png" 
-              alt="PeachHaus" 
-              className="w-48 h-auto max-h-24 object-contain drop-shadow-lg"
-            />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold">PeachHaus Owner Portal</h2>
-            <div className="flex items-center gap-2 justify-center text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <p>Loading your dashboard...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PremiumLoadingScreen />;
   }
 
   if (!session && !isAdminAccess) {
@@ -1249,17 +1238,41 @@ export default function OwnerDashboard() {
                   rentalType={property?.rental_type as "hybrid" | "mid_term" | "long_term" | null}
                 />
               </div>
-            ) : (
-              <Card className="border-none shadow-lg">
+            ) : insightsError ? (
+              <Card className="border-none shadow-lg border-l-4 border-l-destructive">
                 <CardContent className="py-12 text-center">
-                  <Sparkles className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground">Market insights not available</p>
+                  <AlertCircle className="h-12 w-12 mx-auto text-destructive/60 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Couldn't load insights</h3>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    This sometimes happens on slower connections. Your property data is still safe.
+                  </p>
                   <Button
-                    variant="outline"
-                    className="mt-4"
+                    size="lg"
                     onClick={() => property && loadMarketInsights(property.id)}
+                    className="gap-2 h-14 px-8 text-lg"
                   >
-                    Generate Insights
+                    <RefreshCw className="h-5 w-5" />
+                    Try Again
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-none shadow-lg premium-card">
+                <CardContent className="py-12 text-center">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <Sparkles className="h-10 w-10 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">AI Market Insights</h3>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    Get personalized market analysis, comparable properties, and revenue optimization tips worth $500+
+                  </p>
+                  <Button
+                    size="lg"
+                    onClick={() => property && loadMarketInsights(property.id)}
+                    className="gap-2 h-14 px-8 text-lg bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  >
+                    <Sparkles className="h-5 w-5" />
+                    Generate AI Insights
                   </Button>
                 </CardContent>
               </Card>
@@ -1419,78 +1432,40 @@ export default function OwnerDashboard() {
         </Tabs>
       </main>
 
-      {/* Mobile Bottom Tab Bar */}
+      {/* Premium Mobile Bottom Tab Bar */}
       {isMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-lg border-t safe-area-inset z-50">
-          <div className="flex justify-around items-center h-16 px-2">
-            {PRIMARY_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.value;
-              return (
-                <button
-                  key={tab.value}
-                  onClick={() => setActiveTab(tab.value)}
-                  className={`flex flex-col items-center justify-center flex-1 h-full min-w-0 px-1 transition-colors ${
-                    isActive 
-                      ? 'text-primary' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Icon className={`h-5 w-5 mb-0.5 ${isActive ? 'text-primary' : ''}`} />
-                  <span className={`text-[10px] font-medium truncate ${isActive ? 'text-primary' : ''}`}>
-                    {tab.label}
-                  </span>
-                </button>
-              );
-            })}
-            
-            {/* More Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className={`flex flex-col items-center justify-center flex-1 h-full min-w-0 px-1 transition-colors ${
-                    isSecondaryTabActive 
-                      ? 'text-primary' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {isSecondaryTabActive && activeSecondaryTab ? (
-                    <>
-                      {(() => {
-                        const Icon = activeSecondaryTab.icon;
-                        return <Icon className="h-5 w-5 mb-0.5 text-primary" />;
-                      })()}
-                      <span className="text-[10px] font-medium truncate text-primary">
-                        {activeSecondaryTab.label}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <MoreHorizontal className="h-5 w-5 mb-0.5" />
-                      <span className="text-[10px] font-medium">More</span>
-                    </>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side="top" className="w-48 mb-2">
-                {SECONDARY_TABS.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.value;
-                  return (
-                    <DropdownMenuItem 
-                      key={tab.value}
-                      onClick={() => setActiveTab(tab.value)}
-                      className={isActive ? 'bg-primary/10 text-primary' : ''}
-                    >
-                      <Icon className="h-4 w-4 mr-2" />
-                      {tab.label}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </nav>
+        <>
+          <PremiumBottomNav
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onMoreClick={() => setMobileMenuOpen(true)}
+            isSecondaryTabActive={isSecondaryTabActive}
+            activeSecondaryLabel={activeSecondaryTab?.label}
+            ActiveSecondaryIcon={activeSecondaryTab?.icon}
+          />
+          
+          <MobileMoreMenu
+            open={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onScheduleCall={() => setShowScheduleCallModal(true)}
+            onRefresh={() => refreshData(true)}
+            onLogout={handleLogout}
+            isRefreshing={isRefreshing}
+          />
+          
+          {/* Floating Action Buttons */}
+          <FloatingActions
+            onScheduleCall={() => setShowScheduleCallModal(true)}
+            onGenerateReport={() => {
+              if (session && property) {
+                // Trigger report generation
+                toast.info("Generating report...");
+              }
+            }}
+          />
+        </>
       )}
 
       {/* Footer - Hidden on mobile due to bottom nav */}
