@@ -10194,6 +10194,7 @@ export type Database = {
       team_routing: {
         Row: {
           created_at: string | null
+          department: string | null
           display_name: string
           dtmf_digit: string | null
           forward_to_browser: boolean | null
@@ -10201,12 +10202,15 @@ export type Database = {
           ghl_number: string
           id: string
           is_active: boolean | null
+          mobile_number: string | null
+          skills: string[] | null
           updated_at: string | null
           user_id: string | null
           voicemail_enabled: boolean | null
         }
         Insert: {
           created_at?: string | null
+          department?: string | null
           display_name: string
           dtmf_digit?: string | null
           forward_to_browser?: boolean | null
@@ -10214,12 +10218,15 @@ export type Database = {
           ghl_number: string
           id?: string
           is_active?: boolean | null
+          mobile_number?: string | null
+          skills?: string[] | null
           updated_at?: string | null
           user_id?: string | null
           voicemail_enabled?: boolean | null
         }
         Update: {
           created_at?: string | null
+          department?: string | null
           display_name?: string
           dtmf_digit?: string | null
           forward_to_browser?: boolean | null
@@ -10227,6 +10234,8 @@ export type Database = {
           ghl_number?: string
           id?: string
           is_active?: boolean | null
+          mobile_number?: string | null
+          skills?: string[] | null
           updated_at?: string | null
           user_id?: string | null
           voicemail_enabled?: boolean | null
@@ -10769,6 +10778,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_presence: {
+        Row: {
+          created_at: string
+          device_info: Json | null
+          id: string
+          is_available: boolean
+          last_seen: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_info?: Json | null
+          id?: string
+          is_available?: boolean
+          last_seen?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_info?: Json | null
+          id?: string
+          is_available?: boolean
+          last_seen?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

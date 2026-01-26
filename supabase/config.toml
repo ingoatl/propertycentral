@@ -1,5 +1,8 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.twilio-call-transfer]
+verify_jwt = false
+
 [functions.export-owner-property-data]
 verify_jwt = true
 
