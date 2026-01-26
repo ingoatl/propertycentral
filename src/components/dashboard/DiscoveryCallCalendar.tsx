@@ -40,6 +40,8 @@ import {
   CalendarCheck,
   Tag,
   Trash2,
+  Plus,
+  Briefcase,
 } from "lucide-react";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { useQueryClient } from "@tanstack/react-query";
@@ -64,6 +66,9 @@ import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 import { useGhlCalendarSync, GhlAppointment } from "@/hooks/useGhlCalendarSync";
 import { AdminRescheduleDialog } from "@/components/scheduling/AdminRescheduleDialog";
 import { OwnerCallDetailModal } from "@/components/calendar/OwnerCallDetailModal";
+import { useTeamAppointments, TeamAppointment, APPOINTMENT_TYPES } from "@/hooks/useTeamAppointments";
+import { CreateAppointmentDialog } from "@/components/calendar/CreateAppointmentDialog";
+import { AppointmentDetailModal } from "@/components/calendar/AppointmentDetailModal";
 interface DiscoveryCall {
   id: string;
   scheduled_at: string;
@@ -187,9 +192,18 @@ export function DiscoveryCallCalendar() {
   const [selectedCall, setSelectedCall] = useState<DiscoveryCall | null>(null);
   const [selectedOwnerCall, setSelectedOwnerCall] = useState<OwnerCall | null>(null);
   const [selectedGhlEvent, setSelectedGhlEvent] = useState<GhlAppointment | null>(null);
+  const [selectedTeamAppointment, setSelectedTeamAppointment] = useState<TeamAppointment | null>(null);
+  const [showCreateAppointment, setShowCreateAppointment] = useState(false);
   // Local state for optimistic deletion
   const [deletedCallIds, setDeletedCallIds] = useState<Set<string>>(new Set());
   const [deletedOwnerCallIds, setDeletedOwnerCallIds] = useState<Set<string>>(new Set());
+
+  // Fetch team appointments
+  const { data: teamAppointments = [], isLoading: isLoadingTeamAppts } = useTeamAppointments({
+    startDate: startOfMonth(currentMonth),
+    endDate: endOfMonth(currentMonth),
+    status: ["scheduled", "confirmed"],
+  });
 
   // Fetch discovery calls
   const { data: calls = [], isLoading: isLoadingCalls } = useQuery({
@@ -275,7 +289,7 @@ export function DiscoveryCallCalendar() {
   });
 
 
-  const isLoading = isLoadingCalls || isLoadingGhl || isLoadingOwnerCalls;
+  const isLoading = isLoadingCalls || isLoadingGhl || isLoadingOwnerCalls || isLoadingTeamAppts;
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -324,12 +338,17 @@ export function DiscoveryCallCalendar() {
     );
   };
 
+  const getTeamAppointmentsForDay = (date: Date) => {
+    return teamAppointments.filter((apt) => isSameDay(new Date(apt.scheduled_at), date));
+  };
+
   const getAllEventsForDay = (date: Date) => {
     const dayCalls = getCallsForDay(date).map(call => ({ type: 'discovery' as const, data: call, time: new Date(call.scheduled_at) }));
     const dayInspections = getInspectionsForDay(date).map(call => ({ type: 'inspection' as const, data: call, time: new Date(call.scheduled_at) }));
     const dayGhl = getGhlEventsForDay(date).map(apt => ({ type: 'ghl' as const, data: apt, time: new Date(apt.scheduled_at) }));
     const dayOwnerCalls = getOwnerCallsForDay(date).map(call => ({ type: 'owner_call' as const, data: call, time: new Date(call.scheduled_at) }));
-    return [...dayCalls, ...dayInspections, ...dayGhl, ...dayOwnerCalls].sort((a, b) => a.time.getTime() - b.time.getTime());
+    const dayTeamAppts = getTeamAppointmentsForDay(date).map(apt => ({ type: 'team' as const, data: apt, time: new Date(apt.scheduled_at) }));
+    return [...dayCalls, ...dayInspections, ...dayGhl, ...dayOwnerCalls, ...dayTeamAppts].sort((a, b) => a.time.getTime() - b.time.getTime());
   };
 
   const upcomingCalls = regularCalls
@@ -348,12 +367,17 @@ export function DiscoveryCallCalendar() {
     .filter((call) => new Date(call.scheduled_at) >= new Date() && call.status === "scheduled")
     .slice(0, 5);
 
+  const upcomingTeamAppts = teamAppointments
+    .filter((apt) => new Date(apt.scheduled_at) >= new Date())
+    .slice(0, 5);
+
   // Combined upcoming events
   const allUpcomingEvents = [
     ...upcomingCalls.map(call => ({ type: 'discovery' as const, data: call, time: new Date(call.scheduled_at) })),
     ...upcomingInspections.map(call => ({ type: 'inspection' as const, data: call, time: new Date(call.scheduled_at) })),
     ...upcomingGhlEvents.map(apt => ({ type: 'ghl' as const, data: apt, time: new Date(apt.scheduled_at) })),
     ...upcomingOwnerCalls.map(call => ({ type: 'owner_call' as const, data: call, time: new Date(call.scheduled_at) })),
+    ...upcomingTeamAppts.map(apt => ({ type: 'team' as const, data: apt, time: new Date(apt.scheduled_at) })),
   ].sort((a, b) => a.time.getTime() - b.time.getTime()).slice(0, 8);
 
   return (
@@ -381,9 +405,22 @@ export function DiscoveryCallCalendar() {
                 <User className="h-3 w-3 mr-1" />
                 Owner
               </Badge>
+              <Badge variant="outline" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                <Briefcase className="h-3 w-3 mr-1" />
+                Team
+              </Badge>
             </div>
           </CardTitle>
           <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              className="h-9 px-3 text-xs font-medium"
+              onClick={() => setShowCreateAppointment(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Create
+            </Button>
             <Button
               variant="outline"
               size="sm"
