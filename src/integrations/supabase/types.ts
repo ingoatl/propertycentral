@@ -8747,6 +8747,33 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       reconciliation_audit_log: {
         Row: {
           action: string
@@ -9721,6 +9748,45 @@ export type Database = {
           },
         ]
       }
+      team_channel_templates: {
+        Row: {
+          auto_join_roles: string[] | null
+          channel_type: string | null
+          created_at: string | null
+          description: string | null
+          display_name: string
+          icon_emoji: string | null
+          id: string
+          is_system: boolean | null
+          name: string
+          sort_order: number | null
+        }
+        Insert: {
+          auto_join_roles?: string[] | null
+          channel_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          icon_emoji?: string | null
+          id?: string
+          is_system?: boolean | null
+          name: string
+          sort_order?: number | null
+        }
+        Update: {
+          auto_join_roles?: string[] | null
+          channel_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          icon_emoji?: string | null
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
       team_channels: {
         Row: {
           allowed_roles: string[] | null
@@ -9759,6 +9825,56 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      team_daily_digests: {
+        Row: {
+          calls_scheduled: number | null
+          channel_id: string | null
+          created_at: string | null
+          digest_date: string
+          generated_at: string | null
+          highlights: Json | null
+          id: string
+          summary: string
+          tasks_due: number | null
+          urgent_items: Json | null
+          visits_scheduled: number | null
+        }
+        Insert: {
+          calls_scheduled?: number | null
+          channel_id?: string | null
+          created_at?: string | null
+          digest_date: string
+          generated_at?: string | null
+          highlights?: Json | null
+          id?: string
+          summary: string
+          tasks_due?: number | null
+          urgent_items?: Json | null
+          visits_scheduled?: number | null
+        }
+        Update: {
+          calls_scheduled?: number | null
+          channel_id?: string | null
+          created_at?: string | null
+          digest_date?: string
+          generated_at?: string | null
+          highlights?: Json | null
+          id?: string
+          summary?: string
+          tasks_due?: number | null
+          urgent_items?: Json | null
+          visits_scheduled?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_daily_digests_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "team_channels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_hub_invites: {
         Row: {
@@ -10124,6 +10240,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tenant_api_credentials: {
+        Row: {
+          created_at: string | null
+          credentials: Json
+          id: string
+          is_active: boolean | null
+          is_verified: boolean | null
+          last_verified_at: string | null
+          phone_numbers: Json | null
+          provider: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          credentials?: Json
+          id?: string
+          is_active?: boolean | null
+          is_verified?: boolean | null
+          last_verified_at?: string | null
+          phone_numbers?: Json | null
+          provider: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          credentials?: Json
+          id?: string
+          is_active?: boolean | null
+          is_verified?: boolean | null
+          last_verified_at?: string | null
+          phone_numbers?: Json | null
+          provider?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       tenant_applications: {
         Row: {
