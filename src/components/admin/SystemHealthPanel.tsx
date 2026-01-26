@@ -7,6 +7,7 @@ import { ExpenseWatchdogCard } from "@/components/admin/ExpenseWatchdogCard";
 import { PartnerSyncWatchdogCard } from "@/components/admin/PartnerSyncWatchdogCard";
 import { SyncStatusBar } from "@/components/admin/SyncStatusBar";
 import { IntegrationStatusDashboard } from "@/components/admin/IntegrationStatusDashboard";
+import { ComplianceWatchdogCard } from "@/components/admin/ComplianceWatchdogCard";
 import { Activity, Mail, DollarSign, Home, RefreshCw, Shield } from "lucide-react";
 
 export const SystemHealthPanel = () => {
@@ -19,10 +20,14 @@ export const SystemHealthPanel = () => {
 
       {/* Tabbed Watchdog Sections */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
           <TabsTrigger value="integrations" className="gap-1.5">
             <RefreshCw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Integrations</span>
+          </TabsTrigger>
+          <TabsTrigger value="compliance" className="gap-1.5">
+            <Shield className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Compliance</span>
           </TabsTrigger>
           <TabsTrigger value="email" className="gap-1.5">
             <Mail className="h-3.5 w-3.5" />
@@ -44,6 +49,10 @@ export const SystemHealthPanel = () => {
 
         <TabsContent value="integrations" className="mt-4">
           <IntegrationStatusDashboard />
+        </TabsContent>
+
+        <TabsContent value="compliance" className="mt-4">
+          <ComplianceWatchdogCard />
         </TabsContent>
 
         <TabsContent value="email" className="mt-4">

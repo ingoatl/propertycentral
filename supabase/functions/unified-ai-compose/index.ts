@@ -464,39 +464,135 @@ serve(async (req) => {
     // Step 3: Build the prompt with tone knowledge
     const prompt = buildPrompt(request, context, toneKnowledge || []);
 
-    // Step 4: Call Lovable AI Gateway
+    // Step 4: Check circuit breaker before calling AI
+    const { data: circuitBreaker } = await supabase
+      .from('ai_circuit_breaker')
+      .select('*')
+      .eq('service_name', 'unified-ai-compose')
+      .maybeSingle();
+    
+    let canProceed = true;
+    if (circuitBreaker?.state === 'open' && circuitBreaker.opened_at) {
+      const openedAt = new Date(circuitBreaker.opened_at);
+      const elapsedSeconds = (Date.now() - openedAt.getTime()) / 1000;
+      if (elapsedSeconds < circuitBreaker.reset_timeout_seconds) {
+        canProceed = false;
+      } else {
+        // Move to half-open
+        await supabase
+          .from('ai_circuit_breaker')
+          .update({ state: 'half_open', half_open_at: new Date().toISOString() })
+          .eq('service_name', 'unified-ai-compose');
+      }
+    }
+    
+    if (!canProceed) {
+      console.log('[CircuitBreaker] Circuit is OPEN, using fallback response');
+      // Return a graceful fallback
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `Hi ${context.contactProfile.name.split(' ')[0]},\n\nThank you for reaching out. I'll get back to you shortly with a more detailed response.\n\n- Ingo`,
+          subject: 'Following up',
+          qualityScore: 50,
+          validationIssues: ['Used fallback due to service recovery'],
+          contextUsed: { memoriesCount: 0, knowledgeEntriesUsed: [], questionsAnswered: 0, sentimentDetected: 'neutral', conversationPhase: 'unknown' },
+          metadata: { model: 'fallback', generationTimeMs: 0 },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Step 5: Call Lovable AI Gateway with retry logic
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableApiKey) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${lovableApiKey}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: "You are Ingo, a real property manager at PeachHaus Group. Write natural, human responses - never use emojis. Be conversational, helpful, and specific. Match the tone profile exactly." },
-          { role: "user", content: prompt }
-        ],
-        model: "google/gemini-3-flash-preview",
-        max_tokens: messageType === 'sms' ? 500 : 2000,
-        temperature: 0.7,
-      }),
-    });
+    let aiResponse: Response | null = null;
+    let lastError: Error | null = null;
+    const maxRetries = 3;
+    const backoffMs = 1000;
 
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        throw new Error("Rate limits exceeded, please try again later.");
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${lovableApiKey}`,
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: "You are Ingo, a real property manager at PeachHaus Group. Write natural, human responses - never use emojis. Be conversational, helpful, and specific. Match the tone profile exactly." },
+              { role: "user", content: prompt }
+            ],
+            model: "google/gemini-3-flash-preview",
+            max_tokens: messageType === 'sms' ? 500 : 2000,
+            temperature: 0.7,
+          }),
+        });
+
+        if (aiResponse.ok) {
+          // Success - record it
+          await supabase
+            .from('ai_circuit_breaker')
+            .update({ 
+              success_count: (circuitBreaker?.success_count || 0) + 1,
+              last_success_at: new Date().toISOString(),
+              state: circuitBreaker?.state === 'half_open' ? 'closed' : circuitBreaker?.state || 'closed',
+              failure_count: circuitBreaker?.state === 'half_open' ? 0 : circuitBreaker?.failure_count || 0,
+              updated_at: new Date().toISOString()
+            })
+            .eq('service_name', 'unified-ai-compose');
+          break;
+        }
+
+        // Handle specific errors
+        if (aiResponse.status === 429) {
+          console.log(`[CircuitBreaker] Rate limited, attempt ${attempt + 1}/${maxRetries}`);
+          const retryAfter = aiResponse.headers.get('Retry-After');
+          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : backoffMs * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+
+        if (aiResponse.status === 402) {
+          lastError = new Error("AI credits depleted, please add funds.");
+          break;
+        }
+
+        const errorText = await aiResponse.text();
+        lastError = new Error(`AI generation failed: ${errorText}`);
+
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.error(`[CircuitBreaker] Attempt ${attempt + 1} failed:`, lastError.message);
+        
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, backoffMs * Math.pow(2, attempt)));
+        }
       }
-      if (aiResponse.status === 402) {
-        throw new Error("AI credits depleted, please add funds.");
-      }
-      const errorText = await aiResponse.text();
-      console.error("Lovable AI error:", aiResponse.status, errorText);
-      throw new Error(`AI generation failed: ${errorText}`);
+    }
+
+    if (!aiResponse || !aiResponse.ok) {
+      // Record failure and potentially open circuit
+      const newFailureCount = (circuitBreaker?.failure_count || 0) + 1;
+      const shouldOpen = newFailureCount >= (circuitBreaker?.failure_threshold || 5);
+      
+      await supabase
+        .from('ai_circuit_breaker')
+        .update({ 
+          failure_count: newFailureCount,
+          last_failure_at: new Date().toISOString(),
+          last_error_message: lastError?.message || 'Unknown error',
+          state: shouldOpen ? 'open' : circuitBreaker?.state || 'closed',
+          opened_at: shouldOpen ? new Date().toISOString() : circuitBreaker?.opened_at,
+          updated_at: new Date().toISOString()
+        })
+        .eq('service_name', 'unified-ai-compose');
+      
+      throw lastError || new Error("AI generation failed after retries");
     }
 
     const aiResult = await aiResponse.json();
@@ -516,12 +612,12 @@ serve(async (req) => {
       generatedMessage = lines.slice(1).join('\n').trim();
     }
 
-    // Step 5: Validate response quality
+    // Step 6: Validate response quality
     const validation = validateResponse(generatedMessage, context, messageType);
 
     const generationTimeMs = Date.now() - startTime;
 
-    // Step 6: Log for quality tracking
+    // Step 7: Log for quality tracking
     const authHeader = req.headers.get("authorization");
     let userId: string | null = null;
     if (authHeader) {
