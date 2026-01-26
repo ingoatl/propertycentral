@@ -67,10 +67,9 @@ import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
 import { ScheduleOwnerCallModal } from "./components/ScheduleOwnerCallModal";
 import { ContactPeachHausDropdown } from "./components/ContactPeachHausDropdown";
 import { AudioPropertySummary } from "./components/AudioPropertySummary";
-import { PremiumBottomNav } from "./components/PremiumBottomNav";
-import { MobileMoreMenu } from "./components/MobileMoreMenu";
 import { PremiumLoadingScreen } from "./components/PremiumLoadingScreen";
-import { FloatingActions } from "./components/FloatingActions";
+import { MobileTopNav } from "./components/MobileTopNav";
+import { MobileHeader } from "./components/MobileHeader";
 import { useIsMobile } from "@/hooks/use-mobile";
 import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
@@ -173,24 +172,7 @@ interface MarketInsightsData {
   generatedAt: string;
 }
 
-// Primary tabs always visible on mobile bottom bar
-const PRIMARY_TABS = [
-  { value: "overview", label: "Overview", icon: BarChart3 },
-  { value: "messages", label: "Messages", icon: MessageCircle },
-  { value: "bookings", label: "Bookings", icon: Users },
-  { value: "property", label: "Property", icon: Home },
-];
-
-// Secondary tabs in "More" menu on mobile
-const SECONDARY_TABS = [
-  { value: "insights", label: "Insights", icon: Sparkles },
-  { value: "statements", label: "Statements", icon: FileText },
-  { value: "receipts", label: "Expenses", icon: Receipt },
-  { value: "maintenance", label: "Repairs", icon: Wrench },
-  { value: "scheduled", label: "Scheduled", icon: Calendar },
-  { value: "screenings", label: "Screenings", icon: Shield },
-  { value: "marketing", label: "Marketing", icon: Megaphone },
-];
+// Tab configuration is now in MobileTopNav component
 
 export default function OwnerDashboard() {
   const [searchParams] = useSearchParams();
@@ -231,7 +213,6 @@ export default function OwnerDashboard() {
   const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
   const [marketingStats, setMarketingStats] = useState<any[]>([]);
   const [peachHausData, setPeachHausData] = useState<any>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [insightsError, setInsightsError] = useState(false);
   
   // Session stability & refresh state
@@ -537,7 +518,9 @@ export default function OwnerDashboard() {
     }
   };
 
-  const loadMarketInsights = async (propertyId: string) => {
+  const loadMarketInsights = async (propertyId: string, retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    
     setLoadingInsights(true);
     setInsightsError(false);
     setInsightsProgress(0);
@@ -546,33 +529,21 @@ export default function OwnerDashboard() {
     // Get property rental type to customize loading steps
     const isMTR = property?.rental_type === 'mid_term';
     
-    // Detailed progress steps with value descriptions - customized by property type
+    // Faster progress steps for mobile - 1 second intervals
     const progressSteps = isMTR ? [
-      { progress: 8, step: "Connecting to corporate housing databases...", detail: "Accessing relocation & travel nurse platforms" },
-      { progress: 15, step: "Analyzing your property's performance...", detail: "Reviewing MTR booking history & revenue" },
-      { progress: 22, step: "Scanning comparable furnished rentals...", detail: "Finding similar corporate housing in your area" },
-      { progress: 30, step: "Evaluating Fortune 500 relocation trends...", detail: "Home Depot, Delta, Coca-Cola, UPS data" },
-      { progress: 38, step: "Analyzing healthcare traveler demand...", detail: "Travel nurse placement data from 60+ Atlanta hospitals" },
-      { progress: 45, step: "Reviewing insurance placement trends...", detail: "Storm season & family displacement housing" },
-      { progress: 52, step: "Gathering corporate project timelines...", detail: "Major construction & consulting assignments" },
-      { progress: 60, step: "Analyzing university rotation schedules...", detail: "Medical residency & internship housing demand" },
-      { progress: 68, step: "Evaluating extended stay pricing...", detail: "Optimal monthly rates for your market" },
-      { progress: 75, step: "Generating AI-powered insights...", detail: "Custom recommendations for corporate housing" },
-      { progress: 82, step: "Preparing partnership strategies...", detail: "Relocation companies & insurance adjusters" },
-      { progress: 88, step: "Finalizing your personalized report...", detail: "This corporate housing data is worth $500+" },
+      { progress: 10, step: "Connecting to corporate housing databases..." },
+      { progress: 25, step: "Analyzing your property's performance..." },
+      { progress: 40, step: "Scanning comparable furnished rentals..." },
+      { progress: 55, step: "Evaluating relocation & healthcare demand..." },
+      { progress: 70, step: "Generating AI-powered insights..." },
+      { progress: 85, step: "Finalizing your personalized report..." },
     ] : [
-      { progress: 8, step: "Connecting to market data sources...", detail: "Accessing real-time rental market APIs" },
-      { progress: 15, step: "Analyzing your property's performance...", detail: "Reviewing your revenue and booking history" },
-      { progress: 22, step: "Scanning 50+ comparable rentals...", detail: "Finding properties similar to yours within 5 miles" },
-      { progress: 30, step: "Gathering occupancy data from AirDNA...", detail: "Premium market intelligence data" },
-      { progress: 38, step: "Analyzing seasonal rate trends...", detail: "Historical pricing patterns in your area" },
-      { progress: 45, step: "Identifying major events & demand drivers...", detail: "Sports, concerts, festivals, corporate travel" },
-      { progress: 52, step: "Researching World Cup 2026 impact...", detail: "Atlanta is a host city - massive demand expected" },
-      { progress: 60, step: "Evaluating corporate housing demand...", detail: "Fortune 500 relocation & travel data" },
-      { progress: 68, step: "Analyzing insurance placement trends...", detail: "Storm season & displacement housing needs" },
-      { progress: 75, step: "Generating AI-powered insights...", detail: "Custom recommendations for your property" },
-      { progress: 82, step: "Preparing revenue optimization tips...", detail: "Pricing strategies to maximize earnings" },
-      { progress: 88, step: "Finalizing your personalized report...", detail: "This data is worth $500+ from market research firms" },
+      { progress: 10, step: "Connecting to market data sources..." },
+      { progress: 25, step: "Analyzing your property's performance..." },
+      { progress: 40, step: "Scanning comparable rentals nearby..." },
+      { progress: 55, step: "Identifying demand drivers & events..." },
+      { progress: 70, step: "Generating AI-powered insights..." },
+      { progress: 85, step: "Finalizing your personalized report..." },
     ];
     
     let stepIndex = 0;
@@ -582,17 +553,32 @@ export default function OwnerDashboard() {
         setInsightsStep(progressSteps[stepIndex].step);
         stepIndex++;
       }
-    }, 1800); // Slower 1.8 second intervals
+    }, 1200); // Faster 1.2 second intervals for mobile
 
     try {
+      // Add timeout for mobile connections
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+      
       const { data, error } = await supabase.functions.invoke("generate-market-insights", {
         body: { propertyId },
       });
 
+      clearTimeout(timeoutId);
       clearInterval(progressInterval);
 
       if (error) {
         console.error("Error loading market insights:", error);
+        
+        // Retry on failure if we haven't exceeded retries
+        if (retryCount < MAX_RETRIES) {
+          console.log(`Retrying market insights (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
+          setInsightsStep(`Retrying... (attempt ${retryCount + 2})`);
+          setInsightsProgress(0);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+          return loadMarketInsights(propertyId, retryCount + 1);
+        }
+        
         setInsightsStep("Failed to generate insights");
         setInsightsError(true);
         return;
@@ -601,13 +587,24 @@ export default function OwnerDashboard() {
       // Smoothly complete to 100%
       setInsightsProgress(95);
       setInsightsStep("Almost there...");
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
       setInsightsProgress(100);
       setInsightsStep("Complete! Your insights are ready.");
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 200));
       setMarketInsights(data);
-    } catch (err) {
+      
+    } catch (err: any) {
       console.error("Error loading market insights:", err);
+      clearInterval(progressInterval);
+      
+      // Retry on timeout or network error
+      if (retryCount < MAX_RETRIES && (err.name === 'AbortError' || err.message?.includes('network'))) {
+        console.log(`Retrying after timeout (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
+        setInsightsStep(`Connection slow, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return loadMarketInsights(propertyId, retryCount + 1);
+      }
+      
       setInsightsStep("Failed to generate insights");
       setInsightsError(true);
     } finally {
@@ -753,9 +750,6 @@ export default function OwnerDashboard() {
     return data?.publicUrl;
   }, [property?.image_path, property?.id]);
 
-  // Check if current tab is a secondary tab (for "More" menu highlighting)
-  const isSecondaryTabActive = SECONDARY_TABS.some(tab => tab.value === activeTab);
-  const activeSecondaryTab = SECONDARY_TABS.find(tab => tab.value === activeTab);
 
   // For demo mode with session already set, don't block with loading screen - show dashboard with loading indicator
   const isDemoWithSession = isAdminAccess && session?.ownerId === "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
@@ -817,160 +811,139 @@ export default function OwnerDashboard() {
   const latestStatement = statements[0];
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-background via-muted/20 to-background ${isMobile ? 'pb-32' : ''}`}>
-      {/* Mobile-Optimized Header */}
-      <header className="relative">
-        {/* Property Image Hero - Compact on Mobile */}
-        {propertyImageUrl && (
-          <div className={`absolute inset-0 ${isMobile ? 'h-40' : 'h-64 md:h-80'}`}>
-            <img
-              src={propertyImageUrl}
-              alt={property?.name || "Property"}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-background" />
-          </div>
-        )}
-        
-        <div className={`relative ${propertyImageUrl ? (isMobile ? 'pt-4 pb-20' : 'pt-8 pb-32 md:pb-40') : 'py-4 md:py-6'} ${!propertyImageUrl ? 'bg-gradient-to-br from-primary/10 to-primary/5' : ''}`}>
-          <div className="max-w-7xl mx-auto px-4">
-            {/* Mobile Layout */}
-            {isMobile ? (
-              <div className="space-y-3">
-                {/* Top row: Logo + Actions */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/90 dark:bg-background/90 backdrop-blur flex items-center justify-center shadow-lg">
-                      <Building2 className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className={propertyImageUrl ? 'text-white' : ''}>
-                      <h1 className="font-bold text-lg leading-tight line-clamp-1">{property?.name || "Your Property"}</h1>
+    <div className={`min-h-screen bg-gradient-to-br from-background via-muted/20 to-background`}>
+      {/* Mobile: Sticky Header + Tab Nav */}
+      {isMobile && (
+        <div className="sticky top-0 z-50">
+          {/* Property Image Background for header */}
+          {propertyImageUrl && (
+            <div className="absolute inset-0 h-24 overflow-hidden">
+              <img
+                src={propertyImageUrl}
+                alt={property?.name || "Property"}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-background" />
+            </div>
+          )}
+          
+          {/* Mobile Header */}
+          <MobileHeader
+            propertyName={property?.name}
+            ownerName={session?.ownerName}
+            secondOwnerName={session?.secondOwnerName}
+            averageRating={performanceMetrics.averageRating}
+            reviewCount={performanceMetrics.reviewCount}
+            hasPropertyImage={!!propertyImageUrl}
+            onScheduleCall={() => setShowScheduleCallModal(true)}
+            onRefresh={() => refreshData(true)}
+            onLogout={handleLogout}
+            isRefreshing={isRefreshing}
+          />
+          
+          {/* Mobile Top Tab Navigation */}
+          <MobileTopNav
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        </div>
+      )}
+
+      {/* Desktop-Optimized Header */}
+      {!isMobile && (
+        <header className="relative">
+          {/* Property Image Hero */}
+          {propertyImageUrl && (
+            <div className="absolute inset-0 h-64 md:h-80">
+              <img
+                src={propertyImageUrl}
+                alt={property?.name || "Property"}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-background" />
+            </div>
+          )}
+          
+          <div className={`relative ${propertyImageUrl ? 'pt-8 pb-32 md:pb-40' : 'py-4 md:py-6'} ${!propertyImageUrl ? 'bg-gradient-to-br from-primary/10 to-primary/5' : ''}`}>
+            <div className="max-w-7xl mx-auto px-4">
+              {/* Desktop Layout */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-white/90 dark:bg-background/90 backdrop-blur flex items-center justify-center shadow-lg">
+                    <Building2 className="h-7 w-7 text-primary" />
+                  </div>
+                  <div className={propertyImageUrl ? 'text-white' : ''}>
+                    <h1 className="font-bold text-2xl md:text-3xl">{property?.name || "Your Property"}</h1>
+                    <div className="flex items-center gap-2 text-sm opacity-90">
+                      <MapPin className="h-4 w-4" />
+                      {property?.address}
                     </div>
                   </div>
-                  {/* Compact action menu for mobile */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant={propertyImageUrl ? "secondary" : "outline"} 
-                        size="sm"
-                        className="h-9 w-9 p-0"
-                      >
-                        <Menu className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => setShowScheduleCallModal(true)}>
-                        <Phone className="h-4 w-4 mr-2" />
-                        Schedule Call
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => refreshData(true)} disabled={isRefreshing}>
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleLogout}>
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Logout
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
-                
-                {/* Welcome + Rating */}
-                <div className={`${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
-                  <p className="text-sm">
-                    Welcome, {session.ownerName?.split(' ')[0]}
-                    {session.secondOwnerName && ` & ${session.secondOwnerName.split(' ')[0]}`}
-                  </p>
-                  {performanceMetrics.averageRating && (
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                      <span className="font-medium text-sm">{performanceMetrics.averageRating.toFixed(1)}</span>
-                      <span className="text-xs opacity-75">({performanceMetrics.reviewCount})</span>
-                    </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {session && (
+                    <ContactPeachHausDropdown
+                      ownerId={session.ownerId}
+                      ownerName={session.ownerName}
+                      ownerEmail={session.email}
+                      propertyId={property?.id}
+                      propertyName={property?.name}
+                      onScheduleCall={() => setShowScheduleCallModal(true)}
+                      variant={propertyImageUrl ? "outline" : "outline"}
+                    />
                   )}
+                  {session && property && (
+                    <GenerateDashboardPdfButton
+                      ownerId={session.ownerId}
+                      propertyId={property.id}
+                      propertyName={property.name}
+                      variant={propertyImageUrl ? "outline" : "outline"}
+                      size="sm"
+                      onBeforeGenerate={() => refreshData(false)}
+                    />
+                  )}
+                  <Button 
+                    variant={propertyImageUrl ? "secondary" : "outline"} 
+                    size="sm" 
+                    onClick={() => refreshData(true)}
+                    disabled={isRefreshing}
+                    className="gap-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                  </Button>
+                  <Button 
+                    variant={propertyImageUrl ? "secondary" : "ghost"} 
+                    size="sm" 
+                    onClick={handleLogout} 
+                    className="gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="hidden sm:inline">Logout</span>
+                  </Button>
                 </div>
               </div>
-            ) : (
-              /* Desktop Layout */
-              <>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-white/90 dark:bg-background/90 backdrop-blur flex items-center justify-center shadow-lg">
-                      <Building2 className="h-7 w-7 text-primary" />
-                    </div>
-                    <div className={propertyImageUrl ? 'text-white' : ''}>
-                      <h1 className="font-bold text-2xl md:text-3xl">{property?.name || "Your Property"}</h1>
-                      <div className="flex items-center gap-2 text-sm opacity-90">
-                        <MapPin className="h-4 w-4" />
-                        {property?.address}
-                      </div>
-                    </div>
+              
+              <div className={`mt-4 ${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
+                <p className="text-lg">
+                  Welcome back, {session.ownerName}
+                  {session.secondOwnerName && ` & ${session.secondOwnerName}`}
+                </p>
+                {performanceMetrics.averageRating && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    <span className="font-semibold">{performanceMetrics.averageRating.toFixed(1)}</span>
+                    <span className="text-sm">({performanceMetrics.reviewCount} reviews)</span>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {session && (
-                      <ContactPeachHausDropdown
-                        ownerId={session.ownerId}
-                        ownerName={session.ownerName}
-                        ownerEmail={session.email}
-                        propertyId={property?.id}
-                        propertyName={property?.name}
-                        onScheduleCall={() => setShowScheduleCallModal(true)}
-                        variant={propertyImageUrl ? "outline" : "outline"}
-                      />
-                    )}
-                    {session && property && (
-                      <GenerateDashboardPdfButton
-                        ownerId={session.ownerId}
-                        propertyId={property.id}
-                        propertyName={property.name}
-                        variant={propertyImageUrl ? "outline" : "outline"}
-                        size="sm"
-                        onBeforeGenerate={() => refreshData(false)}
-                      />
-                    )}
-                    <Button 
-                      variant={propertyImageUrl ? "secondary" : "outline"} 
-                      size="sm" 
-                      onClick={() => refreshData(true)}
-                      disabled={isRefreshing}
-                      className="gap-2"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                      <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-                    </Button>
-                    <Button 
-                      variant={propertyImageUrl ? "secondary" : "ghost"} 
-                      size="sm" 
-                      onClick={handleLogout} 
-                      className="gap-2"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span className="hidden sm:inline">Logout</span>
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className={`mt-4 ${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
-                  <p className="text-lg">
-                    Welcome back, {session.ownerName}
-                    {session.secondOwnerName && ` & ${session.secondOwnerName}`}
-                  </p>
-                  {performanceMetrics.averageRating && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      <span className="font-semibold">{performanceMetrics.averageRating.toFixed(1)}</span>
-                      <span className="text-sm">({performanceMetrics.reviewCount} reviews)</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      {/* Main Content */}
-      <main className={`max-w-7xl mx-auto px-4 py-6 ${propertyImageUrl ? (isMobile ? '-mt-8' : '-mt-16 md:-mt-20') : ''} relative z-10`}>
+      {/* Main Content - Add top padding on mobile for sticky header */}
+      <main className={`max-w-7xl mx-auto px-4 py-4 md:py-6 ${!isMobile && propertyImageUrl ? '-mt-16 md:-mt-20' : ''} relative z-10`}>
         {/* Data Status Alert */}
         {(isRefreshing || dataStale) && (
           <Alert className={`mb-4 ${dataStale ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'}`}>
@@ -1432,41 +1405,7 @@ export default function OwnerDashboard() {
         </Tabs>
       </main>
 
-      {/* Premium Mobile Bottom Tab Bar */}
-      {isMobile && (
-        <>
-          <PremiumBottomNav
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            onMoreClick={() => setMobileMenuOpen(true)}
-            isSecondaryTabActive={isSecondaryTabActive}
-            activeSecondaryLabel={activeSecondaryTab?.label}
-            ActiveSecondaryIcon={activeSecondaryTab?.icon}
-          />
-          
-          <MobileMoreMenu
-            open={mobileMenuOpen}
-            onClose={() => setMobileMenuOpen(false)}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            onScheduleCall={() => setShowScheduleCallModal(true)}
-            onRefresh={() => refreshData(true)}
-            onLogout={handleLogout}
-            isRefreshing={isRefreshing}
-          />
-          
-          {/* Floating Action Buttons */}
-          <FloatingActions
-            onScheduleCall={() => setShowScheduleCallModal(true)}
-            onGenerateReport={() => {
-              if (session && property) {
-                // Trigger report generation
-                toast.info("Generating report...");
-              }
-            }}
-          />
-        </>
-      )}
+      {/* No bottom navigation - using top nav for mobile */}
 
       {/* Footer - Hidden on mobile due to bottom nav */}
       {!isMobile && (

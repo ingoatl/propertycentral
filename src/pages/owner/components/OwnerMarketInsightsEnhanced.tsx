@@ -158,30 +158,30 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
     const tipIndex = Math.floor((loadingProgress / 25)) % loadingTips.length;
     
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <Card className="border-none shadow-lg overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
-          <CardContent className="py-16">
-            <div className="max-w-xl mx-auto text-center space-y-6">
+          <CardContent className="py-10 md:py-16 px-4 md:px-6">
+            <div className="max-w-xl mx-auto text-center space-y-5 md:space-y-6">
               {/* Animated icon container */}
-              <div className="relative w-20 h-20 mx-auto">
+              <div className="relative w-16 h-16 md:w-20 md:h-20 mx-auto">
                 <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
                 <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin" style={{ animationDuration: '2s' }} />
                 <div className="absolute inset-2 rounded-full bg-gradient-to-br from-primary/10 to-primary/30 flex items-center justify-center">
-                  <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+                  <Sparkles className="h-6 w-6 md:h-8 md:w-8 text-primary animate-pulse" />
                 </div>
               </div>
               
               {/* Header */}
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                  Building Your Market Intelligence Report
+                <h3 className="text-lg md:text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                  Building Your Market Report
                 </h3>
-                <p className="text-primary font-medium h-6 transition-all duration-700">{loadingStep}</p>
+                <p className="text-primary font-medium text-sm md:text-base h-5 md:h-6 transition-all duration-700 line-clamp-1">{loadingStep}</p>
               </div>
               
               {/* Smooth progress bar */}
-              <div className="space-y-2 px-4">
-                <div className="relative h-3 bg-muted/50 rounded-full overflow-hidden">
+              <div className="space-y-2 px-2 md:px-4">
+                <div className="relative h-2.5 md:h-3 bg-muted/50 rounded-full overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-shimmer" />
                   <div 
                     className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-primary to-primary/80 rounded-full transition-all duration-1000 ease-out"
@@ -190,39 +190,39 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
                     <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-r from-transparent to-white/30 rounded-full" />
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground font-medium tabular-nums">
+                <p className="text-xs md:text-sm text-muted-foreground font-medium tabular-nums">
                   {loadingProgress}% complete
                 </p>
               </div>
               
               {/* Value proposition during loading */}
-              <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 text-left">
-                <p className="text-sm text-muted-foreground mb-2 font-medium">
+              <div className="p-3 md:p-4 bg-primary/5 rounded-xl border border-primary/10 text-left">
+                <p className="text-xs md:text-sm text-muted-foreground mb-1 md:mb-2 font-medium">
                   💡 Did you know?
                 </p>
-                <p className="text-sm text-foreground transition-all duration-500">
+                <p className="text-xs md:text-sm text-foreground transition-all duration-500">
                   {loadingTips[tipIndex]}
                 </p>
               </div>
               
-              {/* What's being analyzed */}
-              <div className="grid grid-cols-3 gap-3 text-xs text-muted-foreground">
+              {/* What's being analyzed - Mobile optimized */}
+              <div className="grid grid-cols-3 gap-2 md:gap-3 text-[10px] md:text-xs text-muted-foreground">
                 <div className={`p-2 rounded-lg transition-all duration-500 ${loadingProgress >= 25 ? 'bg-primary/10 text-primary' : 'bg-muted/30'}`}>
-                  <BarChart3 className="h-4 w-4 mx-auto mb-1" />
-                  Revenue Data
+                  <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4 mx-auto mb-1" />
+                  Revenue
                 </div>
                 <div className={`p-2 rounded-lg transition-all duration-500 ${loadingProgress >= 50 ? 'bg-primary/10 text-primary' : 'bg-muted/30'}`}>
-                  <Building2 className="h-4 w-4 mx-auto mb-1" />
-                  Comparables
+                  <Building2 className="h-3.5 w-3.5 md:h-4 md:w-4 mx-auto mb-1" />
+                  Comps
                 </div>
                 <div className={`p-2 rounded-lg transition-all duration-500 ${loadingProgress >= 75 ? 'bg-primary/10 text-primary' : 'bg-muted/30'}`}>
-                  <Calendar className="h-4 w-4 mx-auto mb-1" />
-                  Events & Demand
+                  <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 mx-auto mb-1" />
+                  Events
                 </div>
               </div>
               
-              <p className="text-xs text-muted-foreground italic">
-                This comprehensive market analysis is included free with your PeachHaus management
+              <p className="text-[10px] md:text-xs text-muted-foreground italic">
+                Free with your PeachHaus management
               </p>
             </div>
           </CardContent>
