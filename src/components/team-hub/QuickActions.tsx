@@ -46,15 +46,14 @@ export function QuickActions({ message, onActionComplete }: QuickActionsProps) {
     
     setIsSubmitting(true);
     try {
-      // Create a task in onboarding_tasks table (general purpose tasks)
+      // Create a conversation note as a lightweight task tracker
       const { error } = await supabase
-        .from('onboarding_tasks')
+        .from('conversation_notes')
         .insert({
-          title: formData.title,
-          description: formData.description || `Created from Team Hub message: "${message.content.slice(0, 100)}..."`,
-          created_by: user.id,
-          status: 'pending',
+          note: `**Task:** ${formData.title}\n\n${formData.description || `Created from Team Hub message: "${message.content.slice(0, 100)}..."`}`,
+          user_id: user.id,
           property_id: message.property_id,
+          is_ai_generated: false,
         });
 
       if (error) throw error;
@@ -72,7 +71,7 @@ export function QuickActions({ message, onActionComplete }: QuickActionsProps) {
   };
 
   const handleCreateWorkOrder = async () => {
-    if (!user || !formData.title.trim()) return;
+    if (!user || !formData.title.trim() || !message.property_id) return;
     
     setIsSubmitting(true);
     try {
@@ -82,8 +81,9 @@ export function QuickActions({ message, onActionComplete }: QuickActionsProps) {
           title: formData.title,
           description: formData.description || `Created from Team Hub message: "${message.content.slice(0, 100)}..."`,
           created_by: user.id,
-          status: 'pending',
-          urgency: 'medium',
+          status: 'new',
+          urgency: 'normal',
+          category: 'general',
           property_id: message.property_id,
           source: 'team_hub',
         });
@@ -110,15 +110,14 @@ export function QuickActions({ message, onActionComplete }: QuickActionsProps) {
     
     setIsSubmitting(true);
     try {
-      // Create a follow-up task
+      // Create a follow-up as a conversation note with due date in content
       const { error } = await supabase
-        .from('onboarding_tasks')
+        .from('conversation_notes')
         .insert({
-          title: formData.title || `Follow-up: ${message.content.slice(0, 50)}...`,
-          description: formData.description || `Follow up on Team Hub message from ${message.sender?.first_name || 'team member'}`,
-          created_by: user.id,
-          status: 'pending',
+          note: `**Follow-up (${formData.dueDate}):** ${formData.title || message.content.slice(0, 50)}\n\n${formData.description || `Follow up on Team Hub message from ${message.sender?.first_name || 'team member'}`}`,
+          user_id: user.id,
           property_id: message.property_id,
+          is_ai_generated: false,
         });
 
       if (error) throw error;
