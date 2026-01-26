@@ -165,12 +165,13 @@ export function SchedulePredictiveMaintenanceModal({
       });
 
       // Upsert schedules
-      const { error } = await supabase
+      const { data: insertedSchedules, error } = await supabase
         .from("property_maintenance_schedules")
         .upsert(schedulesToCreate, { 
           onConflict: "property_id,template_id",
           ignoreDuplicates: false 
-        });
+        })
+        .select("id");
 
       if (error) throw error;
 
@@ -212,10 +213,34 @@ export function SchedulePredictiveMaintenanceModal({
         }
       }
 
+      // Send notifications to vendor and owner
+      const scheduleIds = insertedSchedules?.map(s => s.id) || [];
+      if (scheduleIds.length > 0) {
+        try {
+          const { data: notifyResult, error: notifyError } = await supabase.functions.invoke("notify-preventive-schedule", {
+            body: {
+              scheduleIds,
+              propertyId: selectedPropertyId,
+              notifyVendor: true,
+              notifyOwner: notifyOwner
+            }
+          });
+          
+          if (notifyError) {
+            console.error("Notification error:", notifyError);
+          } else {
+            console.log("Notifications sent:", notifyResult);
+          }
+        } catch (notifyErr) {
+          console.error("Failed to send notifications:", notifyErr);
+          // Don't throw - scheduling was successful, notifications are secondary
+        }
+      }
+
       return schedulesToCreate.length;
     },
     onSuccess: (count) => {
-      toast.success(`Scheduled ${count} maintenance tasks`);
+      toast.success(`Scheduled ${count} maintenance tasks. Notifications sent to vendor and owner.`);
       queryClient.invalidateQueries({ queryKey: ["property-maintenance-schedules"] });
       queryClient.invalidateQueries({ queryKey: ["scheduled-maintenance-tasks"] });
       onOpenChange(false);

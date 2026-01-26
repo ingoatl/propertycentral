@@ -617,3 +617,9 @@ verify_jwt = true
 
 [functions.generate-preventive-tasks]
 verify_jwt = false
+
+[functions.notify-preventive-schedule]
+verify_jwt = true
+
+[functions.ai-suggest-maintenance-schedule]
+verify_jwt = true
