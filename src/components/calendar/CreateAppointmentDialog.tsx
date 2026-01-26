@@ -156,7 +156,7 @@ export function CreateAppointmentDialog({
       title,
       description: description || undefined,
       assigned_to: assignedTo || undefined,
-      property_id: propertyId || undefined,
+      property_id: propertyId && propertyId !== "none" ? propertyId : undefined,
       location_address: locationAddress || undefined,
       contact_name: contactName || undefined,
       contact_phone: contactPhone || undefined,
@@ -209,15 +209,17 @@ export function CreateAppointmentDialog({
                 <SelectTrigger>
                   <SelectValue placeholder="Select team member" />
                 </SelectTrigger>
-              <SelectContent>
-                  {teamMembers.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        {member.first_name || member.email}
-                      </div>
-                    </SelectItem>
-                  ))}
+                <SelectContent>
+                  {teamMembers
+                    .filter((member) => member.id && member.id.trim() !== "")
+                    .map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {member.first_name || member.email}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -309,15 +311,17 @@ export function CreateAppointmentDialog({
                   <SelectValue placeholder="Select property (optional)" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
-                  <SelectItem value="">No property</SelectItem>
-                  {properties.map((property) => (
-                    <SelectItem key={property.id} value={property.id}>
-                      <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        {property.name}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="none">No property</SelectItem>
+                  {properties
+                    .filter((property) => property.id && property.id.trim() !== "")
+                    .map((property) => (
+                      <SelectItem key={property.id} value={property.id}>
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-muted-foreground" />
+                          {property.name}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
