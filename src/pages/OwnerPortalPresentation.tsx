@@ -118,6 +118,11 @@ export default function OwnerPortalPresentation() {
   const containerRef = useRef<HTMLDivElement>(null);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
+  // CRITICAL: Track which slide we've triggered audio for (prevents double-play in Strict Mode)
+  const hasPlayedForSlideRef = useRef<string | null>(null);
+  // Touch swipe support
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
 
   // Preload slides for immediate audio playback
   const { 
@@ -132,24 +137,64 @@ export default function OwnerPortalPresentation() {
     preloadSlides: SLIDES.map(s => ({ id: s.id, script: s.script }))
   });
 
-  // Advance to next slide
+  // Advance to next slide with end-of-presentation guard
   const advanceSlide = useCallback(() => {
-    if (currentSlide < SLIDES.length - 1) {
-      setCurrentSlide(prev => prev + 1);
-    } else {
+    // Guard: prevent advancing past the end
+    if (currentSlide >= SLIDES.length - 1) {
+      // Clean stop at end of presentation
       setIsPlaying(false);
+      stopAudio();
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      audioEndedRef.current = true;
+      return;
     }
-  }, [currentSlide]);
+    setCurrentSlide(prev => prev + 1);
+  }, [currentSlide, stopAudio]);
 
-  // Play audio and manage slide timing when slide changes
+  // Touch swipe handlers for mobile navigation
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX.current;
+    
+    if (Math.abs(diff) > 50) { // Minimum swipe distance
+      if (diff > 0 && currentSlide < SLIDES.length - 1) {
+        stopAudio();
+        audioEndedRef.current = true;
+        hasPlayedForSlideRef.current = null;
+        setCurrentSlide(prev => prev + 1);
+      } else if (diff < 0 && currentSlide > 0) {
+        stopAudio();
+        audioEndedRef.current = true;
+        hasPlayedForSlideRef.current = null;
+        setCurrentSlide(prev => prev - 1);
+      }
+    }
+  }, [currentSlide, stopAudio]);
+
+  // Play audio and manage slide timing when slide changes - with double-play prevention
   useEffect(() => {
     if (!isPlaying) {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      hasPlayedForSlideRef.current = null; // Reset when paused
       stopAudio();
       return;
     }
 
     const slide = SLIDES[currentSlide];
+    
+    // CRITICAL: Prevent double-play for this specific slide (React Strict Mode fix)
+    if (hasPlayedForSlideRef.current === slide.id) {
+      return;
+    }
+    hasPlayedForSlideRef.current = slide.id;
+    
     audioEndedRef.current = false;
 
     // Clear any existing timer
@@ -192,13 +237,13 @@ export default function OwnerPortalPresentation() {
         }
       }, mutedDuration);
     } else {
-      // When audio is enabled, set a very long fallback (30 seconds) as safety net
+      // When audio is enabled, set a very long fallback (45 seconds) as safety net
       fallbackTimerRef.current = setTimeout(() => {
         if (!audioEndedRef.current) {
           console.log("Fallback timer triggered for slide:", slide.id);
           advanceSlide();
         }
-      }, 30000);
+      }, 45000);
     }
 
     return () => {
@@ -253,6 +298,7 @@ export default function OwnerPortalPresentation() {
   const goToSlide = (index: number) => {
     stopAudio();
     audioEndedRef.current = true;
+    hasPlayedForSlideRef.current = null; // Reset slide lock
     setCurrentSlide(index);
     setIsPlaying(false);
   };
@@ -304,6 +350,8 @@ export default function OwnerPortalPresentation() {
     <div 
       ref={containerRef}
       className="min-h-screen min-h-[100dvh] bg-[#0a0a1a] overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Single Slide with AnimatePresence */}
       <AnimatePresence mode="wait">
@@ -332,79 +380,81 @@ export default function OwnerPortalPresentation() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-10 w-10 md:h-8 md:w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => navigate("/")}
           >
-            <Home className="h-4 w-4" />
+            <Home className="h-5 w-5 md:h-4 md:w-4" />
           </Button>
 
           {/* Audio Toggle */}
           <Button
             variant="ghost"
             size="icon"
-            className={`h-8 w-8 shrink-0 hover:bg-white/10 ${isMuted ? 'text-white/40' : 'text-[#fae052]'}`}
+            className={`h-10 w-10 md:h-8 md:w-8 shrink-0 hover:bg-white/10 ${isMuted ? 'text-white/40' : 'text-[#fae052]'}`}
             onClick={toggleMute}
           >
             {isMuted ? (
-              <VolumeX className="h-4 w-4" />
+              <VolumeX className="h-5 w-5 md:h-4 md:w-4" />
             ) : (
-              <Volume2 className="h-4 w-4" />
+              <Volume2 className="h-5 w-5 md:h-4 md:w-4" />
             )}
           </Button>
 
           <div className="w-px h-6 bg-white/10 hidden md:block" />
 
-          {/* Prev */}
+          {/* Prev - Larger on mobile */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-10 w-10 md:h-8 md:w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
             disabled={currentSlide === 0}
             onClick={() => {
               stopAudio();
               audioEndedRef.current = true;
+              hasPlayedForSlideRef.current = null;
               setCurrentSlide(prev => prev - 1);
             }}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-5 w-5 md:h-4 md:w-4" />
           </Button>
 
           {/* Play/Pause - Prominent */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-10 w-10 shrink-0 text-white hover:bg-white/10 bg-[#fae052]/20 relative"
+            className="h-12 w-12 md:h-10 md:w-10 shrink-0 text-white hover:bg-white/10 bg-[#fae052]/20 relative"
             onClick={togglePlay}
           >
             {isAudioLoading && (
               <div className="absolute inset-0 rounded-lg border-2 border-[#fae052] border-t-transparent animate-spin" />
             )}
             {isPlaying ? (
-              <Pause className="h-5 w-5 text-[#fae052]" />
+              <Pause className="h-6 w-6 md:h-5 md:w-5 text-[#fae052]" />
             ) : (
-              <Play className="h-5 w-5 text-[#fae052] ml-0.5" />
+              <Play className="h-6 w-6 md:h-5 md:w-5 text-[#fae052] ml-0.5" />
             )}
           </Button>
 
-          {/* Next */}
+          {/* Next - Larger on mobile */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-10 w-10 md:h-8 md:w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
             disabled={currentSlide === SLIDES.length - 1}
             onClick={() => {
               stopAudio();
               audioEndedRef.current = true;
+              hasPlayedForSlideRef.current = null;
               setCurrentSlide(prev => prev + 1);
             }}
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-5 w-5 md:h-4 md:w-4" />
           </Button>
 
           <div className="w-px h-6 bg-white/10 hidden md:block" />
 
-          {/* Progress Dots - Hidden on small mobile */}
-          <div className="hidden sm:flex items-center gap-1 px-1">
+          {/* Progress Dots - Hidden on mobile */}
+          <div className="hidden md:flex items-center gap-1 px-1">
             {SLIDES.map((slide, index) => (
               <button
                 key={slide.id}
@@ -423,21 +473,21 @@ export default function OwnerPortalPresentation() {
 
           <div className="w-px h-6 bg-white/10 hidden md:block" />
 
-          {/* Restart */}
+          {/* Restart - Hidden on mobile */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10 hidden sm:flex"
+            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10 hidden md:flex"
             onClick={restart}
           >
             <RotateCcw className="h-4 w-4" />
           </Button>
 
-          {/* Fullscreen */}
+          {/* Fullscreen - Hidden on mobile */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10 hidden sm:flex"
+            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10 hidden md:flex"
             onClick={toggleFullscreen}
           >
             <Maximize className="h-4 w-4" />

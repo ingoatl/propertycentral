@@ -25,9 +25,10 @@ serve(async (req) => {
     // Default to Sarah voice if not specified (female, warm, professional)
     const voice = voiceId || "EXAVITQu4vr4xnSDxMaL";
 
-    // Call ElevenLabs TTS API
+    // Call ElevenLabs TTS API - Using turbo model for ~70% faster generation
+    // and smaller format for ~75% reduced file size
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_22050_32`,
       {
         method: "POST",
         headers: {
@@ -36,11 +37,10 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           text,
-          model_id: "eleven_multilingual_v2",
+          model_id: "eleven_turbo_v2_5", // Fast model - 70% lower latency
           voice_settings: {
-            stability: 0.65,
-            similarity_boost: 0.80,
-            style: 0.35,
+            stability: 0.6,
+            similarity_boost: 0.75,
             use_speaker_boost: true,
           },
         }),
@@ -59,6 +59,7 @@ serve(async (req) => {
       headers: {
         ...corsHeaders,
         "Content-Type": "audio/mpeg",
+        "Cache-Control": "public, max-age=86400", // 24 hour browser cache
       },
     });
   } catch (error) {
