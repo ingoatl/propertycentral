@@ -35,8 +35,8 @@ const SLIDES = [
     id: "founders", 
     component: MeetTheFoundersSlide, 
     label: "Team",
-    duration: 12000,
-    script: "Meet Anja and Ingo, the founders of PeachHaus. With decades of experience in luxury hospitality and real estate, they've built a management company that treats every property like their own."
+    duration: 18000,
+    script: "Meet Anja and Ingo Winzer, the husband and wife team behind PeachHaus. Anja brings over 15 years of experience in luxury hospitality from five-star hotels across Europe, while Ingo's background in real estate investment and technology ensures your property is optimized for maximum returns. Together, they've built a management company that combines old-world hospitality with modern revenue optimization. They personally oversee every property in the portfolio and treat each home as if it were their own."
   },
   { 
     id: "promise", 
@@ -170,11 +170,14 @@ export default function OnboardingPresentation() {
 
   const goToSlide = useCallback((index: number) => {
     if (index >= 0 && index < SLIDES.length && !isTransitioning) {
+      // Stop current audio before transitioning
+      stopAudio();
+      audioEndedRef.current = true; // Prevent double-trigger
       setIsTransitioning(true);
       setCurrentSlide(index);
       setTimeout(() => setIsTransitioning(false), 500);
     }
-  }, [isTransitioning]);
+  }, [isTransitioning, stopAudio]);
 
   const advanceSlide = useCallback(() => {
     if (currentSlide < SLIDES.length - 1) {
@@ -255,6 +258,8 @@ export default function OnboardingPresentation() {
         clearTimeout(fallbackTimerRef.current);
         fallbackTimerRef.current = null;
       }
+      // Always stop audio on cleanup to prevent overlapping
+      stopAudio();
     };
   }, [currentSlide, isPlaying, isMuted, playAudioForSlide, stopAudio, advanceSlide]);
 

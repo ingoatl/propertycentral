@@ -196,6 +196,8 @@ export default function OwnerPortalPresentation() {
         clearTimeout(fallbackTimerRef.current);
         fallbackTimerRef.current = null;
       }
+      // Always stop audio on cleanup to prevent overlapping
+      stopAudio();
     };
   }, [currentSlide, isPlaying, isMuted, playAudioForSlide, stopAudio, advanceSlide]);
 
@@ -216,11 +218,15 @@ export default function OwnerPortalPresentation() {
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
         if (currentSlide < SLIDES.length - 1) {
+          stopAudio();
+          audioEndedRef.current = true;
           setCurrentSlide(prev => prev + 1);
         }
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (currentSlide > 0) {
+          stopAudio();
+          audioEndedRef.current = true;
           setCurrentSlide(prev => prev - 1);
         }
       } else if (e.key === "Escape") {
@@ -232,9 +238,11 @@ export default function OwnerPortalPresentation() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentSlide, toggleMute]);
+  }, [currentSlide, toggleMute, stopAudio]);
 
   const goToSlide = (index: number) => {
+    stopAudio();
+    audioEndedRef.current = true;
     setCurrentSlide(index);
     setIsPlaying(false);
   };
