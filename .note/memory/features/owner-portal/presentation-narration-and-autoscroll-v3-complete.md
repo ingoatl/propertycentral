@@ -3,6 +3,12 @@ Updated: now
 
 The Owner Portal Presentation uses an intelligent auto-scrolling system that only animates tall images with >100px overflow; shorter images display centered without animation using object-contain. AI narration uses Sarah's voice (EXAVITQu4vr4xnSDxMaL) with enhanced voice settings (stability: 0.65, style: 0.35) for a warm, professional tone. Slides advance only after narration completes (3-second pause before next slide). The Intro slide features warmer language ("Welcome to Worry-Free Ownership") instead of cold corporate messaging. All 12 slide components include proper bottom padding (pb-24) to prevent overlap with the fixed navigation bar. AutoScrollImage component uses ResizeObserver for reliable dimension calculation and only triggers animation when meaningful overflow exists, preventing image distortion.
 
+## Audio Preloading
+The usePresentationAudio hook now accepts a `preloadSlides` option to pre-fetch audio for the first 3 slides on mount. This ensures immediate playback without delay when the presentation starts.
+
+## Mobile Responsiveness
+The presentation is fully mobile-responsive with `min-h-[100dvh]` for proper viewport handling, responsive text sizes, and a centered bottom navigation bar that adapts to screen size with hidden dots and controls on small screens.
+
 ## Communication Slide (NEW)
 A new "CommunicationSlide" highlights industry-leading owner access: voicemail, text, scheduled calls, and direct phone. The narration emphasizes that this level of access is rare in property management.
 

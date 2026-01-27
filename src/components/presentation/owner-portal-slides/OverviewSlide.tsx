@@ -23,40 +23,40 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-6 px-4 md:px-8">
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-4 md:py-6 px-4 md:px-8">
       {/* Headline */}
       <motion.div 
-        className="text-center mb-3 max-w-4xl"
+        className="text-center mb-2 md:mb-3 max-w-4xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h2 className="text-3xl md:text-5xl font-bold text-white mb-2">
+        <h2 className="text-2xl md:text-5xl font-bold text-white mb-1 md:mb-2">
           Real-Time Performance, <span className="text-[#fae052]">Zero Guesswork</span>
         </h2>
-        <p className="text-base md:text-lg text-white/70">
+        <p className="text-sm md:text-lg text-white/70">
           Revenue, occupancy, and ratings — updated in real-time
         </p>
       </motion.div>
 
       {/* Audio Player Card - Monthly Recap Sample */}
       <motion.div
-        className="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-3 mb-3 max-w-md w-full"
+        className="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-2 md:p-3 mb-2 md:mb-3 max-w-md w-full"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.2 }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <Button
             size="icon"
             variant="ghost"
-            className="h-10 w-10 rounded-full bg-[#fae052] hover:bg-[#fae052]/90 text-black shrink-0"
+            className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-[#fae052] hover:bg-[#fae052]/90 text-black shrink-0"
             onClick={toggleAudio}
           >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+            {isPlaying ? <Pause className="h-3 w-3 md:h-4 md:w-4" /> : <Play className="h-3 w-3 md:h-4 md:w-4 ml-0.5" />}
           </Button>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-medium text-sm">Monthly Performance Recap</p>
+            <p className="text-white font-medium text-xs md:text-sm">Monthly Performance Recap</p>
             <p className="text-white/60 text-xs truncate">Click play to hear a demo recap</p>
           </div>
           <Volume2 className="h-4 w-4 text-amber-400 shrink-0" />
@@ -70,7 +70,7 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
 
       {/* Screenshot */}
       <motion.div
-        className="relative w-full max-w-5xl flex-1 flex items-center justify-center"
+        className="relative w-full max-w-5xl flex-1 flex items-start justify-center overflow-hidden"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
@@ -79,23 +79,24 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
           src="/images/owner-portal/01-overview.png" 
           alt="Dashboard Overview"
           scrollDuration={10}
+          isActive={isActive}
         />
       </motion.div>
 
       {/* Pain Point Solved - directly under screenshot */}
       <motion.div
-        className="mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center"
+        className="mt-3 md:mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 md:px-6 py-2 md:py-3 max-w-2xl text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
       >
-        <p className="text-emerald-400 font-medium text-sm">
+        <p className="text-emerald-400 font-medium text-xs md:text-sm">
           ✓ Never wonder how your property is performing — see it all in real-time
         </p>
       </motion.div>
 
       {/* Spacer for bottom nav */}
-      <div className="h-20" />
+      <div className="h-16 md:h-20" />
     </div>
   );
 }
