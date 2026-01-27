@@ -662,3 +662,59 @@ All colors MUST be HSL.
 .spring-bounce:active {
   transform: scale(0.96);
 }
+
+/* ==========================================
+   PERFORMANCE OPTIMIZATIONS
+   ========================================== */
+
+/* Content-visibility for off-screen content - major perf boost */
+.perf-contain {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* GPU acceleration for animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Reduce paint area for fixed elements */
+.fixed-optimized {
+  isolation: isolate;
+  contain: layout style;
+}
+
+/* Optimize long lists/tables */
+.virtual-list-item {
+  contain: layout style paint;
+}
+
+/* Reduce reflows on resize */
+.stable-layout {
+  contain: layout;
+}
+
+/* Optimize images for LCP */
+img {
+  content-visibility: auto;
+}
+
+/* Prevent layout shift from loading fonts */
+@supports (font-display: swap) {
+  @font-face {
+    font-display: swap;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
