@@ -6,8 +6,8 @@ interface UseStoredPresentationAudioOptions {
   onAudioEnd?: () => void;
 }
 
-// Uplifting background music URL (shared between presentations - stored in Supabase)
-const BACKGROUND_MUSIC_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/message-attachments/presentation-audio/background-music.mp3";
+// Uplifting background music URL (stored in Supabase) - with cache bust
+const BACKGROUND_MUSIC_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/message-attachments/presentation-audio/background-music.mp3?v=2";
 
 export function useStoredPresentationAudio(options: UseStoredPresentationAudioOptions) {
   const { presentation } = options;
@@ -26,12 +26,12 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
   // Mutex lock to prevent double-play
   const isPlayingSlideRef = useRef<string | null>(null);
 
-  // Build the storage URL for a slide
+  // Build the storage URL for a slide (with cache bust for fresh audio)
   const getStorageUrl = useCallback((slideId: string) => {
     const { data } = supabase.storage
       .from("message-attachments")
       .getPublicUrl(`presentation-audio/${presentation}/${slideId}.mp3`);
-    return data.publicUrl;
+    return `${data.publicUrl}?v=2`;
   }, [presentation]);
 
   // Preload audio URLs on mount
