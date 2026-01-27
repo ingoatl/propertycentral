@@ -3,36 +3,34 @@ import { Wrench, CheckCircle, Clock, ThumbsUp } from "lucide-react";
 
 export function RepairsSlide() {
   const features = [
-    { icon: CheckCircle, text: "Work order status tracking" },
-    { icon: ThumbsUp, text: "Approve or decline repairs directly" },
-    { icon: Clock, text: "Scheduled maintenance visible" },
-    { icon: Wrench, text: "Vendor info and costs upfront" },
+    { icon: CheckCircle, text: "Status tracking" },
+    { icon: ThumbsUp, text: "Approve/decline directly" },
+    { icon: Clock, text: "Scheduled maintenance" },
+    { icon: Wrench, text: "Costs upfront" },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-16 px-4 md:px-8">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-12 px-4 md:px-8">
+      {/* Fortune 500 Assertion-Based Headline */}
       <motion.div 
-        className="text-center mb-8 max-w-3xl"
+        className="text-center mb-6 max-w-4xl"
         initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
-          Maintenance & <span className="text-[#fae052]">Repairs</span>
+        <h2 className="text-3xl md:text-5xl font-bold text-white mb-3">
+          <span className="text-[#fae052]">Stay in Control</span> of Maintenance
         </h2>
         <p className="text-lg text-white/70">
-          Stay in control — approve work before it happens, with full cost visibility
+          Approve work before it happens — all costs visible upfront
         </p>
       </motion.div>
 
       {/* Feature Pills */}
       <motion.div
-        className="flex flex-wrap justify-center gap-3 mb-8 max-w-3xl"
+        className="flex flex-wrap justify-center gap-3 mb-6 max-w-3xl"
         initial={{ opacity: 0, y: 10 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
         {features.map((feature, i) => (
@@ -48,10 +46,9 @@ export function RepairsSlide() {
 
       {/* Screenshot */}
       <motion.div
-        className="relative w-full max-w-5xl"
+        className="relative w-full max-w-5xl flex-1"
         initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1a] via-transparent to-transparent z-10 pointer-events-none" />
@@ -66,13 +63,12 @@ export function RepairsSlide() {
 
       {/* Pain Point Solved */}
       <motion.div
-        className="mt-8 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-4 max-w-2xl text-center"
+        className="mt-6 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center"
         initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
+        animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
       >
-        <p className="text-emerald-400 font-medium">
+        <p className="text-emerald-400 font-medium text-sm">
           ✓ Stay in control of repairs — approve work before it happens
         </p>
       </motion.div>

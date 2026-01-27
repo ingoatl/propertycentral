@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { 
@@ -8,9 +8,12 @@ import {
   Maximize, 
   ChevronLeft, 
   ChevronRight,
-  RotateCcw
+  RotateCcw,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { usePresentationAudio } from "@/hooks/usePresentationAudio";
 import { OwnerPortalIntroSlide } from "@/components/presentation/owner-portal-slides/OwnerPortalIntroSlide";
 import { OverviewSlide } from "@/components/presentation/owner-portal-slides/OverviewSlide";
 import { InsightsSlide } from "@/components/presentation/owner-portal-slides/InsightsSlide";
@@ -23,19 +26,81 @@ import { ScreeningsSlide } from "@/components/presentation/owner-portal-slides/S
 import { MarketingSlide } from "@/components/presentation/owner-portal-slides/MarketingSlide";
 import { OwnerPortalClosingSlide } from "@/components/presentation/owner-portal-slides/OwnerPortalClosingSlide";
 
+// Slide configuration with narration scripts
 const SLIDES = [
-  { id: "intro", label: "Intro", duration: 5000 },
-  { id: "overview", label: "Overview", duration: 10000 },
-  { id: "insights", label: "Insights", duration: 8000 },
-  { id: "bookings", label: "Bookings", duration: 6000 },
-  { id: "statements", label: "Statements", duration: 5000 },
-  { id: "expenses", label: "Expenses", duration: 7000 },
-  { id: "messages", label: "Messages", duration: 10000 },
-  { id: "repairs", label: "Repairs", duration: 7000 },
-  { id: "screenings", label: "Screenings", duration: 7000 },
-  { id: "marketing", label: "Marketing", duration: 6000 },
-  { id: "closing", label: "CTA", duration: 5000 },
+  { 
+    id: "intro", 
+    label: "Intro", 
+    duration: 6000,
+    script: "Welcome to PeachHaus. Your property. Complete visibility."
+  },
+  { 
+    id: "overview", 
+    label: "Overview", 
+    duration: 14000,
+    script: "See your complete property performance at a glance. Total revenue, occupancy rates, and guest ratings updated in real-time. Every month, you'll receive an AI-generated audio recap delivered directly to your phone."
+  },
+  { 
+    id: "insights", 
+    label: "Insights", 
+    duration: 12000,
+    script: "Know exactly how your property stacks up against the competition. Our market intelligence shows revenue opportunities, upcoming events that drive demand, and dynamic pricing powered by PriceLabs."
+  },
+  { 
+    id: "bookings", 
+    label: "Bookings", 
+    duration: 10000,
+    script: "Always know who's staying at your property. Our visual calendar shows every reservation with guest details and revenue forecasts for upcoming stays."
+  },
+  { 
+    id: "statements", 
+    label: "Statements", 
+    duration: 9000,
+    script: "Transparent financials you can access anytime. Download your monthly statements with gross and net earnings clearly shown."
+  },
+  { 
+    id: "expenses", 
+    label: "Expenses", 
+    duration: 12000,
+    script: "No hidden fees. Every dollar is documented. See itemized expenses with vendor names and receipt attachments. Filter by category to understand exactly where your money goes."
+  },
+  { 
+    id: "messages", 
+    label: "Messages", 
+    duration: 12000,
+    script: "Every conversation in one place. SMS, emails, voicemails, and video updates. Listen to recordings from your property manager and never miss an important update."
+  },
+  { 
+    id: "repairs", 
+    label: "Repairs", 
+    duration: 12000,
+    script: "Stay in control of maintenance. See work order status, approve or decline repairs directly, and view scheduled maintenance. All costs are visible upfront before any work begins."
+  },
+  { 
+    id: "screenings", 
+    label: "Screenings", 
+    duration: 10000,
+    script: "Know who's staying in your home. Every guest is ID verified with background checks and watchlist screening. Our verification process reduces property damage claims by 47 percent."
+  },
+  { 
+    id: "marketing", 
+    label: "Marketing", 
+    duration: 10000,
+    script: "See exactly how we're promoting your investment. View social media posts, platform distribution across Airbnb, VRBO, and corporate housing, and track our marketing activities in real-time."
+  },
+  { 
+    id: "closing", 
+    label: "CTA", 
+    duration: 8000,
+    script: "Ready to experience true transparency? Explore our demo portal or schedule a call with our team today."
+  },
 ];
+
+const slideVariants = {
+  enter: { opacity: 0, scale: 0.98, y: 20 },
+  center: { opacity: 1, scale: 1, y: 0 },
+  exit: { opacity: 0, scale: 0.98, y: -20 }
+};
 
 export default function OwnerPortalPresentation() {
   const navigate = useNavigate();
@@ -43,39 +108,62 @@ export default function OwnerPortalPresentation() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const progressRef = useRef<NodeJS.Timeout | null>(null);
+  const [slideProgress, setSlideProgress] = useState(0);
 
-  // Auto-advance slides
+  const { 
+    playAudioForSlide, 
+    stopAudio, 
+    isMuted, 
+    toggleMute, 
+    isLoading: isAudioLoading 
+  } = usePresentationAudio();
+
+  // Play audio when slide changes
+  useEffect(() => {
+    const slide = SLIDES[currentSlide];
+    if (isPlaying && slide.script) {
+      playAudioForSlide(slide.id, slide.script);
+    }
+    
+    return () => {
+      stopAudio();
+    };
+  }, [currentSlide, isPlaying, playAudioForSlide, stopAudio]);
+
+  // Auto-advance slides with progress tracking
   useEffect(() => {
     if (!isPlaying) {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (progressRef.current) clearInterval(progressRef.current);
       return;
     }
 
+    setSlideProgress(0);
+    const duration = SLIDES[currentSlide].duration;
+    const progressInterval = 50; // Update every 50ms
+    
+    progressRef.current = setInterval(() => {
+      setSlideProgress(prev => Math.min(prev + (100 * progressInterval / duration), 100));
+    }, progressInterval);
+
     timerRef.current = setTimeout(() => {
       if (currentSlide < SLIDES.length - 1) {
-        setCurrentSlide((prev) => prev + 1);
+        setCurrentSlide(prev => prev + 1);
       } else {
         setIsPlaying(false);
       }
-    }, SLIDES[currentSlide].duration);
+    }, duration);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (progressRef.current) clearInterval(progressRef.current);
     };
   }, [currentSlide, isPlaying]);
 
-  // Scroll to current slide
-  useEffect(() => {
-    const slideEl = slideRefs.current[currentSlide];
-    if (slideEl) {
-      slideEl.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [currentSlide]);
-
   // Toggle fullscreen
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen();
       setIsFullscreen(true);
@@ -83,7 +171,7 @@ export default function OwnerPortalPresentation() {
       document.exitFullscreen();
       setIsFullscreen(false);
     }
-  };
+  }, []);
 
   // Keyboard navigation
   useEffect(() => {
@@ -91,21 +179,23 @@ export default function OwnerPortalPresentation() {
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
         if (currentSlide < SLIDES.length - 1) {
-          setCurrentSlide((prev) => prev + 1);
+          setCurrentSlide(prev => prev + 1);
         }
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (currentSlide > 0) {
-          setCurrentSlide((prev) => prev - 1);
+          setCurrentSlide(prev => prev - 1);
         }
       } else if (e.key === "Escape") {
         setIsPlaying(false);
+      } else if (e.key === "m" || e.key === "M") {
+        toggleMute();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentSlide]);
+  }, [currentSlide, toggleMute]);
 
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
@@ -117,33 +207,58 @@ export default function OwnerPortalPresentation() {
     setIsPlaying(true);
   };
 
+  const togglePlay = () => {
+    if (!isPlaying) {
+      // If at the end, restart
+      if (currentSlide === SLIDES.length - 1) {
+        restart();
+      } else {
+        setIsPlaying(true);
+      }
+    } else {
+      setIsPlaying(false);
+      stopAudio();
+    }
+  };
+
   const progress = ((currentSlide + 1) / SLIDES.length) * 100;
+
+  const renderSlide = (slideId: string, isActive: boolean) => {
+    switch (slideId) {
+      case "intro": return <OwnerPortalIntroSlide />;
+      case "overview": return <OverviewSlide isActive={isActive} />;
+      case "insights": return <InsightsSlide />;
+      case "bookings": return <BookingsSlide />;
+      case "statements": return <StatementsSlide />;
+      case "expenses": return <ExpensesSlide />;
+      case "messages": return <MessagesSlide />;
+      case "repairs": return <RepairsSlide />;
+      case "screenings": return <ScreeningsSlide />;
+      case "marketing": return <MarketingSlide />;
+      case "closing": return <OwnerPortalClosingSlide />;
+      default: return null;
+    }
+  };
 
   return (
     <div 
       ref={containerRef}
-      className="min-h-screen bg-[#0a0a1a] overflow-y-auto scroll-smooth"
+      className="min-h-screen bg-[#0a0a1a] overflow-hidden"
     >
-      {/* Slides */}
-      {SLIDES.map((slide, index) => (
-        <div
-          key={slide.id}
-          ref={(el) => (slideRefs.current[index] = el)}
+      {/* Single Slide with AnimatePresence */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={SLIDES[currentSlide].id}
+          variants={slideVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.5, ease: "easeInOut" }}
           className="min-h-screen"
         >
-          {slide.id === "intro" && <OwnerPortalIntroSlide />}
-          {slide.id === "overview" && <OverviewSlide isActive={currentSlide === index} />}
-          {slide.id === "insights" && <InsightsSlide />}
-          {slide.id === "bookings" && <BookingsSlide />}
-          {slide.id === "statements" && <StatementsSlide />}
-          {slide.id === "expenses" && <ExpensesSlide />}
-          {slide.id === "messages" && <MessagesSlide />}
-          {slide.id === "repairs" && <RepairsSlide />}
-          {slide.id === "screenings" && <ScreeningsSlide />}
-          {slide.id === "marketing" && <MarketingSlide />}
-          {slide.id === "closing" && <OwnerPortalClosingSlide />}
-        </div>
-      ))}
+          {renderSlide(SLIDES[currentSlide].id, true)}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Fixed Navigation Bar */}
       <motion.div
@@ -163,13 +278,29 @@ export default function OwnerPortalPresentation() {
             <Home className="h-4 w-4" />
           </Button>
 
+          {/* Audio Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 hover:bg-white/10 ${isMuted ? 'text-white/40' : 'text-[#fae052]'}`}
+            onClick={toggleMute}
+          >
+            {isMuted ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </Button>
+
+          <div className="w-px h-6 bg-white/10" />
+
           {/* Prev */}
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
             disabled={currentSlide === 0}
-            onClick={() => setCurrentSlide((prev) => prev - 1)}
+            onClick={() => setCurrentSlide(prev => prev - 1)}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -179,7 +310,7 @@ export default function OwnerPortalPresentation() {
             variant="ghost"
             size="icon"
             className="h-10 w-10 text-white hover:bg-white/10 bg-[#fae052]/20"
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={togglePlay}
           >
             {isPlaying ? (
               <Pause className="h-5 w-5 text-[#fae052]" />
@@ -194,34 +325,38 @@ export default function OwnerPortalPresentation() {
             size="icon"
             className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
             disabled={currentSlide === SLIDES.length - 1}
-            onClick={() => setCurrentSlide((prev) => prev + 1)}
+            onClick={() => setCurrentSlide(prev => prev + 1)}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
 
+          <div className="w-px h-6 bg-white/10" />
+
           {/* Progress Dots */}
-          <div className="flex items-center gap-1 px-2 border-l border-white/10 ml-1">
+          <div className="flex items-center gap-1 px-1">
             {SLIDES.map((slide, index) => (
               <button
                 key={slide.id}
                 onClick={() => goToSlide(index)}
-                className={`h-2 w-2 rounded-full transition-all ${
+                className={`h-2 rounded-full transition-all ${
                   index === currentSlide
                     ? "bg-[#fae052] w-4"
                     : index < currentSlide
-                    ? "bg-white/50"
-                    : "bg-white/20"
+                    ? "bg-white/50 w-2"
+                    : "bg-white/20 w-2"
                 }`}
                 title={slide.label}
               />
             ))}
           </div>
 
+          <div className="w-px h-6 bg-white/10" />
+
           {/* Restart */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10 border-l border-white/10 ml-1"
+            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
             onClick={restart}
           >
             <RotateCcw className="h-4 w-4" />
@@ -239,19 +374,46 @@ export default function OwnerPortalPresentation() {
         </div>
       </motion.div>
 
-      {/* Progress Bar */}
+      {/* Progress Bar with per-slide progress */}
       <div className="fixed top-0 left-0 right-0 h-1 bg-white/10 z-50">
+        {/* Overall progress (segment markers) */}
+        <div className="relative h-full">
+          {SLIDES.map((_, index) => (
+            <div
+              key={index}
+              className="absolute top-0 bottom-0 border-r border-white/20"
+              style={{ left: `${((index + 1) / SLIDES.length) * 100}%` }}
+            />
+          ))}
+        </div>
+        {/* Overall progress */}
         <motion.div
-          className="h-full bg-[#fae052]"
+          className="absolute top-0 h-full bg-[#fae052]/50"
           initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
+          animate={{ width: `${(currentSlide / SLIDES.length) * 100}%` }}
           transition={{ duration: 0.3 }}
+        />
+        {/* Current slide progress */}
+        <motion.div
+          className="absolute top-0 h-full bg-[#fae052]"
+          style={{ 
+            left: `${(currentSlide / SLIDES.length) * 100}%`,
+            width: `${(slideProgress / 100) * (100 / SLIDES.length)}%`
+          }}
         />
       </div>
 
       {/* Slide Counter */}
-      <div className="fixed top-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full text-white/70 text-sm z-50">
-        {currentSlide + 1} / {SLIDES.length}
+      <div className="fixed top-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full text-white/70 text-sm z-50 flex items-center gap-2">
+        {isAudioLoading && (
+          <div className="h-2 w-2 rounded-full bg-[#fae052] animate-pulse" />
+        )}
+        <span>{currentSlide + 1} / {SLIDES.length}</span>
+      </div>
+
+      {/* Current Slide Label */}
+      <div className="fixed top-4 left-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full text-white/70 text-sm z-50">
+        {SLIDES[currentSlide].label}
       </div>
     </div>
   );

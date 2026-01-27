@@ -3,8 +3,6 @@ import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OwnerPortalAdmin } from "@/components/admin/OwnerPortalAdmin";
 import { IntegrationStatusDashboard } from "@/components/admin/IntegrationStatusDashboard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Users, Activity, Presentation, ExternalLink } from "lucide-react";
 
 export default function OwnerPortalManagement() {
@@ -12,38 +10,39 @@ export default function OwnerPortalManagement() {
 
   return (
     <div className="container mx-auto px-3 py-4 md:px-6 md:py-6 space-y-4 md:space-y-6">
-      {/* Presentation Links Card */}
-      <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Presentation className="h-5 w-5 text-amber-600" />
-            Presentation Links
-          </CardTitle>
-          <CardDescription>Share these links with prospects to showcase our services</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/owner-portal-presentation" target="_blank">
-              <Button variant="outline" className="border-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Owner Portal
-              </Button>
-            </Link>
-            <Link to="/onboarding-presentation" target="_blank">
-              <Button variant="outline" className="border-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Onboarding
-              </Button>
-            </Link>
-            <Link to="/designer-presentation" target="_blank">
-              <Button variant="outline" className="border-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Design Services
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Compact Presentation Links */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm bg-muted/50 rounded-lg px-4 py-2">
+        <span className="text-muted-foreground flex items-center gap-1.5">
+          <Presentation className="h-3.5 w-3.5" />
+          Presentations:
+        </span>
+        <Link 
+          to="/owner-portal-presentation" 
+          target="_blank"
+          className="text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-1"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Owner Portal
+        </Link>
+        <span className="text-muted-foreground">•</span>
+        <Link 
+          to="/onboarding-presentation" 
+          target="_blank"
+          className="text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-1"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Onboarding
+        </Link>
+        <span className="text-muted-foreground">•</span>
+        <Link 
+          to="/designer-presentation" 
+          target="_blank"
+          className="text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-1"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Design Services
+        </Link>
+      </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="inline-flex h-9 md:h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground w-full sm:w-auto">
