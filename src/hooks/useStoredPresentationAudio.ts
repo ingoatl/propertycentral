@@ -6,7 +6,7 @@ interface UseStoredPresentationAudioOptions {
   onAudioEnd?: () => void;
 }
 
-// Subtle ambient music - will be generated separately
+// Uplifting background music URL (shared between presentations - stored in Supabase)
 const BACKGROUND_MUSIC_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/message-attachments/presentation-audio/background-music.mp3";
 
 export function useStoredPresentationAudio(options: UseStoredPresentationAudioOptions) {
@@ -52,7 +52,7 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     preloadUrls();
   }, [getStorageUrl, presentation]);
 
-  // Start background music (subtle ambient) - completely optional, non-blocking
+  // Start background music (uplifting ambient) - completely optional, non-blocking
   const startBackgroundMusic = useCallback(() => {
     if (isMuted || isMusicPlaying) return;
     
@@ -61,7 +61,7 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
       if (!musicRef.current) {
         musicRef.current = new Audio(BACKGROUND_MUSIC_URL);
         musicRef.current.loop = true;
-        musicRef.current.volume = 0.05; // Very subtle - barely audible
+        musicRef.current.volume = 0.08; // Subtle but present - uplifting background
       }
       
       // Fire and forget - don't await or handle errors that would block
