@@ -60,6 +60,7 @@ const TeamHubInvite = lazy(() => import("./pages/TeamHubInvite"));
 const Tax1099 = lazy(() => import("./pages/Tax1099"));
 const BookOwnerCall = lazy(() => import("./pages/BookOwnerCall"));
 const VendorQuote = lazy(() => import("./pages/VendorQuote"));
+const OwnerPortalPresentation = lazy(() => import("./pages/OwnerPortalPresentation"));
 
 // QueryClient configured with optimized caching and stale time settings
 const queryClient = new QueryClient({
@@ -142,6 +143,7 @@ const App = () => (
                     <Route path="/vendor-job/:token" element={<VendorJobPortal />} />
                     <Route path="/vendor-quote/:requestId" element={<VendorQuote />} />
                     <Route path="/vendor/w9-upload" element={<VendorW9Upload />} />
+                    <Route path="/owner-portal-presentation" element={<OwnerPortalPresentation />} />
                     <Route path="*" element={
                       <ErrorBoundary>
                         <Layout>
