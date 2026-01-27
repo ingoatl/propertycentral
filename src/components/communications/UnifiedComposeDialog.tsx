@@ -122,6 +122,14 @@ const SMS_TEMPLATES = [
     label: "Thanks",
     content: "Hi {{name}}, thanks for your time today! I'll follow up with that info shortly.",
   },
+  {
+    label: "Owner Portal",
+    content: "Hi {{name}}, here's a look at our Owner Portal - the most transparent property management experience: https://propertycentral.lovable.app/owner-portal-presentation",
+  },
+  {
+    label: "Presentations",
+    content: "Hi {{name}}, check out what makes PeachHaus different:\n• Owner Portal: propertycentral.lovable.app/owner-portal-presentation\n• Onboarding: propertycentral.lovable.app/onboarding-presentation\n• Design Services: propertycentral.lovable.app/designer-presentation",
+  },
 ];
 
 export function UnifiedComposeDialog({
