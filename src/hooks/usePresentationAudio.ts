@@ -22,6 +22,8 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
   const gainNode = useRef<GainNode | null>(null);
   const onAudioEndRef = useRef<(() => void) | null>(null);
   const preloadingRef = useRef(false);
+  // CRITICAL: Mutex lock to prevent double-play of same slide (React Strict Mode fix)
+  const isPlayingSlideRef = useRef<string | null>(null);
 
   // Initialize AudioContext (must be after user interaction)
   const initAudioContext = useCallback(() => {
@@ -71,7 +73,7 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
     }
   }, [voiceId, initAudioContext]);
 
-  // Preload audio for slides on mount - preload first 5 slides for smooth experience
+  // Preload audio for slides on mount - preload first 3 slides in parallel for critical path
   useEffect(() => {
     if (preloadSlides.length === 0 || preloadingRef.current) return;
     
@@ -81,26 +83,29 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
       // Initialize audio context early
       initAudioContext();
       
-      // Preload first 5 slides for immediate playback
-      const slidesToPreload = preloadSlides.slice(0, 5);
+      // Parallel preload of first 3 slides (critical path for immediate playback)
+      const criticalSlides = preloadSlides.slice(0, 3);
       
       await Promise.all(
-        slidesToPreload.map((slide) => preloadAudioBuffer(slide.id, slide.script))
+        criticalSlides.map((slide) => preloadAudioBuffer(slide.id, slide.script))
       );
       
-      setIsPreloaded(true);
+      setIsPreloaded(true); // Ready signal - first 3 slides loaded
       
-      // Continue preloading remaining slides in background
-      const remainingSlides = preloadSlides.slice(5);
-      for (const slide of remainingSlides) {
-        await preloadAudioBuffer(slide.id, slide.script);
-      }
+      // Background preload remaining slides with fire-and-forget (no await blocks UI)
+      const remainingSlides = preloadSlides.slice(3);
+      remainingSlides.forEach((slide) => {
+        preloadAudioBuffer(slide.id, slide.script); // Fire and forget
+      });
     };
     
     preloadAudio();
   }, [preloadSlides, preloadAudioBuffer, initAudioContext]);
 
   const stopAudio = useCallback(() => {
+    // Clear playback lock when stopping
+    isPlayingSlideRef.current = null;
+    
     if (activeSource.current) {
       try {
         activeSource.current.stop();
@@ -123,8 +128,17 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
       return;
     }
     
-    // Stop any currently playing audio
+    // CRITICAL: Check if already playing this slide (prevents double-trigger from React Strict Mode)
+    if (isPlayingSlideRef.current === slideId) {
+      console.log("Already playing slide:", slideId, "- skipping duplicate call");
+      return;
+    }
+    
+    // Stop any currently playing audio first
     stopAudio();
+    
+    // Lock this slide to prevent duplicate plays
+    isPlayingSlideRef.current = slideId;
     setCurrentSlideId(slideId);
     onAudioEndRef.current = onEnd || null;
 
@@ -185,6 +199,8 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
     
     // Handle audio end
     source.onended = () => {
+      // Clear the playback lock when audio ends
+      isPlayingSlideRef.current = null;
       setIsPlaying(false);
       activeSource.current = null;
       onAudioEndRef.current?.();

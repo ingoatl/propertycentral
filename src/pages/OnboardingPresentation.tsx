@@ -160,6 +160,11 @@ export default function OnboardingPresentation() {
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
   const hasPlayedRef = useRef(false);
+  // CRITICAL: Track which slide we've triggered audio for (prevents double-play in Strict Mode)
+  const hasPlayedForSlideRef = useRef<string | null>(null);
+  // Touch swipe support
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
 
   // Prepare slides for preloading
   const preloadSlides = SLIDES.map(s => ({ id: s.id, script: s.script || "" }));
@@ -182,6 +187,7 @@ export default function OnboardingPresentation() {
       // Stop current audio before transitioning
       stopAudio();
       audioEndedRef.current = true; // Prevent double-trigger
+      hasPlayedForSlideRef.current = null; // Reset slide lock
       setIsTransitioning(true);
       setCurrentSlide(index);
       setTimeout(() => setIsTransitioning(false), 500);
@@ -189,12 +195,20 @@ export default function OnboardingPresentation() {
   }, [isTransitioning, stopAudio]);
 
   const advanceSlide = useCallback(() => {
-    if (currentSlide < SLIDES.length - 1) {
-      goToSlide(currentSlide + 1);
-    } else {
+    // Guard: prevent advancing past the end
+    if (currentSlide >= SLIDES.length - 1) {
+      // Clean stop at end of presentation
       setIsPlaying(false);
+      stopAudio();
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      audioEndedRef.current = true;
+      return;
     }
-  }, [currentSlide, goToSlide]);
+    goToSlide(currentSlide + 1);
+  }, [currentSlide, goToSlide, stopAudio]);
 
   const nextSlide = useCallback(() => {
     goToSlide(currentSlide + 1);
@@ -204,14 +218,39 @@ export default function OnboardingPresentation() {
     goToSlide(currentSlide - 1);
   }, [currentSlide, goToSlide]);
 
-  // Auto-play with audio narration - fixed double-play bug
+  // Touch swipe handlers for mobile navigation
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX.current;
+    
+    if (Math.abs(diff) > 50) { // Minimum swipe distance
+      if (diff > 0) {
+        nextSlide(); // Swipe left = next
+      } else {
+        prevSlide(); // Swipe right = prev
+      }
+    }
+  }, [nextSlide, prevSlide]);
+
+  // Auto-play with audio narration - fixed double-play bug with slide-specific lock
   useEffect(() => {
     if (!isPlaying) {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      hasPlayedForSlideRef.current = null; // Reset when paused
       return;
     }
 
     const slide = SLIDES[currentSlide];
+    
+    // CRITICAL: Prevent double-play for this specific slide (React Strict Mode fix)
+    if (hasPlayedForSlideRef.current === slide.id) {
+      return;
+    }
+    hasPlayedForSlideRef.current = slide.id;
     
     // Reset the flag for this slide
     audioEndedRef.current = false;
@@ -355,7 +394,11 @@ export default function OnboardingPresentation() {
   const CurrentSlideComponent = SLIDES[currentSlide].component;
 
   return (
-    <div className="fixed inset-0 bg-[#0a0a1a] overflow-hidden">
+    <div 
+      className="fixed inset-0 bg-[#0a0a1a] overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Slide Content */}
       <div
         className={cn(
@@ -366,16 +409,16 @@ export default function OnboardingPresentation() {
         <CurrentSlideComponent />
       </div>
 
-      {/* Navigation Controls */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-50 bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-4 py-2">
+      {/* Navigation Controls - Mobile-optimized with larger touch targets */}
+      <div className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 md:gap-2 z-50 bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-3 md:px-4 py-2">
         {/* Home */}
         <Link to="/">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full text-white/70 hover:text-white hover:bg-white/10"
+            className="h-10 w-10 md:h-8 md:w-8 rounded-full text-white/70 hover:text-white hover:bg-white/10"
           >
-            <Home className="h-4 w-4" />
+            <Home className="h-5 w-5 md:h-4 md:w-4" />
           </Button>
         </Link>
 
@@ -384,56 +427,56 @@ export default function OnboardingPresentation() {
           variant="ghost"
           size="icon"
           className={cn(
-            "h-8 w-8 hover:bg-white/10",
+            "h-10 w-10 md:h-8 md:w-8 hover:bg-white/10",
             isMuted ? "text-white/40" : "text-amber-400"
           )}
           onClick={toggleMute}
         >
-          {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          {isMuted ? <VolumeX className="h-5 w-5 md:h-4 md:w-4" /> : <Volume2 className="h-5 w-5 md:h-4 md:w-4" />}
         </Button>
 
-        <div className="w-px h-6 bg-white/10" />
+        <div className="w-px h-6 bg-white/10 hidden md:block" />
 
-        {/* Previous Button */}
+        {/* Previous Button - Larger on mobile */}
         <Button
           variant="ghost"
           size="icon"
           onClick={prevSlide}
           disabled={currentSlide === 0}
-          className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30"
+          className="h-10 w-10 md:h-8 md:w-8 text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5 md:h-4 md:w-4" />
         </Button>
 
         {/* Play/Pause */}
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-white hover:bg-white/10 bg-amber-500/20"
+          className="h-12 w-12 md:h-10 md:w-10 text-white hover:bg-white/10 bg-amber-500/20"
           onClick={togglePlay}
         >
           {isPlaying ? (
-            <Pause className="h-5 w-5 text-amber-400" />
+            <Pause className="h-6 w-6 md:h-5 md:w-5 text-amber-400" />
           ) : (
-            <Play className="h-5 w-5 text-amber-400 ml-0.5" />
+            <Play className="h-6 w-6 md:h-5 md:w-5 text-amber-400 ml-0.5" />
           )}
         </Button>
 
-        {/* Next Button */}
+        {/* Next Button - Larger on mobile */}
         <Button
           variant="ghost"
           size="icon"
           onClick={nextSlide}
           disabled={currentSlide === SLIDES.length - 1}
-          className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30"
+          className="h-10 w-10 md:h-8 md:w-8 text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-5 w-5 md:h-4 md:w-4" />
         </Button>
 
-        <div className="w-px h-6 bg-white/10" />
+        <div className="w-px h-6 bg-white/10 hidden md:block" />
 
-        {/* Slide Indicators */}
-        <div className="flex items-center gap-1">
+        {/* Slide Indicators - Hidden on mobile */}
+        <div className="hidden md:flex items-center gap-1">
           {SLIDES.map((_, index) => (
             <button
               key={index}
@@ -454,24 +497,24 @@ export default function OnboardingPresentation() {
           ))}
         </div>
 
-        <div className="w-px h-6 bg-white/10" />
+        <div className="w-px h-6 bg-white/10 hidden md:block" />
 
-        {/* Restart */}
+        {/* Restart - Hidden on mobile */}
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+          className="hidden md:flex h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
           onClick={restart}
         >
           <RotateCcw className="h-4 w-4" />
         </Button>
 
-        {/* Fullscreen */}
+        {/* Fullscreen - Hidden on mobile */}
         <Button
           variant="ghost"
           size="icon"
           onClick={toggleFullscreen}
-          className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+          className="hidden md:flex h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
         >
           {isFullscreen ? (
             <Minimize2 className="h-4 w-4" />
