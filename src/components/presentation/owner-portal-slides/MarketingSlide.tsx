@@ -15,15 +15,15 @@ export function MarketingSlide({ isActive }: MarketingSlideProps) {
   ];
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-4 md:py-6 px-4 md:px-8">
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-4 px-4 md:px-8">
       {/* Headline */}
       <motion.div 
-        className="text-center mb-2 md:mb-3 max-w-4xl"
+        className="text-center mb-2 max-w-4xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h2 className="text-2xl md:text-5xl font-bold text-white mb-1 md:mb-2">
+        <h2 className="text-2xl md:text-5xl font-bold text-white mb-1">
           See <span className="text-[#fae052]">Every Marketing Effort</span>
         </h2>
         <p className="text-sm md:text-lg text-white/70">
@@ -33,7 +33,7 @@ export function MarketingSlide({ isActive }: MarketingSlideProps) {
 
       {/* Feature Pills */}
       <motion.div
-        className="flex flex-wrap justify-center gap-2 mb-2 md:mb-3 max-w-3xl"
+        className="flex flex-wrap justify-center gap-2 mb-2 max-w-3xl"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
@@ -49,9 +49,9 @@ export function MarketingSlide({ isActive }: MarketingSlideProps) {
         ))}
       </motion.div>
 
-      {/* Screenshot */}
+      {/* Screenshot - Full height scroll with longer duration */}
       <motion.div
-        className="relative w-full max-w-5xl flex-1 flex items-start justify-center overflow-hidden"
+        className="relative w-full max-w-5xl flex-1 flex items-start justify-center"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
@@ -59,14 +59,14 @@ export function MarketingSlide({ isActive }: MarketingSlideProps) {
         <AutoScrollImage 
           src="/images/owner-portal/10-marketing.png" 
           alt="Marketing Dashboard"
-          scrollDuration={12}
+          scrollDuration={18}
           isActive={isActive}
         />
       </motion.div>
 
-      {/* Pain Point Solved - directly under screenshot */}
+      {/* Pain Point Solved - directly under screenshot with mt-2 */}
       <motion.div
-        className="mt-3 md:mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 md:px-6 py-2 md:py-3 max-w-2xl text-center"
+        className="mt-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 md:px-6 py-2 max-w-2xl text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6 }}

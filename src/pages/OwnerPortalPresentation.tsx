@@ -112,8 +112,9 @@ const slideVariants = {
 export default function OwnerPortalPresentation() {
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false); // Start paused until user clicks play
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
@@ -126,6 +127,7 @@ export default function OwnerPortalPresentation() {
     toggleMute, 
     isLoading: isAudioLoading,
     isPreloaded,
+    initAudioContext,
   } = usePresentationAudio({
     preloadSlides: SLIDES.map(s => ({ id: s.id, script: s.script }))
   });
@@ -175,12 +177,9 @@ export default function OwnerPortalPresentation() {
       }, 3000);
     };
 
-    // Play audio with callback for when it ends
+    // Play audio immediately (no delay - audio is preloaded)
     if (slide.script && !isMuted) {
-      // Small delay before starting audio for smoother transitions
-      setTimeout(() => {
-        playAudioForSlide(slide.id, slide.script, onAudioComplete);
-      }, 500);
+      playAudioForSlide(slide.id, slide.script, onAudioComplete);
     }
 
     // Fallback timer - only used if muted, with much longer durations
@@ -259,11 +258,17 @@ export default function OwnerPortalPresentation() {
   };
 
   const restart = () => {
+    initAudioContext(); // Ensure audio context is ready
     setCurrentSlide(0);
     setIsPlaying(true);
+    setHasStarted(true);
   };
 
   const togglePlay = () => {
+    // Initialize audio context on first user interaction
+    initAudioContext();
+    setHasStarted(true);
+    
     if (!isPlaying) {
       // If at the end, restart
       if (currentSlide === SLIDES.length - 1) {
@@ -276,8 +281,6 @@ export default function OwnerPortalPresentation() {
       stopAudio();
     }
   };
-
-  const progress = ((currentSlide + 1) / SLIDES.length) * 100;
 
   const renderSlide = (slideId: string, isActive: boolean) => {
     switch (slideId) {
@@ -311,20 +314,20 @@ export default function OwnerPortalPresentation() {
           animate="center"
           exit="exit"
           transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="min-h-screen min-h-[100dvh] pb-24"
+          className="min-h-screen min-h-[100dvh] pb-20 md:pb-24"
         >
           {renderSlide(SLIDES[currentSlide].id, true)}
         </motion.div>
       </AnimatePresence>
 
-      {/* Fixed Navigation Bar - Centered */}
+      {/* Fixed Navigation Bar - Perfectly Centered */}
       <motion.div
-        className="fixed bottom-4 md:bottom-6 left-0 right-0 z-50 flex justify-center px-4"
+        className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4"
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.5 }}
       >
-        <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 shadow-2xl max-w-full overflow-x-auto">
+        <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 shadow-2xl">
           {/* Home */}
           <Button
             variant="ghost"
@@ -357,18 +360,25 @@ export default function OwnerPortalPresentation() {
             size="icon"
             className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
             disabled={currentSlide === 0}
-            onClick={() => setCurrentSlide(prev => prev - 1)}
+            onClick={() => {
+              stopAudio();
+              audioEndedRef.current = true;
+              setCurrentSlide(prev => prev - 1);
+            }}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
 
-          {/* Play/Pause */}
+          {/* Play/Pause - Prominent */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-10 w-10 shrink-0 text-white hover:bg-white/10 bg-[#fae052]/20"
+            className="h-10 w-10 shrink-0 text-white hover:bg-white/10 bg-[#fae052]/20 relative"
             onClick={togglePlay}
           >
+            {isAudioLoading && (
+              <div className="absolute inset-0 rounded-lg border-2 border-[#fae052] border-t-transparent animate-spin" />
+            )}
             {isPlaying ? (
               <Pause className="h-5 w-5 text-[#fae052]" />
             ) : (
@@ -382,7 +392,11 @@ export default function OwnerPortalPresentation() {
             size="icon"
             className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
             disabled={currentSlide === SLIDES.length - 1}
-            onClick={() => setCurrentSlide(prev => prev + 1)}
+            onClick={() => {
+              stopAudio();
+              audioEndedRef.current = true;
+              setCurrentSlide(prev => prev + 1);
+            }}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -454,8 +468,8 @@ export default function OwnerPortalPresentation() {
 
       {/* Slide Counter */}
       <div className="fixed top-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full text-white/70 text-sm z-50 flex items-center gap-2">
-        {isAudioLoading && (
-          <div className="h-2 w-2 rounded-full bg-[#fae052] animate-pulse" />
+        {isPreloaded && (
+          <div className="h-2 w-2 rounded-full bg-emerald-400" title="Audio preloaded" />
         )}
         <span>{currentSlide + 1} / {SLIDES.length}</span>
       </div>

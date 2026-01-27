@@ -14,64 +14,100 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSlideId, setCurrentSlideId] = useState<string | null>(null);
   const [isPreloaded, setIsPreloaded] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioCache = useRef<Map<string, string>>(new Map());
+  
+  // Web Audio API for zero-latency playback
+  const audioContext = useRef<AudioContext | null>(null);
+  const audioBufferCache = useRef<Map<string, AudioBuffer>>(new Map());
+  const activeSource = useRef<AudioBufferSourceNode | null>(null);
+  const gainNode = useRef<GainNode | null>(null);
   const onAudioEndRef = useRef<(() => void) | null>(null);
   const preloadingRef = useRef(false);
 
-  // Preload audio for slides on mount
+  // Initialize AudioContext (must be after user interaction)
+  const initAudioContext = useCallback(() => {
+    if (!audioContext.current) {
+      audioContext.current = new AudioContext();
+      gainNode.current = audioContext.current.createGain();
+      gainNode.current.gain.value = 0.8;
+      gainNode.current.connect(audioContext.current.destination);
+    }
+    // Resume if suspended (browser autoplay policy)
+    if (audioContext.current.state === 'suspended') {
+      audioContext.current.resume();
+    }
+    return audioContext.current;
+  }, []);
+
+  // Preload and decode audio for a slide
+  const preloadAudioBuffer = useCallback(async (slideId: string, script: string): Promise<void> => {
+    if (!script || audioBufferCache.current.has(slideId)) return;
+    
+    const ctx = initAudioContext();
+    
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ 
+            text: script, 
+            voiceId 
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        audioBufferCache.current.set(slideId, audioBuffer);
+      }
+    } catch (error) {
+      console.error(`Failed to preload audio for slide ${slideId}:`, error);
+    }
+  }, [voiceId, initAudioContext]);
+
+  // Preload audio for slides on mount - preload first 5 slides for smooth experience
   useEffect(() => {
     if (preloadSlides.length === 0 || preloadingRef.current) return;
     
     preloadingRef.current = true;
     
     const preloadAudio = async () => {
-      // Preload first 3 slides for immediate playback
-      const slidesToPreload = preloadSlides.slice(0, 3);
+      // Initialize audio context early
+      initAudioContext();
+      
+      // Preload first 5 slides for immediate playback
+      const slidesToPreload = preloadSlides.slice(0, 5);
       
       await Promise.all(
-        slidesToPreload.map(async (slide) => {
-          if (audioCache.current.has(slide.id) || !slide.script) return;
-          
-          try {
-            const response = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({ 
-                  text: slide.script, 
-                  voiceId 
-                }),
-              }
-            );
-
-            if (response.ok) {
-              const audioBlob = await response.blob();
-              const audioUrl = URL.createObjectURL(audioBlob);
-              audioCache.current.set(slide.id, audioUrl);
-            }
-          } catch (error) {
-            console.error(`Failed to preload audio for slide ${slide.id}:`, error);
-          }
-        })
+        slidesToPreload.map((slide) => preloadAudioBuffer(slide.id, slide.script))
       );
       
       setIsPreloaded(true);
+      
+      // Continue preloading remaining slides in background
+      const remainingSlides = preloadSlides.slice(5);
+      for (const slide of remainingSlides) {
+        await preloadAudioBuffer(slide.id, slide.script);
+      }
     };
     
     preloadAudio();
-  }, [preloadSlides, voiceId]);
+  }, [preloadSlides, preloadAudioBuffer, initAudioContext]);
 
   const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
+    if (activeSource.current) {
+      try {
+        activeSource.current.stop();
+      } catch (e) {
+        // Ignore if already stopped
+      }
+      activeSource.current = null;
     }
     setIsPlaying(false);
   }, []);
@@ -92,10 +128,12 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
     setCurrentSlideId(slideId);
     onAudioEndRef.current = onEnd || null;
 
-    // Check cache first
-    let audioUrl = audioCache.current.get(slideId);
+    const ctx = initAudioContext();
+
+    // Check buffer cache first
+    let audioBuffer = audioBufferCache.current.get(slideId);
     
-    if (!audioUrl) {
+    if (!audioBuffer) {
       setIsLoading(true);
       
       try {
@@ -122,9 +160,9 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
           return;
         }
 
-        const audioBlob = await response.blob();
-        audioUrl = URL.createObjectURL(audioBlob);
-        audioCache.current.set(slideId, audioUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        audioBufferCache.current.set(slideId, audioBuffer);
       } catch (error) {
         console.error("Failed to generate audio:", error);
         setIsLoading(false);
@@ -135,25 +173,29 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
       setIsLoading(false);
     }
 
-    // Play the audio
-    audioRef.current = new Audio(audioUrl);
-    audioRef.current.volume = 0.8;
-    setIsPlaying(true);
+    // Create buffer source for instant playback
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    
+    if (gainNode.current) {
+      source.connect(gainNode.current);
+    } else {
+      source.connect(ctx.destination);
+    }
     
     // Handle audio end
-    audioRef.current.onended = () => {
+    source.onended = () => {
       setIsPlaying(false);
+      activeSource.current = null;
       onAudioEndRef.current?.();
     };
     
-    try {
-      await audioRef.current.play();
-    } catch (error) {
-      console.error("Failed to play audio:", error);
-      setIsPlaying(false);
-      onEnd?.();
-    }
-  }, [isMuted, voiceId, stopAudio]);
+    activeSource.current = source;
+    setIsPlaying(true);
+    
+    // Start playback immediately - no delay!
+    source.start(0);
+  }, [isMuted, voiceId, stopAudio, initAudioContext]);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
@@ -165,6 +207,16 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
     });
   }, [stopAudio]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAudio();
+      if (audioContext.current) {
+        audioContext.current.close();
+      }
+    };
+  }, [stopAudio]);
+
   return { 
     playAudioForSlide, 
     stopAudio,
@@ -174,6 +226,7 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
     isLoading,
     isPlaying,
     currentSlideId,
-    isPreloaded
+    isPreloaded,
+    initAudioContext // Expose for user interaction initialization
   };
 }
