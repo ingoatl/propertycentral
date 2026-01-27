@@ -18,67 +18,43 @@ export function AutoScrollImage({
 }: AutoScrollImageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const staticImageRef = useRef<HTMLImageElement>(null);
   const [scrollAmount, setScrollAmount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [imageNaturalHeight, setImageNaturalHeight] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
 
-  // Fixed container height for consistency
-  const CONTAINER_HEIGHT = "50vh";
-  const SCROLL_THRESHOLD = 50; // Only animate if overflow > 50px
+  // Only animate if image is significantly taller than container (>100px overflow)
+  const SCROLL_THRESHOLD = 100;
 
   // Calculate scroll amount when image loads
-  useEffect(() => {
-    if (!isLoaded || !containerRef.current) return;
-
-    const calculateOverflow = () => {
-      const container = containerRef.current;
-      const img = imageRef.current || staticImageRef.current;
-      if (!img || !container) return;
-
-      const naturalHeight = img.naturalHeight;
-      const naturalWidth = img.naturalWidth;
-      const containerWidth = container.clientWidth;
-      const containerHeight = container.clientHeight;
-      
-      if (naturalWidth === 0 || naturalHeight === 0 || containerWidth === 0) return;
-      
-      // Calculate how tall the image will be when rendered at container width
-      const aspectRatio = naturalWidth / naturalHeight;
-      const renderedHeight = containerWidth / aspectRatio;
-      
-      // Calculate overflow (how much taller the image is than the container)
-      const overflow = Math.max(0, renderedHeight - containerHeight);
-      
-      console.log('AutoScrollImage calc:', { 
-        src, 
-        naturalHeight, 
-        naturalWidth, 
-        containerHeight, 
-        containerWidth,
-        renderedHeight,
-        overflow,
-        willAnimate: overflow > SCROLL_THRESHOLD
-      });
-      
-      setScrollAmount(overflow);
-    };
-
-    // Calculate after a small delay to ensure container is sized
-    const timer = setTimeout(calculateOverflow, 100);
-    
-    // Also recalculate on resize
-    const resizeObserver = new ResizeObserver(calculateOverflow);
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
-
-    return () => {
-      clearTimeout(timer);
-      resizeObserver.disconnect();
-    };
-  }, [isLoaded, src]);
-
   const handleImageLoad = () => {
+    const img = imageRef.current;
+    const container = containerRef.current;
+    
+    if (!img || !container) return;
+    
+    // Get the rendered dimensions
+    const containerRect = container.getBoundingClientRect();
+    const containerH = containerRect.height;
+    
+    // Calculate rendered image height based on container width and aspect ratio
+    const naturalWidth = img.naturalWidth;
+    const naturalHeight = img.naturalHeight;
+    const aspectRatio = naturalWidth / naturalHeight;
+    const renderedHeight = containerRect.width / aspectRatio;
+    
+    setImageNaturalHeight(naturalHeight);
+    setContainerHeight(containerH);
+    
+    // Only scroll if the image is significantly taller than the container
+    const overflow = Math.max(0, renderedHeight - containerH);
+    
+    if (overflow > SCROLL_THRESHOLD) {
+      setScrollAmount(overflow);
+    } else {
+      setScrollAmount(0);
+    }
+    
     setIsLoaded(true);
   };
 
@@ -88,13 +64,24 @@ export function AutoScrollImage({
     setScrollAmount(0);
   }, [src]);
 
-  const shouldAnimate = scrollAmount > SCROLL_THRESHOLD && isActive && isLoaded;
+  // Recalculate on resize
+  useEffect(() => {
+    if (!isLoaded) return;
+    
+    const handleResize = () => {
+      handleImageLoad();
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isLoaded]);
+
+  const shouldAnimate = scrollAmount > 0 && isActive && isLoaded;
 
   return (
     <div 
       ref={containerRef}
-      className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative w-full"
-      style={{ height: CONTAINER_HEIGHT }}
+      className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative w-full max-h-[55vh]"
     >
       {shouldAnimate ? (
         // Animated scrolling image for tall content
@@ -115,12 +102,12 @@ export function AutoScrollImage({
           }}
         />
       ) : (
-        // Static centered image for content that fits
+        // Static image that fits
         <img 
-          ref={staticImageRef}
+          ref={imageRef}
           src={src}
           alt={alt}
-          className={`w-full h-full object-contain object-top ${className}`}
+          className={`w-full h-auto max-h-[55vh] object-contain object-top ${className}`}
           onLoad={handleImageLoad}
         />
       )}

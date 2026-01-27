@@ -10,10 +10,10 @@ export function InsightsSlide() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-8 pb-24 px-4 md:px-8">
-      {/* Fortune 500 Assertion-Based Headline */}
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-6 px-4 md:px-8">
+      {/* Headline */}
       <motion.div 
-        className="text-center mb-4 max-w-4xl"
+        className="text-center mb-3 max-w-4xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -28,7 +28,7 @@ export function InsightsSlide() {
 
       {/* Feature Pills */}
       <motion.div
-        className="flex flex-wrap justify-center gap-2 mb-4 max-w-2xl"
+        className="flex flex-wrap justify-center gap-2 mb-3 max-w-2xl"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
@@ -44,9 +44,9 @@ export function InsightsSlide() {
         ))}
       </motion.div>
 
-      {/* Screenshot with auto-scroll for tall images */}
+      {/* Screenshot */}
       <motion.div
-        className="relative w-full max-w-6xl flex-1 flex items-start justify-center overflow-hidden"
+        className="relative w-full max-w-5xl flex-1 flex items-center justify-center"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
@@ -58,9 +58,9 @@ export function InsightsSlide() {
         />
       </motion.div>
 
-      {/* Pain Point Solved */}
+      {/* Pain Point Solved - directly under screenshot */}
       <motion.div
-        className="mt-6 mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center mx-auto"
+        className="mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
@@ -69,6 +69,9 @@ export function InsightsSlide() {
           ✓ Know exactly how your property stacks up against the competition
         </p>
       </motion.div>
+
+      {/* Spacer for bottom nav */}
+      <div className="h-20" />
     </div>
   );
 }
