@@ -26,25 +26,25 @@ import { ScreeningsSlide } from "@/components/presentation/owner-portal-slides/S
 import { MarketingSlide } from "@/components/presentation/owner-portal-slides/MarketingSlide";
 import { OwnerPortalClosingSlide } from "@/components/presentation/owner-portal-slides/OwnerPortalClosingSlide";
 
-// Slide configuration with narration scripts
+// Slide configuration with narration scripts (Sarah voice - female, warm, professional)
 const SLIDES = [
   { 
     id: "intro", 
     label: "Intro", 
-    duration: 6000,
-    script: "Welcome to PeachHaus. Your property. Complete visibility."
+    duration: 8000,
+    script: "Welcome to PeachHaus. We're so glad you're here... Let us show you how we take care of your investment — and keep you completely informed, every step of the way."
   },
   { 
     id: "overview", 
     label: "Overview", 
     duration: 14000,
-    script: "See your complete property performance at a glance. Total revenue, occupancy rates, and guest ratings updated in real-time. Every month, you'll receive an AI-generated audio recap delivered directly to your phone."
+    script: "Here's your dashboard... Everything you need to know about your property — revenue, occupancy, and guest ratings — all in real-time. And every month, you'll receive a personalized audio recap, delivered right to your phone."
   },
   { 
     id: "insights", 
     label: "Insights", 
     duration: 12000,
-    script: "Know exactly how your property stacks up against the competition. Our market intelligence shows revenue opportunities, upcoming events that drive demand, and dynamic pricing powered by PriceLabs."
+    script: "Know exactly how your property stacks up against the competition. Our market intelligence reveals revenue opportunities, tracks demand-driving events, and powers dynamic pricing through PriceLabs."
   },
   { 
     id: "bookings", 
@@ -56,31 +56,31 @@ const SLIDES = [
     id: "statements", 
     label: "Statements", 
     duration: 9000,
-    script: "Transparent financials you can access anytime. Download your monthly statements with gross and net earnings clearly shown."
+    script: "Transparent financials you can access anytime. Download your monthly statements with gross and net earnings clearly broken down."
   },
   { 
     id: "expenses", 
     label: "Expenses", 
     duration: 12000,
-    script: "No hidden fees. Every dollar is documented. See itemized expenses with vendor names and receipt attachments. Filter by category to understand exactly where your money goes."
+    script: "No hidden fees... ever. Every dollar is documented with vendor names and receipt attachments. Filter by category to understand exactly where your money goes."
   },
   { 
     id: "messages", 
     label: "Messages", 
     duration: 12000,
-    script: "Every conversation in one place. SMS, emails, voicemails, and video updates. Listen to recordings from your property manager and never miss an important update."
+    script: "Every conversation, in one place. SMS, emails, voicemails, and video updates. Listen to recordings from your property manager and never miss an important update."
   },
   { 
     id: "repairs", 
     label: "Repairs", 
     duration: 12000,
-    script: "Stay in control of maintenance. See work order status, approve or decline repairs directly, and view scheduled maintenance. All costs are visible upfront before any work begins."
+    script: "Stay in control of maintenance. See work order status, approve or decline repairs directly, and view scheduled maintenance. All costs are visible upfront — before any work begins."
   },
   { 
     id: "screenings", 
     label: "Screenings", 
     duration: 10000,
-    script: "Know who's staying in your home. Every guest is ID verified with background checks and watchlist screening. Our verification process reduces property damage claims by 47 percent."
+    script: "Peace of mind, built in. Every single guest is verified before they arrive — ID check, background screening, and watchlist review. This process has reduced property damage claims by forty-seven percent."
   },
   { 
     id: "marketing", 
@@ -92,7 +92,7 @@ const SLIDES = [
     id: "closing", 
     label: "CTA", 
     duration: 8000,
-    script: "Ready to experience true transparency? Explore our demo portal or schedule a call with our team today."
+    script: "Ready to experience true transparency? Explore our demo portal, or schedule a call with our team today. We'd love to show you more."
   },
 ];
 

@@ -60,7 +60,7 @@ export function ExpensesSlide() {
 
       {/* Pain Point Solved */}
       <motion.div
-        className="mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2 max-w-2xl text-center"
+        className="mt-6 mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center mx-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
