@@ -48,7 +48,6 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { CorporateOutreachCard } from "./CorporateOutreachCard";
-import { AudioPropertySummary } from "./AudioPropertySummary";
 import { OwnerValueRealized } from "./OwnerValueRealized";
 import { SocialPostsGallery } from "./SocialPostsGallery";
 
@@ -864,43 +863,21 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
 
           <Separator />
 
-          {/* Audio Summary & Value Realized Section */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Audio Property Summary */}
-            <AudioPropertySummary 
-              propertyName={propertyName}
-              ownerName={ownerName}
-              secondOwnerName={secondOwnerName}
-              rentalType={rentalType}
-              marketingStats={effectiveStats}
-              listingHealth={peachHausData?.listingHealth}
-              revenueData={revenueData}
-              peachHausData={{
-                maintenanceCompleted: peachHausData?.maintenanceCompleted,
-                tenantPaymentStatus: peachHausData?.tenantPaymentStatus,
-                guestCommunicationsHandled: peachHausData?.guestCommunicationsHandled,
-                marketComparison: peachHausData?.marketComparison,
-              }}
-              hasBookings={hasBookings}
-              onboardingStage={onboardingStage}
-            />
-
-            {/* Value Realized */}
-            <OwnerValueRealized 
-              propertyName={propertyName}
-              metrics={{
-                guestCommunicationsHandled: activities.filter(a => 
-                  a.activity_type?.includes('email') || a.activity_type?.includes('message')
-                ).length,
-                maintenanceIssuesCoordinated: 0,
-                bookingInquiriesManaged: activities.filter(a => 
-                  a.activity_type?.includes('inquiry')
-                ).length,
-                gapNightsFilled: 0,
-                dynamicPricingAdjustments: 0,
-              }}
-            />
-          </div>
+          {/* Value Realized Section */}
+          <OwnerValueRealized 
+            propertyName={propertyName}
+            metrics={{
+              guestCommunicationsHandled: activities.filter(a => 
+                a.activity_type?.includes('email') || a.activity_type?.includes('message')
+              ).length,
+              maintenanceIssuesCoordinated: 0,
+              bookingInquiriesManaged: activities.filter(a => 
+                a.activity_type?.includes('inquiry')
+              ).length,
+              gapNightsFilled: 0,
+              dynamicPricingAdjustments: 0,
+            }}
+          />
         </>
       )}
 

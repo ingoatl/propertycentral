@@ -677,7 +677,7 @@ export function AudioPropertySummary({
       <CardHeader className="bg-gradient-to-r from-primary/10 via-purple-500/10 to-pink-500/10">
         <CardTitle className="flex items-center gap-2">
           <Headphones className="h-5 w-5 text-primary" />
-          Listen to Your {previousMonthName} Recap
+          Listen to Your Last Month's Recap
         </CardTitle>
         <CardDescription>
           AI-narrated monthly summary you can listen to on the go
