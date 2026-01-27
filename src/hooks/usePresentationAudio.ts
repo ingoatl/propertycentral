@@ -6,8 +6,8 @@ interface UsePresentationAudioOptions {
 }
 
 export function usePresentationAudio(options: UsePresentationAudioOptions = {}) {
-  // Brian voice - professional male narrator
-  const { voiceId = "nPczCjzI2devNBz1zQrb" } = options;
+  // Sarah voice - professional female narrator
+  const { voiceId = "EXAVITQu4vr4xnSDxMaL" } = options;
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
