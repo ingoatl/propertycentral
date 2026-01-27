@@ -38,7 +38,7 @@ const ONBOARDING_SLIDES = [
 
 const OWNER_PORTAL_SLIDES = [
   { id: "intro", script: "Welcome to PeachHaus... We're so glad you're here. Let us show you how we take care of your investment — and keep you completely informed, every step of the way.", voiceId: SARAH_VOICE },
-  { id: "overview", script: "Here's your dashboard... Everything you need to know about your property — revenue, occupancy, and guest ratings — all in real-time. And every month, you'll receive a personalized audio recap, delivered right to your phone.", voiceId: SARAH_VOICE },
+  { id: "overview", script: "Here's your dashboard... Everything you need to know about your property — revenue, occupancy, and guest ratings — all in real-time. And every month, you'll receive a personalized audio recap, just like the sample you can play above. It's delivered right to your phone, so you never miss an update.", voiceId: SARAH_VOICE },
   { id: "insights", script: "Know exactly how your property stacks up against the competition. Our market intelligence reveals revenue opportunities, tracks demand-driving events, and powers dynamic pricing through PriceLabs.", voiceId: SARAH_VOICE },
   { id: "bookings", script: "Always know who's staying at your property. Our visual calendar shows every reservation with guest details and revenue forecasts for upcoming stays.", voiceId: SARAH_VOICE },
   { id: "statements", script: "Transparent financials you can access anytime. Download your monthly statements with gross and net earnings clearly broken down.", voiceId: SARAH_VOICE },

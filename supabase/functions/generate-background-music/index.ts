@@ -18,25 +18,6 @@ serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
-    // Check if background music already exists
-    const { data: existingFile } = await supabase.storage
-      .from("message-attachments")
-      .list("presentation-audio", { search: "background-music.mp3" });
-    
-    if (existingFile && existingFile.length > 0) {
-      const { data: urlData } = supabase.storage
-        .from("message-attachments")
-        .getPublicUrl("presentation-audio/background-music.mp3");
-      
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: "Background music already exists",
-        url: urlData.publicUrl
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    
     if (!ELEVENLABS_API_KEY) {
       return new Response(JSON.stringify({ 
         success: false, 
@@ -47,9 +28,37 @@ serve(async (req) => {
       });
     }
     
-    console.log("Generating background music...");
+    const { presentation } = await req.json().catch(() => ({}));
+    const fileName = presentation === "onboarding" ? "background-music-onboarding.mp3" : "background-music.mp3";
+    const filePath = `presentation-audio/${fileName}`;
     
-    // Generate subtle ambient music using ElevenLabs Music API
+    // Check if background music already exists
+    const existingCheck = await supabase.storage
+      .from("message-attachments")
+      .list("presentation-audio", { search: fileName });
+    
+    if (existingCheck.data && existingCheck.data.length > 0) {
+      const { data: urlData } = supabase.storage
+        .from("message-attachments")
+        .getPublicUrl(filePath);
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: "Background music already exists",
+        url: urlData.publicUrl
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    console.log(`Generating ${presentation || 'owner-portal'} background music...`);
+    
+    // Different music prompts for each presentation
+    const musicPrompt = presentation === "onboarding" 
+      ? "Uplifting, inspiring corporate music. Warm piano, gentle orchestral swells, hopeful and welcoming. Professional yet friendly atmosphere. Motivational business presentation music."
+      : "Beautiful, uplifting ambient music. Warm piano melodies, gentle strings, inspiring and hopeful. Premium corporate presentation with emotional warmth. Elegant and sophisticated.";
+    
+    // Generate uplifting ambient music using ElevenLabs Music API
     const response = await fetch(
       "https://api.elevenlabs.io/v1/music",
       {
@@ -59,8 +68,8 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: "Soft, minimal corporate ambient music. Gentle piano and subtle strings. Calm, professional, inspiring. Perfect for business presentations. Very quiet and unobtrusive background music.",
-          duration_seconds: 120, // 2 minutes, will loop
+          prompt: musicPrompt,
+          duration_seconds: 180, // 3 minutes, will loop
         }),
       }
     );
@@ -82,7 +91,7 @@ serve(async (req) => {
     // Upload to storage
     const { error: uploadError } = await supabase.storage
       .from("message-attachments")
-      .upload("presentation-audio/background-music.mp3", audioBuffer, {
+      .upload(filePath, audioBuffer, {
         contentType: "audio/mpeg",
         upsert: true,
       });
@@ -101,7 +110,7 @@ serve(async (req) => {
     // Get public URL
     const { data: urlData } = supabase.storage
       .from("message-attachments")
-      .getPublicUrl("presentation-audio/background-music.mp3");
+      .getPublicUrl(filePath);
     
     console.log("Successfully generated and uploaded background music");
     
