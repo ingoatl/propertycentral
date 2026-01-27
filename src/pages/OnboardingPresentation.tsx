@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Home, Volume2, VolumeX, Play, Pause, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Link } from "react-router-dom";
 import { useStoredPresentationAudio } from "@/hooks/useStoredPresentationAudio";
 
 // Import slides
@@ -160,11 +159,18 @@ export default function OnboardingPresentation() {
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
   const hasPlayedRef = useRef(false);
+  // Ref to track isPlaying for use in callbacks (avoids stale closure)
+  const isPlayingRef = useRef(false);
   // CRITICAL: Track which slide we've triggered audio for (prevents double-play in Strict Mode)
   const hasPlayedForSlideRef = useRef<string | null>(null);
   // Touch swipe support
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // Use stored audio from Supabase (pre-generated)
   const { 
@@ -269,9 +275,9 @@ export default function OnboardingPresentation() {
         fallbackTimerRef.current = null;
       }
       
-      // Pause before advancing (3 seconds)
+      // Pause before advancing (3 seconds) - use ref to check current playing state
       setTimeout(() => {
-        if (isPlaying) {
+        if (isPlayingRef.current) {
           advanceSlide();
         }
       }, 3000);
@@ -409,16 +415,21 @@ export default function OnboardingPresentation() {
       {/* Navigation Controls - Perfectly Centered */}
       <div className="fixed bottom-4 md:bottom-6 left-0 right-0 flex justify-center z-50 px-4">
         <div className="flex items-center gap-1.5 md:gap-2 bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-3 md:px-4 py-2">
-        {/* Home */}
-        <Link to="/">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 md:h-8 md:w-8 rounded-full text-white/70 hover:text-white hover:bg-white/10"
-          >
-            <Home className="h-5 w-5 md:h-4 md:w-4" />
-          </Button>
-        </Link>
+        {/* Home - Goes to slide 1 */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 md:h-8 md:w-8 rounded-full text-white/70 hover:text-white hover:bg-white/10"
+          onClick={() => {
+            stopAudio();
+            audioEndedRef.current = true;
+            hasPlayedForSlideRef.current = null;
+            setCurrentSlide(0);
+            setIsPlaying(false);
+          }}
+        >
+          <Home className="h-5 w-5 md:h-4 md:w-4" />
+        </Button>
 
         {/* Audio Toggle */}
         <Button
