@@ -23,15 +23,15 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
   };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-4 md:py-6 px-4 md:px-8">
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-4 px-4 md:px-8">
       {/* Headline */}
       <motion.div 
-        className="text-center mb-2 md:mb-3 max-w-4xl"
+        className="text-center mb-2 max-w-4xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h2 className="text-2xl md:text-5xl font-bold text-white mb-1 md:mb-2">
+        <h2 className="text-2xl md:text-5xl font-bold text-white mb-1">
           Real-Time Performance, <span className="text-[#fae052]">Zero Guesswork</span>
         </h2>
         <p className="text-sm md:text-lg text-white/70">
@@ -41,7 +41,7 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
 
       {/* Audio Player Card - Monthly Recap Sample */}
       <motion.div
-        className="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-2 md:p-3 mb-2 md:mb-3 max-w-md w-full"
+        className="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-2 md:p-3 mb-2 max-w-md w-full"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.2 }}
@@ -57,7 +57,7 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
           </Button>
           <div className="flex-1 min-w-0">
             <p className="text-white font-medium text-xs md:text-sm">Monthly Performance Recap</p>
-            <p className="text-white/60 text-xs truncate">Click play to hear a demo recap</p>
+            <p className="text-white/60 text-xs truncate">Click play to hear your personalized audio recap demo</p>
           </div>
           <Volume2 className="h-4 w-4 text-amber-400 shrink-0" />
         </div>
@@ -68,9 +68,9 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
         />
       </motion.div>
 
-      {/* Screenshot */}
+      {/* Screenshot - Full height scroll */}
       <motion.div
-        className="relative w-full max-w-5xl flex-1 flex items-start justify-center overflow-hidden"
+        className="relative w-full max-w-5xl flex-1 flex items-start justify-center"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
@@ -78,14 +78,14 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
         <AutoScrollImage 
           src="/images/owner-portal/01-overview.png" 
           alt="Dashboard Overview"
-          scrollDuration={10}
+          scrollDuration={15}
           isActive={isActive}
         />
       </motion.div>
 
-      {/* Pain Point Solved - directly under screenshot */}
+      {/* Pain Point Solved - directly under screenshot with mt-2 */}
       <motion.div
-        className="mt-3 md:mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 md:px-6 py-2 md:py-3 max-w-2xl text-center"
+        className="mt-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 md:px-6 py-2 max-w-2xl text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
