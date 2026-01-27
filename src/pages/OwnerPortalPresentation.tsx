@@ -376,12 +376,18 @@ export default function OwnerPortalPresentation() {
         transition={{ delay: 0.5 }}
       >
         <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 shadow-2xl">
-          {/* Home */}
+          {/* Home - Goes to slide 1 */}
           <Button
             variant="ghost"
             size="icon"
             className="h-10 w-10 md:h-8 md:w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
-            onClick={() => navigate("/")}
+            onClick={() => {
+              stopAudio();
+              audioEndedRef.current = true;
+              hasPlayedForSlideRef.current = null;
+              setCurrentSlide(0);
+              setIsPlaying(false);
+            }}
           >
             <Home className="h-5 w-5 md:h-4 md:w-4" />
           </Button>

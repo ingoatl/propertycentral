@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 
 export function OwnerPortalIntroSlide() {
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center pb-24 px-4 md:px-8">
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center px-4 md:px-8 py-12 pb-28">
       {/* PeachHaus Logo */}
       <motion.img
         src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png"
