@@ -14,6 +14,10 @@ import {
   CalendarDays,
   Shield,
 } from "lucide-react";
+import { 
+  DEMO_OWNER_ID, 
+  demoScheduledTasks 
+} from "../data/demoPortalData";
 
 interface OwnerScheduledMaintenanceTabProps {
   ownerId: string;
@@ -78,10 +82,18 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 export function OwnerScheduledMaintenanceTab({ ownerId, propertyId }: OwnerScheduledMaintenanceTabProps) {
+  // Check if demo mode
+  const isDemo = ownerId === DEMO_OWNER_ID;
+  
   // Fetch scheduled maintenance tasks
   const { data: scheduledTasks = [], isLoading } = useQuery({
     queryKey: ["owner-scheduled-maintenance", ownerId, propertyId],
     queryFn: async () => {
+      // Return demo data for demo portal
+      if (isDemo) {
+        return demoScheduledTasks as ScheduledTask[];
+      }
+      
       // First get properties owned by this owner
       const { data: properties } = await supabase
         .from("properties")

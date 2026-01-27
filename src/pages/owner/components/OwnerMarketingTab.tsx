@@ -51,6 +51,11 @@ import { CorporateOutreachCard } from "./CorporateOutreachCard";
 import { OwnerValueRealized } from "./OwnerValueRealized";
 import { SocialPostsGallery } from "./SocialPostsGallery";
 import { MarketingActivityTimeline } from "./MarketingActivityTimeline";
+import { 
+  DEMO_PROPERTY_ID, 
+  demoMarketingActivities, 
+  demoSocialPosts 
+} from "../data/demoPortalData";
 
 interface GuestInfo {
   guest_name: string | null;
@@ -373,8 +378,9 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
   const isDemo = propertyId === DEMO_PROPERTY_ID;
 
   useEffect(() => {
-    // For demo, skip DB fetch - we already have mock data from marketingStats prop
+    // For demo, use mock data directly
     if (isDemo) {
+      setActivities(demoMarketingActivities as MarketingActivity[]);
       setLoading(false);
       return;
     }
