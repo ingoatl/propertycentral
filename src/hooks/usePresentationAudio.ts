@@ -2,15 +2,18 @@ import { useState, useRef, useCallback } from "react";
 
 interface UsePresentationAudioOptions {
   voiceId?: string;
+  onAudioEnd?: () => void;
 }
 
 export function usePresentationAudio(options: UsePresentationAudioOptions = {}) {
   const { voiceId = "EXAVITQu4vr4xnSDxMaL" } = options; // Sarah voice - professional female
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [currentSlideId, setCurrentSlideId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCache = useRef<Map<string, string>>(new Map());
+  const onAudioEndRef = useRef<(() => void) | null>(null);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -18,14 +21,24 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
       audioRef.current.currentTime = 0;
       audioRef.current = null;
     }
+    setIsPlaying(false);
   }, []);
 
-  const playAudioForSlide = useCallback(async (slideId: string, script: string) => {
-    if (isMuted || !script) return;
+  const playAudioForSlide = useCallback(async (
+    slideId: string, 
+    script: string,
+    onEnd?: () => void
+  ): Promise<void> => {
+    if (isMuted || !script) {
+      // If muted, call onEnd immediately
+      onEnd?.();
+      return;
+    }
     
     // Stop any currently playing audio
     stopAudio();
     setCurrentSlideId(slideId);
+    onAudioEndRef.current = onEnd || null;
 
     // Check cache first
     let audioUrl = audioCache.current.get(slideId);
@@ -53,6 +66,7 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
         if (!response.ok) {
           console.error("TTS request failed:", response.status);
           setIsLoading(false);
+          onEnd?.();
           return;
         }
 
@@ -62,6 +76,7 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
       } catch (error) {
         console.error("Failed to generate audio:", error);
         setIsLoading(false);
+        onEnd?.();
         return;
       }
       
@@ -71,11 +86,20 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
     // Play the audio
     audioRef.current = new Audio(audioUrl);
     audioRef.current.volume = 0.8;
+    setIsPlaying(true);
+    
+    // Handle audio end
+    audioRef.current.onended = () => {
+      setIsPlaying(false);
+      onAudioEndRef.current?.();
+    };
     
     try {
       await audioRef.current.play();
     } catch (error) {
       console.error("Failed to play audio:", error);
+      setIsPlaying(false);
+      onEnd?.();
     }
   }, [isMuted, voiceId, stopAudio]);
 
@@ -96,6 +120,7 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
     setIsMuted,
     toggleMute,
     isLoading,
+    isPlaying,
     currentSlideId
   };
 }

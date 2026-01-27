@@ -108,59 +108,65 @@ export default function OwnerPortalPresentation() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const progressRef = useRef<NodeJS.Timeout | null>(null);
-  const [slideProgress, setSlideProgress] = useState(0);
+  const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioEndedRef = useRef(false);
 
   const { 
     playAudioForSlide, 
     stopAudio, 
     isMuted, 
     toggleMute, 
-    isLoading: isAudioLoading 
+    isLoading: isAudioLoading,
   } = usePresentationAudio();
 
-  // Play audio when slide changes
-  useEffect(() => {
-    const slide = SLIDES[currentSlide];
-    if (isPlaying && slide.script) {
-      playAudioForSlide(slide.id, slide.script);
+  // Advance to next slide
+  const advanceSlide = useCallback(() => {
+    if (currentSlide < SLIDES.length - 1) {
+      setCurrentSlide(prev => prev + 1);
+    } else {
+      setIsPlaying(false);
     }
-    
-    return () => {
-      stopAudio();
-    };
-  }, [currentSlide, isPlaying, playAudioForSlide, stopAudio]);
+  }, [currentSlide]);
 
-  // Auto-advance slides with progress tracking
+  // Play audio and manage slide timing when slide changes
   useEffect(() => {
     if (!isPlaying) {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (progressRef.current) clearInterval(progressRef.current);
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
       return;
     }
 
-    setSlideProgress(0);
-    const duration = SLIDES[currentSlide].duration;
-    const progressInterval = 50; // Update every 50ms
-    
-    progressRef.current = setInterval(() => {
-      setSlideProgress(prev => Math.min(prev + (100 * progressInterval / duration), 100));
-    }, progressInterval);
+    const slide = SLIDES[currentSlide];
+    audioEndedRef.current = false;
 
-    timerRef.current = setTimeout(() => {
-      if (currentSlide < SLIDES.length - 1) {
-        setCurrentSlide(prev => prev + 1);
-      } else {
-        setIsPlaying(false);
+    // Callback when audio ends
+    const onAudioComplete = () => {
+      audioEndedRef.current = true;
+      // Small delay after audio ends before advancing
+      setTimeout(() => {
+        if (audioEndedRef.current) {
+          advanceSlide();
+        }
+      }, 500);
+    };
+
+    // Play audio with callback for when it ends
+    if (slide.script && !isMuted) {
+      playAudioForSlide(slide.id, slide.script, onAudioComplete);
+    }
+
+    // Fallback timer - if muted or audio fails, use slide duration
+    const fallbackDuration = isMuted ? slide.duration : slide.duration + 5000;
+    fallbackTimerRef.current = setTimeout(() => {
+      if (!audioEndedRef.current) {
+        advanceSlide();
       }
-    }, duration);
+    }, fallbackDuration);
 
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (progressRef.current) clearInterval(progressRef.current);
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      stopAudio();
     };
-  }, [currentSlide, isPlaying]);
+  }, [currentSlide, isPlaying, isMuted, playAudioForSlide, stopAudio, advanceSlide]);
 
   // Toggle fullscreen
   const toggleFullscreen = useCallback(() => {
@@ -374,9 +380,9 @@ export default function OwnerPortalPresentation() {
         </div>
       </motion.div>
 
-      {/* Progress Bar with per-slide progress */}
+      {/* Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-1 bg-white/10 z-50">
-        {/* Overall progress (segment markers) */}
+        {/* Segment markers */}
         <div className="relative h-full">
           {SLIDES.map((_, index) => (
             <div
@@ -386,20 +392,12 @@ export default function OwnerPortalPresentation() {
             />
           ))}
         </div>
-        {/* Overall progress */}
-        <motion.div
-          className="absolute top-0 h-full bg-[#fae052]/50"
-          initial={{ width: 0 }}
-          animate={{ width: `${(currentSlide / SLIDES.length) * 100}%` }}
-          transition={{ duration: 0.3 }}
-        />
-        {/* Current slide progress */}
+        {/* Overall progress - fills up to current slide */}
         <motion.div
           className="absolute top-0 h-full bg-[#fae052]"
-          style={{ 
-            left: `${(currentSlide / SLIDES.length) * 100}%`,
-            width: `${(slideProgress / 100) * (100 / SLIDES.length)}%`
-          }}
+          initial={{ width: 0 }}
+          animate={{ width: `${((currentSlide + 1) / SLIDES.length) * 100}%` }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
         />
       </div>
 
