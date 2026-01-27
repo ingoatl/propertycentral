@@ -18,22 +18,44 @@ export function AutoScrollImage({
   const imageRef = useRef<HTMLImageElement>(null);
   const [scrollAmount, setScrollAmount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [containerHeight, setContainerHeight] = useState(0);
 
+  // Calculate container height on mount and window resize
   useEffect(() => {
-    if (!isLoaded || !containerRef.current || !imageRef.current) return;
+    const updateContainerHeight = () => {
+      if (containerRef.current) {
+        // Get the computed max height (60vh)
+        const maxHeight = window.innerHeight * 0.6;
+        setContainerHeight(maxHeight);
+      }
+    };
 
-    const containerHeight = containerRef.current.clientHeight;
-    const imageHeight = imageRef.current.clientHeight;
+    updateContainerHeight();
+    window.addEventListener("resize", updateContainerHeight);
+    return () => window.removeEventListener("resize", updateContainerHeight);
+  }, []);
+
+  // Calculate scroll amount when image loads
+  useEffect(() => {
+    if (!isLoaded || !imageRef.current || containerHeight === 0) return;
+
+    const imageHeight = imageRef.current.naturalHeight;
+    const imageWidth = imageRef.current.naturalWidth;
     
-    // Calculate how much we need to scroll (image height - container height)
-    const overflow = Math.max(0, imageHeight - containerHeight);
+    // Calculate rendered image height based on container width
+    const containerWidth = containerRef.current?.clientWidth || 0;
+    const renderedHeight = (containerWidth / imageWidth) * imageHeight;
+    
+    // Calculate how much we need to scroll
+    const overflow = Math.max(0, renderedHeight - containerHeight);
     setScrollAmount(overflow);
-  }, [isLoaded]);
+  }, [isLoaded, containerHeight]);
 
   return (
     <div 
       ref={containerRef}
-      className="rounded-xl overflow-hidden shadow-2xl border border-white/10 max-h-[60vh] relative"
+      className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative"
+      style={{ height: `${containerHeight}px`, maxHeight: "60vh" }}
     >
       <motion.img 
         ref={imageRef}
@@ -49,7 +71,7 @@ export function AutoScrollImage({
           duration: scrollDuration, 
           ease: "easeInOut", 
           repeat: Infinity, 
-          repeatDelay: 1.5
+          repeatDelay: 2
         } : undefined}
       />
     </div>

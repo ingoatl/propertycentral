@@ -132,39 +132,70 @@ export default function OwnerPortalPresentation() {
   useEffect(() => {
     if (!isPlaying) {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      stopAudio();
       return;
     }
 
     const slide = SLIDES[currentSlide];
     audioEndedRef.current = false;
 
+    // Clear any existing timer
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+
     // Callback when audio ends
     const onAudioComplete = () => {
+      if (audioEndedRef.current) return; // Prevent double-trigger
       audioEndedRef.current = true;
-      // Longer pause after audio ends before advancing for better viewing experience
+      
+      // Clear fallback timer since audio completed
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      
+      // Longer pause after audio ends before advancing (3 seconds)
       setTimeout(() => {
-        if (audioEndedRef.current) {
+        if (isPlaying) {
           advanceSlide();
         }
-      }, 1500); // 1.5 second pause between slides
+      }, 3000);
     };
 
     // Play audio with callback for when it ends
     if (slide.script && !isMuted) {
-      playAudioForSlide(slide.id, slide.script, onAudioComplete);
+      // Small delay before starting audio for smoother transitions
+      setTimeout(() => {
+        playAudioForSlide(slide.id, slide.script, onAudioComplete);
+      }, 500);
     }
 
-    // Fallback timer - if muted or audio fails, use slide duration
-    const fallbackDuration = isMuted ? slide.duration : slide.duration + 5000;
-    fallbackTimerRef.current = setTimeout(() => {
-      if (!audioEndedRef.current) {
-        advanceSlide();
-      }
-    }, fallbackDuration);
+    // Fallback timer - only used if muted, with much longer durations
+    if (isMuted) {
+      // When muted, use the slide duration plus extra viewing time
+      const mutedDuration = slide.duration + 4000;
+      fallbackTimerRef.current = setTimeout(() => {
+        if (!audioEndedRef.current) {
+          advanceSlide();
+        }
+      }, mutedDuration);
+    } else {
+      // When audio is enabled, set a very long fallback (30 seconds) as safety net
+      fallbackTimerRef.current = setTimeout(() => {
+        if (!audioEndedRef.current) {
+          console.log("Fallback timer triggered for slide:", slide.id);
+          advanceSlide();
+        }
+      }, 30000);
+    }
 
     return () => {
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-      stopAudio();
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
     };
   }, [currentSlide, isPlaying, isMuted, playAudioForSlide, stopAudio, advanceSlide]);
 
