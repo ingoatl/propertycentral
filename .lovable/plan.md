@@ -1,162 +1,231 @@
 
-# Owner Portal Presentation Enhancement Plan
+
+# Owner Portal Presentation Complete Optimization Plan
 
 ## Issues Identified
 
-### 1. Female Voice Not Playing in Owner Portal Presentation
-**Root Cause**: The edge function `elevenlabs-tts/index.ts` has Brian (`nPczCjzI2devNBz1zQrb`) as the default voice on line 26. When the frontend sends `voiceId`, it should override this, but the hook is using Sarah's ID correctly.
+### 1. Image Distortion & Display Problems
+- **Root cause**: The `AutoScrollImage` component's height calculation is inconsistent. The `max-h-[55vh]` constraint on both container and image causes distortion when natural aspect ratios conflict with viewport-based sizing.
+- **Marketing & Overview slides** specifically have tall screenshots that need proper full-length scrolling display.
 
-**Fix**: 
-- Verify the hook passes `voiceId` in the API request body (it does - line 61)
-- Update the edge function to use Sarah as default, since Owner Portal is the primary use case
-- Alternatively, ensure each presentation explicitly passes the correct voiceId
+### 2. Voice Not Playing / Audio Delay
+- **Root cause**: Audio preloading fetches 3 slides but does not guarantee the audio is decoded and ready for instant playback. Network delays cause noticeable lag on first play.
+- **Solution**: Use Web Audio API with `AudioContext.decodeAudioData()` to preload and decode audio buffers. This ensures instant playback with no delay.
 
-### 2. Auto-Scrolling Not Working / Image Distortion
-**Root Cause**: The `AutoScrollImage` component calculates overflow but:
-- Container height calculation uses `entry.contentRect.height` which may not be reliable for `flex-1` containers
-- The `min-h-screen` parent with `flex-col` layout causes the flex-1 child to have unpredictable height
-- Only scroll when there's ACTUAL overflow (rendered image taller than container)
+### 3. Green Callout Bar Position
+- **Issue**: The green "Pain Point Solved" callout is too far from the screenshot and too close to the bottom navigation.
+- **Solution**: Move it directly under the image with `mt-2` and ensure consistent `mb-6` spacing before the bottom spacer.
 
-**Fix**:
-- Use a fixed container height approach (e.g., `55vh` or calculate based on available space)
-- Add minimum scroll threshold (only scroll if overflow > 50px to avoid micro-scrolls)
-- For images that fit, display them centered without animation
+### 4. Bottom Navigation Bar Not Centered
+- **Issue**: On some screen sizes the control bar may not appear perfectly centered.
+- **Solution**: Already using `left-0 right-0 flex justify-center` - will verify and ensure max-width constraints work properly.
 
-### 3. Intro Slide Needs Warmer Language
-**Current**: "Your Property. Complete Visibility." with script "Welcome to PeachHaus. Your property. Complete visibility."
+### 5. Overview Slide Missing Audio Recap CTA
+- **Issue**: Need to add text suggesting users click the play button above to hear a personalized audio recap demo.
 
-**Fix**: 
-- Update headline to: "Your Property. **Our Passion.**" or "Welcome to **Worry-Free Ownership.**"
-- Update script to be warmer: "Welcome to PeachHaus. We're so glad you're here. Let us show you how we take care of your investment — and keep you informed every step of the way."
-
-### 4. Bottom Callout Positioning (Screenshot 2)
-**Issue**: The green "Pain Point Solved" callout appears too close to the navigation bar and may not be centered properly on some screens.
-
-**Fix**:
-- Ensure consistent `mx-auto` centering
-- Add `mb-6` or `mb-8` to create space before the fixed bottom nav
-- Consider making the callout float above the bottom navigation area
-
-### 5. Voice Narration Quality & Consistency
-**Research Findings**:
-- **Sarah** voice: female, expressive, social, energetic - good for Owner Portal
-- **Brian** voice: male, deep, narration, serious - good for Onboarding
-- Higher **stability** (0.65) = more consistent professional sound
-- Add **style** for warmth (0.35-0.4)
-- Use proper punctuation (periods for pauses, ellipses for longer pauses)
-
-**Fix**: Update voice settings in edge function:
-```typescript
-voice_settings: {
-  stability: 0.65,        // Was 0.5 - increase for consistency
-  similarity_boost: 0.80, // Was 0.75 - slight increase
-  style: 0.35,           // Was 0.3 - slight increase for warmth
-  use_speaker_boost: true,
-}
-```
+### 6. Performance & File Size
+- **Current state**: Images are loading as full PNG files which are likely 500KB-2MB each.
+- **Solution**: Implement progressive image loading with:
+  - Loading states with skeleton/blur placeholders
+  - Better height constraints to prevent layout shift
+  - Consider WebP format recommendation for future optimization
 
 ---
 
 ## Technical Implementation
 
-### Phase 1: Fix Voice Assignment
+### Phase 1: Fix AutoScrollImage Component for Full-Length Display
 
-**File: `supabase/functions/elevenlabs-tts/index.ts`**
-- Change default voice from Brian to Sarah (Sarah's ID: `EXAVITQu4vr4xnSDxMaL`)
-- Update voice settings for more professional, persuasive delivery
+The key changes:
+1. **Fixed container height** instead of flex-1 (which is unpredictable)
+2. **Proper overflow detection** - only scroll when image is genuinely taller than container
+3. **No distortion** - use `object-contain` for static display, `object-top` alignment
+4. **Smoother animation** - use longer scroll duration and proper easing
 
 ```typescript
-// Default to Sarah voice for Owner Portal (primary use case)
-const voice = voiceId || "EXAVITQu4vr4xnSDxMaL";
+// AutoScrollImage.tsx - Key fixes
+export function AutoScrollImage({
+  src,
+  alt,
+  className = "",
+  scrollDuration = 12, // Slower scroll for better viewing
+  isActive = true
+}: AutoScrollImageProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [scrollAmount, setScrollAmount] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [imageHeight, setImageHeight] = useState<number | null>(null);
 
-voice_settings: {
-  stability: 0.65,
-  similarity_boost: 0.80,
-  style: 0.35,
-  use_speaker_boost: true,
-  speed: 0.95 // Slightly slower for clarity
+  // Fixed container height for consistent display
+  const CONTAINER_HEIGHT = "calc(100vh - 280px)"; // Account for header, callouts, nav
+  const SCROLL_THRESHOLD = 80; // Only scroll if overflow > 80px
+
+  const calculateScroll = useCallback(() => {
+    const container = containerRef.current;
+    const img = imageRef.current;
+    if (!container || !img || !img.complete) return;
+
+    const containerHeight = container.clientHeight;
+    const containerWidth = container.clientWidth;
+    
+    // Calculate rendered height based on image aspect ratio and container width
+    const aspectRatio = img.naturalWidth / img.naturalHeight;
+    const renderedHeight = containerWidth / aspectRatio;
+    
+    setImageHeight(renderedHeight);
+    
+    // Calculate overflow
+    const overflow = renderedHeight - containerHeight;
+    
+    if (overflow > SCROLL_THRESHOLD) {
+      setScrollAmount(overflow);
+    } else {
+      setScrollAmount(0);
+    }
+  }, []);
+
+  // ... rest of implementation
+  
+  return (
+    <div 
+      ref={containerRef}
+      className="rounded-xl overflow-hidden shadow-2xl border border-white/10 w-full"
+      style={{ height: CONTAINER_HEIGHT, maxHeight: "55vh" }}
+    >
+      {shouldAnimate ? (
+        <motion.img
+          animate={{ y: [0, -scrollAmount, 0] }}
+          transition={{
+            duration: scrollDuration,
+            ease: "easeInOut",
+            repeat: Infinity,
+            repeatDelay: 3
+          }}
+        />
+      ) : (
+        <img 
+          className="w-full h-full object-contain object-top"
+        />
+      )}
+    </div>
+  );
 }
 ```
 
-**File: `src/pages/OnboardingPresentation.tsx`**
-- Ensure it explicitly passes Brian's voiceId: `nPczCjzI2devNBz1zQrb`
+### Phase 2: Implement Web Audio API for Instant Playback
 
-### Phase 2: Fix AutoScrollImage Component
-
-**File: `src/components/presentation/AutoScrollImage.tsx`**
-
-Key changes:
-1. Use explicit container height (`55vh`)
-2. Calculate if image actually needs scrolling (overflow threshold of 50px)
-3. If no scroll needed, show image at `object-contain` without animation
-4. Better initial state handling
+Replace current `HTMLAudioElement` approach with `AudioContext` for zero-delay playback:
 
 ```typescript
-// Only animate if there's meaningful overflow
-const shouldAnimate = scrollAmount > 50 && isActive && isLoaded;
+// usePresentationAudio.ts - Key changes
+const audioContext = useRef<AudioContext | null>(null);
+const audioBufferCache = useRef<Map<string, AudioBuffer>>(new Map());
+const activeSource = useRef<AudioBufferSourceNode | null>(null);
 
-// If no scroll needed, center the image
-return (
-  <div className="..." style={{ height: "55vh" }}>
-    {shouldAnimate ? (
-      <motion.img 
-        animate={{ y: [0, -scrollAmount, 0] }}
-        // animation config
-      />
-    ) : (
-      <img 
-        className="w-full h-full object-contain"
-        // no animation - centered
-      />
-    )}
-  </div>
-);
+// Initialize AudioContext on first user interaction
+const initAudioContext = useCallback(() => {
+  if (!audioContext.current) {
+    audioContext.current = new AudioContext();
+  }
+  return audioContext.current;
+}, []);
+
+// Preload and decode audio
+const preloadAudio = async (slideId: string, script: string) => {
+  const ctx = initAudioContext();
+  if (audioBufferCache.current.has(slideId)) return;
+  
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+    method: "POST",
+    headers: { ... },
+    body: JSON.stringify({ text: script, voiceId })
+  });
+  
+  const arrayBuffer = await response.arrayBuffer();
+  const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+  audioBufferCache.current.set(slideId, audioBuffer);
+};
+
+// Play with zero delay
+const playAudio = (slideId: string) => {
+  const buffer = audioBufferCache.current.get(slideId);
+  if (!buffer) return;
+  
+  const ctx = audioContext.current;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.onended = onAudioEndRef.current;
+  source.start(0); // Instant playback!
+  activeSource.current = source;
+};
 ```
 
-### Phase 3: Update Intro Slide
+### Phase 3: Update All Slide Components
 
-**File: `src/components/presentation/owner-portal-slides/OwnerPortalIntroSlide.tsx`**
+**Common changes for all slides:**
+1. Remove inconsistent `flex-1` - use fixed heights
+2. Move green callout closer to image with `mt-2` instead of `mt-3 md:mt-4`
+3. Standardize spacing: `py-4 px-4 md:py-6 md:px-6`
+4. Ensure proper bottom spacer `h-20 md:h-24`
 
-Update headline:
+**OverviewSlide.tsx - Add Audio Recap CTA:**
 ```tsx
-<motion.h1 className="...">
-  Welcome to{" "}
-  <span className="text-[#fae052]">Worry-Free Ownership</span>
-</motion.h1>
-
-<motion.p className="...">
-  Your property, our passion — complete visibility into your investment
-</motion.p>
+<p className="text-white/60 text-xs truncate">
+  Click play above to download your personalized audio recap
+</p>
 ```
 
-**File: `src/pages/OwnerPortalPresentation.tsx`**
-
-Update intro script:
-```typescript
-script: "Welcome to PeachHaus. We're so glad you're here. Let us show you how we take care of your investment — and keep you completely informed, every step of the way."
+**MarketingSlide.tsx - Ensure full scroll:**
+```tsx
+<AutoScrollImage 
+  src="/images/owner-portal/10-marketing.png" 
+  alt="Marketing Dashboard"
+  scrollDuration={15} // Longer duration for tall content
+  isActive={isActive}
+/>
 ```
 
-### Phase 4: Fix Bottom Callout Positioning
+### Phase 4: Optimize Image Loading
 
-Update all slide components to ensure proper callout positioning:
+Add loading skeleton and progressive reveal:
 
 ```tsx
-{/* Pain Point Solved - positioned with proper margins */}
+// New OptimizedImage component
+function OptimizedImage({ src, alt, ...props }) {
+  const [loaded, setLoaded] = useState(false);
+  
+  return (
+    <div className="relative">
+      {/* Skeleton placeholder */}
+      {!loaded && (
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-white/10 animate-pulse rounded-xl" />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setLoaded(true)}
+        className={`transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        {...props}
+      />
+    </div>
+  );
+}
+```
+
+### Phase 5: Center Navigation Bar Properly
+
+```tsx
+// OwnerPortalPresentation.tsx - Navigation bar
 <motion.div
-  className="mt-6 mb-8 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center mx-auto"
-  // ...
+  className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 w-full max-w-2xl"
 >
+  <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-3 md:px-4 py-2 flex items-center justify-center gap-1 md:gap-2 shadow-2xl mx-auto w-fit">
+    {/* Controls */}
+  </div>
+</motion.div>
 ```
-
-### Phase 5: Update All Slide Scripts for Better Persuasion
-
-Improve scripts with better pacing and emotional punctuation:
-
-| Slide | Current Script | Improved Script |
-|-------|---------------|-----------------|
-| Intro | "Welcome to PeachHaus. Your property. Complete visibility." | "Welcome to PeachHaus. We're so glad you're here... Let us show you how we take care of your investment — and keep you completely informed, every step of the way." |
-| Overview | "See your complete property performance..." | "Here's your dashboard... Everything you need to know about your property — revenue, occupancy, and guest ratings — all in real-time. And every month, you'll receive a personalized audio recap, delivered right to your phone." |
-| Screenings | "Know who's staying in your home..." | "Peace of mind, built in. Every single guest is verified before they arrive — ID check, background screening, and watchlist review. This process has reduced property damage claims by forty-seven percent." |
 
 ---
 
@@ -164,21 +233,49 @@ Improve scripts with better pacing and emotional punctuation:
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/elevenlabs-tts/index.ts` | Change default voice to Sarah, improve voice settings |
-| `src/components/presentation/AutoScrollImage.tsx` | Fix height calculation, add scroll threshold, improve non-scrolling images |
-| `src/components/presentation/owner-portal-slides/OwnerPortalIntroSlide.tsx` | Update headline and subtitle to warmer language |
-| `src/pages/OwnerPortalPresentation.tsx` | Update all slide scripts for better narration |
-| `src/pages/OnboardingPresentation.tsx` | Ensure Brian voice is explicitly passed |
-| All slide components (10 files) | Adjust bottom callout margins for better positioning |
+| `src/components/presentation/AutoScrollImage.tsx` | Complete refactor - fixed height, proper scroll detection, no distortion |
+| `src/hooks/usePresentationAudio.ts` | Implement Web Audio API for instant playback, better preloading |
+| `src/pages/OwnerPortalPresentation.tsx` | Center navigation bar, adjust slide container heights |
+| `src/components/presentation/owner-portal-slides/OverviewSlide.tsx` | Add audio recap CTA text, adjust layout |
+| `src/components/presentation/owner-portal-slides/MarketingSlide.tsx` | Adjust scroll duration, fix layout |
+| `src/components/presentation/owner-portal-slides/InsightsSlide.tsx` | Fix layout, move callout closer |
+| All 12 slide components | Standardize layout: consistent heights, callout positioning |
+
+---
+
+## Image Container Height Strategy
+
+The key insight is using a **calculated fixed height** instead of `flex-1` or viewport-relative units:
+
+```
+Total viewport height: 100vh
+- Top progress bar: 4px
+- Top labels (slide counter, name): 48px  
+- Headline area: ~100px
+- Feature pills: ~50px
+- Green callout: ~50px
+- Bottom nav: 80px
+- Padding: ~60px
+------------------------------
+Available for image: ~calc(100vh - 400px)
+```
+
+This ensures:
+- Consistent image display across all slides
+- No distortion (object-contain)
+- Full scroll when content exceeds container
+- Green callout always visible and positioned correctly
 
 ---
 
 ## Expected Outcomes
 
 After implementation:
-1. **Sarah's voice plays** in Owner Portal Presentation (female, warm, professional)
-2. **Brian's voice plays** in Onboarding Presentation (male, serious, authoritative)
-3. **Auto-scroll only activates** for tall images that need it — short images display centered
-4. **Warmer intro** welcomes owners instead of cold "Complete Visibility" headline
-5. **Better callout positioning** with proper spacing from navigation bar
-6. **More persuasive narration** with improved voice settings and script pacing
+1. **No distortion** - Images display at proper aspect ratio with object-contain
+2. **Full-length scrolling** - Tall screenshots (Overview, Marketing, Insights) scroll smoothly top to bottom
+3. **Instant audio** - Voice plays immediately when slide loads (preloaded via Web Audio API)
+4. **Centered navigation** - Control bar perfectly centered on all screen sizes
+5. **Proper callout position** - Green "Pain Point Solved" directly under image, not too close to nav
+6. **Audio recap CTA** - Overview slide encourages clicking play to hear demo
+7. **Mobile optimized** - Uses `100dvh`, responsive spacing, touch-friendly controls
+
