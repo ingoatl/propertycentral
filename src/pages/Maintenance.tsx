@@ -18,7 +18,7 @@ const Maintenance = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<WorkOrderStatus | "all">("all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("list");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
   const queryClient = useQueryClient();
