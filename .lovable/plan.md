@@ -1,499 +1,326 @@
 
-# Fair Housing Compliance & AI Reliability Enhancement Plan
+# Owner Portal Presentation Implementation Plan
 
-## Executive Summary
-
-This plan implements three critical systems:
-1. **Fair Housing Compliance Layer** - AI-powered screening of all outbound messages against Fair Housing Act rules
-2. **Georgia Real Estate License Compliance** - Validation that operations managers can send specific message types under GA law
-3. **Self-Healing AI Watchdog** - Prevents edge function failures and auto-recovers from errors
+## Overview
+Create a premium, auto-scrolling presentation that showcases the PeachHaus Owner Portal - demonstrating how it solves the key pain points property owners face with traditional management companies. The presentation will feature:
+- Auto-scrolling screenshot walkthrough at optimal viewing speed
+- Intelligent narration explaining each tab's benefits
+- Embedded monthly recap audio sample
+- Links accessible from Dashboard and all Communication sections
 
 ---
 
-## Part 1: Fair Housing Compliance System
+## Owner Pain Points Addressed
 
-### Background Research
+Based on industry research, property owners struggle with:
 
-The **Fair Housing Act** prohibits discrimination in housing-related communications based on 7 protected classes:
-- Race
-- Color
-- National Origin
-- Religion
-- Sex (including gender identity and sexual orientation)
-- Familial Status (families with children under 18)
-- Disability
+| Pain Point | How Our Portal Solves It |
+|------------|-------------------------|
+| **Lack of Transparency** | Real-time dashboards, downloadable statements, expense tracking with receipts |
+| **Poor Communication** | Multi-channel messaging (SMS, Email, Voice, Video) with full history |
+| **Hidden Fees & Expenses** | Every expense itemized with receipt attachments, category filtering |
+| **No Visibility into Property Performance** | Live booking calendar, revenue forecasts, market comparisons |
+| **Maintenance Black Hole** | Work order tracking with approval workflow, vendor quotes, scheduled maintenance |
+| **Guest Quality Concerns** | ID verification, background checks, watchlist screening with 100% verification rate |
+| **Not Knowing Marketing Efforts** | Social media gallery, activity timeline, platform distribution visibility |
 
-### Prohibited Language Categories
+---
 
-Messages will be screened for:
+## Technical Architecture
 
-| Category | Examples to Block |
-|----------|------------------|
-| **Race/Color** | "no Section 8", "professionals only", neighborhood demographics |
-| **National Origin** | "must speak English", "Americans only", citizenship requirements |
-| **Religion** | "Christian community", "near churches", religious holidays as criteria |
-| **Sex/Gender** | "perfect for single men", gender-specific pronouns for property |
-| **Familial Status** | "adult community", "no children", "quiet building", school references as negative |
-| **Disability** | "must be able to climb stairs", "no wheelchairs", mental health references |
-
-### Implementation: Compliance Validation Edge Function
-
-**New file: `supabase/functions/validate-fair-housing/index.ts`**
+### 1. New Files to Create
 
 ```text
-POST /validate-fair-housing
-{
-  "message": "The message to validate",
-  "messageType": "sms" | "email",
-  "senderRole": "admin" | "operations_manager" | "agent",
-  "recipientType": "lead" | "owner" | "tenant" | "vendor"
-}
-
-Response:
-{
-  "compliant": true | false,
-  "issues": [
-    {
-      "phrase": "detected phrase",
-      "category": "familial_status",
-      "severity": "block" | "warn",
-      "suggestion": "alternative phrasing"
-    }
-  ],
-  "riskScore": 0-100,
-  "canSend": true | false
-}
+src/pages/OwnerPortalPresentation.tsx          - Main presentation page
+src/components/presentation/owner-portal-slides/
+  ├── OwnerPortalIntroSlide.tsx                - Opening slide with value proposition
+  ├── OverviewSlide.tsx                        - Dashboard overview with AI recap
+  ├── InsightsSlide.tsx                        - Market research & insights  
+  ├── BookingsSlide.tsx                        - Calendar & booking management
+  ├── StatementsSlide.tsx                      - Financial statements
+  ├── ExpensesSlide.tsx                        - Expense transparency
+  ├── MessagesSlide.tsx                        - Multi-channel communication
+  ├── RepairsSlide.tsx                         - Maintenance & work orders
+  ├── ScreeningsSlide.tsx                      - Guest verification security
+  ├── MarketingSlide.tsx                       - Marketing efforts showcase
+  └── OwnerPortalClosingSlide.tsx              - CTA and contact
+public/audio/monthly-recap-sample.mp3          - Copy of uploaded audio file
+public/images/owner-portal/                    - Screenshot images
 ```
 
-### Detection Strategy
+### 2. Route Addition in App.tsx
 
-1. **Keyword Pattern Matching** - Fast first-pass filter for known prohibited terms
-2. **AI Context Analysis** - Lovable AI analyzes message context for subtle discrimination
-3. **Phrase Substitution Suggestions** - Provides compliant alternatives when possible
+```typescript
+// Add to lazy imports
+const OwnerPortalPresentation = lazy(() => import("./pages/OwnerPortalPresentation"));
 
----
-
-## Part 2: Georgia Real Estate License Compliance
-
-### Background Research
-
-Under **Georgia Code Title 43, Chapter 40** and GREC rules:
-
-| Communication Type | Broker Only | Operations Manager Allowed |
-|-------------------|-------------|---------------------------|
-| **Property marketing** | Requires licensure | Yes, if under broker supervision |
-| **Lease negotiations** | Broker oversight needed | Yes, for existing clients |
-| **Maintenance coordination** | N/A | Yes |
-| **Owner financial discussions** | Broker/licensee | With broker approval |
-| **Rental pricing discussions** | Licensee required | Must defer to broker |
-
-### Implementation: Sender Authorization Check
-
-The compliance layer will validate:
-1. **Message topic classification** - Uses AI to detect if message involves licensed activities
-2. **Sender role verification** - Checks if current user has appropriate role
-3. **Escalation routing** - Flags messages that require broker review
-
-### New Database Table: `compliance_message_log`
-
-```sql
-CREATE TABLE compliance_message_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  message_id UUID,
-  original_message TEXT NOT NULL,
-  message_type TEXT NOT NULL,
-  sender_user_id UUID REFERENCES auth.users(id),
-  sender_role TEXT,
-  recipient_type TEXT,
-  
-  -- Fair Housing Analysis
-  fh_compliant BOOLEAN NOT NULL,
-  fh_risk_score INTEGER,
-  fh_issues JSONB DEFAULT '[]',
-  fh_blocked_phrases TEXT[],
-  
-  -- GA License Compliance
-  ga_compliant BOOLEAN NOT NULL,
-  requires_broker_review BOOLEAN DEFAULT false,
-  topic_classification TEXT,
-  
-  -- Action taken
-  action_taken TEXT CHECK (action_taken IN ('sent', 'blocked', 'modified', 'escalated')),
-  modified_message TEXT,
-  reviewed_by UUID REFERENCES auth.users(id),
-  reviewed_at TIMESTAMPTZ,
-  
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+// Add route (outside Layout, like other presentations)
+<Route path="/owner-portal-presentation" element={<OwnerPortalPresentation />} />
 ```
 
 ---
 
-## Part 3: Self-Healing AI Watchdog
+## Slide Content Structure
 
-### Problem Analysis
+### Slide 1: Introduction (5 seconds)
+**Title**: "Your Property. Complete Visibility."
+**Subtitle**: "Experience the most comprehensive owner portal in the industry"
+- PeachHaus branding
+- Smooth fade-in animation
 
-The user reported an edge function error during AI response generation. Common failure modes:
-1. **Rate limiting (429)** - Too many requests to Lovable AI
-2. **Credit depletion (402)** - AI usage exceeded
-3. **Timeout** - Long-running AI requests
-4. **Context engine failure** - Missing or invalid contact data
-5. **Network issues** - Transient connectivity problems
+### Slide 2: Overview Dashboard (8 seconds)
+**Screenshot**: `screencapture-...-13_20_38.png`
+**Key Points**:
+- Total Revenue at a glance ($74,350)
+- Occupancy Rate (92%)
+- Guest Rating (4.9 stars)
+- "Listen to Your Last Month's Recap" - AI-generated audio summary
+- **Audio Player**: Embedded monthly recap sample plays here
 
-### Solution: AI Reliability Watchdog
+**Pain Point Solved**: "Never wonder how your property is performing - see it all in real-time"
 
-**New file: `supabase/functions/ai-reliability-watchdog/index.ts`**
+### Slide 3: Market Insights (8 seconds)  
+**Screenshot**: `screencapture-...-13_21_00.png`
+**Key Points**:
+- Revenue diversification opportunities
+- Revenue-driving events (Dragon Con, Music Midtown, SEC Championship)
+- Comparable properties in your area
+- Dynamic pricing powered by PriceLabs
 
-This watchdog will:
+**Pain Point Solved**: "Know exactly how your property stacks up against the competition"
 
-1. **Monitor AI Response Quality table** for failed generations
-2. **Retry failed requests** with exponential backoff
-3. **Circuit breaker pattern** to prevent cascade failures
-4. **Automatic degradation** to simpler prompts when complex ones fail
-5. **Alert on persistent failures** via team notifications
+### Slide 4: Bookings (6 seconds)
+**Screenshot**: `screencapture-...-13_21_19.png`
+**Key Points**:
+- Visual booking calendar
+- Short-term vs Mid-term color coding
+- Booking history with guest names and revenue
+- Upcoming reservations with revenue forecast
 
-### Self-Healing Mechanisms
+**Pain Point Solved**: "Always know who's staying at your property and when"
 
+### Slide 5: Statements (5 seconds)
+**Screenshot**: `screencapture-...-13_21_41.png`
+**Key Points**:
+- Monthly statement history
+- Gross Revenue vs Net earnings clearly shown
+- One-click PDF download
+
+**Pain Point Solved**: "Transparent financials - download statements anytime"
+
+### Slide 6: Expenses (7 seconds)
+**Screenshot**: `screencapture-...-13_21_54.png`
+**Key Points**:
+- Every expense itemized by category
+- Vendor names attached
+- Receipt attachments (8/8 with receipts shown)
+- Searchable and filterable
+
+**Pain Point Solved**: "No hidden fees - every dollar is accounted for with documentation"
+
+### Slide 7: Messages (8 seconds)
+**Screenshot**: `screencapture-...-13_22_27.png`
+**Key Points**:
+- All communication channels in one place (SMS, Email, Voice, Video)
+- Listen to voicemails from your property manager
+- Watch video updates
+- Full conversation history
+
+**Pain Point Solved**: "Never miss an update - every conversation preserved and accessible"
+
+### Slide 8: Repairs (7 seconds)
+**Screenshot**: `screencapture-...-13_22_46.png`
+**Key Points**:
+- Work order status tracking (Completed, Awaiting Approval, Scheduled)
+- Approve or Decline repairs directly from portal
+- Vendor information and costs upfront
+- Total maintenance costs visible
+
+**Pain Point Solved**: "Stay in control of repairs - approve work before it happens"
+
+### Slide 9: Screenings (7 seconds)
+**Screenshot**: `screencapture-...-13_23_32.png`
+**Key Points**:
+- 100% Verification Rate
+- ID Verified, Background Check, Watchlist screening
+- Guest risk assessment (Low Risk indicators)
+- 47% reduction in property damage claims
+
+**Pain Point Solved**: "Know exactly who is staying in your home - every guest verified"
+
+### Slide 10: Marketing (6 seconds) 
+**Key Points**:
+- Social media posts for your property
+- Platform distribution (Airbnb, VRBO, Furnished Finder, Corporate Housing)
+- Marketing activity timeline
+- See exactly how we're promoting your investment
+
+**Pain Point Solved**: "Visibility into every marketing effort for your property"
+
+### Slide 11: Closing CTA (5 seconds)
+**Title**: "Ready to Experience True Transparency?"
+- "View Demo Portal" button
+- "Schedule a Call" button
+- Contact information
+
+---
+
+## Auto-Scroll & Animation Specifications
+
+### Scroll Behavior
+- **Scroll Speed**: 50px per second (smooth, readable pace)
+- **Pause Duration**: 3-5 seconds at each key section
+- **Total Duration**: Approximately 75 seconds for full presentation
+- **Controls**: Play/Pause, manual navigation, progress bar
+
+### Screenshot Display
+- Full-width screenshot within a device frame mockup
+- Subtle parallax effect as scrolling occurs
+- Highlight boxes appear around key features as they're discussed
+- Text overlays fade in/out with feature explanations
+
+### Audio Integration
+- Monthly recap audio plays during Overview slide
+- Audio controls: play/pause, volume, progress
+- Graceful fallback if audio blocked by browser
+
+---
+
+## Presentation Links Integration
+
+### 1. Dashboard Link (OwnerPortalManagement.tsx)
+Add a prominent card/button linking to the presentation:
+```tsx
+<Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+  <CardHeader>
+    <CardTitle className="flex items-center gap-2">
+      <Presentation className="h-5 w-5 text-amber-600" />
+      Owner Portal Presentation
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    <p className="text-sm text-muted-foreground mb-4">
+      Share our industry-leading owner portal with prospects
+    </p>
+    <Link to="/owner-portal-presentation">
+      <Button className="bg-amber-600 hover:bg-amber-700">
+        View Presentation
+      </Button>
+    </Link>
+  </CardContent>
+</Card>
+```
+
+### 2. SMS Templates (UnifiedComposeDialog.tsx)
+Add presentation links to SMS_TEMPLATES array:
+```typescript
+const SMS_TEMPLATES = [
+  // ... existing templates
+  {
+    label: "Owner Portal",
+    content: "Hi {{name}}, here's a look at our Owner Portal - the most transparent property management experience: https://propertycentral.lovable.app/owner-portal-presentation",
+  },
+  {
+    label: "Presentations",
+    content: "Hi {{name}}, check out what makes PeachHaus different:\n• Owner Portal: propertycentral.lovable.app/owner-portal-presentation\n• Onboarding: propertycentral.lovable.app/onboarding-presentation\n• Design Services: propertycentral.lovable.app/designer-presentation",
+  },
+];
+```
+
+### 3. Quick Links Component for InboxView
+Create a collapsible "Quick Links" section in the compose area with one-click copy for all 3 presentation URLs.
+
+---
+
+## Screenshot Assets Processing
+
+### Asset Handling
+1. Copy uploaded screenshots to `public/images/owner-portal/` directory
+2. Copy uploaded audio to `public/audio/monthly-recap-sample.mp3`
+3. Reference with direct paths: `/images/owner-portal/overview.png`
+
+### Image Naming Convention
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                    AI REQUEST FLOW                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Message Input                                              │
-│       │                                                     │
-│       ▼                                                     │
-│  ┌──────────────────┐                                       │
-│  │ Fair Housing     │ ──Block──> Return Error               │
-│  │ Compliance Check │                                       │
-│  └────────┬─────────┘                                       │
-│           │ Pass                                            │
-│           ▼                                                 │
-│  ┌──────────────────┐                                       │
-│  │ GA License       │ ──Escalate──> Route to Broker        │
-│  │ Authorization    │                                       │
-│  └────────┬─────────┘                                       │
-│           │ Authorized                                      │
-│           ▼                                                 │
-│  ┌──────────────────┐                                       │
-│  │ Circuit Breaker  │ ──Open──> Use Cached/Template        │
-│  │ Check            │                                       │
-│  └────────┬─────────┘                                       │
-│           │ Closed                                          │
-│           ▼                                                 │
-│  ┌──────────────────┐     ┌──────────────────┐             │
-│  │ Primary AI Call  │ ──Fail──> Retry Queue  │             │
-│  │ (gemini-3-flash) │          │              │             │
-│  └────────┬─────────┘          │              │             │
-│           │ Success            │ Retry        │             │
-│           │                    ▼              │             │
-│           │            ┌──────────────────┐   │             │
-│           │            │ Fallback AI Call │   │             │
-│           │            │ (simpler prompt) │   │             │
-│           │            └────────┬─────────┘   │             │
-│           │                     │             │             │
-│           ▼                     ▼             │             │
-│  ┌──────────────────────────────────────────┐│             │
-│  │           Compliance Validation          ││             │
-│  │      (re-check generated response)       ││             │
-│  └────────────────────┬─────────────────────┘│             │
-│                       │                       │             │
-│                       ▼                       │             │
-│                  Send Message                 │             │
-│                                               │             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Circuit Breaker State Table
-
-```sql
-CREATE TABLE ai_circuit_breaker (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  service_name TEXT UNIQUE NOT NULL,
-  state TEXT CHECK (state IN ('closed', 'open', 'half_open')) DEFAULT 'closed',
-  failure_count INTEGER DEFAULT 0,
-  last_failure_at TIMESTAMPTZ,
-  last_success_at TIMESTAMPTZ,
-  opened_at TIMESTAMPTZ,
-  half_open_at TIMESTAMPTZ,
-  failure_threshold INTEGER DEFAULT 5,
-  reset_timeout_seconds INTEGER DEFAULT 60,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+public/images/owner-portal/
+  ├── 01-overview.png
+  ├── 02-insights.png  
+  ├── 03-bookings.png
+  ├── 04-statements.png
+  ├── 05-expenses.png
+  ├── 06-messages.png
+  ├── 07-repairs.png
+  ├── 08-screenings.png
+  └── 09-marketing.png
 ```
 
 ---
 
-## Part 4: Integration with Existing Message Flow
+## Key UI Components
 
-### Modified Message Sending Flow
-
-All message sending functions will be updated to include compliance checks:
-
-**Files to modify:**
-- `supabase/functions/ghl-send-sms/index.ts`
-- `supabase/functions/send-lead-email/index.ts`
-- `supabase/functions/unified-ai-compose/index.ts`
-
-### Pre-Send Validation Hook
-
-```typescript
-// Before sending any message:
-const compliance = await validateCompliance({
-  message: messageContent,
-  messageType: 'sms',
-  senderUserId: userId,
-  recipientType: contactType
-});
-
-if (!compliance.canSend) {
-  if (compliance.requiresBrokerReview) {
-    // Queue for broker approval
-    await queueForBrokerReview(messageContent, compliance);
-    return { success: false, reason: 'requires_broker_review' };
-  }
-  
-  // Return with violations
-  return { 
-    success: false, 
-    reason: 'compliance_violation',
-    issues: compliance.issues,
-    suggestions: compliance.suggestions
-  };
+### PresentationViewer Component
+```tsx
+interface PresentationSlide {
+  id: string;
+  image: string;
+  title: string;
+  subtitle: string;
+  painPoint: string;
+  features: string[];
+  audioSrc?: string; // Optional audio for specific slide
 }
+
+// Features:
+- CSS scroll-snap for smooth slide transitions
+- Intersection Observer for slide visibility detection
+- Framer Motion for animations
+- Audio API for recap playback
+- Progress indicator showing current position
 ```
 
-### Frontend Warning UI
-
-When compliance issues are detected, the UI will show:
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  ⚠️ Fair Housing Compliance Alert                   │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  Your message contains language that may violate    │
-│  the Fair Housing Act:                              │
-│                                                     │
-│  ❌ "no children" → familial status discrimination  │
-│                                                     │
-│  Suggested alternative:                             │
-│  ✓ "All applicants welcome"                         │
-│                                                     │
-│  ┌────────────┐  ┌────────────────────────────┐    │
-│  │  Edit      │  │  Request Broker Review     │    │
-│  └────────────┘  └────────────────────────────┘    │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
+### Navigation Controls
+- Floating navigation bar (bottom center like other presentations)
+- Play/Pause auto-scroll toggle
+- Slide indicator dots
+- Fullscreen toggle
+- Home button (return to dashboard)
 
 ---
 
-## Part 5: Watchdog Dashboard Integration
+## Implementation Steps
 
-### New Admin Panel Section
+### Phase 1: Asset Setup
+1. Copy screenshots to public/images/owner-portal/
+2. Copy audio file to public/audio/
+3. Create owner-portal-slides directory structure
 
-Add compliance monitoring to the existing `SystemHealthPanel.tsx`:
+### Phase 2: Slide Components
+1. Create OwnerPortalIntroSlide with PeachHaus branding
+2. Build each tab slide with screenshot + overlay text
+3. Create OwnerPortalClosingSlide with CTAs
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  System Health                                              │
-├─────────────────────────────────────────────────────────────┤
-│  [Integrations] [Email] [Finance] [Visits] [Partner]        │
-│                                                             │
-│  + [Compliance] ← NEW TAB                                   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Fair Housing Compliance          Last 24h            │   │
-│  │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │   │
-│  │ Messages Scanned: 247                                │   │
-│  │ Blocked: 3  │  Modified: 12  │  Escalated: 1        │   │
-│  │                                                      │   │
-│  │ Most Common Issues:                                  │   │
-│  │ • "quiet building" (familial status) - 8 times      │   │
-│  │ • "professionals" (race/income proxy) - 4 times     │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ AI Service Health                 ● Healthy         │   │
-│  │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │   │
-│  │ Circuit Breaker: CLOSED                              │   │
-│  │ Success Rate: 99.2%                                  │   │
-│  │ Avg Response Time: 2.3s                              │   │
-│  │ Failed (auto-recovered): 2                           │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+### Phase 3: Presentation Page
+1. Create OwnerPortalPresentation.tsx with auto-scroll logic
+2. Implement audio player integration
+3. Add navigation controls matching existing presentation style
+
+### Phase 4: Integration
+1. Add route to App.tsx
+2. Add presentation card to OwnerPortalManagement.tsx
+3. Add SMS templates for presentation links
+4. Add quick copy links in communication compose areas
 
 ---
 
-## Implementation Summary
+## Memory Update
 
-### New Files to Create
+After implementation, update project memory:
+```markdown
+# Memory: features/owner-portal/presentation-and-demo-mode-v2
 
-| File | Purpose |
-|------|---------|
-| `supabase/functions/validate-fair-housing/index.ts` | Fair Housing compliance validation |
-| `supabase/functions/ai-reliability-watchdog/index.ts` | Self-healing AI monitoring |
-| `src/components/admin/ComplianceWatchdogCard.tsx` | Dashboard for compliance monitoring |
-| `src/components/communications/ComplianceAlert.tsx` | UI warning for violations |
-| `src/lib/compliance/fairHousingRules.ts` | Prohibited phrase patterns |
-
-### Files to Modify
-
-| File | Changes |
-|------|---------|
-| `supabase/functions/ghl-send-sms/index.ts` | Add pre-send compliance check |
-| `supabase/functions/send-lead-email/index.ts` | Add pre-send compliance check |
-| `supabase/functions/unified-ai-compose/index.ts` | Add circuit breaker, retry logic, compliance validation |
-| `src/components/admin/SystemHealthPanel.tsx` | Add Compliance tab |
-| `src/components/communications/SendSMSDialog.tsx` | Show compliance warnings |
-| `src/components/communications/ComposeEmailDialog.tsx` | Show compliance warnings |
-
-### Database Migrations
-
-1. Create `compliance_message_log` table
-2. Create `ai_circuit_breaker` table
-3. Add compliance-related columns to `watchdog_logs`
-
----
-
-## Technical Details
-
-### Fair Housing Prohibited Patterns
-
-```typescript
-// src/lib/compliance/fairHousingRules.ts
-export const FAIR_HOUSING_PATTERNS = {
-  familial_status: [
-    { pattern: /\b(no|not? allow(ed)?|without) (kids?|children|minors?|families)\b/i, severity: 'block' },
-    { pattern: /\b(adult[s]? only|seniors? only|55\+|over 55)\b/i, severity: 'warn', context: 'May be valid for HOPA-qualified communities' },
-    { pattern: /\bquiet (building|community|neighborhood)\b/i, severity: 'warn' },
-    { pattern: /\b(school|playground) (district|nearby)\b/i, severity: 'context', note: 'OK for marketing, not for screening' },
-  ],
-  race_color: [
-    { pattern: /\bno section ?8\b/i, severity: 'block', note: 'Disparate impact on protected classes' },
-    { pattern: /\b(professionals? only|executive|white[- ]collar)\b/i, severity: 'warn' },
-  ],
-  national_origin: [
-    { pattern: /\b(must|need to|required) speak english\b/i, severity: 'block' },
-    { pattern: /\b(americans?|citizens?) only\b/i, severity: 'block' },
-    { pattern: /\b(no|without) (immigrants?|foreigners?)\b/i, severity: 'block' },
-  ],
-  religion: [
-    { pattern: /\b(christian|muslim|jewish|catholic|protestant) (community|neighborhood|values)\b/i, severity: 'block' },
-  ],
-  disability: [
-    { pattern: /\b(must|able to|can) (walk|climb|use stairs)\b/i, severity: 'block' },
-    { pattern: /\bno (wheelchair|disability|handicap)\b/i, severity: 'block' },
-    { pattern: /\bmental(ly)? (ill|health|stable)\b/i, severity: 'warn' },
-  ],
-  sex_gender: [
-    { pattern: /\b(perfect for|ideal for|great for) (single )?(men|women|guys?|girls?|ladies|gentlemen)\b/i, severity: 'block' },
-    { pattern: /\b(man|woman|male|female) only\b/i, severity: 'block' },
-  ],
-};
+The Owner Portal Presentation (/owner-portal-presentation) is a premium auto-scrolling 
+showcase of all portal tabs. It features 10 slides with screenshot walkthroughs, 
+pain-point messaging, and an embedded monthly recap audio sample. Presentation links 
+are accessible via SMS templates in UnifiedComposeDialog and a card in 
+OwnerPortalManagement.tsx. The scroll speed is optimized at 50px/sec with 3-5 second 
+pauses per section for a total ~75 second runtime.
 ```
-
-### AI Circuit Breaker Logic
-
-```typescript
-async function checkCircuitBreaker(serviceName: string): Promise<{
-  canProceed: boolean;
-  state: 'closed' | 'open' | 'half_open';
-}> {
-  const { data: breaker } = await supabase
-    .from('ai_circuit_breaker')
-    .select('*')
-    .eq('service_name', serviceName)
-    .single();
-  
-  if (!breaker) {
-    return { canProceed: true, state: 'closed' };
-  }
-  
-  const now = new Date();
-  
-  if (breaker.state === 'open') {
-    const openedAt = new Date(breaker.opened_at);
-    const elapsedSeconds = (now.getTime() - openedAt.getTime()) / 1000;
-    
-    if (elapsedSeconds >= breaker.reset_timeout_seconds) {
-      // Move to half-open, allow one request
-      await supabase
-        .from('ai_circuit_breaker')
-        .update({ state: 'half_open', half_open_at: now.toISOString() })
-        .eq('id', breaker.id);
-      
-      return { canProceed: true, state: 'half_open' };
-    }
-    
-    return { canProceed: false, state: 'open' };
-  }
-  
-  return { canProceed: true, state: breaker.state };
-}
-```
-
-### Error Recovery in unified-ai-compose
-
-```typescript
-// Enhanced error handling with retry and fallback
-try {
-  const aiResponse = await fetchWithRetry(
-    "https://ai.gateway.lovable.dev/v1/chat/completions",
-    {
-      method: "POST",
-      headers: { ... },
-      body: JSON.stringify({ ... }),
-    },
-    { maxRetries: 3, backoffMs: 1000 }
-  );
-  
-  // Success - update circuit breaker
-  await recordSuccess('unified-ai-compose');
-  
-} catch (error) {
-  // Record failure
-  await recordFailure('unified-ai-compose', error);
-  
-  // Check if circuit should open
-  const shouldOpen = await shouldOpenCircuit('unified-ai-compose');
-  if (shouldOpen) {
-    await openCircuit('unified-ai-compose');
-  }
-  
-  // Attempt fallback
-  return await generateFallbackResponse(context, messageType);
-}
-```
-
----
-
-## Testing Plan
-
-1. **Fair Housing Detection Tests**
-   - Test each protected class pattern
-   - Verify false positive handling
-   - Test edge cases (legitimate uses)
-
-2. **GA License Compliance Tests**
-   - Test message topic classification
-   - Verify escalation routing
-   - Test broker approval workflow
-
-3. **AI Reliability Tests**
-   - Simulate rate limiting (429)
-   - Simulate credit depletion (402)
-   - Test circuit breaker state transitions
-   - Verify retry logic with exponential backoff
-
----
-
-## Rollout Plan
-
-1. **Phase 1**: Deploy compliance validation function (monitor-only mode)
-2. **Phase 2**: Enable warnings in UI (no blocking)
-3. **Phase 3**: Enable blocking for high-severity violations
-4. **Phase 4**: Add broker escalation workflow
-5. **Phase 5**: Deploy AI watchdog with auto-recovery
