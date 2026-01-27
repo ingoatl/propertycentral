@@ -378,14 +378,25 @@ export default function OnboardingPresentation() {
     initAudioContext();
     
     if (!isPlaying) {
+      // Reset audio tracking for fresh start
+      hasPlayedForSlideRef.current = null;
+      audioEndedRef.current = false;
+      
       if (currentSlide === SLIDES.length - 1) {
         setCurrentSlide(0);
       }
       hasPlayedRef.current = true;
       setIsPlaying(true);
     } else {
+      // PAUSE: Stop audio and clear timers
       setIsPlaying(false);
       stopAudio();
+      hasPlayedForSlideRef.current = null;
+      audioEndedRef.current = true;
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
     }
   };
 
@@ -532,6 +543,25 @@ export default function OnboardingPresentation() {
           )}
         </Button>
         </div>
+      </div>
+
+      {/* Progress Bar - Below top controls */}
+      <div className="fixed top-12 left-0 right-0 h-1 bg-white/10 z-40">
+        {/* Segment markers */}
+        <div className="relative h-full">
+          {SLIDES.map((_, index) => (
+            <div
+              key={index}
+              className="absolute top-0 bottom-0 border-r border-white/20"
+              style={{ left: `${((index + 1) / SLIDES.length) * 100}%` }}
+            />
+          ))}
+        </div>
+        {/* Overall progress - fills up to current slide */}
+        <div
+          className="absolute top-0 h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500 ease-out"
+          style={{ width: `${((currentSlide + 1) / SLIDES.length) * 100}%` }}
+        />
       </div>
 
       {/* Top Right Controls */}
