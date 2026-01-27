@@ -60,8 +60,9 @@ async function generateAudio(text: string, voiceId: string): Promise<ArrayBuffer
   try {
     console.log(`Generating audio for voice ${voiceId}, text length: ${text.length}`);
     
+    // Using multilingual_v2 for highest quality (stored audio, no real-time needed)
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
       {
         method: "POST",
         headers: {
@@ -70,10 +71,11 @@ async function generateAudio(text: string, voiceId: string): Promise<ArrayBuffer
         },
         body: JSON.stringify({
           text,
-          model_id: "eleven_turbo_v2_5",
+          model_id: "eleven_multilingual_v2",
           voice_settings: {
             stability: 0.6,
             similarity_boost: 0.75,
+            style: 0.3,
             use_speaker_boost: true,
           },
         }),
