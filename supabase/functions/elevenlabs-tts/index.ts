@@ -22,8 +22,8 @@ serve(async (req) => {
       throw new Error("ELEVENLABS_API_KEY is not configured");
     }
 
-    // Default to Brian voice if not specified
-    const voice = voiceId || "nPczCjzI2devNBz1zQrb";
+    // Default to Sarah voice if not specified (female, warm, professional)
+    const voice = voiceId || "EXAVITQu4vr4xnSDxMaL";
 
     // Call ElevenLabs TTS API
     const response = await fetch(
@@ -38,9 +38,9 @@ serve(async (req) => {
           text,
           model_id: "eleven_multilingual_v2",
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.3,
+            stability: 0.65,
+            similarity_boost: 0.80,
+            style: 0.35,
             use_speaker_boost: true,
           },
         }),
