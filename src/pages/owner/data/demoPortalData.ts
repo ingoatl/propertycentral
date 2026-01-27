@@ -4,6 +4,21 @@
 export const DEMO_OWNER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 export const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
 
+// Demo property details matching the Rita Way property (5bed/4bath in Smyrna, GA)
+export const DEMO_PROPERTY = {
+  id: DEMO_PROPERTY_ID,
+  name: "3069 Rita Way Retreat",
+  address: "3069 Rita Way, Smyrna, GA 30080",
+  bedrooms: 5,
+  bathrooms: 4,
+  sqft: 3200,
+  max_guests: 12,
+  property_type: "hybrid",
+  // Suburban home with warm tones matching the Rita Way aesthetic
+  hero_image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=1200&h=600&fit=crop",
+  thumbnail: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=300&fit=crop"
+};
+
 // ============================================
 // MARKETING TAB MOCK DATA
 // ============================================
