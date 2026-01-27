@@ -35,8 +35,8 @@ const SLIDES = [
     id: "founders", 
     component: MeetTheFoundersSlide, 
     label: "Team",
-    duration: 18000,
-    script: "Meet Anja and Ingo Winzer, the husband and wife team behind PeachHaus. Anja brings over 15 years of experience in luxury hospitality from five-star hotels across Europe, while Ingo's background in real estate investment and technology ensures your property is optimized for maximum returns. Together, they've built a management company that combines old-world hospitality with modern revenue optimization. They personally oversee every property in the portfolio and treat each home as if it were their own."
+    duration: 22000,
+    script: "Meet Anja and Ingo, the husband and wife team behind PeachHaus. Anja is a licensed Georgia real estate broker, Airbnb coach, and hospitality design expert who has grown over two million dollars in short-term rental bookings. She's also the author of The Hybrid Rental Strategy, our proven approach where we focus on mid-term rentals first and fill in the gaps with short-term stays where allowed. Ingo brings over thirty years of entrepreneurship experience with ten years specifically in the real estate and property management space. Together they've built PeachHaus to combine old-world hospitality with modern revenue optimization."
   },
   { 
     id: "promise", 
@@ -50,7 +50,7 @@ const SLIDES = [
     component: ByTheNumbersSlide, 
     label: "Stats",
     duration: 10000,
-    script: "The numbers speak for themselves. Our properties consistently outperform market averages with higher occupancy rates and premium nightly rates."
+    script: "The numbers speak for themselves. With over fourteen hundred five-star Airbnb reviews, our properties consistently outperform market averages with higher occupancy rates and premium nightly rates."
   },
   { 
     id: "problem", 
@@ -156,17 +156,26 @@ export default function OnboardingPresentation() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false); // Start paused until audio is ready
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
+  const hasPlayedRef = useRef(false);
+
+  // Prepare slides for preloading
+  const preloadSlides = SLIDES.map(s => ({ id: s.id, script: s.script || "" }));
 
   const { 
     playAudioForSlide, 
     stopAudio, 
     isMuted, 
     toggleMute, 
-    isLoading: isAudioLoading 
-  } = usePresentationAudio({ voiceId: "nPczCjzI2devNBz1zQrb" }); // Brian (male voice)
+    isLoading: isAudioLoading,
+    isPreloaded,
+    initAudioContext
+  } = usePresentationAudio({ 
+    voiceId: "nPczCjzI2devNBz1zQrb", // Brian (male voice)
+    preloadSlides
+  });
 
   const goToSlide = useCallback((index: number) => {
     if (index >= 0 && index < SLIDES.length && !isTransitioning) {
@@ -195,15 +204,16 @@ export default function OnboardingPresentation() {
     goToSlide(currentSlide - 1);
   }, [currentSlide, goToSlide]);
 
-  // Auto-play with audio narration
+  // Auto-play with audio narration - fixed double-play bug
   useEffect(() => {
     if (!isPlaying) {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-      stopAudio();
       return;
     }
 
     const slide = SLIDES[currentSlide];
+    
+    // Reset the flag for this slide
     audioEndedRef.current = false;
 
     // Clear any existing timer
@@ -214,6 +224,7 @@ export default function OnboardingPresentation() {
 
     // Callback when audio ends
     const onAudioComplete = () => {
+      // Prevent double-trigger
       if (audioEndedRef.current) return;
       audioEndedRef.current = true;
       
@@ -230,27 +241,28 @@ export default function OnboardingPresentation() {
       }, 3000);
     };
 
-    // Play audio with callback
+    // Play audio immediately (no 500ms delay since we're preloaded)
     if (slide.script && !isMuted) {
-      setTimeout(() => {
-        playAudioForSlide(slide.id, slide.script!, onAudioComplete);
-      }, 500);
+      playAudioForSlide(slide.id, slide.script!, onAudioComplete);
     }
 
-    // Fallback timer
+    // Fallback timer for muted mode or if audio fails
     if (isMuted) {
       const mutedDuration = slide.duration + 4000;
       fallbackTimerRef.current = setTimeout(() => {
         if (!audioEndedRef.current) {
+          audioEndedRef.current = true;
           advanceSlide();
         }
       }, mutedDuration);
     } else {
+      // Extended fallback - 45 seconds max per slide
       fallbackTimerRef.current = setTimeout(() => {
         if (!audioEndedRef.current) {
+          audioEndedRef.current = true;
           advanceSlide();
         }
-      }, 30000);
+      }, 45000);
     }
 
     return () => {
@@ -258,10 +270,8 @@ export default function OnboardingPresentation() {
         clearTimeout(fallbackTimerRef.current);
         fallbackTimerRef.current = null;
       }
-      // Always stop audio on cleanup to prevent overlapping
-      stopAudio();
     };
-  }, [currentSlide, isPlaying, isMuted, playAudioForSlide, stopAudio, advanceSlide]);
+  }, [currentSlide, isPlaying, isMuted, playAudioForSlide, advanceSlide]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -322,10 +332,14 @@ export default function OnboardingPresentation() {
   };
 
   const togglePlay = () => {
+    // Initialize audio context on user interaction
+    initAudioContext();
+    
     if (!isPlaying) {
       if (currentSlide === SLIDES.length - 1) {
         setCurrentSlide(0);
       }
+      hasPlayedRef.current = true;
       setIsPlaying(true);
     } else {
       setIsPlaying(false);
@@ -471,6 +485,9 @@ export default function OnboardingPresentation() {
       <div className="fixed top-4 right-4 flex items-center gap-2 z-50 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full">
         {isAudioLoading && (
           <div className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+        )}
+        {isPreloaded && !isAudioLoading && (
+          <div className="h-2 w-2 rounded-full bg-green-400" title="Audio ready" />
         )}
         <span className="text-white/70 text-sm">
           {currentSlide + 1} / {SLIDES.length}

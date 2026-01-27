@@ -44,7 +44,7 @@ export function ByTheNumbersSlide() {
       icon: Star, 
       value: 1400, 
       suffix: "+", 
-      label: "Five-Star Reviews",
+      label: "Five-Star Airbnb Reviews",
       color: "from-amber-400 to-yellow-500"
     },
     { 

@@ -17,14 +17,14 @@ export function MeetTheFoundersSlide() {
             <div className="flex flex-col items-center text-center">
               <img
                 src={ingoHeadshot}
-                alt="Ingo Schaer"
+                alt="Ingo"
                 className="w-40 h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 rounded-full object-cover border-4 border-amber-400/30 mb-6 group-hover:border-amber-400 transition-all duration-300 shadow-2xl"
               />
-              <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">Ingo Schaer</h3>
+              <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">Ingo</h3>
               <p className="text-amber-400 font-semibold text-xl lg:text-2xl mb-4">Founder & Automation Expert</p>
               <p className="text-white/60 text-lg lg:text-xl mb-6 leading-relaxed max-w-lg">
-                10 years of entrepreneurship experience. Built and exited multiple businesses, 
-                now leading PeachHaus with a focus on scale, systems, and strategic automation.
+                30+ years of entrepreneurship experience with 10 years specifically in the real estate and property management space. 
+                Leading PeachHaus with a focus on scale, systems, and strategic automation.
               </p>
               
               {/* Published Author Badge */}
@@ -58,14 +58,14 @@ export function MeetTheFoundersSlide() {
             <div className="flex flex-col items-center text-center">
               <img
                 src="https://www.peachhausgroup.com/lovable-uploads/ac75dc97-704f-4604-940b-b9c460d497fa.png"
-                alt="Anja Schaer"
+                alt="Anja"
                 className="w-40 h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 rounded-full object-cover border-4 border-orange-400/30 mb-6 group-hover:border-orange-400 transition-all duration-300 shadow-2xl"
               />
-              <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">Anja Schaer</h3>
+              <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">Anja</h3>
               <p className="text-orange-400 font-semibold text-xl lg:text-2xl mb-4">Co-founder, Licensed GA Broker</p>
               <p className="text-white/60 text-lg lg:text-xl mb-6 leading-relaxed max-w-lg">
                 Licensed Georgia Real Estate Broker, Airbnb coach and hospitality design expert. 
-                Grew over $1.5M in STR bookings through design and exceptional guest experiences.
+                Grew over $2M in STR bookings through design and exceptional guest experiences.
               </p>
               
               {/* Published Author Badge */}
@@ -74,7 +74,7 @@ export function MeetTheFoundersSlide() {
                 <span className="text-orange-400 font-semibold text-base lg:text-lg uppercase tracking-wider">Published Author</span>
               </div>
               
-              {/* Book Cover */}
+              {/* Book Cover - The Hybrid Rental Strategy */}
               <div className="flex gap-4 justify-center">
                 <div className="relative group/book">
                   <img
@@ -84,6 +84,9 @@ export function MeetTheFoundersSlide() {
                   />
                 </div>
               </div>
+              <p className="text-white/40 text-sm mt-3 max-w-xs">
+                Our proven strategy: mid-term rentals first, short-term stays fill the gaps
+              </p>
             </div>
           </div>
         </div>
