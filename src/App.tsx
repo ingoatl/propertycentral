@@ -62,22 +62,27 @@ const BookOwnerCall = lazy(() => import("./pages/BookOwnerCall"));
 const VendorQuote = lazy(() => import("./pages/VendorQuote"));
 const OwnerPortalPresentation = lazy(() => import("./pages/OwnerPortalPresentation"));
 
-// QueryClient configured with optimized caching and stale time settings
+// QueryClient configured with aggressive caching for speed
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes (formerly cacheTime)
+      staleTime: 1000 * 60 * 10, // 10 minutes - data stays fresh longer
+      gcTime: 1000 * 60 * 60, // 1 hour cache retention
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
       retry: 1,
+      networkMode: 'offlineFirst', // Use cache first, then network
+    },
+    mutations: {
+      networkMode: 'offlineFirst',
     },
   },
 });
 
-// Loading fallback component for lazy-loaded pages
+// Minimal loading skeleton for faster perceived load
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-pulse text-muted-foreground">Loading...</div>
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
   </div>
 );
 
