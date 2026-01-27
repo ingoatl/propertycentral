@@ -70,6 +70,12 @@ const platformConfig: Record<string, {
     color: "text-blue-700 dark:text-blue-300",
     bgColor: "bg-blue-100 dark:bg-blue-900/40",
   },
+  google: {
+    icon: <MapPin className="w-4 h-4" />,
+    label: "Google",
+    color: "text-emerald-600 dark:text-emerald-400",
+    bgColor: "bg-emerald-100 dark:bg-emerald-900/40",
+  },
   gmb: {
     icon: <MapPin className="w-4 h-4" />,
     label: "Google",

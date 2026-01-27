@@ -47,7 +47,7 @@ const platformFilters = [
   { key: "instagram", label: "Instagram", icon: <Instagram className="w-4 h-4" /> },
   { key: "facebook", label: "Facebook", icon: <Facebook className="w-4 h-4" /> },
   { key: "linkedin", label: "LinkedIn", icon: <Linkedin className="w-4 h-4" /> },
-  { key: "gmb", label: "Google", icon: <MapPin className="w-4 h-4" /> },
+  { key: "google", label: "Google", icon: <MapPin className="w-4 h-4" /> },
   { key: "nextdoor", label: "Nextdoor", icon: <Home className="w-4 h-4" /> },
 ];
 
