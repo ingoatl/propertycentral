@@ -41,8 +41,8 @@ export function CommunicationSlide() {
   ];
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center px-4 md:px-8 py-8">
-      {/* Headline - centered */}
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center px-4 md:px-8 py-12 pb-28">
+      {/* Headline */}
       <motion.div 
         className="text-center mb-4 max-w-4xl"
         initial={{ opacity: 0, y: 20 }}
@@ -57,9 +57,9 @@ export function CommunicationSlide() {
         </p>
       </motion.div>
 
-      {/* Feature Pills - centered */}
+      {/* Feature Pills */}
       <motion.div
-        className="flex flex-wrap justify-center gap-2 md:gap-3 mb-6 max-w-3xl"
+        className="flex flex-wrap justify-center gap-2 md:gap-3 mb-4 max-w-3xl"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
@@ -75,9 +75,9 @@ export function CommunicationSlide() {
         ))}
       </motion.div>
 
-      {/* Communication Channels Grid - centered */}
+      {/* Communication Channels Grid */}
       <motion.div
-        className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-3xl mb-6"
+        className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-3xl mb-4"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
@@ -85,23 +85,23 @@ export function CommunicationSlide() {
         {channels.map((channel, i) => (
           <motion.div
             key={i}
-            className={`relative bg-gradient-to-br ${channel.color} border border-white/10 rounded-2xl p-5 backdrop-blur-sm`}
+            className={`relative bg-gradient-to-br ${channel.color} border border-white/10 rounded-2xl p-4 backdrop-blur-sm`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 + i * 0.1 }}
           >
-            <div className={`w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-3`}>
-              <channel.icon className={`h-6 w-6 ${channel.iconColor}`} />
+            <div className={`w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-2`}>
+              <channel.icon className={`h-5 w-5 ${channel.iconColor}`} />
             </div>
-            <h3 className="text-base font-semibold text-white mb-1">{channel.title}</h3>
-            <p className="text-sm text-white/60">{channel.description}</p>
+            <h3 className="text-sm font-semibold text-white mb-1">{channel.title}</h3>
+            <p className="text-xs text-white/60">{channel.description}</p>
           </motion.div>
         ))}
       </motion.div>
 
-      {/* Industry Leadership Callout - centered */}
+      {/* Industry Leadership Callout */}
       <motion.div
-        className="bg-[#fae052]/10 border border-[#fae052]/30 rounded-xl px-6 md:px-8 py-3 max-w-2xl text-center mb-4"
+        className="bg-[#fae052]/10 border border-[#fae052]/30 rounded-xl px-6 md:px-8 py-3 max-w-2xl text-center mb-3"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.8 }}
@@ -114,7 +114,7 @@ export function CommunicationSlide() {
         </p>
       </motion.div>
 
-      {/* Pain Point Solved - centered */}
+      {/* Pain Point Solved */}
       <motion.div
         className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 md:px-8 py-3 max-w-2xl text-center"
         initial={{ opacity: 0 }}

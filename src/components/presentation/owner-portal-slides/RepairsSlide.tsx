@@ -15,8 +15,8 @@ export function RepairsSlide({ isActive }: RepairsSlideProps) {
   ];
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center px-4 md:px-8 py-8">
-      {/* Headline - centered */}
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center px-4 md:px-8 py-12 pb-28">
+      {/* Headline */}
       <motion.div 
         className="text-center mb-4 max-w-4xl"
         initial={{ opacity: 0, y: 20 }}
@@ -31,9 +31,9 @@ export function RepairsSlide({ isActive }: RepairsSlideProps) {
         </p>
       </motion.div>
 
-      {/* Feature Pills - centered */}
+      {/* Feature Pills */}
       <motion.div
-        className="flex flex-wrap justify-center gap-2 md:gap-3 mb-6 max-w-3xl"
+        className="flex flex-wrap justify-center gap-2 md:gap-3 mb-4 max-w-3xl"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
@@ -49,9 +49,9 @@ export function RepairsSlide({ isActive }: RepairsSlideProps) {
         ))}
       </motion.div>
 
-      {/* Screenshot - vertically centered */}
+      {/* Screenshot - Flexible height */}
       <motion.div
-        className="relative w-full max-w-5xl h-[45vh] md:h-[50vh] flex items-center justify-center"
+        className="relative w-full max-w-5xl flex-1 min-h-[35vh] max-h-[45vh] flex items-center justify-center"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
@@ -64,9 +64,9 @@ export function RepairsSlide({ isActive }: RepairsSlideProps) {
         />
       </motion.div>
 
-      {/* Pain Point Solved - centered */}
+      {/* Pain Point Solved */}
       <motion.div
-        className="mt-6 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 md:px-8 py-3 max-w-2xl text-center"
+        className="mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 md:px-8 py-3 max-w-2xl text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}

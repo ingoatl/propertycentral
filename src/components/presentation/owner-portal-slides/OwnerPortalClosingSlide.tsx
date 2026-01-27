@@ -4,7 +4,7 @@ import { ExternalLink, Calendar, Phone, Mail } from "lucide-react";
 
 export function OwnerPortalClosingSlide() {
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center py-8 pb-24 px-4 md:px-8">
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center px-4 md:px-8 py-12 pb-28">
       {/* Owner Photos */}
       <motion.div
         className="mb-4"
