@@ -10,15 +10,15 @@ export function ExpensesSlide() {
   ];
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-4 px-4 md:px-8">
-      {/* Headline */}
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center justify-center py-8 px-4 md:px-8">
+      {/* Headline - centered */}
       <motion.div 
-        className="text-center mb-2 max-w-4xl"
+        className="text-center mb-4 max-w-4xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h2 className="text-2xl md:text-5xl font-bold text-white mb-1">
+        <h2 className="text-2xl md:text-5xl font-bold text-white mb-2">
           <span className="text-[#fae052]">100%</span> Expense Transparency
         </h2>
         <p className="text-sm md:text-lg text-white/70">
@@ -28,7 +28,7 @@ export function ExpensesSlide() {
 
       {/* Feature Pills */}
       <motion.div
-        className="flex flex-wrap justify-center gap-2 mb-2 max-w-2xl"
+        className="flex flex-wrap justify-center gap-2 mb-4 max-w-2xl"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
@@ -44,9 +44,10 @@ export function ExpensesSlide() {
         ))}
       </motion.div>
 
-      {/* Screenshot */}
+      {/* Screenshot - centered with fixed max-height */}
       <motion.div
-        className="relative w-full max-w-5xl flex-1 flex items-start justify-center"
+        className="relative w-full max-w-5xl flex items-center justify-center"
+        style={{ height: "calc(100vh - 320px)", maxHeight: "50vh" }}
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
@@ -58,9 +59,9 @@ export function ExpensesSlide() {
         />
       </motion.div>
 
-      {/* Pain Point Solved - directly under screenshot with mt-2 */}
+      {/* Pain Point Solved - directly under screenshot */}
       <motion.div
-        className="mt-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 md:px-6 py-2 max-w-2xl text-center"
+        className="mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 md:px-6 py-2 max-w-2xl text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
@@ -71,7 +72,7 @@ export function ExpensesSlide() {
       </motion.div>
 
       {/* Spacer for bottom nav */}
-      <div className="h-16 md:h-20" />
+      <div className="h-20 md:h-24" />
     </div>
   );
 }
