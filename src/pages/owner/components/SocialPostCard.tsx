@@ -100,6 +100,7 @@ const formatNumber = (num?: number): string => {
 export const SocialPostCard = ({ post }: SocialPostCardProps) => {
   const [imageError, setImageError] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   const config = platformConfig[post.platform?.toLowerCase()] || {
     icon: <Share2 className="w-4 h-4" />,
@@ -109,11 +110,21 @@ export const SocialPostCard = ({ post }: SocialPostCardProps) => {
   };
 
   const isVideo = post.media_type === "video";
+  const isTikTok = post.platform?.toLowerCase() === "tiktok";
   const thumbnailUrl = post.thumbnail_url || post.media_url;
   const hasMedia = thumbnailUrl && !imageError;
   const truncatedCaption = post.caption && post.caption.length > 100 
     ? post.caption.slice(0, 100) + "..." 
     : post.caption;
+
+  // Extract TikTok video ID from post URL
+  const getTikTokVideoId = (): string | null => {
+    if (!post.post_url) return null;
+    const match = post.post_url.match(/video\/(\d+)/);
+    return match ? match[1] : null;
+  };
+
+  const tiktokVideoId = getTikTokVideoId();
 
   const handleViewPost = () => {
     if (post.post_url) {
@@ -121,13 +132,65 @@ export const SocialPostCard = ({ post }: SocialPostCardProps) => {
     }
   };
 
+  const handlePlayVideo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (post.post_url) {
+      // Open in new tab for TikTok since embedding is restricted
+      window.open(post.post_url, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 group border-border/50">
+    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 group border-border/50 bg-gradient-to-br from-background to-muted/20">
       {/* Media Preview */}
-      <div className="relative aspect-square bg-muted overflow-hidden">
-        {isVideo && post.media_url && !post.thumbnail_url ? (
-          // Video preview with video element for TikToks without thumbnails
-          <>
+      <div className="relative aspect-[9/16] md:aspect-square bg-muted overflow-hidden">
+        {isTikTok && tiktokVideoId ? (
+          // TikTok video preview with thumbnail and play overlay
+          <div 
+            className="w-full h-full cursor-pointer relative"
+            onClick={handlePlayVideo}
+          >
+            {post.thumbnail_url ? (
+              <img
+                src={post.thumbnail_url}
+                alt={post.caption || "TikTok video"}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                onError={() => setImageError(true)}
+              />
+            ) : post.media_url ? (
+              <video
+                src={post.media_url}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                muted
+                playsInline
+                preload="metadata"
+                poster=""
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className={cn("w-full h-full flex items-center justify-center", config.bgColor)}>
+                <Video className="w-16 h-16 text-muted-foreground/30" />
+              </div>
+            )}
+            
+            {/* Play button overlay */}
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/60 via-black/20 to-transparent group-hover:from-black/70">
+              <div className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-2xl transform transition-all duration-300 group-hover:scale-110 group-hover:bg-white">
+                <Play className="w-8 h-8 text-primary ml-1" fill="currentColor" />
+              </div>
+            </div>
+
+            {/* TikTok branding */}
+            <div className="absolute bottom-3 left-3 right-3">
+              <div className="flex items-center gap-2 text-white text-sm">
+                <Video className="w-4 h-4" />
+                <span className="font-medium">Watch on TikTok</span>
+              </div>
+            </div>
+          </div>
+        ) : isVideo && post.media_url && !post.thumbnail_url ? (
+          // Generic video preview
+          <div className="w-full h-full relative" onClick={handlePlayVideo}>
             <video
               src={post.media_url}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -138,10 +201,10 @@ export const SocialPostCard = ({ post }: SocialPostCardProps) => {
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black/30">
               <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                <Play className="w-7 h-7 text-primary ml-1" />
+                <Play className="w-7 h-7 text-primary ml-1" fill="currentColor" />
               </div>
             </div>
-          </>
+          </div>
         ) : hasMedia ? (
           <>
             <img
@@ -151,9 +214,9 @@ export const SocialPostCard = ({ post }: SocialPostCardProps) => {
               onError={() => setImageError(true)}
             />
             {isVideo && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer" onClick={handlePlayVideo}>
                 <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                  <Play className="w-7 h-7 text-primary ml-1" />
+                  <Play className="w-7 h-7 text-primary ml-1" fill="currentColor" />
                 </div>
               </div>
             )}
@@ -171,7 +234,7 @@ export const SocialPostCard = ({ post }: SocialPostCardProps) => {
           <Badge 
             variant="secondary" 
             className={cn(
-              "gap-1.5 shadow-lg backdrop-blur-sm bg-background/90",
+              "gap-1.5 shadow-lg backdrop-blur-md bg-background/95 border-0",
               config.color
             )}
           >
@@ -182,21 +245,21 @@ export const SocialPostCard = ({ post }: SocialPostCardProps) => {
 
         {/* Metrics Overlay */}
         {(post.views || post.likes) && (
-          <div className="absolute bottom-3 left-3 right-3 flex items-center gap-3">
+          <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 flex-wrap">
             {post.views ? (
-              <div className="flex items-center gap-1 text-white text-sm font-medium bg-black/60 px-2 py-1 rounded-md backdrop-blur-sm">
+              <div className="flex items-center gap-1 text-white text-sm font-medium bg-black/70 px-2.5 py-1.5 rounded-full backdrop-blur-sm">
                 <Eye className="w-3.5 h-3.5" />
                 <span>{formatNumber(post.views)}</span>
               </div>
             ) : null}
             {post.likes ? (
-              <div className="flex items-center gap-1 text-white text-sm font-medium bg-black/60 px-2 py-1 rounded-md backdrop-blur-sm">
+              <div className="flex items-center gap-1 text-white text-sm font-medium bg-black/70 px-2.5 py-1.5 rounded-full backdrop-blur-sm">
                 <Heart className="w-3.5 h-3.5" />
                 <span>{formatNumber(post.likes)}</span>
               </div>
             ) : null}
             {post.comments ? (
-              <div className="flex items-center gap-1 text-white text-sm font-medium bg-black/60 px-2 py-1 rounded-md backdrop-blur-sm">
+              <div className="flex items-center gap-1 text-white text-sm font-medium bg-black/70 px-2.5 py-1.5 rounded-full backdrop-blur-sm">
                 <MessageCircle className="w-3.5 h-3.5" />
                 <span>{formatNumber(post.comments)}</span>
               </div>
@@ -210,7 +273,7 @@ export const SocialPostCard = ({ post }: SocialPostCardProps) => {
         {post.caption && (
           <p 
             className={cn(
-              "text-sm text-muted-foreground leading-relaxed cursor-pointer",
+              "text-sm text-muted-foreground leading-relaxed cursor-pointer hover:text-foreground transition-colors",
               !showFullCaption && "line-clamp-2"
             )}
             onClick={() => setShowFullCaption(!showFullCaption)}
@@ -232,10 +295,10 @@ export const SocialPostCard = ({ post }: SocialPostCardProps) => {
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 gap-1.5 text-xs"
+              className="h-8 gap-1.5 text-xs hover:bg-primary/10 hover:text-primary"
               onClick={handleViewPost}
             >
-              View Post
+              {isVideo ? "Watch" : "View"} Post
               <ExternalLink className="w-3 h-3" />
             </Button>
           )}
