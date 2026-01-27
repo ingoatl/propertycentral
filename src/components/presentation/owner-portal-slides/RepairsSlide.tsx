@@ -1,17 +1,17 @@
 import { motion } from "framer-motion";
-import { Wrench, CheckCircle, Clock, ThumbsUp } from "lucide-react";
+import { Wrench, CheckCircle, Clock, ThumbsUp, CalendarDays } from "lucide-react";
 import { AutoScrollImage } from "@/components/presentation/AutoScrollImage";
 
 export function RepairsSlide() {
   const features = [
     { icon: CheckCircle, text: "Status tracking" },
-    { icon: ThumbsUp, text: "Approve/decline directly" },
+    { icon: ThumbsUp, text: "Approve repairs over $500" },
     { icon: Clock, text: "Scheduled maintenance" },
-    { icon: Wrench, text: "Costs upfront" },
+    { icon: CalendarDays, text: "Predictive tasks" },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-8 pb-24 px-4 md:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-8 pb-28 px-4 md:px-8">
       {/* Fortune 500 Assertion-Based Headline */}
       <motion.div 
         className="text-center mb-4 max-w-4xl"
@@ -23,7 +23,7 @@ export function RepairsSlide() {
           <span className="text-[#fae052]">Stay in Control</span> of Maintenance
         </h2>
         <p className="text-base md:text-lg text-white/70">
-          Approve work before it happens — all costs visible upfront
+          Approve repairs over $500 before work begins — plus view predictive maintenance tasks
         </p>
       </motion.div>
 
@@ -61,13 +61,13 @@ export function RepairsSlide() {
 
       {/* Pain Point Solved */}
       <motion.div
-        className="mt-6 mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center mx-auto"
+        className="mt-6 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center mx-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
       >
         <p className="text-emerald-400 font-medium text-sm">
-          ✓ Stay in control of repairs — approve work before it happens
+          ✓ Approve repairs over $500 and track predictive maintenance
         </p>
       </motion.div>
     </div>

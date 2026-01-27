@@ -32,17 +32,7 @@ export function OwnerPortalIntroSlide() {
         Your property, our passion — complete visibility into your investment
       </motion.p>
 
-      <motion.div
-        className="mt-16 flex flex-col items-center gap-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1, duration: 0.6 }}
-      >
-        <div className="flex items-center gap-2 text-white/60 text-sm">
-          <div className="h-2 w-2 rounded-full bg-[#fae052] animate-pulse" />
-          Auto-scrolling with AI narration
-        </div>
-      </motion.div>
+      {/* Removed "Auto-scrolling with AI narration" indicator */}
     </div>
   );
 }

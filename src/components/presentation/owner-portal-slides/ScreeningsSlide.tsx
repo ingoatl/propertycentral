@@ -11,7 +11,7 @@ export function ScreeningsSlide() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-8 pb-24 px-4 md:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-8 pb-28 px-4 md:px-8">
       {/* Fortune 500 Assertion-Based Headline with Metric */}
       <motion.div 
         className="text-center mb-4 max-w-4xl"
@@ -59,9 +59,9 @@ export function ScreeningsSlide() {
         />
       </motion.div>
 
-      {/* Pain Point Solved */}
+      {/* Pain Point Solved - properly centered */}
       <motion.div
-        className="mt-6 mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center mx-auto"
+        className="mt-6 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-6 py-3 max-w-2xl text-center mx-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}

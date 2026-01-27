@@ -18,6 +18,7 @@ export function AutoScrollImage({
 }: AutoScrollImageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const staticImageRef = useRef<HTMLImageElement>(null);
   const [scrollAmount, setScrollAmount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -27,11 +28,11 @@ export function AutoScrollImage({
 
   // Calculate scroll amount when image loads
   useEffect(() => {
-    if (!isLoaded || !imageRef.current || !containerRef.current) return;
+    if (!isLoaded || !containerRef.current) return;
 
     const calculateOverflow = () => {
-      const img = imageRef.current;
       const container = containerRef.current;
+      const img = imageRef.current || staticImageRef.current;
       if (!img || !container) return;
 
       const naturalHeight = img.naturalHeight;
@@ -116,7 +117,7 @@ export function AutoScrollImage({
       ) : (
         // Static centered image for content that fits
         <img 
-          ref={imageRef}
+          ref={staticImageRef}
           src={src}
           alt={alt}
           className={`w-full h-full object-contain object-top ${className}`}

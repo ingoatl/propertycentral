@@ -24,6 +24,7 @@ import { MessagesSlide } from "@/components/presentation/owner-portal-slides/Mes
 import { RepairsSlide } from "@/components/presentation/owner-portal-slides/RepairsSlide";
 import { ScreeningsSlide } from "@/components/presentation/owner-portal-slides/ScreeningsSlide";
 import { MarketingSlide } from "@/components/presentation/owner-portal-slides/MarketingSlide";
+import { CommunicationSlide } from "@/components/presentation/owner-portal-slides/CommunicationSlide";
 import { OwnerPortalClosingSlide } from "@/components/presentation/owner-portal-slides/OwnerPortalClosingSlide";
 
 // Slide configuration with narration scripts (Sarah voice - female, warm, professional)
@@ -31,8 +32,8 @@ const SLIDES = [
   { 
     id: "intro", 
     label: "Intro", 
-    duration: 8000,
-    script: "Welcome to PeachHaus. We're so glad you're here... Let us show you how we take care of your investment — and keep you completely informed, every step of the way."
+    duration: 10000,
+    script: "Welcome to PeachHaus... We're so glad you're here. Let us show you how we take care of your investment — and keep you completely informed, every step of the way."
   },
   { 
     id: "overview", 
@@ -73,8 +74,8 @@ const SLIDES = [
   { 
     id: "repairs", 
     label: "Repairs", 
-    duration: 12000,
-    script: "Stay in control of maintenance. See work order status, approve or decline repairs directly, and view scheduled maintenance. All costs are visible upfront — before any work begins."
+    duration: 14000,
+    script: "Stay in control of maintenance. Any repair over five hundred dollars requires your approval before work begins... And you'll also see predictive maintenance tasks scheduled for your property — things like HVAC servicing and gutter cleaning — all planned ahead of time."
   },
   { 
     id: "screenings", 
@@ -87,6 +88,12 @@ const SLIDES = [
     label: "Marketing", 
     duration: 10000,
     script: "See exactly how we're promoting your investment. View social media posts, platform distribution across Airbnb, VRBO, and corporate housing, and track our marketing activities in real-time."
+  },
+  { 
+    id: "communication", 
+    label: "Contact", 
+    duration: 12000,
+    script: "We believe communication with your property manager should be effortless. That's why you can leave a voicemail, send a text, schedule a video call, or call us directly — right from your dashboard. This level of access is rare in our industry, and we're proud to offer it."
   },
   { 
     id: "closing", 
@@ -280,6 +287,7 @@ export default function OwnerPortalPresentation() {
       case "repairs": return <RepairsSlide />;
       case "screenings": return <ScreeningsSlide />;
       case "marketing": return <MarketingSlide />;
+      case "communication": return <CommunicationSlide />;
       case "closing": return <OwnerPortalClosingSlide />;
       default: return null;
     }
