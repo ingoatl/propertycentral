@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Home, Volume2, VolumeX
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-import { usePresentationAudio } from "@/hooks/usePresentationAudio";
+import { useStoredPresentationAudio } from "@/hooks/useStoredPresentationAudio";
 
 // Import slides
 import { TitleSlide } from "@/components/presentation/slides/TitleSlide";
@@ -166,9 +166,7 @@ export default function OnboardingPresentation() {
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
-  // Prepare slides for preloading
-  const preloadSlides = SLIDES.map(s => ({ id: s.id, script: s.script || "" }));
-
+  // Use stored audio from Supabase (pre-generated)
   const { 
     playAudioForSlide, 
     stopAudio, 
@@ -177,9 +175,8 @@ export default function OnboardingPresentation() {
     isLoading: isAudioLoading,
     isPreloaded,
     initAudioContext
-  } = usePresentationAudio({ 
-    voiceId: "nPczCjzI2devNBz1zQrb", // Brian (male voice)
-    preloadSlides
+  } = useStoredPresentationAudio({ 
+    presentation: "onboarding"
   });
 
   const goToSlide = useCallback((index: number) => {
@@ -409,8 +406,9 @@ export default function OnboardingPresentation() {
         <CurrentSlideComponent />
       </div>
 
-      {/* Navigation Controls - Mobile-optimized with larger touch targets */}
-      <div className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 md:gap-2 z-50 bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-3 md:px-4 py-2">
+      {/* Navigation Controls - Perfectly Centered */}
+      <div className="fixed bottom-4 md:bottom-6 left-0 right-0 flex justify-center z-50 px-4">
+        <div className="flex items-center gap-1.5 md:gap-2 bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-3 md:px-4 py-2">
         {/* Home */}
         <Link to="/">
           <Button
@@ -522,6 +520,7 @@ export default function OnboardingPresentation() {
             <Maximize2 className="h-4 w-4" />
           )}
         </Button>
+        </div>
       </div>
 
       {/* Top Right Controls */}

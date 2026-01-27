@@ -13,7 +13,7 @@ import {
   VolumeX
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { usePresentationAudio } from "@/hooks/usePresentationAudio";
+import { useStoredPresentationAudio } from "@/hooks/useStoredPresentationAudio";
 import { OwnerPortalIntroSlide } from "@/components/presentation/owner-portal-slides/OwnerPortalIntroSlide";
 import { OverviewSlide } from "@/components/presentation/owner-portal-slides/OverviewSlide";
 import { InsightsSlide } from "@/components/presentation/owner-portal-slides/InsightsSlide";
@@ -124,7 +124,7 @@ export default function OwnerPortalPresentation() {
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
-  // Preload slides for immediate audio playback
+  // Use stored audio from Supabase (pre-generated)
   const { 
     playAudioForSlide, 
     stopAudio, 
@@ -133,8 +133,8 @@ export default function OwnerPortalPresentation() {
     isLoading: isAudioLoading,
     isPreloaded,
     initAudioContext,
-  } = usePresentationAudio({
-    preloadSlides: SLIDES.map(s => ({ id: s.id, script: s.script }))
+  } = useStoredPresentationAudio({
+    presentation: "owner-portal"
   });
 
   // Advance to next slide with end-of-presentation guard
@@ -370,7 +370,7 @@ export default function OwnerPortalPresentation() {
 
       {/* Fixed Navigation Bar - Perfectly Centered */}
       <motion.div
-        className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4"
+        className="fixed bottom-4 md:bottom-6 left-0 right-0 flex justify-center z-50 px-4"
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.5 }}
