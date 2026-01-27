@@ -1,326 +1,313 @@
 
-# Owner Portal Presentation Implementation Plan
+# Owner Portal Presentation Restructure Plan
 
 ## Overview
-Create a premium, auto-scrolling presentation that showcases the PeachHaus Owner Portal - demonstrating how it solves the key pain points property owners face with traditional management companies. The presentation will feature:
-- Auto-scrolling screenshot walkthrough at optimal viewing speed
-- Intelligent narration explaining each tab's benefits
-- Embedded monthly recap audio sample
-- Links accessible from Dashboard and all Communication sections
+Completely rebuild the Owner Portal Presentation to Fortune 500 standards with auto-scrolling slides, AI-generated audio narration via ElevenLabs, and polished professional design.
 
 ---
 
-## Owner Pain Points Addressed
+## Issues Identified
 
-Based on industry research, property owners struggle with:
+### 1. Broken Slides
+- Missing images for some slides (no Marketing screenshot uploaded)
+- Inconsistent screenshot naming (`06-messages.png` vs `07-messages-detail.png` vs `08-repairs.png`)
+- Some slides reference images that don't exist in the `public/images/owner-portal/` directory
 
-| Pain Point | How Our Portal Solves It |
-|------------|-------------------------|
-| **Lack of Transparency** | Real-time dashboards, downloadable statements, expense tracking with receipts |
-| **Poor Communication** | Multi-channel messaging (SMS, Email, Voice, Video) with full history |
-| **Hidden Fees & Expenses** | Every expense itemized with receipt attachments, category filtering |
-| **No Visibility into Property Performance** | Live booking calendar, revenue forecasts, market comparisons |
-| **Maintenance Black Hole** | Work order tracking with approval workflow, vendor quotes, scheduled maintenance |
-| **Guest Quality Concerns** | ID verification, background checks, watchlist screening with 100% verification rate |
-| **Not Knowing Marketing Efforts** | Social media gallery, activity timeline, platform distribution visibility |
+### 2. Auto-Scroll Not Working Properly
+- Current implementation uses `scrollIntoView` which conflicts with the slide-based navigation
+- Timer-based auto-advance exists but doesn't provide smooth cinematic scrolling
+- No visual indication of progress per slide
+
+### 3. Missing Audio Narration
+- Only the Overview slide has audio capability (monthly recap sample)
+- No AI-generated narration explaining each feature
+
+### 4. Presentation Links Too Large
+- Current buttons in OwnerPortalManagement.tsx are full-sized with large margins
+- Need compact inline links
+
+---
+
+## Fortune 500 Design Principles Applied
+
+Based on research from PitchWorx and Apple keynote analysis:
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Strategic Narrative** | Frame each slide around owner pain points, not just features |
+| **One Idea Per Slide** | Each slide focuses on a single tab with clear value proposition |
+| **Engineered Minimalism** | Clean layouts, generous white space, single focal screenshot |
+| **Brand Cohesion** | Consistent PeachHaus gold (#fae052) accent, dark gradient background |
+| **Data-Driven Headlines** | Use assertion-based titles ("47% Reduction in Damage Claims" vs "Guest Screening") |
+| **Smooth Transitions** | Fade/scale animations, no jarring cuts |
 
 ---
 
 ## Technical Architecture
 
-### 1. New Files to Create
+### Phase 1: Fix Asset Structure
 
-```text
-src/pages/OwnerPortalPresentation.tsx          - Main presentation page
-src/components/presentation/owner-portal-slides/
-  ├── OwnerPortalIntroSlide.tsx                - Opening slide with value proposition
-  ├── OverviewSlide.tsx                        - Dashboard overview with AI recap
-  ├── InsightsSlide.tsx                        - Market research & insights  
-  ├── BookingsSlide.tsx                        - Calendar & booking management
-  ├── StatementsSlide.tsx                      - Financial statements
-  ├── ExpensesSlide.tsx                        - Expense transparency
-  ├── MessagesSlide.tsx                        - Multi-channel communication
-  ├── RepairsSlide.tsx                         - Maintenance & work orders
-  ├── ScreeningsSlide.tsx                      - Guest verification security
-  ├── MarketingSlide.tsx                       - Marketing efforts showcase
-  └── OwnerPortalClosingSlide.tsx              - CTA and contact
-public/audio/monthly-recap-sample.mp3          - Copy of uploaded audio file
-public/images/owner-portal/                    - Screenshot images
-```
-
-### 2. Route Addition in App.tsx
-
-```typescript
-// Add to lazy imports
-const OwnerPortalPresentation = lazy(() => import("./pages/OwnerPortalPresentation"));
-
-// Add route (outside Layout, like other presentations)
-<Route path="/owner-portal-presentation" element={<OwnerPortalPresentation />} />
-```
-
----
-
-## Slide Content Structure
-
-### Slide 1: Introduction (5 seconds)
-**Title**: "Your Property. Complete Visibility."
-**Subtitle**: "Experience the most comprehensive owner portal in the industry"
-- PeachHaus branding
-- Smooth fade-in animation
-
-### Slide 2: Overview Dashboard (8 seconds)
-**Screenshot**: `screencapture-...-13_20_38.png`
-**Key Points**:
-- Total Revenue at a glance ($74,350)
-- Occupancy Rate (92%)
-- Guest Rating (4.9 stars)
-- "Listen to Your Last Month's Recap" - AI-generated audio summary
-- **Audio Player**: Embedded monthly recap sample plays here
-
-**Pain Point Solved**: "Never wonder how your property is performing - see it all in real-time"
-
-### Slide 3: Market Insights (8 seconds)  
-**Screenshot**: `screencapture-...-13_21_00.png`
-**Key Points**:
-- Revenue diversification opportunities
-- Revenue-driving events (Dragon Con, Music Midtown, SEC Championship)
-- Comparable properties in your area
-- Dynamic pricing powered by PriceLabs
-
-**Pain Point Solved**: "Know exactly how your property stacks up against the competition"
-
-### Slide 4: Bookings (6 seconds)
-**Screenshot**: `screencapture-...-13_21_19.png`
-**Key Points**:
-- Visual booking calendar
-- Short-term vs Mid-term color coding
-- Booking history with guest names and revenue
-- Upcoming reservations with revenue forecast
-
-**Pain Point Solved**: "Always know who's staying at your property and when"
-
-### Slide 5: Statements (5 seconds)
-**Screenshot**: `screencapture-...-13_21_41.png`
-**Key Points**:
-- Monthly statement history
-- Gross Revenue vs Net earnings clearly shown
-- One-click PDF download
-
-**Pain Point Solved**: "Transparent financials - download statements anytime"
-
-### Slide 6: Expenses (7 seconds)
-**Screenshot**: `screencapture-...-13_21_54.png`
-**Key Points**:
-- Every expense itemized by category
-- Vendor names attached
-- Receipt attachments (8/8 with receipts shown)
-- Searchable and filterable
-
-**Pain Point Solved**: "No hidden fees - every dollar is accounted for with documentation"
-
-### Slide 7: Messages (8 seconds)
-**Screenshot**: `screencapture-...-13_22_27.png`
-**Key Points**:
-- All communication channels in one place (SMS, Email, Voice, Video)
-- Listen to voicemails from your property manager
-- Watch video updates
-- Full conversation history
-
-**Pain Point Solved**: "Never miss an update - every conversation preserved and accessible"
-
-### Slide 8: Repairs (7 seconds)
-**Screenshot**: `screencapture-...-13_22_46.png`
-**Key Points**:
-- Work order status tracking (Completed, Awaiting Approval, Scheduled)
-- Approve or Decline repairs directly from portal
-- Vendor information and costs upfront
-- Total maintenance costs visible
-
-**Pain Point Solved**: "Stay in control of repairs - approve work before it happens"
-
-### Slide 9: Screenings (7 seconds)
-**Screenshot**: `screencapture-...-13_23_32.png`
-**Key Points**:
-- 100% Verification Rate
-- ID Verified, Background Check, Watchlist screening
-- Guest risk assessment (Low Risk indicators)
-- 47% reduction in property damage claims
-
-**Pain Point Solved**: "Know exactly who is staying in your home - every guest verified"
-
-### Slide 10: Marketing (6 seconds) 
-**Key Points**:
-- Social media posts for your property
-- Platform distribution (Airbnb, VRBO, Furnished Finder, Corporate Housing)
-- Marketing activity timeline
-- See exactly how we're promoting your investment
-
-**Pain Point Solved**: "Visibility into every marketing effort for your property"
-
-### Slide 11: Closing CTA (5 seconds)
-**Title**: "Ready to Experience True Transparency?"
-- "View Demo Portal" button
-- "Schedule a Call" button
-- Contact information
-
----
-
-## Auto-Scroll & Animation Specifications
-
-### Scroll Behavior
-- **Scroll Speed**: 50px per second (smooth, readable pace)
-- **Pause Duration**: 3-5 seconds at each key section
-- **Total Duration**: Approximately 75 seconds for full presentation
-- **Controls**: Play/Pause, manual navigation, progress bar
-
-### Screenshot Display
-- Full-width screenshot within a device frame mockup
-- Subtle parallax effect as scrolling occurs
-- Highlight boxes appear around key features as they're discussed
-- Text overlays fade in/out with feature explanations
-
-### Audio Integration
-- Monthly recap audio plays during Overview slide
-- Audio controls: play/pause, volume, progress
-- Graceful fallback if audio blocked by browser
-
----
-
-## Presentation Links Integration
-
-### 1. Dashboard Link (OwnerPortalManagement.tsx)
-Add a prominent card/button linking to the presentation:
-```tsx
-<Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
-  <CardHeader>
-    <CardTitle className="flex items-center gap-2">
-      <Presentation className="h-5 w-5 text-amber-600" />
-      Owner Portal Presentation
-    </CardTitle>
-  </CardHeader>
-  <CardContent>
-    <p className="text-sm text-muted-foreground mb-4">
-      Share our industry-leading owner portal with prospects
-    </p>
-    <Link to="/owner-portal-presentation">
-      <Button className="bg-amber-600 hover:bg-amber-700">
-        View Presentation
-      </Button>
-    </Link>
-  </CardContent>
-</Card>
-```
-
-### 2. SMS Templates (UnifiedComposeDialog.tsx)
-Add presentation links to SMS_TEMPLATES array:
-```typescript
-const SMS_TEMPLATES = [
-  // ... existing templates
-  {
-    label: "Owner Portal",
-    content: "Hi {{name}}, here's a look at our Owner Portal - the most transparent property management experience: https://propertycentral.lovable.app/owner-portal-presentation",
-  },
-  {
-    label: "Presentations",
-    content: "Hi {{name}}, check out what makes PeachHaus different:\n• Owner Portal: propertycentral.lovable.app/owner-portal-presentation\n• Onboarding: propertycentral.lovable.app/onboarding-presentation\n• Design Services: propertycentral.lovable.app/designer-presentation",
-  },
-];
-```
-
-### 3. Quick Links Component for InboxView
-Create a collapsible "Quick Links" section in the compose area with one-click copy for all 3 presentation URLs.
-
----
-
-## Screenshot Assets Processing
-
-### Asset Handling
-1. Copy uploaded screenshots to `public/images/owner-portal/` directory
-2. Copy uploaded audio to `public/audio/monthly-recap-sample.mp3`
-3. Reference with direct paths: `/images/owner-portal/overview.png`
-
-### Image Naming Convention
+Rename and verify all images in `public/images/owner-portal/`:
 ```text
 public/images/owner-portal/
-  ├── 01-overview.png
-  ├── 02-insights.png  
-  ├── 03-bookings.png
-  ├── 04-statements.png
-  ├── 05-expenses.png
-  ├── 06-messages.png
-  ├── 07-repairs.png
-  ├── 08-screenings.png
-  └── 09-marketing.png
+  ├── 01-overview.png     ✓ exists
+  ├── 02-insights.png     ✓ exists
+  ├── 03-bookings.png     ✓ exists
+  ├── 04-statements.png   ✓ exists
+  ├── 05-expenses.png     ✓ exists
+  ├── 06-messages.png     ✓ exists
+  ├── 07-messages-detail.png  ✓ exists (use in Messages slide)
+  ├── 08-repairs.png      ✓ exists
+  ├── 09-screenings.png   ✓ exists
+  └── 10-marketing.png    (need to add or use placeholder)
 ```
 
----
+### Phase 2: Create Audio Narration Edge Function
 
-## Key UI Components
+Create `supabase/functions/generate-presentation-audio/index.ts`:
+- Accept slide ID and script text
+- Generate professional narration using ElevenLabs
+- Use Sarah voice (female, professional) for presentation: `EXAVITQu4vr4xnSDxMaL`
+- Cache audio to Supabase Storage for reuse
 
-### PresentationViewer Component
-```tsx
-interface PresentationSlide {
+**Narration Scripts** (one per slide):
+```text
+Slide 1 - Intro (5s):
+"Welcome to PeachHaus. Your property. Complete visibility."
+
+Slide 2 - Overview (12s):
+"See your complete property performance at a glance. Total revenue, occupancy rates, and guest ratings updated in real-time. Every month, you'll receive an AI-generated audio recap delivered directly to your phone."
+
+Slide 3 - Insights (10s):
+"Know exactly how your property stacks up against the competition. Our market intelligence shows revenue opportunities, upcoming events that drive demand, and dynamic pricing powered by PriceLabs."
+
+Slide 4 - Bookings (8s):
+"Always know who's staying at your property. Our visual calendar shows every reservation with guest details and revenue forecasts for upcoming stays."
+
+Slide 5 - Statements (7s):
+"Transparent financials you can access anytime. Download your monthly statements with gross and net earnings clearly shown."
+
+Slide 6 - Expenses (10s):
+"No hidden fees. Every dollar is documented. See itemized expenses with vendor names and receipt attachments. Filter by category to understand exactly where your money goes."
+
+Slide 7 - Messages (10s):
+"Every conversation in one place. SMS, emails, voicemails, and video updates. Listen to recordings from your property manager and never miss an important update."
+
+Slide 8 - Repairs (10s):
+"Stay in control of maintenance. See work order status, approve or decline repairs directly, and view scheduled maintenance. All costs are visible upfront before any work begins."
+
+Slide 9 - Screenings (8s):
+"Know who's staying in your home. Every guest is ID verified with background checks and watchlist screening. Our verification process reduces property damage claims by 47 percent."
+
+Slide 10 - Marketing (8s):
+"See exactly how we're promoting your investment. View social media posts, platform distribution across Airbnb, VRBO, and corporate housing, and track our marketing activities in real-time."
+
+Slide 11 - Closing (6s):
+"Ready to experience true transparency? Explore our demo portal or schedule a call with our team today."
+```
+
+### Phase 3: Restructure Presentation Page
+
+**File: `src/pages/OwnerPortalPresentation.tsx`**
+
+Key changes:
+1. Replace scroll-based navigation with true slide transitions (AnimatePresence)
+2. Add auto-play with smooth progress bar per slide
+3. Integrate audio narration that plays automatically per slide
+4. Add audio toggle (mute/unmute)
+5. Improve visual transitions with fade + scale
+
+```typescript
+// New structure
+interface Slide {
   id: string;
-  image: string;
-  title: string;
-  subtitle: string;
-  painPoint: string;
-  features: string[];
-  audioSrc?: string; // Optional audio for specific slide
+  label: string;
+  duration: number; // milliseconds
+  component: React.ComponentType<{ isActive: boolean }>;
+  audioScript?: string; // For generating narration
 }
 
-// Features:
-- CSS scroll-snap for smooth slide transitions
-- Intersection Observer for slide visibility detection
-- Framer Motion for animations
-- Audio API for recap playback
-- Progress indicator showing current position
+// Auto-advance with audio sync
+useEffect(() => {
+  if (isPlaying && !isMuted) {
+    // Play audio for current slide
+    playAudioForSlide(currentSlide);
+  }
+  
+  // Auto-advance after slide duration
+  const timer = setTimeout(() => {
+    if (currentSlide < slides.length - 1) {
+      setCurrentSlide(prev => prev + 1);
+    }
+  }, slides[currentSlide].duration);
+  
+  return () => clearTimeout(timer);
+}, [currentSlide, isPlaying]);
 ```
 
-### Navigation Controls
-- Floating navigation bar (bottom center like other presentations)
-- Play/Pause auto-scroll toggle
-- Slide indicator dots
-- Fullscreen toggle
-- Home button (return to dashboard)
+### Phase 4: Update Individual Slides
+
+Each slide component will be enhanced:
+
+1. **Add `isActive` prop** to control animations and audio
+2. **Use AnimatePresence** for smooth enter/exit
+3. **Apply Fortune 500 minimalism** - larger screenshots, cleaner text
+4. **Add assertion-based headlines** with metrics where applicable
+
+Example enhanced slide:
+```tsx
+export function ScreeningsSlide({ isActive }: { isActive: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      className="min-h-screen flex flex-col items-center justify-center"
+    >
+      {/* Assertion-based headline */}
+      <h2 className="text-5xl font-bold">
+        <span className="text-[#fae052]">47%</span> Reduction in Damage Claims
+      </h2>
+      <p className="text-xl text-white/70 mt-4">
+        Every guest verified before arrival with ID, background check, and watchlist screening
+      </p>
+      {/* Large screenshot */}
+      <div className="mt-12 max-w-6xl w-full">
+        <img src="/images/owner-portal/09-screenings.png" />
+      </div>
+    </motion.div>
+  );
+}
+```
+
+### Phase 5: Create Audio Hook
+
+**File: `src/hooks/usePresentationAudio.ts`**
+
+```typescript
+export function usePresentationAudio() {
+  const [isMuted, setIsMuted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  const playAudioForSlide = async (slideId: string, script: string) => {
+    if (isMuted) return;
+    
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    
+    setIsLoading(true);
+    
+    // Fetch TTS audio from edge function
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: script, 
+          voiceId: 'EXAVITQu4vr4xnSDxMaL' // Sarah voice
+        })
+      }
+    );
+    
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    
+    audioRef.current = new Audio(audioUrl);
+    await audioRef.current.play();
+    
+    setIsLoading(false);
+  };
+  
+  return { playAudioForSlide, isMuted, setIsMuted, isLoading };
+}
+```
+
+### Phase 6: Update Presentation Links (Smaller)
+
+**File: `src/pages/OwnerPortalManagement.tsx`**
+
+Change from large card with buttons to compact inline links:
+
+```tsx
+{/* Compact Presentation Links */}
+<div className="flex flex-wrap items-center gap-2 mb-4 text-sm">
+  <span className="text-muted-foreground">Quick Links:</span>
+  <Link to="/owner-portal-presentation" className="text-amber-600 hover:underline flex items-center gap-1">
+    <ExternalLink className="h-3 w-3" />Owner Portal
+  </Link>
+  <span className="text-muted-foreground">•</span>
+  <Link to="/onboarding-presentation" className="text-amber-600 hover:underline flex items-center gap-1">
+    <ExternalLink className="h-3 w-3" />Onboarding
+  </Link>
+  <span className="text-muted-foreground">•</span>
+  <Link to="/designer-presentation" className="text-amber-600 hover:underline flex items-center gap-1">
+    <ExternalLink className="h-3 w-3" />Design Services
+  </Link>
+</div>
+```
 
 ---
 
-## Implementation Steps
+## Implementation Checklist
 
-### Phase 1: Asset Setup
-1. Copy screenshots to public/images/owner-portal/
-2. Copy audio file to public/audio/
-3. Create owner-portal-slides directory structure
+### Files to Create:
+- `supabase/functions/generate-presentation-audio/index.ts` - TTS caching function
+- `src/hooks/usePresentationAudio.ts` - Audio playback hook
 
-### Phase 2: Slide Components
-1. Create OwnerPortalIntroSlide with PeachHaus branding
-2. Build each tab slide with screenshot + overlay text
-3. Create OwnerPortalClosingSlide with CTAs
-
-### Phase 3: Presentation Page
-1. Create OwnerPortalPresentation.tsx with auto-scroll logic
-2. Implement audio player integration
-3. Add navigation controls matching existing presentation style
-
-### Phase 4: Integration
-1. Add route to App.tsx
-2. Add presentation card to OwnerPortalManagement.tsx
-3. Add SMS templates for presentation links
-4. Add quick copy links in communication compose areas
+### Files to Update:
+- `src/pages/OwnerPortalPresentation.tsx` - Complete restructure
+- `src/components/presentation/owner-portal-slides/OwnerPortalIntroSlide.tsx`
+- `src/components/presentation/owner-portal-slides/OverviewSlide.tsx`
+- `src/components/presentation/owner-portal-slides/InsightsSlide.tsx`
+- `src/components/presentation/owner-portal-slides/BookingsSlide.tsx`
+- `src/components/presentation/owner-portal-slides/StatementsSlide.tsx`
+- `src/components/presentation/owner-portal-slides/ExpensesSlide.tsx`
+- `src/components/presentation/owner-portal-slides/MessagesSlide.tsx`
+- `src/components/presentation/owner-portal-slides/RepairsSlide.tsx`
+- `src/components/presentation/owner-portal-slides/ScreeningsSlide.tsx`
+- `src/components/presentation/owner-portal-slides/MarketingSlide.tsx`
+- `src/components/presentation/owner-portal-slides/OwnerPortalClosingSlide.tsx`
+- `src/pages/OwnerPortalManagement.tsx` - Smaller presentation links
 
 ---
 
-## Memory Update
+## Audio Generation Strategy
 
-After implementation, update project memory:
-```markdown
-# Memory: features/owner-portal/presentation-and-demo-mode-v2
+Since generating 11 audio files at runtime would be slow and expensive, we'll use a hybrid approach:
 
-The Owner Portal Presentation (/owner-portal-presentation) is a premium auto-scrolling 
-showcase of all portal tabs. It features 10 slides with screenshot walkthroughs, 
-pain-point messaging, and an embedded monthly recap audio sample. Presentation links 
-are accessible via SMS templates in UnifiedComposeDialog and a card in 
-OwnerPortalManagement.tsx. The scroll speed is optimized at 50px/sec with 3-5 second 
-pauses per section for a total ~75 second runtime.
+1. **Pre-generate** audio files for each slide using a one-time admin action
+2. **Store** in Supabase Storage bucket: `presentation-audio/`
+3. **Reference** via public URLs in the slide components
+4. **Fallback** to live generation if cached audio missing
+
+Pre-generated audio paths:
+```text
+presentation-audio/owner-portal/
+  ├── 01-intro.mp3
+  ├── 02-overview.mp3
+  ├── 03-insights.mp3
+  ├── 04-bookings.mp3
+  ├── 05-statements.mp3
+  ├── 06-expenses.mp3
+  ├── 07-messages.mp3
+  ├── 08-repairs.mp3
+  ├── 09-screenings.mp3
+  ├── 10-marketing.mp3
+  └── 11-closing.mp3
 ```
+
+---
+
+## Expected Outcome
+
+After implementation:
+- Professional auto-scrolling presentation with smooth slide transitions
+- AI-narrated audio playing automatically (with mute option)
+- Fortune 500-level design with assertion-based headlines
+- Compact presentation links in the admin dashboard
+- Total presentation runtime: ~90 seconds
+- Works on desktop and mobile with touch/swipe support
