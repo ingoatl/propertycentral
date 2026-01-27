@@ -7,9 +7,11 @@ const corsHeaders = {
 };
 
 // Property name keywords for matching posts to properties - CORRECT UUIDs from database
+// STRICT MATCHING: Keywords MUST be very specific to avoid cross-matching
 const PROPERTY_KEYWORDS: Record<string, string> = {
-  // The Berkley at Chimney Lakes / Smoke Hollow
-  "berkley": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
+  // The Berkley at Chimney Lakes / Smoke Hollow - SPECIFIC matches only
+  "the berkley": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
+  "berkley at chimney": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
   "chimney lakes": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
   "smoke hollow": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
   "3419 smoke hollow": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
@@ -22,12 +24,14 @@ const PROPERTY_KEYWORDS: Record<string, string> = {
   "osburn ct": "695bfc2a-4187-4377-8e25-18aa2fcd0454",
   "4241 osburn": "695bfc2a-4187-4377-8e25-18aa2fcd0454",
   // Scandinavian Retreat
-  "scandinavian": "9f7f6d4d-9873-46be-926f-c5a48863a946",
+  "scandinavian retreat": "9f7f6d4d-9873-46be-926f-c5a48863a946",
   "laurel bridge": "9f7f6d4d-9873-46be-926f-c5a48863a946",
-  // Modern + Cozy Townhome (Old Roswell)
+  // Modern + Cozy Townhome (Old Roswell) - The Bloom
+  "the bloom": "6ffe191b-d85c-44f3-b91b-f8d38bee16b4",
   "old roswell": "6ffe191b-d85c-44f3-b91b-f8d38bee16b4",
   "modern + cozy": "6ffe191b-d85c-44f3-b91b-f8d38bee16b4",
   "willow stream": "6ffe191b-d85c-44f3-b91b-f8d38bee16b4",
+  "169 willow": "6ffe191b-d85c-44f3-b91b-f8d38bee16b4",
   // Woodland Lane
   "woodland": "54536b8d-9b6f-41f8-855f-3c4eb78aaf00",
   "mableton": "54536b8d-9b6f-41f8-855f-3c4eb78aaf00",
@@ -57,22 +61,9 @@ const PROPERTY_KEYWORDS: Record<string, string> = {
   "1427 hazy": "eb5a82df-fc98-4001-a5d1-0e20dc5e4e2f",
 };
 
-// Location-based fallback matching for posts that mention city/area
-const LOCATION_KEYWORDS: Record<string, string[]> = {
-  "roswell": [
-    "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38", // The Berkley - primary Roswell property
-    "6ffe191b-d85c-44f3-b91b-f8d38bee16b4", // Modern + Cozy
-  ],
-  "kennesaw": [
-    "6c80c23b-997a-45af-8702-aeb7a7cf3e81", // Scandi Chic
-    "05e83cd6-e232-46f1-a6eb-99b6a979bea8", // Sand Wedge
-    "3f4ee435-5cbd-4c14-87b0-8c0dbd921cf0", // Timberlake
-  ],
-  "smyrna": [
-    "96e2819b-c0e8-4281-b535-5c99c39973b3", // Lavish Living
-    "9f7f6d4d-9873-46be-926f-c5a48863a946", // Scandinavian Retreat
-  ],
-};
+// NOTE: Removed location-based fallback matching to prevent cross-matching
+// Posts that only mention city names will remain unmatched until manually tagged
+// This is INTENTIONAL to ensure posts only show on the correct property dashboard
 
 interface GhlPost {
   _id: string;
@@ -230,20 +221,8 @@ serve(async (req) => {
         }
       }
 
-      // Location-based fallback matching - for posts that only mention city
-      if (!matchedPropertyId) {
-        for (const [location, propIds] of Object.entries(LOCATION_KEYWORDS)) {
-          if (caption.includes(location)) {
-            // Use the first (primary) property for this location
-            const primaryPropId = propIds[0];
-            if (propertyMap.has(primaryPropId)) {
-              matchedPropertyId = primaryPropId;
-              console.log(`[ghl-sync-social-posts] Location match: ${location} -> ${primaryPropId}`);
-              break;
-            }
-          }
-        }
-      }
+      // NOTE: Location-based fallback matching was removed to prevent cross-matching
+      // Posts that only mention city names will remain unmatched until manually tagged
 
       // Generate post URL based on platform
       const getPostUrl = (post: GhlPost): string | null => {
