@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { FileText, Download, TrendingUp } from "lucide-react";
+import { AutoScrollImage } from "@/components/presentation/AutoScrollImage";
 
 export function StatementsSlide() {
   const features = [
@@ -50,16 +51,11 @@ export function StatementsSlide() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
       >
-        <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 max-h-[60vh] overflow-y-auto scrollbar-hide">
-          <motion.img 
-            src="/images/owner-portal/04-statements.png" 
-            alt="Financial Statements"
-            className="w-full h-auto"
-            initial={{ y: 0 }}
-            animate={{ y: [0, -60, 0] }}
-            transition={{ duration: 6, ease: "easeInOut", repeat: Infinity, repeatDelay: 2 }}
-          />
-        </div>
+        <AutoScrollImage 
+          src="/images/owner-portal/04-statements.png" 
+          alt="Financial Statements"
+          scrollDuration={8}
+        />
       </motion.div>
 
       {/* Pain Point Solved */}

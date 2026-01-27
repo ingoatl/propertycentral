@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,23 +49,27 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { OwnerReceiptsTab } from "./components/OwnerReceiptsTab";
-import { OwnerBookingsTab } from "./components/OwnerBookingsTab";
+
+// Lazy load heavy tab components for better performance
+const OwnerReceiptsTab = lazy(() => import("./components/OwnerReceiptsTab").then(m => ({ default: m.OwnerReceiptsTab })));
+const OwnerBookingsTab = lazy(() => import("./components/OwnerBookingsTab").then(m => ({ default: m.OwnerBookingsTab })));
+const OwnerMessagesTab = lazy(() => import("./components/OwnerMessagesTab").then(m => ({ default: m.OwnerMessagesTab })));
+const OwnerMaintenanceTab = lazy(() => import("./components/OwnerMaintenanceTab").then(m => ({ default: m.OwnerMaintenanceTab })));
+const OwnerScheduledMaintenanceTab = lazy(() => import("./components/OwnerScheduledMaintenanceTab").then(m => ({ default: m.OwnerScheduledMaintenanceTab })));
+const OwnerGuestScreeningsTab = lazy(() => import("./components/OwnerGuestScreeningsTab").then(m => ({ default: m.OwnerGuestScreeningsTab })));
+const OwnerMarketingTab = lazy(() => import("./components/OwnerMarketingTab").then(m => ({ default: m.OwnerMarketingTab })));
+const OwnerPropertyTab = lazy(() => import("./components/OwnerPropertyTab").then(m => ({ default: m.OwnerPropertyTab })));
+const OwnerMarketInsightsEnhanced = lazy(() => import("./components/OwnerMarketInsightsEnhanced").then(m => ({ default: m.OwnerMarketInsightsEnhanced })));
+
+// Direct imports for essential components (needed on initial load)
 import { OwnerPerformanceCharts } from "./components/OwnerPerformanceCharts";
 import { OwnerPerformanceOverview } from "./components/OwnerPerformanceOverview";
 import { OwnerReviewsCard } from "./components/OwnerReviewsCard";
-import { OwnerMarketInsightsEnhanced } from "./components/OwnerMarketInsightsEnhanced";
-import { OwnerPropertyTab } from "./components/OwnerPropertyTab";
 import { OwnerRevenueForecast } from "./components/OwnerRevenueForecast";
 import { EnhancedEventsTimeline } from "./components/EnhancedEventsTimeline";
 import { StatementViewer } from "./components/StatementViewer";
 import { OwnerOnboardingTimeline } from "./components/OwnerOnboardingTimeline";
 import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfButton";
-import { OwnerMessagesTab } from "./components/OwnerMessagesTab";
-import { OwnerMaintenanceTab } from "./components/OwnerMaintenanceTab";
-import { OwnerScheduledMaintenanceTab } from "./components/OwnerScheduledMaintenanceTab";
-import { OwnerGuestScreeningsTab } from "./components/OwnerGuestScreeningsTab";
-import { OwnerMarketingTab } from "./components/OwnerMarketingTab";
 import { ScheduleOwnerCallModal } from "./components/ScheduleOwnerCallModal";
 import { ContactPeachHausDropdown } from "./components/ContactPeachHausDropdown";
 import { AudioPropertySummary } from "./components/AudioPropertySummary";
@@ -74,6 +78,14 @@ import { MobileTopNav } from "./components/MobileTopNav";
 import { MobileHeader } from "./components/MobileHeader";
 import { MobileCommunicationDialogs } from "./components/MobileCommunicationDialogs";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+// Tab loading skeleton
+const TabLoader = () => (
+  <div className="py-8 flex flex-col items-center justify-center gap-3">
+    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    <p className="text-sm text-muted-foreground">Loading...</p>
+  </div>
+);
 import { 
   DEMO_OWNER_ID as IMPORTED_DEMO_OWNER_ID,
   DEMO_PROPERTY_ID as IMPORTED_DEMO_PROPERTY_ID,
@@ -1280,7 +1292,9 @@ export default function OwnerDashboard() {
           </TabsContent>
 
           <TabsContent value="bookings">
-            {property && <OwnerBookingsTab propertyId={property.id} bookings={bookings || undefined} />}
+            <Suspense fallback={<TabLoader />}>
+              {property && <OwnerBookingsTab propertyId={property.id} bookings={bookings || undefined} />}
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="statements">
@@ -1343,91 +1357,105 @@ export default function OwnerDashboard() {
           </TabsContent>
 
           <TabsContent value="receipts">
-            {property && <OwnerReceiptsTab expenses={expenses} propertyId={property.id} token={sessionToken || undefined} />}
+            <Suspense fallback={<TabLoader />}>
+              {property && <OwnerReceiptsTab expenses={expenses} propertyId={property.id} token={sessionToken || undefined} />}
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="property">
-            {property && session && (
-              <OwnerPropertyTab 
-                property={property}
-                owner={{
-                  name: session.ownerName,
-                  email: session.email,
-                  secondOwnerName: session.secondOwnerName,
-                  secondOwnerEmail: session.secondOwnerEmail,
-                }}
-                peachHausData={peachHausData}
-              />
-            )}
+            <Suspense fallback={<TabLoader />}>
+              {property && session && (
+                <OwnerPropertyTab 
+                  property={property}
+                  owner={{
+                    name: session.ownerName,
+                    email: session.email,
+                    secondOwnerName: session.secondOwnerName,
+                    secondOwnerEmail: session.secondOwnerEmail,
+                  }}
+                  peachHausData={peachHausData}
+                />
+              )}
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="messages">
-            {session && <OwnerMessagesTab ownerId={session.ownerId} />}
+            <Suspense fallback={<TabLoader />}>
+              {session && <OwnerMessagesTab ownerId={session.ownerId} />}
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="maintenance">
-            {session && (
-              <OwnerMaintenanceTab 
-                ownerId={session.ownerId} 
-                propertyId={property?.id}
-              />
-            )}
+            <Suspense fallback={<TabLoader />}>
+              {session && (
+                <OwnerMaintenanceTab 
+                  ownerId={session.ownerId} 
+                  propertyId={property?.id}
+                />
+              )}
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="scheduled">
-            {session && (
-              <OwnerScheduledMaintenanceTab 
-                ownerId={session.ownerId} 
-                propertyId={property?.id}
-              />
-            )}
+            <Suspense fallback={<TabLoader />}>
+              {session && (
+                <OwnerScheduledMaintenanceTab 
+                  ownerId={session.ownerId} 
+                  propertyId={property?.id}
+                />
+              )}
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="screenings">
-            {property && (
-              <OwnerGuestScreeningsTab 
-                propertyId={property.id} 
-                screenings={guestScreenings}
-              />
-            )}
+            <Suspense fallback={<TabLoader />}>
+              {property && (
+                <OwnerGuestScreeningsTab 
+                  propertyId={property.id} 
+                  screenings={guestScreenings}
+                />
+              )}
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="marketing">
-            {property && (
-              <OwnerMarketingTab 
-                propertyId={property.id} 
-                propertyName={property.name}
-                directBookingUrl={property.website_url}
-                marketingStats={marketingStats}
-                ownerName={session?.ownerName}
-                secondOwnerName={session?.secondOwnerName}
-                rentalType={property.rental_type}
-                revenueData={{
-                  thisMonthRevenue: performanceMetrics.totalRevenue,
-                  lastMonthRevenue: statements[0]?.total_revenue,
-                  occupancyRate: performanceMetrics.occupancyRate,
-                  upcomingBookings: bookings?.str?.filter((b: any) => new Date(b.check_in) > new Date()).length || 0,
-                  strRevenue: performanceMetrics.strRevenue,
-                  mtrRevenue: performanceMetrics.mtrRevenue,
-                  averageRating: performanceMetrics.averageRating || undefined,
-                  reviewCount: performanceMetrics.reviewCount,
-                  strBookings: performanceMetrics.strBookings,
-                  mtrBookings: performanceMetrics.mtrBookings,
-                }}
-                peachHausData={peachHausData ? {
-                  listingHealth: peachHausData.listingHealth || peachHausData.listing_health,
-                  maintenanceCompleted: peachHausData.maintenanceCompleted || 0,
-                  tenantPaymentStatus: peachHausData.tenantPaymentStatus || "on_time",
-                  guestCommunicationsHandled: peachHausData.guestCommunicationsHandled || 0,
-                  marketComparison: peachHausData.marketComparison,
-                } : undefined}
-                hasBookings={
-                  (bookings?.str?.length || 0) > 0 || 
-                  (bookings?.mtr?.length || 0) > 0
-                }
-                onboardingStage={property?.onboarding_stage}
-              />
-            )}
+            <Suspense fallback={<TabLoader />}>
+              {property && (
+                <OwnerMarketingTab 
+                  propertyId={property.id} 
+                  propertyName={property.name}
+                  directBookingUrl={property.website_url}
+                  marketingStats={marketingStats}
+                  ownerName={session?.ownerName}
+                  secondOwnerName={session?.secondOwnerName}
+                  rentalType={property.rental_type}
+                  revenueData={{
+                    thisMonthRevenue: performanceMetrics.totalRevenue,
+                    lastMonthRevenue: statements[0]?.total_revenue,
+                    occupancyRate: performanceMetrics.occupancyRate,
+                    upcomingBookings: bookings?.str?.filter((b: any) => new Date(b.check_in) > new Date()).length || 0,
+                    strRevenue: performanceMetrics.strRevenue,
+                    mtrRevenue: performanceMetrics.mtrRevenue,
+                    averageRating: performanceMetrics.averageRating || undefined,
+                    reviewCount: performanceMetrics.reviewCount,
+                    strBookings: performanceMetrics.strBookings,
+                    mtrBookings: performanceMetrics.mtrBookings,
+                  }}
+                  peachHausData={peachHausData ? {
+                    listingHealth: peachHausData.listingHealth || peachHausData.listing_health,
+                    maintenanceCompleted: peachHausData.maintenanceCompleted || 0,
+                    tenantPaymentStatus: peachHausData.tenantPaymentStatus || "on_time",
+                    guestCommunicationsHandled: peachHausData.guestCommunicationsHandled || 0,
+                    marketComparison: peachHausData.marketComparison,
+                  } : undefined}
+                  hasBookings={
+                    (bookings?.str?.length || 0) > 0 || 
+                    (bookings?.mtr?.length || 0) > 0
+                  }
+                  onboardingStage={property?.onboarding_stage}
+                />
+              )}
+            </Suspense>
           </TabsContent>
         </Tabs>
       </main>
