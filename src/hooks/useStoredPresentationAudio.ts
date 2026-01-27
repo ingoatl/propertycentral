@@ -52,22 +52,28 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     preloadUrls();
   }, [getStorageUrl, presentation]);
 
-  // Start background music (subtle ambient)
+  // Start background music (subtle ambient) - completely optional, non-blocking
   const startBackgroundMusic = useCallback(() => {
     if (isMuted || isMusicPlaying) return;
     
-    if (!musicRef.current) {
-      musicRef.current = new Audio(BACKGROUND_MUSIC_URL);
-      musicRef.current.loop = true;
-      musicRef.current.volume = 0.06; // Very subtle - barely audible
+    // Try to play background music but don't block if it fails
+    try {
+      if (!musicRef.current) {
+        musicRef.current = new Audio(BACKGROUND_MUSIC_URL);
+        musicRef.current.loop = true;
+        musicRef.current.volume = 0.05; // Very subtle - barely audible
+      }
+      
+      // Fire and forget - don't await or handle errors that would block
+      musicRef.current.play()
+        .then(() => setIsMusicPlaying(true))
+        .catch(() => {
+          // Background music is completely optional - silently ignore failures
+          console.log("Background music not available - continuing without it");
+        });
+    } catch {
+      // Ignore any errors - background music is non-essential
     }
-    
-    musicRef.current.play().then(() => {
-      setIsMusicPlaying(true);
-    }).catch(err => {
-      // Background music is optional - don't break if not available
-      console.log("Background music not available or blocked:", err.message);
-    });
   }, [isMuted, isMusicPlaying]);
 
   // Stop background music
@@ -80,12 +86,17 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
   }, []);
 
   const stopAudio = useCallback(() => {
-    isPlayingSlideRef.current = null;
+    // Only clear the slide ref - don't break the autoplay mechanism
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      // Clear event handlers to prevent stale callbacks
+      audioRef.current.oncanplaythrough = null;
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
     }
     setIsPlaying(false);
+    setIsLoading(false);
   }, []);
 
   const playAudioForSlide = useCallback(async (
@@ -104,16 +115,22 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
       return;
     }
     
-    // Prevent double-play
+    // Prevent double-play for same slide
     if (isPlayingSlideRef.current === slideId) {
       console.log("Already playing slide:", slideId);
       return;
     }
     
-    // Stop current audio
-    stopAudio();
+    // Stop current audio first (without clearing the ref yet)
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.oncanplaythrough = null;
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+    }
     
-    // Lock this slide
+    // Now lock this slide
     isPlayingSlideRef.current = slideId;
     setCurrentSlideId(slideId);
     onAudioEndRef.current = onEnd || null;
@@ -127,7 +144,7 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
 
     setIsLoading(true);
 
-    // Create and play audio element
+    // Create audio element if needed
     if (!audioRef.current) {
       audioRef.current = new Audio();
     }
@@ -135,7 +152,12 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     const audio = audioRef.current;
     audio.src = audioUrl;
     
+    // Set up event handlers
     audio.oncanplaythrough = () => {
+      // Verify we're still meant to play this slide
+      if (isPlayingSlideRef.current !== slideId) {
+        return;
+      }
       setIsLoading(false);
       setIsPlaying(true);
       audio.play().catch(err => {
@@ -147,13 +169,15 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     };
 
     audio.onended = () => {
+      console.log("Audio ended for slide:", slideId);
       isPlayingSlideRef.current = null;
       setIsPlaying(false);
+      // Call the stored callback
       onAudioEndRef.current?.();
     };
 
     audio.onerror = (e) => {
-      console.error("Audio error:", e);
+      console.error("Audio error for slide:", slideId, e);
       setIsLoading(false);
       setIsPlaying(false);
       isPlayingSlideRef.current = null;
@@ -162,7 +186,7 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     };
 
     audio.load();
-  }, [isMuted, getStorageUrl, stopAudio, startBackgroundMusic]);
+  }, [isMuted, getStorageUrl, startBackgroundMusic]);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
