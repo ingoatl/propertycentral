@@ -6,6 +6,9 @@ interface UseStoredPresentationAudioOptions {
   onAudioEnd?: () => void;
 }
 
+// Subtle ambient music - will be generated separately
+const BACKGROUND_MUSIC_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/message-attachments/presentation-audio/background-music.mp3";
+
 export function useStoredPresentationAudio(options: UseStoredPresentationAudioOptions) {
   const { presentation } = options;
   const [isMuted, setIsMuted] = useState(false);
@@ -13,9 +16,11 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSlideId, setCurrentSlideId] = useState<string | null>(null);
   const [isPreloaded, setIsPreloaded] = useState(false);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   
-  // Audio element for playback
+  // Audio elements for playback
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlCache = useRef<Map<string, string>>(new Map());
   const onAudioEndRef = useRef<(() => void) | null>(null);
   // Mutex lock to prevent double-play
@@ -33,7 +38,8 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
   useEffect(() => {
     const preloadUrls = async () => {
       // Test if first slide audio exists
-      const testUrl = getStorageUrl("title");
+      const testSlide = presentation === "onboarding" ? "title" : "intro";
+      const testUrl = getStorageUrl(testSlide);
       try {
         const response = await fetch(testUrl, { method: "HEAD" });
         if (response.ok) {
@@ -44,7 +50,34 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
       }
     };
     preloadUrls();
-  }, [getStorageUrl]);
+  }, [getStorageUrl, presentation]);
+
+  // Start background music (subtle ambient)
+  const startBackgroundMusic = useCallback(() => {
+    if (isMuted || isMusicPlaying) return;
+    
+    if (!musicRef.current) {
+      musicRef.current = new Audio(BACKGROUND_MUSIC_URL);
+      musicRef.current.loop = true;
+      musicRef.current.volume = 0.06; // Very subtle - barely audible
+    }
+    
+    musicRef.current.play().then(() => {
+      setIsMusicPlaying(true);
+    }).catch(err => {
+      // Background music is optional - don't break if not available
+      console.log("Background music not available or blocked:", err.message);
+    });
+  }, [isMuted, isMusicPlaying]);
+
+  // Stop background music
+  const stopBackgroundMusic = useCallback(() => {
+    if (musicRef.current) {
+      musicRef.current.pause();
+      musicRef.current.currentTime = 0;
+    }
+    setIsMusicPlaying(false);
+  }, []);
 
   const stopAudio = useCallback(() => {
     isPlayingSlideRef.current = null;
@@ -60,8 +93,14 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     _script: string, // Kept for API compatibility
     onEnd?: () => void
   ): Promise<void> => {
+    // Start background music if not already playing (optional enhancement)
+    startBackgroundMusic();
+    
     if (isMuted) {
-      onEnd?.();
+      // Even when muted, call onEnd after a short delay to allow auto-advance
+      setTimeout(() => {
+        onEnd?.();
+      }, 100);
       return;
     }
     
@@ -118,25 +157,28 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
       setIsLoading(false);
       setIsPlaying(false);
       isPlayingSlideRef.current = null;
+      // Still call onEnd to allow auto-advance even if audio fails
       onEnd?.();
     };
 
     audio.load();
-  }, [isMuted, getStorageUrl, stopAudio]);
+  }, [isMuted, getStorageUrl, stopAudio, startBackgroundMusic]);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
       if (!prev) {
         stopAudio();
+        stopBackgroundMusic();
       }
       return !prev;
     });
-  }, [stopAudio]);
+  }, [stopAudio, stopBackgroundMusic]);
 
   // Initialize audio context on user interaction
   const initAudioContext = useCallback(() => {
-    // No-op for stored audio, but kept for API compatibility
-  }, []);
+    // Start background music on first interaction
+    startBackgroundMusic();
+  }, [startBackgroundMusic]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -145,17 +187,23 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
         audioRef.current.pause();
         audioRef.current = null;
       }
+      if (musicRef.current) {
+        musicRef.current.pause();
+        musicRef.current = null;
+      }
     };
   }, []);
 
   return {
     playAudioForSlide,
     stopAudio,
+    stopBackgroundMusic,
     isMuted,
     setIsMuted,
     toggleMute,
     isLoading,
     isPlaying,
+    isMusicPlaying,
     currentSlideId,
     isPreloaded,
     initAudioContext,

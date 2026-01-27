@@ -12,7 +12,6 @@ import {
   Volume2,
   VolumeX
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { useStoredPresentationAudio } from "@/hooks/useStoredPresentationAudio";
 import { OwnerPortalIntroSlide } from "@/components/presentation/owner-portal-slides/OwnerPortalIntroSlide";
 import { OverviewSlide } from "@/components/presentation/owner-portal-slides/OverviewSlide";
@@ -110,7 +109,6 @@ const slideVariants = {
 };
 
 export default function OwnerPortalPresentation() {
-  const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false); // Start paused until user clicks play
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -118,11 +116,18 @@ export default function OwnerPortalPresentation() {
   const containerRef = useRef<HTMLDivElement>(null);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
+  // Ref to track isPlaying for use in callbacks (avoids stale closure)
+  const isPlayingRef = useRef(false);
   // CRITICAL: Track which slide we've triggered audio for (prevents double-play in Strict Mode)
   const hasPlayedForSlideRef = useRef<string | null>(null);
   // Touch swipe support
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // Use stored audio from Supabase (pre-generated)
   const { 
@@ -214,9 +219,9 @@ export default function OwnerPortalPresentation() {
         fallbackTimerRef.current = null;
       }
       
-      // Longer pause after audio ends before advancing (3 seconds)
+      // Longer pause after audio ends before advancing (3 seconds) - use ref to check current state
       setTimeout(() => {
-        if (isPlaying) {
+        if (isPlayingRef.current) {
           advanceSlide();
         }
       }, 3000);
