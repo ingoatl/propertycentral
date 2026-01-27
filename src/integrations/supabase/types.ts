@@ -9663,6 +9663,93 @@ export type Database = {
           },
         ]
       }
+      social_media_posts: {
+        Row: {
+          caption: string | null
+          comments: number | null
+          created_at: string | null
+          engagement_rate: number | null
+          external_id: string | null
+          id: string
+          likes: number | null
+          media_type: string | null
+          media_url: string | null
+          platform: string
+          post_type: string | null
+          post_url: string | null
+          property_id: string | null
+          published_at: string | null
+          scheduled_for: string | null
+          shares: number | null
+          source: string
+          status: string | null
+          synced_at: string | null
+          thumbnail_url: string | null
+          views: number | null
+        }
+        Insert: {
+          caption?: string | null
+          comments?: number | null
+          created_at?: string | null
+          engagement_rate?: number | null
+          external_id?: string | null
+          id?: string
+          likes?: number | null
+          media_type?: string | null
+          media_url?: string | null
+          platform: string
+          post_type?: string | null
+          post_url?: string | null
+          property_id?: string | null
+          published_at?: string | null
+          scheduled_for?: string | null
+          shares?: number | null
+          source: string
+          status?: string | null
+          synced_at?: string | null
+          thumbnail_url?: string | null
+          views?: number | null
+        }
+        Update: {
+          caption?: string | null
+          comments?: number | null
+          created_at?: string | null
+          engagement_rate?: number | null
+          external_id?: string | null
+          id?: string
+          likes?: number | null
+          media_type?: string | null
+          media_url?: string | null
+          platform?: string
+          post_type?: string | null
+          post_url?: string | null
+          property_id?: string | null
+          published_at?: string | null
+          scheduled_for?: string | null
+          shares?: number | null
+          source?: string
+          status?: string | null
+          synced_at?: string | null
+          thumbnail_url?: string | null
+          views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_posts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_posts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_attachments: {
         Row: {
           created_at: string

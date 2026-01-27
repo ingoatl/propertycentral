@@ -50,6 +50,7 @@ import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { CorporateOutreachCard } from "./CorporateOutreachCard";
 import { AudioPropertySummary } from "./AudioPropertySummary";
 import { OwnerValueRealized } from "./OwnerValueRealized";
+import { SocialPostsGallery } from "./SocialPostsGallery";
 
 interface GuestInfo {
   guest_name: string | null;
@@ -857,6 +858,9 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
               </CardContent>
             </Card>
           )}
+
+          {/* Social Posts Gallery - Live posts from GHL & Marketing Hub */}
+          <SocialPostsGallery propertyId={propertyId} propertyName={propertyName} />
 
           <Separator />
 
