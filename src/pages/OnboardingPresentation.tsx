@@ -166,7 +166,7 @@ export default function OnboardingPresentation() {
     isMuted, 
     toggleMute, 
     isLoading: isAudioLoading 
-  } = usePresentationAudio();
+  } = usePresentationAudio({ voiceId: "nPczCjzI2devNBz1zQrb" }); // Brian (male voice)
 
   const goToSlide = useCallback((index: number) => {
     if (index >= 0 && index < SLIDES.length && !isTransitioning) {

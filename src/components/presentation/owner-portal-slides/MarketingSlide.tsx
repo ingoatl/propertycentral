@@ -11,7 +11,7 @@ export function MarketingSlide() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-8 px-4 md:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] flex flex-col items-center py-8 pb-24 px-4 md:px-8">
       {/* Fortune 500 Assertion-Based Headline */}
       <motion.div 
         className="text-center mb-4 max-w-4xl"
