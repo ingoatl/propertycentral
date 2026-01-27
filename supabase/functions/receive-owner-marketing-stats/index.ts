@@ -6,6 +6,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
 };
 
+interface RecentPost {
+  platform: string;
+  url: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  caption?: string;
+  posted_at: string;
+  has_verified_link: boolean;
+  views?: number;
+  likes?: number;
+  comments?: number;
+  external_id?: string;
+}
+
 interface MarketingStatsPayload {
   property_source_id?: string;
   property_name?: string;
@@ -16,9 +30,13 @@ interface MarketingStatsPayload {
     instagram_stories?: number;
     facebook_posts?: number;
     gmb_posts?: number;
+    tiktok_posts?: number;
+    linkedin_posts?: number;
+    nextdoor_posts?: number;
     total_reach?: number;
     total_engagement?: number;
     engagement_rate?: number;
+    recent_posts?: RecentPost[];
   };
   outreach?: {
     total_companies_contacted?: number;
@@ -256,6 +274,42 @@ serve(async (req) => {
       throw upsertError;
     }
 
+    // If recent_posts are included, sync them to social_media_posts table
+    if (payload.social_media?.recent_posts && payload.social_media.recent_posts.length > 0) {
+      console.log(`[receive-owner-marketing-stats] Syncing ${payload.social_media.recent_posts.length} recent posts`);
+      
+      for (const post of payload.social_media.recent_posts) {
+        const externalId = post.external_id || `mh_${property.id}_${post.platform}_${new Date(post.posted_at).getTime()}`;
+        
+        const { error: postError } = await supabase
+          .from("social_media_posts")
+          .upsert({
+            external_id: externalId,
+            source: "marketing_hub",
+            property_id: property.id,
+            platform: post.platform?.toLowerCase() || "unknown",
+            post_type: "post",
+            caption: post.caption || null,
+            media_url: post.media_url || null,
+            media_type: post.media_url?.includes("video") ? "video" : "image",
+            thumbnail_url: post.thumbnail_url || null,
+            post_url: post.has_verified_link ? post.url : null,
+            views: post.views || 0,
+            likes: post.likes || 0,
+            comments: post.comments || 0,
+            status: "published",
+            published_at: post.posted_at,
+            synced_at: new Date().toISOString(),
+          }, {
+            onConflict: "external_id,source",
+          });
+
+        if (postError) {
+          console.error("[receive-owner-marketing-stats] Post upsert error:", postError);
+        }
+      }
+    }
+
     // Log sync
     await supabase.from("partner_sync_log").insert({
       source_system: "marketing_hub",
@@ -265,7 +319,8 @@ serve(async (req) => {
       error_details: { 
         property_name: property.name, 
         report_month: payload.report_period,
-        marketing_hub_property_id: payload.marketing_hub_property_id 
+        marketing_hub_property_id: payload.marketing_hub_property_id,
+        posts_synced: payload.social_media?.recent_posts?.length || 0
       }
     });
 
