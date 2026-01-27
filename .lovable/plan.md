@@ -1,230 +1,285 @@
 
+# Onboarding & Owner Portal Presentation Complete Optimization Plan
 
-# Owner Portal Presentation Complete Optimization Plan
+## Issues Identified Through Research
 
-## Issues Identified
+### 1. Double Narration Playback (Critical Bug)
+**Root Cause Analysis:**
+- In React Strict Mode (development), `useEffect` runs twice on mount, which triggers audio playback twice
+- The current `audioEndedRef` guard is being reset on each render cycle before the protection kicks in
+- When `isPlaying` changes, the effect runs again and may trigger playback before the previous instance cleanly exits
 
-### 1. Image Distortion & Display Problems
-- **Root cause**: The `AutoScrollImage` component's height calculation is inconsistent. The `max-h-[55vh]` constraint on both container and image causes distortion when natural aspect ratios conflict with viewport-based sizing.
-- **Marketing & Overview slides** specifically have tall screenshots that need proper full-length scrolling display.
+**Research Finding:**
+From StackOverflow and React documentation: The standard fix is to use a ref-based flag that persists across the double-mount, and to implement proper cleanup that stops any existing audio before starting new playback.
 
-### 2. Voice Not Playing / Audio Delay
-- **Root cause**: Audio preloading fetches 3 slides but does not guarantee the audio is decoded and ready for instant playback. Network delays cause noticeable lag on first play.
-- **Solution**: Use Web Audio API with `AudioContext.decodeAudioData()` to preload and decode audio buffers. This ensures instant playback with no delay.
+### 2. Slow Audio Loading Times
+**Root Cause Analysis:**
+- Using `eleven_multilingual_v2` model which is highest quality but slower
+- Using `mp3_44100_128` format (128kbps, 44.1kHz) - large file sizes
+- Not using the faster `eleven_turbo_v2_5` model available for real-time use
+- Audio preloading fetches sequentially for slides 6-18 after parallel load of first 5
 
-### 3. Green Callout Bar Position
-- **Issue**: The green "Pain Point Solved" callout is too far from the screenshot and too close to the bottom navigation.
-- **Solution**: Move it directly under the image with `mt-2` and ensure consistent `mb-6` spacing before the bottom spacer.
+**Research Finding:**
+From ElevenLabs documentation:
+- `eleven_turbo_v2_5` has **70% lower latency** than `eleven_multilingual_v2`
+- `mp3_22050_32` format is 4x smaller than `mp3_44100_128` (adequate for speech)
+- Streaming endpoint provides faster time-to-first-audio
 
-### 4. Bottom Navigation Bar Not Centered
-- **Issue**: On some screen sizes the control bar may not appear perfectly centered.
-- **Solution**: Already using `left-0 right-0 flex justify-center` - will verify and ensure max-width constraints work properly.
+### 3. Mobile Navigation Issues (User Screenshot)
+**Analysis from Screenshot:**
+- The bottom navigation bar is visible but appears cut off on the right
+- Navigation dots (slide indicators) are hidden on mobile which is correct
+- The `ChevronRight` button may be getting truncated or hard to tap
+- Buttons appear correctly positioned but the bar could benefit from better touch targets
 
-### 5. Overview Slide Missing Audio Recap CTA
-- **Issue**: Need to add text suggesting users click the play button above to hear a personalized audio recap demo.
-
-### 6. Performance & File Size
-- **Current state**: Images are loading as full PNG files which are likely 500KB-2MB each.
-- **Solution**: Implement progressive image loading with:
-  - Loading states with skeleton/blur placeholders
-  - Better height constraints to prevent layout shift
-  - Consider WebP format recommendation for future optimization
+### 4. Error on Slides Ending
+**Likely Cause:**
+- When the presentation reaches the last slide and `isPlaying` is still true, the `advanceSlide` function is called which sets `isPlaying(false)`
+- If there are pending timers or audio cleanup issues, this can cause race conditions
+- The fallback timer may fire after the presentation has ended
 
 ---
 
-## Technical Implementation
+## Technical Implementation Plan
 
-### Phase 1: Fix AutoScrollImage Component for Full-Length Display
+### Phase 1: Fix Double-Play Bug with Proper Guards
 
-The key changes:
-1. **Fixed container height** instead of flex-1 (which is unpredictable)
-2. **Proper overflow detection** - only scroll when image is genuinely taller than container
-3. **No distortion** - use `object-contain` for static display, `object-top` alignment
-4. **Smoother animation** - use longer scroll duration and proper easing
+**Strategy:** Implement a strict mutex-style lock that prevents any audio playback if one is already in progress or has been triggered for the current slide.
 
 ```typescript
-// AutoScrollImage.tsx - Key fixes
-export function AutoScrollImage({
-  src,
-  alt,
-  className = "",
-  scrollDuration = 12, // Slower scroll for better viewing
-  isActive = true
-}: AutoScrollImageProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const [scrollAmount, setScrollAmount] = useState(0);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [imageHeight, setImageHeight] = useState<number | null>(null);
+// usePresentationAudio.ts changes
+// Add a playback lock ref that tracks if we've started playback for a slide
+const isPlayingSlideRef = useRef<string | null>(null);
 
-  // Fixed container height for consistent display
-  const CONTAINER_HEIGHT = "calc(100vh - 280px)"; // Account for header, callouts, nav
-  const SCROLL_THRESHOLD = 80; // Only scroll if overflow > 80px
-
-  const calculateScroll = useCallback(() => {
-    const container = containerRef.current;
-    const img = imageRef.current;
-    if (!container || !img || !img.complete) return;
-
-    const containerHeight = container.clientHeight;
-    const containerWidth = container.clientWidth;
-    
-    // Calculate rendered height based on image aspect ratio and container width
-    const aspectRatio = img.naturalWidth / img.naturalHeight;
-    const renderedHeight = containerWidth / aspectRatio;
-    
-    setImageHeight(renderedHeight);
-    
-    // Calculate overflow
-    const overflow = renderedHeight - containerHeight;
-    
-    if (overflow > SCROLL_THRESHOLD) {
-      setScrollAmount(overflow);
-    } else {
-      setScrollAmount(0);
-    }
-  }, []);
-
-  // ... rest of implementation
-  
-  return (
-    <div 
-      ref={containerRef}
-      className="rounded-xl overflow-hidden shadow-2xl border border-white/10 w-full"
-      style={{ height: CONTAINER_HEIGHT, maxHeight: "55vh" }}
-    >
-      {shouldAnimate ? (
-        <motion.img
-          animate={{ y: [0, -scrollAmount, 0] }}
-          transition={{
-            duration: scrollDuration,
-            ease: "easeInOut",
-            repeat: Infinity,
-            repeatDelay: 3
-          }}
-        />
-      ) : (
-        <img 
-          className="w-full h-full object-contain object-top"
-        />
-      )}
-    </div>
-  );
-}
-```
-
-### Phase 2: Implement Web Audio API for Instant Playback
-
-Replace current `HTMLAudioElement` approach with `AudioContext` for zero-delay playback:
-
-```typescript
-// usePresentationAudio.ts - Key changes
-const audioContext = useRef<AudioContext | null>(null);
-const audioBufferCache = useRef<Map<string, AudioBuffer>>(new Map());
-const activeSource = useRef<AudioBufferSourceNode | null>(null);
-
-// Initialize AudioContext on first user interaction
-const initAudioContext = useCallback(() => {
-  if (!audioContext.current) {
-    audioContext.current = new AudioContext();
+const playAudioForSlide = useCallback(async (
+  slideId: string, 
+  script: string,
+  onEnd?: () => void
+): Promise<void> => {
+  // CRITICAL: Check if already playing this slide (prevents double-trigger)
+  if (isPlayingSlideRef.current === slideId) {
+    console.log("Already playing slide:", slideId);
+    return;
   }
-  return audioContext.current;
+  
+  // Lock this slide
+  isPlayingSlideRef.current = slideId;
+  
+  // ... rest of playback logic
+  
+  // On end/cleanup, clear the lock
+  source.onended = () => {
+    isPlayingSlideRef.current = null;
+    // ...
+  };
+}, [...]);
+
+// Add to stopAudio
+const stopAudio = useCallback(() => {
+  isPlayingSlideRef.current = null; // Clear lock
+  // ... existing code
 }, []);
+```
 
-// Preload and decode audio
-const preloadAudio = async (slideId: string, script: string) => {
-  const ctx = initAudioContext();
-  if (audioBufferCache.current.has(slideId)) return;
+**OnboardingPresentation.tsx changes:**
+```typescript
+// Add slide-specific guard in the useEffect
+const hasPlayedForSlideRef = useRef<string | null>(null);
+
+useEffect(() => {
+  if (!isPlaying) {
+    // ... cleanup
+    return;
+  }
+
+  const slide = SLIDES[currentSlide];
   
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+  // Prevent double-play for this specific slide
+  if (hasPlayedForSlideRef.current === slide.id) {
+    return;
+  }
+  hasPlayedForSlideRef.current = slide.id;
+  
+  // ... playback logic
+  
+  return () => {
+    hasPlayedForSlideRef.current = null; // Reset on cleanup
+    // ... cleanup
+  };
+}, [currentSlide, isPlaying, ...]);
+```
+
+### Phase 2: Optimize TTS for Speed & File Size
+
+**Edge Function Changes (elevenlabs-tts/index.ts):**
+
+| Setting | Current | Optimized | Improvement |
+|---------|---------|-----------|-------------|
+| Model | `eleven_multilingual_v2` | `eleven_turbo_v2_5` | ~70% faster generation |
+| Format | `mp3_44100_128` | `mp3_22050_32` | ~75% smaller files |
+| Cache | None | Add CDN-friendly headers | Browser caching |
+
+```typescript
+// Updated elevenlabs-tts/index.ts
+const response = await fetch(
+  `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_22050_32`,
+  {
     method: "POST",
-    headers: { ... },
-    body: JSON.stringify({ text: script, voiceId })
-  });
+    headers: {
+      "xi-api-key": ELEVENLABS_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_turbo_v2_5", // FAST model
+      voice_settings: {
+        stability: 0.6,
+        similarity_boost: 0.75,
+        // Remove style for turbo model (not supported as fully)
+      },
+    }),
+  }
+);
+
+// Return with cache headers
+return new Response(audioBuffer, {
+  headers: {
+    ...corsHeaders,
+    "Content-Type": "audio/mpeg",
+    "Cache-Control": "public, max-age=86400", // 24 hour cache
+  },
+});
+```
+
+### Phase 3: Improve Mobile Navigation
+
+**Target Changes:**
+1. Make navigation buttons larger on mobile (min-touch-target 44px)
+2. Simplify the mobile navigation bar to only essential controls
+3. Add swipe gesture support for slide navigation
+
+```typescript
+// OnboardingPresentation.tsx - Mobile optimized nav
+<div className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 md:gap-3 z-50 bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-3 md:px-4 py-2">
+  {/* Mobile-first button sizing */}
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-10 w-10 md:h-8 md:w-8 shrink-0 text-white/70 hover:text-white" // Larger on mobile
+    onClick={prevSlide}
+    disabled={currentSlide === 0}
+  >
+    <ChevronLeft className="h-5 w-5 md:h-4 md:w-4" />
+  </Button>
   
-  const arrayBuffer = await response.arrayBuffer();
-  const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-  audioBufferCache.current.set(slideId, audioBuffer);
-};
-
-// Play with zero delay
-const playAudio = (slideId: string) => {
-  const buffer = audioBufferCache.current.get(slideId);
-  if (!buffer) return;
+  {/* Play button - already good size */}
+  <Button className="h-12 w-12 md:h-10 md:w-10 ...">
+    {/* ... */}
+  </Button>
   
-  const ctx = audioContext.current;
-  const source = ctx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(ctx.destination);
-  source.onended = onAudioEndRef.current;
-  source.start(0); // Instant playback!
-  activeSource.current = source;
-};
-```
-
-### Phase 3: Update All Slide Components
-
-**Common changes for all slides:**
-1. Remove inconsistent `flex-1` - use fixed heights
-2. Move green callout closer to image with `mt-2` instead of `mt-3 md:mt-4`
-3. Standardize spacing: `py-4 px-4 md:py-6 md:px-6`
-4. Ensure proper bottom spacer `h-20 md:h-24`
-
-**OverviewSlide.tsx - Add Audio Recap CTA:**
-```tsx
-<p className="text-white/60 text-xs truncate">
-  Click play above to download your personalized audio recap
-</p>
-```
-
-**MarketingSlide.tsx - Ensure full scroll:**
-```tsx
-<AutoScrollImage 
-  src="/images/owner-portal/10-marketing.png" 
-  alt="Marketing Dashboard"
-  scrollDuration={15} // Longer duration for tall content
-  isActive={isActive}
-/>
-```
-
-### Phase 4: Optimize Image Loading
-
-Add loading skeleton and progressive reveal:
-
-```tsx
-// New OptimizedImage component
-function OptimizedImage({ src, alt, ...props }) {
-  const [loaded, setLoaded] = useState(false);
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-10 w-10 md:h-8 md:w-8 shrink-0 text-white/70 hover:text-white"
+    onClick={nextSlide}
+    disabled={currentSlide === SLIDES.length - 1}
+  >
+    <ChevronRight className="h-5 w-5 md:h-4 md:w-4" />
+  </Button>
   
-  return (
-    <div className="relative">
-      {/* Skeleton placeholder */}
-      {!loaded && (
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-white/10 animate-pulse rounded-xl" />
-      )}
-      <img
-        src={src}
-        alt={alt}
-        onLoad={() => setLoaded(true)}
-        className={`transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-        {...props}
-      />
-    </div>
-  );
-}
-```
-
-### Phase 5: Center Navigation Bar Properly
-
-```tsx
-// OwnerPortalPresentation.tsx - Navigation bar
-<motion.div
-  className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 w-full max-w-2xl"
->
-  <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-3 md:px-4 py-2 flex items-center justify-center gap-1 md:gap-2 shadow-2xl mx-auto w-fit">
-    {/* Controls */}
+  {/* Hide less essential controls on mobile */}
+  <div className="hidden md:flex items-center gap-2">
+    {/* Slide dots, restart, fullscreen */}
   </div>
-</motion.div>
+</div>
+```
+
+**Add Touch Swipe Support:**
+```typescript
+// Add swipe handler using touch events
+const touchStartX = useRef(0);
+const touchEndX = useRef(0);
+
+const handleTouchStart = (e: React.TouchEvent) => {
+  touchStartX.current = e.touches[0].clientX;
+};
+
+const handleTouchEnd = (e: React.TouchEvent) => {
+  touchEndX.current = e.changedTouches[0].clientX;
+  const diff = touchStartX.current - touchEndX.current;
+  
+  if (Math.abs(diff) > 50) { // Minimum swipe distance
+    if (diff > 0) {
+      nextSlide(); // Swipe left = next
+    } else {
+      prevSlide(); // Swipe right = prev
+    }
+  }
+};
+
+// Add to container
+<div 
+  onTouchStart={handleTouchStart}
+  onTouchEnd={handleTouchEnd}
+  className="..."
+>
+```
+
+### Phase 4: Fix End-of-Presentation Error
+
+**Strategy:** Add robust state guards when presentation ends
+
+```typescript
+const advanceSlide = useCallback(() => {
+  // Guard: prevent advancing past the end
+  if (currentSlide >= SLIDES.length - 1) {
+    // Clean stop
+    setIsPlaying(false);
+    stopAudio();
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+    audioEndedRef.current = true; // Prevent any pending callbacks
+    return;
+  }
+  
+  // Normal advance
+  setCurrentSlide(currentSlide + 1);
+}, [currentSlide, stopAudio]);
+```
+
+### Phase 5: Aggressive Audio Preloading
+
+**Strategy:** Start preloading immediately and show loading state until first 3 slides are ready
+
+```typescript
+// usePresentationAudio.ts - Improved preloading
+useEffect(() => {
+  if (preloadSlides.length === 0 || preloadingRef.current) return;
+  
+  preloadingRef.current = true;
+  
+  const preloadAudio = async () => {
+    initAudioContext();
+    
+    // Parallel preload of first 3 slides (critical path)
+    const criticalSlides = preloadSlides.slice(0, 3);
+    await Promise.all(
+      criticalSlides.map((slide) => preloadAudioBuffer(slide.id, slide.script))
+    );
+    
+    setIsPreloaded(true); // Ready signal
+    
+    // Background preload remaining slides with no await
+    const remaining = preloadSlides.slice(3);
+    remaining.forEach((slide) => {
+      preloadAudioBuffer(slide.id, slide.script); // Fire and forget
+    });
+  };
+  
+  preloadAudio();
+}, [...]);
 ```
 
 ---
@@ -233,49 +288,32 @@ function OptimizedImage({ src, alt, ...props }) {
 
 | File | Changes |
 |------|---------|
-| `src/components/presentation/AutoScrollImage.tsx` | Complete refactor - fixed height, proper scroll detection, no distortion |
-| `src/hooks/usePresentationAudio.ts` | Implement Web Audio API for instant playback, better preloading |
-| `src/pages/OwnerPortalPresentation.tsx` | Center navigation bar, adjust slide container heights |
-| `src/components/presentation/owner-portal-slides/OverviewSlide.tsx` | Add audio recap CTA text, adjust layout |
-| `src/components/presentation/owner-portal-slides/MarketingSlide.tsx` | Adjust scroll duration, fix layout |
-| `src/components/presentation/owner-portal-slides/InsightsSlide.tsx` | Fix layout, move callout closer |
-| All 12 slide components | Standardize layout: consistent heights, callout positioning |
+| `src/hooks/usePresentationAudio.ts` | Add playback lock ref, prevent duplicate calls, optimize preloading |
+| `src/pages/OnboardingPresentation.tsx` | Add slide-specific playback guard, fix end-of-presentation error, improve mobile nav, add swipe gestures |
+| `src/pages/OwnerPortalPresentation.tsx` | Same mobile and playback improvements |
+| `supabase/functions/elevenlabs-tts/index.ts` | Switch to turbo model, reduce file size, add cache headers |
 
 ---
 
-## Image Container Height Strategy
+## Expected Performance Improvements
 
-The key insight is using a **calculated fixed height** instead of `flex-1` or viewport-relative units:
-
-```
-Total viewport height: 100vh
-- Top progress bar: 4px
-- Top labels (slide counter, name): 48px  
-- Headline area: ~100px
-- Feature pills: ~50px
-- Green callout: ~50px
-- Bottom nav: 80px
-- Padding: ~60px
-------------------------------
-Available for image: ~calc(100vh - 400px)
-```
-
-This ensures:
-- Consistent image display across all slides
-- No distortion (object-contain)
-- Full scroll when content exceeds container
-- Green callout always visible and positioned correctly
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| TTS Generation Time | ~2-3 seconds | ~0.5-1 second | ~70% faster |
+| Audio File Size | ~400-600 KB | ~100-150 KB | ~75% smaller |
+| First Slide Audio Ready | 3-5 seconds | 1-2 seconds | ~60% faster |
+| Mobile Touch Targets | 32px | 40-48px | Better accessibility |
+| Double Play Bug | Occurring | Fixed | Resolved |
+| End-of-presentation Error | Occurring | Fixed | Resolved |
 
 ---
 
-## Expected Outcomes
+## Summary
 
-After implementation:
-1. **No distortion** - Images display at proper aspect ratio with object-contain
-2. **Full-length scrolling** - Tall screenshots (Overview, Marketing, Insights) scroll smoothly top to bottom
-3. **Instant audio** - Voice plays immediately when slide loads (preloaded via Web Audio API)
-4. **Centered navigation** - Control bar perfectly centered on all screen sizes
-5. **Proper callout position** - Green "Pain Point Solved" directly under image, not too close to nav
-6. **Audio recap CTA** - Overview slide encourages clicking play to hear demo
-7. **Mobile optimized** - Uses `100dvh`, responsive spacing, touch-friendly controls
+This comprehensive optimization addresses all reported issues:
 
+1. **Double narration** - Fixed with slide-specific playback locks and proper ref guards
+2. **Slow loading** - Switched to turbo TTS model, smaller audio format, aggressive preloading
+3. **Mobile navigation** - Larger touch targets, swipe support, simplified mobile UI
+4. **End-of-presentation error** - Robust state guards and cleanup
+5. **Overall performance** - Cache headers, parallel loading, reduced asset sizes
