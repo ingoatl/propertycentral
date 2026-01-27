@@ -321,6 +321,10 @@ export default function OwnerPortalPresentation() {
     setHasStarted(true);
     
     if (!isPlaying) {
+      // Reset audio tracking for fresh start
+      hasPlayedForSlideRef.current = null;
+      audioEndedRef.current = false;
+      
       // If at the end, restart
       if (currentSlide === SLIDES.length - 1) {
         restart();
@@ -328,8 +332,15 @@ export default function OwnerPortalPresentation() {
         setIsPlaying(true);
       }
     } else {
+      // PAUSE: Stop audio and clear timers
       setIsPlaying(false);
       stopAudio();
+      hasPlayedForSlideRef.current = null;
+      audioEndedRef.current = true;
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
     }
   };
 
@@ -506,8 +517,8 @@ export default function OwnerPortalPresentation() {
         </div>
       </motion.div>
 
-      {/* Progress Bar */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-white/10 z-50">
+      {/* Progress Bar - Below top controls */}
+      <div className="fixed top-12 left-0 right-0 h-1 bg-white/10 z-40">
         {/* Segment markers */}
         <div className="relative h-full">
           {SLIDES.map((_, index) => (
