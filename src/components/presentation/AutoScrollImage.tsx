@@ -20,8 +20,6 @@ export function AutoScrollImage({
   const imageRef = useRef<HTMLImageElement>(null);
   const [scrollAmount, setScrollAmount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [imageNaturalHeight, setImageNaturalHeight] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(0);
 
   // Only animate if image is significantly taller than container (>100px overflow)
   const SCROLL_THRESHOLD = 100;
@@ -42,9 +40,6 @@ export function AutoScrollImage({
     const naturalHeight = img.naturalHeight;
     const aspectRatio = naturalWidth / naturalHeight;
     const renderedHeight = containerRect.width / aspectRatio;
-    
-    setImageNaturalHeight(naturalHeight);
-    setContainerHeight(containerH);
     
     // Only scroll if the image is significantly taller than the container
     const overflow = Math.max(0, renderedHeight - containerH);

@@ -118,13 +118,17 @@ export default function OwnerPortalPresentation() {
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
 
+  // Preload slides for immediate audio playback
   const { 
     playAudioForSlide, 
     stopAudio, 
     isMuted, 
     toggleMute, 
     isLoading: isAudioLoading,
-  } = usePresentationAudio();
+    isPreloaded,
+  } = usePresentationAudio({
+    preloadSlides: SLIDES.map(s => ({ id: s.id, script: s.script }))
+  });
 
   // Advance to next slide
   const advanceSlide = useCallback(() => {
@@ -279,14 +283,14 @@ export default function OwnerPortalPresentation() {
     switch (slideId) {
       case "intro": return <OwnerPortalIntroSlide />;
       case "overview": return <OverviewSlide isActive={isActive} />;
-      case "insights": return <InsightsSlide />;
+      case "insights": return <InsightsSlide isActive={isActive} />;
       case "bookings": return <BookingsSlide />;
       case "statements": return <StatementsSlide />;
       case "expenses": return <ExpensesSlide />;
       case "messages": return <MessagesSlide />;
       case "repairs": return <RepairsSlide />;
       case "screenings": return <ScreeningsSlide />;
-      case "marketing": return <MarketingSlide />;
+      case "marketing": return <MarketingSlide isActive={isActive} />;
       case "communication": return <CommunicationSlide />;
       case "closing": return <OwnerPortalClosingSlide />;
       default: return null;
@@ -296,7 +300,7 @@ export default function OwnerPortalPresentation() {
   return (
     <div 
       ref={containerRef}
-      className="min-h-screen bg-[#0a0a1a] overflow-hidden"
+      className="min-h-screen min-h-[100dvh] bg-[#0a0a1a] overflow-hidden"
     >
       {/* Single Slide with AnimatePresence */}
       <AnimatePresence mode="wait">
@@ -307,25 +311,25 @@ export default function OwnerPortalPresentation() {
           animate="center"
           exit="exit"
           transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="min-h-screen"
+          className="min-h-screen min-h-[100dvh] pb-24"
         >
           {renderSlide(SLIDES[currentSlide].id, true)}
         </motion.div>
       </AnimatePresence>
 
-      {/* Fixed Navigation Bar */}
+      {/* Fixed Navigation Bar - Centered */}
       <motion.div
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+        className="fixed bottom-4 md:bottom-6 left-0 right-0 z-50 flex justify-center px-4"
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.5 }}
       >
-        <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-4 py-2 flex items-center gap-2 shadow-2xl">
+        <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-full px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 shadow-2xl max-w-full overflow-x-auto">
           {/* Home */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => navigate("/")}
           >
             <Home className="h-4 w-4" />
@@ -335,7 +339,7 @@ export default function OwnerPortalPresentation() {
           <Button
             variant="ghost"
             size="icon"
-            className={`h-8 w-8 hover:bg-white/10 ${isMuted ? 'text-white/40' : 'text-[#fae052]'}`}
+            className={`h-8 w-8 shrink-0 hover:bg-white/10 ${isMuted ? 'text-white/40' : 'text-[#fae052]'}`}
             onClick={toggleMute}
           >
             {isMuted ? (
@@ -345,13 +349,13 @@ export default function OwnerPortalPresentation() {
             )}
           </Button>
 
-          <div className="w-px h-6 bg-white/10" />
+          <div className="w-px h-6 bg-white/10 hidden md:block" />
 
           {/* Prev */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
             disabled={currentSlide === 0}
             onClick={() => setCurrentSlide(prev => prev - 1)}
           >
@@ -362,7 +366,7 @@ export default function OwnerPortalPresentation() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-10 w-10 text-white hover:bg-white/10 bg-[#fae052]/20"
+            className="h-10 w-10 shrink-0 text-white hover:bg-white/10 bg-[#fae052]/20"
             onClick={togglePlay}
           >
             {isPlaying ? (
@@ -376,17 +380,17 @@ export default function OwnerPortalPresentation() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10"
             disabled={currentSlide === SLIDES.length - 1}
             onClick={() => setCurrentSlide(prev => prev + 1)}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
 
-          <div className="w-px h-6 bg-white/10" />
+          <div className="w-px h-6 bg-white/10 hidden md:block" />
 
-          {/* Progress Dots */}
-          <div className="flex items-center gap-1 px-1">
+          {/* Progress Dots - Hidden on small mobile */}
+          <div className="hidden sm:flex items-center gap-1 px-1">
             {SLIDES.map((slide, index) => (
               <button
                 key={slide.id}
@@ -403,13 +407,13 @@ export default function OwnerPortalPresentation() {
             ))}
           </div>
 
-          <div className="w-px h-6 bg-white/10" />
+          <div className="w-px h-6 bg-white/10 hidden md:block" />
 
           {/* Restart */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10 hidden sm:flex"
             onClick={restart}
           >
             <RotateCcw className="h-4 w-4" />
@@ -419,7 +423,7 @@ export default function OwnerPortalPresentation() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-8 w-8 shrink-0 text-white/70 hover:text-white hover:bg-white/10 hidden sm:flex"
             onClick={toggleFullscreen}
           >
             <Maximize className="h-4 w-4" />

@@ -1,20 +1,71 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 interface UsePresentationAudioOptions {
   voiceId?: string;
   onAudioEnd?: () => void;
+  preloadSlides?: Array<{ id: string; script: string }>;
 }
 
 export function usePresentationAudio(options: UsePresentationAudioOptions = {}) {
   // Sarah voice - professional female narrator
-  const { voiceId = "EXAVITQu4vr4xnSDxMaL" } = options;
+  const { voiceId = "EXAVITQu4vr4xnSDxMaL", preloadSlides = [] } = options;
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSlideId, setCurrentSlideId] = useState<string | null>(null);
+  const [isPreloaded, setIsPreloaded] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCache = useRef<Map<string, string>>(new Map());
   const onAudioEndRef = useRef<(() => void) | null>(null);
+  const preloadingRef = useRef(false);
+
+  // Preload audio for slides on mount
+  useEffect(() => {
+    if (preloadSlides.length === 0 || preloadingRef.current) return;
+    
+    preloadingRef.current = true;
+    
+    const preloadAudio = async () => {
+      // Preload first 3 slides for immediate playback
+      const slidesToPreload = preloadSlides.slice(0, 3);
+      
+      await Promise.all(
+        slidesToPreload.map(async (slide) => {
+          if (audioCache.current.has(slide.id) || !slide.script) return;
+          
+          try {
+            const response = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({ 
+                  text: slide.script, 
+                  voiceId 
+                }),
+              }
+            );
+
+            if (response.ok) {
+              const audioBlob = await response.blob();
+              const audioUrl = URL.createObjectURL(audioBlob);
+              audioCache.current.set(slide.id, audioUrl);
+            }
+          } catch (error) {
+            console.error(`Failed to preload audio for slide ${slide.id}:`, error);
+          }
+        })
+      );
+      
+      setIsPreloaded(true);
+    };
+    
+    preloadAudio();
+  }, [preloadSlides, voiceId]);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -122,6 +173,7 @@ export function usePresentationAudio(options: UsePresentationAudioOptions = {}) 
     toggleMute,
     isLoading,
     isPlaying,
-    currentSlideId
+    currentSlideId,
+    isPreloaded
   };
 }
