@@ -35,7 +35,7 @@ const SLIDES = [
     component: MeetTheFoundersSlide, 
     label: "Team",
     duration: 22000,
-    script: "Meet Anja and Ingo, the husband and wife team behind PeachHaus. Anja is a licensed Georgia real estate broker, Airbnb coach, and hospitality design expert who has grown over two million dollars in short-term rental bookings. She's also the author of The Hybrid Rental Strategy, our proven approach where we focus on mid-term rentals first and fill in the gaps with short-term stays where allowed. Ingo brings over thirty years of entrepreneurship experience with ten years specifically in the real estate and property management space. Together they've built PeachHaus to combine old-world hospitality with modern revenue optimization."
+    script: "Meet Anja and Ingo, the dynamic team behind PeachHaus. Anja is a licensed Georgia real estate broker, Airbnb coach, and hospitality design expert who has grown over two million dollars in short-term rental bookings. She's also the author of The Hybrid Rental Strategy, our proven approach where we focus on mid-term rentals first and fill in the gaps with short-term stays where allowed. Ingo brings over thirty years of entrepreneurship experience with ten years specifically in the real estate and property management space. Together they've built PeachHaus to combine old-world hospitality with modern revenue optimization."
   },
   { 
     id: "promise", 
@@ -242,8 +242,11 @@ export default function OnboardingPresentation() {
   // Auto-play with audio narration - fixed double-play bug with slide-specific lock
   useEffect(() => {
     if (!isPlaying) {
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-      hasPlayedForSlideRef.current = null; // Reset when paused
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      // Don't reset hasPlayedForSlideRef here - only reset when resuming
       return;
     }
 
@@ -312,6 +315,7 @@ export default function OnboardingPresentation() {
         clearTimeout(fallbackTimerRef.current);
         fallbackTimerRef.current = null;
       }
+      // DON'T stop audio in cleanup - causes issues with autoplay
     };
   }, [currentSlide, isPlaying, isMuted, playAudioForSlide, advanceSlide]);
 

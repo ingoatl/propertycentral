@@ -186,9 +186,11 @@ export default function OwnerPortalPresentation() {
   // Play audio and manage slide timing when slide changes - with double-play prevention
   useEffect(() => {
     if (!isPlaying) {
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-      hasPlayedForSlideRef.current = null; // Reset when paused
-      stopAudio();
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      // Don't reset hasPlayedForSlideRef here - only reset when resuming
       return;
     }
 
@@ -219,7 +221,7 @@ export default function OwnerPortalPresentation() {
         fallbackTimerRef.current = null;
       }
       
-      // Longer pause after audio ends before advancing (3 seconds) - use ref to check current state
+      // Pause after audio ends before advancing (3 seconds) - use ref to check current state
       setTimeout(() => {
         if (isPlayingRef.current) {
           advanceSlide();
@@ -256,10 +258,9 @@ export default function OwnerPortalPresentation() {
         clearTimeout(fallbackTimerRef.current);
         fallbackTimerRef.current = null;
       }
-      // Always stop audio on cleanup to prevent overlapping
-      stopAudio();
+      // DON'T stop audio in cleanup - causes issues with autoplay
     };
-  }, [currentSlide, isPlaying, isMuted, playAudioForSlide, stopAudio, advanceSlide]);
+  }, [currentSlide, isPlaying, isMuted, playAudioForSlide, advanceSlide]);
 
   // Toggle fullscreen
   const toggleFullscreen = useCallback(() => {
