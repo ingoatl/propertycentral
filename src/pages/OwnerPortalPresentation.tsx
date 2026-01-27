@@ -141,12 +141,12 @@ export default function OwnerPortalPresentation() {
     // Callback when audio ends
     const onAudioComplete = () => {
       audioEndedRef.current = true;
-      // Small delay after audio ends before advancing
+      // Longer pause after audio ends before advancing for better viewing experience
       setTimeout(() => {
         if (audioEndedRef.current) {
           advanceSlide();
         }
-      }, 500);
+      }, 1500); // 1.5 second pause between slides
     };
 
     // Play audio with callback for when it ends

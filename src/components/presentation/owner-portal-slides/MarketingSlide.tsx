@@ -44,18 +44,21 @@ export function MarketingSlide() {
         ))}
       </motion.div>
 
-      {/* Marketing Screenshot */}
+      {/* Marketing Screenshot with auto-scroll for tall images */}
       <motion.div
-        className="relative w-full max-w-6xl flex-1 flex items-center justify-center"
+        className="relative w-full max-w-6xl flex-1 flex items-start justify-center overflow-hidden"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
       >
-        <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 max-h-[65vh]">
-          <img 
+        <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 max-h-[60vh] overflow-y-auto scrollbar-hide">
+          <motion.img 
             src="/images/owner-portal/10-marketing.png" 
             alt="Marketing Dashboard"
-            className="w-full h-full object-contain object-top"
+            className="w-full h-auto"
+            initial={{ y: 0 }}
+            animate={{ y: [0, -150, 0] }}
+            transition={{ duration: 8, ease: "easeInOut", repeat: Infinity, repeatDelay: 2 }}
           />
         </div>
       </motion.div>
