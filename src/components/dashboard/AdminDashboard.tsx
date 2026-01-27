@@ -71,30 +71,34 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
   const revenueTrend = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
 
   useEffect(() => {
-    loadActivityFeed();
-    loadTeamData();
+    // Parallel load for faster dashboard
+    Promise.all([loadActivityFeed(), loadTeamData()]);
   }, []);
 
   const loadActivityFeed = async () => {
     try {
-      // Load recent tasks, questions, and insights
-      const { data: tasks } = await supabase
-        .from("onboarding_tasks")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(10);
-
-      const { data: questions } = await supabase
-        .from("faq_questions")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      const { data: insights } = await supabase
-        .from("email_insights")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5);
+      // Parallel fetch all activity data for speed
+      const [tasksResult, questionsResult, insightsResult] = await Promise.all([
+        supabase
+          .from("onboarding_tasks")
+          .select("id, title, description, status, updated_at")
+          .order("updated_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("faq_questions")
+          .select("id, question, category, status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("email_insights")
+          .select("id, subject, summary, created_at")
+          .order("created_at", { ascending: false })
+          .limit(5)
+      ]);
+      
+      const tasks = tasksResult.data;
+      const questions = questionsResult.data;
+      const insights = insightsResult.data;
 
       const combinedActivities = [
         ...(tasks || []).map(t => ({
@@ -131,34 +135,36 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
 
   const loadTeamData = async () => {
     try {
-      // Fetch all tasks with role assignments
-      const { data: tasks } = await supabase
-        .from("onboarding_tasks")
-        .select(`
-          id,
-          status,
-          phase_number,
-          assigned_role_id,
-          assigned_to_uuid,
-          project_id,
-          onboarding_projects!inner(property_address)
-        `);
+      // Parallel fetch for faster loading
+      const [tasksResult, usersResult, userRolesResult] = await Promise.all([
+        supabase
+          .from("onboarding_tasks")
+          .select(`
+            id,
+            status,
+            phase_number,
+            assigned_role_id,
+            assigned_to_uuid,
+            project_id,
+            onboarding_projects!inner(property_address)
+          `),
+        supabase
+          .from("profiles")
+          .select("id, first_name, email")
+          .eq("status", "approved"),
+        supabase
+          .from("user_team_roles")
+          .select(`
+            user_id,
+            role_id,
+            profiles!inner(first_name, id),
+            team_roles!inner(role_name)
+          `)
+      ]);
 
-      // Fetch all approved users
-      const { data: users } = await supabase
-        .from("profiles")
-        .select("id, first_name, email")
-        .eq("status", "approved");
-
-      // Fetch user-role mappings
-      const { data: userRoles } = await supabase
-        .from("user_team_roles")
-        .select(`
-          user_id,
-          role_id,
-          profiles!inner(first_name, id),
-          team_roles!inner(role_name)
-        `);
+      const tasks = tasksResult.data;
+      const users = usersResult.data;
+      const userRoles = userRolesResult.data;
 
       if (!tasks || !userRoles || !users) return;
 
