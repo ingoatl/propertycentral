@@ -6,31 +6,72 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Property name keywords for matching posts to properties
+// Property name keywords for matching posts to properties - CORRECT UUIDs from database
 const PROPERTY_KEYWORDS: Record<string, string> = {
-  "berkley": "bdb82ccb-e1f7-499a-8fbc-2e3addc76a60",
-  "chimney lakes": "bdb82ccb-e1f7-499a-8fbc-2e3addc76a60",
-  "family retreat": "2a3b4c5d-6e7f-8901-bcde-f12345678904",
-  "durham": "2a3b4c5d-6e7f-8901-bcde-f12345678904",
-  "homerun hideaway": "2a3b4c5d-6e7f-8901-bcde-f12345678904",
-  "alpine": "3b4c5d6e-7f89-0123-cdef-g23456789015",
-  "scandinavian": "4c5d6e7f-8901-2345-defg-h34567890126",
-  "old roswell": "5d6e7f89-0123-4567-efgh-i45678901237",
-  "modern + cozy": "5d6e7f89-0123-4567-efgh-i45678901237",
-  "woodland": "6e7f8901-2345-6789-fghi-j56789012348",
-  "mableton": "6e7f8901-2345-6789-fghi-j56789012348",
-  "boho lux": "7f890123-4567-8901-ghij-k67890123459",
-  "scandi chic": "7f890123-4567-8901-ghij-k67890123459",
-  "whispering oaks": "8g901234-5678-9012-hijk-l78901234560",
-  "bloom": "8g901234-5678-9012-hijk-l78901234560",
-  "canadian way": "9h012345-6789-0123-ijkl-m89012345671",
-  "maple leaf": "9h012345-6789-0123-ijkl-m89012345671",
-  "midtown lighthouse": "0i123456-7890-1234-jklm-n90123456782",
-  "shift sanctuary": "0i123456-7890-1234-jklm-n90123456782",
-  "smoke hollow": "1j234567-8901-2345-klmn-o01234567893",
-  "alpharetta basecamp": "1j234567-8901-2345-klmn-o01234567893",
-  "lavish living": "2k345678-9012-3456-lmno-p12345678904",
-  "hazy": "76e11f06-a075-444c-afb3-fa8bbf35b06f",
+  // The Berkley at Chimney Lakes / Smoke Hollow
+  "berkley": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
+  "chimney lakes": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
+  "smoke hollow": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
+  "3419 smoke hollow": "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38",
+  // Family Retreat / Durham
+  "family retreat": "fa81c7ec-7e9b-48ab-aa8c-d2ddf41eea9b",
+  "durham ridge": "fa81c7ec-7e9b-48ab-aa8c-d2ddf41eea9b",
+  "5360 durham": "fa81c7ec-7e9b-48ab-aa8c-d2ddf41eea9b",
+  // Alpine
+  "alpine": "695bfc2a-4187-4377-8e25-18aa2fcd0454",
+  "osburn ct": "695bfc2a-4187-4377-8e25-18aa2fcd0454",
+  "4241 osburn": "695bfc2a-4187-4377-8e25-18aa2fcd0454",
+  // Scandinavian Retreat
+  "scandinavian": "9f7f6d4d-9873-46be-926f-c5a48863a946",
+  "laurel bridge": "9f7f6d4d-9873-46be-926f-c5a48863a946",
+  // Modern + Cozy Townhome (Old Roswell)
+  "old roswell": "6ffe191b-d85c-44f3-b91b-f8d38bee16b4",
+  "modern + cozy": "6ffe191b-d85c-44f3-b91b-f8d38bee16b4",
+  "willow stream": "6ffe191b-d85c-44f3-b91b-f8d38bee16b4",
+  // Woodland Lane
+  "woodland": "54536b8d-9b6f-41f8-855f-3c4eb78aaf00",
+  "mableton": "54536b8d-9b6f-41f8-855f-3c4eb78aaf00",
+  "184 woodland": "54536b8d-9b6f-41f8-855f-3c4eb78aaf00",
+  // Scandi Chic
+  "scandi chic": "6c80c23b-997a-45af-8702-aeb7a7cf3e81",
+  "duvall pl": "6c80c23b-997a-45af-8702-aeb7a7cf3e81",
+  "3155 duvall": "6c80c23b-997a-45af-8702-aeb7a7cf3e81",
+  // Whispering Oaks Farmhouse
+  "whispering oaks": "cc43827e-1180-44b1-900f-82b49a267119",
+  "grady smith": "cc43827e-1180-44b1-900f-82b49a267119",
+  "loganville": "cc43827e-1180-44b1-900f-82b49a267119",
+  // Canadian Way
+  "canadian way": "38ddcda8-36f7-4f82-8f0f-27f7877637d5",
+  "3708 canadian": "38ddcda8-36f7-4f82-8f0f-27f7877637d5",
+  "tucker": "38ddcda8-36f7-4f82-8f0f-27f7877637d5",
+  // MidTown Lighthouse
+  "midtown lighthouse": "b3ddb7c3-2eb7-48cd-9446-e46bfb3ee743",
+  "751 piedmont": "b3ddb7c3-2eb7-48cd-9446-e46bfb3ee743",
+  // Lavish Living
+  "lavish living": "96e2819b-c0e8-4281-b535-5c99c39973b3",
+  "rita way": "96e2819b-c0e8-4281-b535-5c99c39973b3",
+  "smyrna": "96e2819b-c0e8-4281-b535-5c99c39973b3",
+  // Hazy Way properties
+  "hazy way": "c74fab1a-cf60-42b6-afe6-fc268026f478",
+  "1429 hazy": "c74fab1a-cf60-42b6-afe6-fc268026f478",
+  "1427 hazy": "eb5a82df-fc98-4001-a5d1-0e20dc5e4e2f",
+};
+
+// Location-based fallback matching for posts that mention city/area
+const LOCATION_KEYWORDS: Record<string, string[]> = {
+  "roswell": [
+    "bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38", // The Berkley - primary Roswell property
+    "6ffe191b-d85c-44f3-b91b-f8d38bee16b4", // Modern + Cozy
+  ],
+  "kennesaw": [
+    "6c80c23b-997a-45af-8702-aeb7a7cf3e81", // Scandi Chic
+    "05e83cd6-e232-46f1-a6eb-99b6a979bea8", // Sand Wedge
+    "3f4ee435-5cbd-4c14-87b0-8c0dbd921cf0", // Timberlake
+  ],
+  "smyrna": [
+    "96e2819b-c0e8-4281-b535-5c99c39973b3", // Lavish Living
+    "9f7f6d4d-9873-46be-926f-c5a48863a946", // Scandinavian Retreat
+  ],
 };
 
 interface GhlPost {
@@ -49,7 +90,30 @@ interface GhlPost {
   postId?: string;
   userId?: string;
   accountId?: string;
+  publishedUrl?: string; // Some platforms include the published URL directly
 }
+
+// Helper to extract TikTok video ID from various formats
+const extractTikTokVideoId = (postId: string | undefined, publishedUrl?: string): string | null => {
+  // If we have a published URL, extract from there
+  if (publishedUrl) {
+    const urlMatch = publishedUrl.match(/video\/(\d+)/);
+    if (urlMatch) return urlMatch[1];
+  }
+  
+  if (!postId) return null;
+  
+  // Format: v_pub_url~v2.7600082490660767774 -> extract the numeric part
+  if (postId.includes('~v2.')) {
+    const match = postId.match(/~v2\.(\d+)/);
+    if (match) return match[1];
+  }
+  
+  // If it's already numeric
+  if (/^\d+$/.test(postId)) return postId;
+  
+  return null;
+};
 
 interface GhlResponse {
   results?: {
@@ -166,19 +230,42 @@ serve(async (req) => {
         }
       }
 
+      // Location-based fallback matching - for posts that only mention city
+      if (!matchedPropertyId) {
+        for (const [location, propIds] of Object.entries(LOCATION_KEYWORDS)) {
+          if (caption.includes(location)) {
+            // Use the first (primary) property for this location
+            const primaryPropId = propIds[0];
+            if (propertyMap.has(primaryPropId)) {
+              matchedPropertyId = primaryPropId;
+              console.log(`[ghl-sync-social-posts] Location match: ${location} -> ${primaryPropId}`);
+              break;
+            }
+          }
+        }
+      }
+
       // Generate post URL based on platform
       const getPostUrl = (post: GhlPost): string | null => {
-        if (!post.postId) return null;
+        const platform = post.platform?.toLowerCase();
         
-        switch (post.platform?.toLowerCase()) {
-          case "tiktok":
-            return `https://www.tiktok.com/@peachhausgroup/video/${post.postId}`;
+        switch (platform) {
+          case "tiktok": {
+            const videoId = extractTikTokVideoId(post.postId, post.publishedUrl);
+            if (videoId) {
+              return `https://www.tiktok.com/@peachhausgroup/video/${videoId}`;
+            }
+            return null;
+          }
           case "instagram":
-            return `https://www.instagram.com/p/${post.postId}/`;
+            if (post.postId) return `https://www.instagram.com/p/${post.postId}/`;
+            return null;
           case "facebook":
-            return `https://www.facebook.com/${post.postId}`;
+            if (post.postId) return `https://www.facebook.com/${post.postId}`;
+            return null;
           case "linkedin":
-            return `https://www.linkedin.com/posts/${post.postId}`;
+            if (post.postId) return `https://www.linkedin.com/posts/${post.postId}`;
+            return null;
           default:
             return null;
         }
