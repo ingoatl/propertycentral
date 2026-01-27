@@ -45,6 +45,8 @@ import {
   Linkedin,
   Video,
   AlertCircle,
+  Maximize2,
+  X,
 } from "lucide-react";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { CorporateOutreachCard } from "./CorporateOutreachCard";
@@ -54,7 +56,8 @@ import { MarketingActivityTimeline } from "./MarketingActivityTimeline";
 import { 
   DEMO_PROPERTY_ID, 
   demoMarketingActivities, 
-  demoSocialPosts 
+  demoSocialPosts,
+  demoMarketingStats
 } from "../data/demoPortalData";
 
 interface GuestInfo {
@@ -318,6 +321,7 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
   const [activities, setActivities] = useState<MarketingActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [aggregateMetrics, setAggregateMetrics] = useState({
     totalViews: 0,
     totalClicks: 0,
@@ -373,8 +377,7 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
     return num.toLocaleString();
   };
 
-  // Demo property ID - skip DB fetch for demo
-  const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+  // Demo property ID - skip DB fetch for demo (use imported constant)
   const isDemo = propertyId === DEMO_PROPERTY_ID;
 
   useEffect(() => {
@@ -595,8 +598,13 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
   
   const effectiveTotalMarketingActions = effectiveTotalSocialPosts + effectiveTotalOutreachActions;
 
+  // Fullscreen container classes
+  const containerClasses = isFullscreen 
+    ? "fixed inset-0 z-50 bg-background overflow-y-auto p-6" 
+    : "space-y-6";
+
   return (
-    <div className="space-y-6">
+    <div className={containerClasses}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -608,13 +616,37 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
             Track all marketing efforts for {propertyName}
           </p>
         </div>
-        {!isDemo && (
-          <Button variant="outline" size="sm" onClick={loadMarketingData}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+        <div className="flex items-center gap-2">
+          {/* Fullscreen button - desktop only */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="hidden md:flex gap-2"
+          >
+            {isFullscreen ? (
+              <>
+                <X className="w-4 h-4" />
+                Exit Fullscreen
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-4 h-4" />
+                View Fullscreen
+              </>
+            )}
           </Button>
-        )}
+          {!isDemo && (
+            <Button variant="outline" size="sm" onClick={loadMarketingData}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Content wrapper - needed for fullscreen spacing */}
+      <div className={isFullscreen ? "space-y-6 max-w-7xl mx-auto" : "space-y-6"}>
 
       {/* Marketing Stats from Marketing Hub */}
       {effectiveStats && (
@@ -1069,6 +1101,7 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 };
