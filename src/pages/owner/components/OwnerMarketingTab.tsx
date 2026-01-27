@@ -556,35 +556,8 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
     );
   }
 
-  // Generate default stats for demo when no stats are passed
-  const effectiveStats = currentStats || (isDemo ? {
-    id: "demo-stats",
-    property_id: propertyId,
-    report_month: new Date().toISOString().substring(0, 7),
-    social_media: {
-      instagram_posts: 12,
-      instagram_stories: 28,
-      facebook_posts: 8,
-      gmb_posts: 6,
-      total_reach: 45200,
-      total_engagement: 2840,
-      engagement_rate: 6.3,
-    },
-    outreach: {
-      total_companies_contacted: 24,
-      industries_targeted: ["Healthcare", "Tech", "Consulting", "Relocation"],
-      emails_sent: 48,
-      calls_made: 12,
-      hotsheets_distributed: 6,
-      decision_makers_identified: 18,
-    },
-    visibility: {
-      marketing_active: true,
-      included_in_hotsheets: true,
-    },
-    executive_summary: "Strong month! Your property was featured in 6 industry hotsheets sent to corporate housing coordinators. We made direct contact with 12 relocation managers at Delta, Coca-Cola, and Home Depot. Social media engagement is up 23% from last month.",
-    synced_at: new Date().toISOString(),
-  } : null);
+  // Generate effective stats - prioritize passed stats, then demo stats
+  const effectiveStats = currentStats || (isDemo ? demoMarketingStats[0] : null);
   
   // Recalculate with effective stats
   const effectiveTotalSocialPosts = (effectiveStats?.social_media?.instagram_posts || 0) + 

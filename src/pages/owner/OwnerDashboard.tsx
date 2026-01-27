@@ -72,7 +72,12 @@ import { MobileTopNav } from "./components/MobileTopNav";
 import { MobileHeader } from "./components/MobileHeader";
 import { MobileCommunicationDialogs } from "./components/MobileCommunicationDialogs";
 import { useIsMobile } from "@/hooks/use-mobile";
-import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
+import { 
+  DEMO_OWNER_ID as IMPORTED_DEMO_OWNER_ID,
+  DEMO_PROPERTY_ID as IMPORTED_DEMO_PROPERTY_ID,
+  DEMO_PROPERTY,
+  demoMarketingStats 
+} from "./data/demoPortalData";
 
 interface OwnerSession {
   ownerId: string;
@@ -311,28 +316,26 @@ export default function OwnerDashboard() {
     const token = searchParams.get("token");
     const ownerIdParam = searchParams.get("owner");
     
-    // Demo owner ID - always allow direct access without authentication
-    const DEMO_OWNER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
-    const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
-    
     // Check if this is the demo portal - set up session immediately for instant access
-    const isDemo = ownerIdParam === DEMO_OWNER_ID;
+    const isDemo = ownerIdParam === IMPORTED_DEMO_OWNER_ID;
     
     if (isDemo) {
       console.log("Demo portal detected - initializing immediately");
       // Set demo session and admin access immediately to prevent any flash of "no access"
       setIsAdminAccess(true);
       setSession({
-        ownerId: DEMO_OWNER_ID,
+        ownerId: IMPORTED_DEMO_OWNER_ID,
         ownerName: "Sara Thompson",
         email: "sara.thompson@demo.com",
-        propertyId: DEMO_PROPERTY_ID,
-        propertyName: "3069 Rita Way Retreat",
+        propertyId: IMPORTED_DEMO_PROPERTY_ID,
+        propertyName: DEMO_PROPERTY.name,
         secondOwnerName: "Michael Thompson",
         secondOwnerEmail: "michael.thompson@demo.com",
       });
+      // Set demo marketing stats immediately
+      setMarketingStats(demoMarketingStats);
       // Load data in the background - don't block the UI
-      loadAllData(DEMO_OWNER_ID, null).catch(err => {
+      loadAllData(IMPORTED_DEMO_OWNER_ID, null).catch(err => {
         console.error("Demo data load error:", err);
         // For demo, we can still show the UI even if data load fails
         setLoading(false);
@@ -734,9 +737,9 @@ export default function OwnerDashboard() {
 
   // Memoize property image URL to prevent recalculation
   const propertyImageUrl = useMemo(() => {
-    // Special case for demo property - use bundled image
-    if (property?.id === 'b2c3d4e5-f6a7-8901-bcde-f12345678901') {
-      return demoPropertyImage;
+    // Special case for demo property - use bundled image from demo data
+    if (property?.id === IMPORTED_DEMO_PROPERTY_ID) {
+      return DEMO_PROPERTY.hero_image;
     }
     
     if (!property?.image_path) return null;
