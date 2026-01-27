@@ -27,7 +27,7 @@ export const demoMarketingStats = [
   {
     id: "demo-stats-1",
     property_id: DEMO_PROPERTY_ID,
-    report_month: new Date().toISOString(),
+    report_month: new Date().toISOString().substring(0, 7), // YYYY-MM format
     social_media: {
       instagram_posts: 12,
       instagram_stories: 28,
@@ -89,7 +89,7 @@ export const demoMarketingStats = [
   {
     id: "demo-stats-2",
     property_id: DEMO_PROPERTY_ID,
-    report_month: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    report_month: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().substring(0, 7), // YYYY-MM format
     social_media: {
       instagram_posts: 10,
       instagram_stories: 22,

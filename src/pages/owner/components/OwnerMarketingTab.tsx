@@ -45,8 +45,6 @@ import {
   Linkedin,
   Video,
   AlertCircle,
-  Maximize2,
-  X,
 } from "lucide-react";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { CorporateOutreachCard } from "./CorporateOutreachCard";
@@ -321,7 +319,6 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
   const [activities, setActivities] = useState<MarketingActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [aggregateMetrics, setAggregateMetrics] = useState({
     totalViews: 0,
     totalClicks: 0,
@@ -571,13 +568,8 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
   
   const effectiveTotalMarketingActions = effectiveTotalSocialPosts + effectiveTotalOutreachActions;
 
-  // Fullscreen container classes
-  const containerClasses = isFullscreen 
-    ? "fixed inset-0 z-50 bg-background overflow-y-auto p-6" 
-    : "space-y-6";
-
   return (
-    <div className={containerClasses}>
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -590,25 +582,6 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Fullscreen button - desktop only */}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="hidden md:flex gap-2"
-          >
-            {isFullscreen ? (
-              <>
-                <X className="w-4 h-4" />
-                Exit Fullscreen
-              </>
-            ) : (
-              <>
-                <Maximize2 className="w-4 h-4" />
-                View Fullscreen
-              </>
-            )}
-          </Button>
           {!isDemo && (
             <Button variant="outline" size="sm" onClick={loadMarketingData}>
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -618,8 +591,8 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
         </div>
       </div>
 
-      {/* Content wrapper - needed for fullscreen spacing */}
-      <div className={isFullscreen ? "space-y-6 max-w-7xl mx-auto" : "space-y-6"}>
+      {/* Content wrapper */}
+      <div className="space-y-6">
 
       {/* Marketing Stats from Marketing Hub */}
       {effectiveStats && (
@@ -632,7 +605,16 @@ export const OwnerMarketingTab = ({ propertyId, propertyName, directBookingUrl, 
                 Marketing Activity Summary
               </CardTitle>
               <CardDescription>
-                {effectiveStats.report_month ? `Report for ${format(new Date(effectiveStats.report_month + '-01'), 'MMMM yyyy')}` : 'Current Period'}
+                {effectiveStats.report_month ? (() => {
+                  try {
+                    // Handle both YYYY-MM and full ISO date formats
+                    const dateStr = effectiveStats.report_month;
+                    const date = dateStr.length > 10 ? new Date(dateStr) : new Date(dateStr + '-01');
+                    return `Report for ${format(date, 'MMMM yyyy')}`;
+                  } catch {
+                    return 'Current Period';
+                  }
+                })() : 'Current Period'}
               </CardDescription>
             </CardHeader>
             <CardContent>

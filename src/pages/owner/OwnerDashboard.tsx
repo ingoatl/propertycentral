@@ -44,6 +44,8 @@ import {
   Phone,
   FileDown,
   Menu,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -223,6 +225,7 @@ export default function OwnerDashboard() {
   const [marketingStats, setMarketingStats] = useState<any[]>([]);
   const [peachHausData, setPeachHausData] = useState<any>(null);
   const [insightsError, setInsightsError] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Session stability & refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -818,7 +821,7 @@ export default function OwnerDashboard() {
   const latestStatement = statements[0];
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-background via-muted/20 to-background`}>
+    <div className={`min-h-screen ${isFullscreen ? 'fixed inset-0 z-50 overflow-y-auto' : ''} bg-gradient-to-br from-background via-muted/20 to-background`}>
       {/* Mobile: Sticky Header + Tab Nav */}
       {isMobile && (
         <div className="sticky top-0 z-50">
@@ -912,6 +915,20 @@ export default function OwnerDashboard() {
                       onBeforeGenerate={() => refreshData(false)}
                     />
                   )}
+                  <Button 
+                    variant={propertyImageUrl ? "secondary" : "outline"} 
+                    size="sm" 
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    className="gap-2"
+                    title={isFullscreen ? "Exit Fullscreen" : "View Fullscreen"}
+                  >
+                    {isFullscreen ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                    <span className="hidden lg:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
+                  </Button>
                   <Button 
                     variant={propertyImageUrl ? "secondary" : "outline"} 
                     size="sm" 
