@@ -25,6 +25,11 @@ import {
   ThumbsUp,
   ThumbsDown,
 } from "lucide-react";
+import { 
+  DEMO_OWNER_ID, 
+  demoWorkOrders, 
+  demoWorkOrderPhotos 
+} from "../data/demoPortalData";
 
 interface OwnerMaintenanceTabProps {
   ownerId: string;
@@ -89,11 +94,29 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
   const [statusFilter, setStatusFilter] = useState<"active" | "completed" | "all">("all");
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
+  
+  // Check if demo mode
+  const isDemo = ownerId === DEMO_OWNER_ID;
 
   // Fetch work orders for this owner's properties
   const { data: workOrders = [], isLoading } = useQuery({
     queryKey: ["owner-work-orders", ownerId, propertyId, statusFilter],
     queryFn: async () => {
+      // Return demo data for demo portal
+      if (isDemo) {
+        let filteredOrders = [...demoWorkOrders];
+        if (statusFilter === "active") {
+          filteredOrders = filteredOrders.filter(wo => 
+            !["completed", "cancelled"].includes(wo.status)
+          );
+        } else if (statusFilter === "completed") {
+          filteredOrders = filteredOrders.filter(wo => 
+            ["completed", "cancelled"].includes(wo.status)
+          );
+        }
+        return filteredOrders as WorkOrder[];
+      }
+      
       let query = supabase
         .from("work_orders")
         .select(`
@@ -159,6 +182,13 @@ export function OwnerMaintenanceTab({ ownerId, propertyId }: OwnerMaintenanceTab
     queryKey: ["work-order-photos-owner", selectedWorkOrder?.id],
     queryFn: async () => {
       if (!selectedWorkOrder?.id) return [];
+      
+      // Return demo photos for demo portal
+      if (isDemo) {
+        const photos = demoWorkOrderPhotos[selectedWorkOrder.id as keyof typeof demoWorkOrderPhotos] || [];
+        return photos as WorkOrderPhoto[];
+      }
+      
       const { data, error } = await supabase
         .from("work_order_photos")
         .select("*")

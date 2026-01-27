@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEMO_PROPERTY_ID, demoSocialPosts } from "../data/demoPortalData";
 
 interface SocialPost {
   id: string;
@@ -65,6 +66,28 @@ export const SocialPostsGallery = ({ propertyId, propertyName }: SocialPostsGall
   const loadPosts = async () => {
     setLoading(true);
     try {
+      // Use demo data for demo property
+      if (propertyId === DEMO_PROPERTY_ID) {
+        const demoPosts = demoSocialPosts.map(p => ({
+          ...p,
+          post_type: "post",
+          views: p.metrics?.views,
+          likes: p.metrics?.likes,
+          comments: p.metrics?.comments,
+          shares: p.metrics?.shares,
+        }));
+        setPosts(demoPosts);
+        
+        const counts: Record<string, number> = {};
+        demoPosts.forEach(post => {
+          const platform = post.platform?.toLowerCase() || "unknown";
+          counts[platform] = (counts[platform] || 0) + 1;
+        });
+        setPlatformCounts(counts);
+        setLoading(false);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from("social_media_posts")
         .select("*")

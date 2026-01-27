@@ -8,6 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { MessageCircle, Play, Video, Mic, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, RefreshCw, Building2 } from "lucide-react";
 import { format } from "date-fns";
+import { 
+  DEMO_OWNER_ID, 
+  demoVoicemails, 
+  demoCommunications 
+} from "../data/demoPortalData";
 
 interface OwnerMessagesTabProps {
   ownerId: string;
@@ -29,10 +34,18 @@ interface Communication {
 }
 
 export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps) {
+  // Check if demo mode
+  const isDemo = ownerId === DEMO_OWNER_ID;
+
   // Fetch voicemail messages
   const { data: voicemails, isLoading: voicemailsLoading } = useQuery({
     queryKey: ["owner-voicemail-messages", ownerId],
     queryFn: async () => {
+      // Return demo data for demo portal
+      if (isDemo) {
+        return demoVoicemails;
+      }
+      
       const { data, error } = await supabase
         .from("voicemail_messages")
         .select("*")
@@ -49,6 +62,11 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
   const { data: communications, isLoading: communicationsLoading, refetch: refetchCommunications } = useQuery({
     queryKey: ["owner-communications", ownerId, propertyId],
     queryFn: async () => {
+      // Return demo data for demo portal
+      if (isDemo) {
+        return demoCommunications as unknown as Communication[];
+      }
+      
       // First get all properties linked to this owner
       const { data: ownerProperties, error: propsError } = await supabase
         .from("properties")
@@ -89,6 +107,11 @@ export function OwnerMessagesTab({ ownerId, propertyId }: OwnerMessagesTabProps)
   const { data: ownerComms, isLoading: ownerCommsLoading } = useQuery({
     queryKey: ["owner-direct-communications", ownerId],
     queryFn: async () => {
+      // Demo data already included above
+      if (isDemo) {
+        return [] as Communication[];
+      }
+      
       const { data, error } = await supabase
         .from("lead_communications")
         .select("*")
