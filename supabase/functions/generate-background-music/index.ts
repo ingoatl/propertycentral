@@ -28,27 +28,29 @@ serve(async (req) => {
       });
     }
     
-    const { presentation } = await req.json().catch(() => ({}));
+    const { presentation, forceRegenerate } = await req.json().catch(() => ({}));
     const fileName = presentation === "onboarding" ? "background-music-onboarding.mp3" : "background-music.mp3";
     const filePath = `presentation-audio/${fileName}`;
     
-    // Check if background music already exists
-    const existingCheck = await supabase.storage
-      .from("message-attachments")
-      .list("presentation-audio", { search: fileName });
-    
-    if (existingCheck.data && existingCheck.data.length > 0) {
-      const { data: urlData } = supabase.storage
+    // Check if background music already exists (unless force regenerate)
+    if (!forceRegenerate) {
+      const existingCheck = await supabase.storage
         .from("message-attachments")
-        .getPublicUrl(filePath);
+        .list("presentation-audio", { search: fileName });
       
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: "Background music already exists",
-        url: urlData.publicUrl
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (existingCheck.data && existingCheck.data.length > 0) {
+        const { data: urlData } = supabase.storage
+          .from("message-attachments")
+          .getPublicUrl(filePath);
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: "Background music already exists",
+          url: urlData.publicUrl
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
     
     console.log(`Generating ${presentation || 'owner-portal'} background music...`);
