@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { MessageSquare, Phone, Video, Mail } from "lucide-react";
+import { AutoScrollImage } from "@/components/presentation/AutoScrollImage";
 
 export function MessagesSlide() {
   const features = [
@@ -51,16 +52,11 @@ export function MessagesSlide() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
       >
-        <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 max-h-[60vh] overflow-y-auto scrollbar-hide">
-          <motion.img 
-            src="/images/owner-portal/07-messages-detail.png" 
-            alt="Messages Overview"
-            className="w-full h-auto"
-            initial={{ y: 0 }}
-            animate={{ y: [0, -100, 0] }}
-            transition={{ duration: 8, ease: "easeInOut", repeat: Infinity, repeatDelay: 2 }}
-          />
-        </div>
+        <AutoScrollImage 
+          src="/images/owner-portal/07-messages-detail.png" 
+          alt="Messages Overview"
+          scrollDuration={10}
+        />
       </motion.div>
 
       {/* Pain Point Solved */}

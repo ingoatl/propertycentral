@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useRef, useState } from "react";
 import { Play, Pause, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AutoScrollImage } from "@/components/presentation/AutoScrollImage";
 
 interface OverviewSlideProps {
   isActive?: boolean;
@@ -74,16 +75,11 @@ export function OverviewSlide({ isActive }: OverviewSlideProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
       >
-        <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 max-h-[55vh] overflow-y-auto scrollbar-hide">
-          <motion.img 
-            src="/images/owner-portal/01-overview.png" 
-            alt="Dashboard Overview"
-            className="w-full h-auto"
-            initial={{ y: 0 }}
-            animate={{ y: [0, -100, 0] }}
-            transition={{ duration: 8, ease: "easeInOut", repeat: Infinity, repeatDelay: 2 }}
-          />
-        </div>
+        <AutoScrollImage 
+          src="/images/owner-portal/01-overview.png" 
+          alt="Dashboard Overview"
+          scrollDuration={10}
+        />
       </motion.div>
 
       {/* Pain Point Solved */}
