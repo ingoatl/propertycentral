@@ -108,7 +108,7 @@ serve(async (req) => {
         id,
         scheduled_at,
         title,
-        location,
+        location_address,
         contact_name,
         contact_phone,
         properties(name, address)
@@ -270,7 +270,8 @@ serve(async (req) => {
     for (const appt of teamAppts || []) {
       const contactName = appt.contact_name || appt.title || "Appointment";
       const property = (appt as any).properties;
-      const propertyAddress = property?.address || property?.name || appt.location || "";
+      const locationAddress = (appt as any).location_address;
+      const propertyAddress = property?.address || property?.name || locationAddress || "";
 
       // Only create alerts for the assigned user (if we had that info)
       // For now, alert all admins

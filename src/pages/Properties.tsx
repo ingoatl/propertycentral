@@ -179,12 +179,33 @@ const Properties = () => {
     const openWorkflowId = searchParams.get('openWorkflow');
     const taskId = searchParams.get('taskId');
     
-    if (openWorkflowId && properties.length > 0) {
-      const projectId = openWorkflowId;
-      const propertyId = Object.entries(propertyProjects).find(
-        ([_, pId]) => pId === projectId
-      )?.[0];
-
+    if (!openWorkflowId) return;
+    
+    // Wait for properties to load first
+    if (properties.length === 0) return;
+    
+    const projectId = openWorkflowId;
+    
+    // Try to find property from cached propertyProjects first
+    let propertyId = Object.entries(propertyProjects).find(
+      ([_, pId]) => pId === projectId
+    )?.[0];
+    
+    // If not found in cache, fetch directly from DB
+    const openWorkflow = async () => {
+      if (!propertyId) {
+        // Fetch project directly to get property_id
+        const { data: project } = await supabase
+          .from("onboarding_projects")
+          .select("id, property_id")
+          .eq("id", projectId)
+          .maybeSingle();
+        
+        if (project?.property_id) {
+          propertyId = project.property_id;
+        }
+      }
+      
       if (propertyId) {
         const property = properties.find(p => p.id === propertyId);
         if (property) {
@@ -201,7 +222,9 @@ const Properties = () => {
           setSearchParams(searchParams);
         }
       }
-    }
+    };
+    
+    openWorkflow();
   }, [searchParams, properties, propertyProjects]);
 
   const loadProperties = async () => {
