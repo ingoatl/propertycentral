@@ -50,7 +50,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
       // AND search owners by name, phone, email
       const searchTerm = `%${query}%`;
       
-      // First search: properties with owner join
+      // First search: properties with owner join - search by address AND name
       const { data: propertiesData, error: propError } = await supabase
         .from("properties")
         .select(`
@@ -68,11 +68,11 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
           )
         `)
         .or(`address.ilike.${searchTerm},name.ilike.${searchTerm}`)
-        .limit(30);
+        .limit(50);
 
       if (propError) throw propError;
 
-      // Second search: directly search owners by name/phone/email
+      // Second search: directly search owners by name/phone/email/second_owner
       const { data: ownersData, error: ownerError } = await supabase
         .from("property_owners")
         .select(`
@@ -89,14 +89,14 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
           )
         `)
         .or(`name.ilike.${searchTerm},phone.ilike.${searchTerm},email.ilike.${searchTerm},second_owner_name.ilike.${searchTerm}`)
-        .limit(30);
+        .limit(50);
 
       if (ownerError) throw ownerError;
 
-      // Combine and deduplicate results
+      // Combine and deduplicate results - prioritize by relevance
       const resultMap = new Map<string, PropertyOwnerResult>();
 
-      // Add property-based results
+      // Add property-based results (found by address/name search)
       (propertiesData || []).forEach((p: any) => {
         if (p.property_owners) {
           resultMap.set(p.id, {
@@ -108,16 +108,18 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
             ownerPhone: p.property_owners.phone,
             ownerEmail: p.property_owners.email,
             secondOwnerName: p.property_owners.second_owner_name,
-            secondOwnerPhone: null, // Column doesn't exist in DB
+            secondOwnerPhone: null,
           });
         }
       });
 
-      // Add owner-based results (may have multiple properties)
+      // Add owner-based results (found by owner name/phone/email search)
       (ownersData || []).forEach((owner: any) => {
         if (owner.properties && Array.isArray(owner.properties)) {
           owner.properties.forEach((prop: any) => {
-            if (!resultMap.has(prop.id)) {
+            // Always add/update if found by owner search (higher relevance for owner-based queries)
+            const existingEntry = resultMap.get(prop.id);
+            if (!existingEntry) {
               resultMap.set(prop.id, {
                 propertyId: prop.id,
                 propertyName: prop.name || "Unknown Property",
@@ -127,14 +129,27 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
                 ownerPhone: owner.phone,
                 ownerEmail: owner.email,
                 secondOwnerName: owner.second_owner_name,
-                secondOwnerPhone: null, // Column doesn't exist in DB
+                secondOwnerPhone: null,
               });
             }
           });
         }
       });
 
-      setResults(Array.from(resultMap.values()).slice(0, 20));
+      // Sort results - prioritize those where owner name matches search query
+      const resultsArray = Array.from(resultMap.values());
+      const lowerQuery = query.toLowerCase();
+      resultsArray.sort((a, b) => {
+        const aOwnerMatch = a.ownerName.toLowerCase().includes(lowerQuery) ? 0 : 1;
+        const bOwnerMatch = b.ownerName.toLowerCase().includes(lowerQuery) ? 0 : 1;
+        if (aOwnerMatch !== bOwnerMatch) return aOwnerMatch - bOwnerMatch;
+        
+        const aAddressMatch = a.propertyAddress.toLowerCase().includes(lowerQuery) ? 0 : 1;
+        const bAddressMatch = b.propertyAddress.toLowerCase().includes(lowerQuery) ? 0 : 1;
+        return aAddressMatch - bAddressMatch;
+      });
+
+      setResults(resultsArray.slice(0, 25));
     } catch (err) {
       console.error("Property search error:", err);
       setResults([]);

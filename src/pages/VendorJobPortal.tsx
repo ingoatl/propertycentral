@@ -20,7 +20,7 @@ import {
   Camera, DollarSign, ExternalLink, Phone, Loader2, Send, 
   Building2, Play, X, Lock, Key, Shield, Copy, FileText,
   ArrowRight, ChevronDown, ChevronUp, AlertCircle, Pause, Mic, Video,
-  PawPrint, Car, Wrench, AlertTriangle
+  PawPrint, Car, Wrench, AlertTriangle, Pencil, Save
 } from "lucide-react";
 
 interface WorkOrderData {
@@ -85,6 +85,8 @@ const VendorJobPortal = () => {
   const [showGetPaidModal, setShowGetPaidModal] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState("");
   const beforeInputRef = useRef<HTMLInputElement>(null);
   const afterInputRef = useRef<HTMLInputElement>(null);
   const voiceAudioRef = useRef<HTMLAudioElement>(null);
@@ -405,6 +407,24 @@ const VendorJobPortal = () => {
     onError: (error) => toast.error("Failed to send: " + error.message),
   });
 
+  // Update description mutation
+  const updateDescription = useMutation({
+    mutationFn: async (newDescription: string) => {
+      if (!workOrder?.id) throw new Error("No work order");
+      const { error } = await supabase
+        .from("work_orders")
+        .update({ description: newDescription })
+        .eq("id", workOrder.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Job description updated");
+      setIsEditingDescription(false);
+      queryClient.invalidateQueries({ queryKey: ["vendor-job", token] });
+    },
+    onError: (error) => toast.error("Failed to update: " + error.message),
+  });
+
   const handleBeforePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) uploadPhoto.mutate({ file, type: "before" });
@@ -594,9 +614,69 @@ const VendorJobPortal = () => {
               )}
             </div>
             
-            {workOrder.description && (
-              <p className="text-sm text-neutral-600 mt-3 p-3 bg-neutral-50 rounded border border-neutral-100">{workOrder.description}</p>
-            )}
+            {/* Editable Job Description */}
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job Description</span>
+                {!isEditingDescription && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => {
+                      setEditedDescription(workOrder.description || "");
+                      setIsEditingDescription(true);
+                    }}
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+              
+              {isEditingDescription ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    placeholder="Enter job description..."
+                    className="min-h-[80px] text-sm"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => updateDescription.mutate(editedDescription)}
+                      disabled={updateDescription.isPending}
+                      className="flex-1"
+                    >
+                      {updateDescription.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Save className="h-3 w-3 mr-1" />
+                          Save
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditingDescription(false);
+                        setEditedDescription("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-600 p-3 bg-neutral-50 rounded border border-neutral-100">
+                  {workOrder.description || "No description provided"}
+                </p>
+              )}
+            </div>
             
             {/* Voice Message Section - Mobile Optimized */}
             {workOrder.voice_message_url && (
