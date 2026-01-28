@@ -24,7 +24,7 @@ interface Contact {
   name: string;
   phone: string | null;
   email: string | null;
-  type: "lead" | "owner";
+  type: "lead" | "owner" | "vendor";
 }
 
 const dialPad = [
@@ -56,7 +56,7 @@ export function QuickCommunicationButton() {
     queryKey: ["quick-contacts", search],
     queryFn: async () => {
       // Run all searches in parallel - using * wildcards for PostgREST .or() syntax
-      const [ownersResult, propertiesResult, partnerResult, leadsResult] = await Promise.all([
+      const [ownersResult, propertiesResult, partnerResult, vendorsResult, leadsResult] = await Promise.all([
         // Search owners by name/phone/email
         supabase
           .from("property_owners")
@@ -89,6 +89,13 @@ export function QuickCommunicationButton() {
           .or(`address.ilike.*${search}*,contact_name.ilike.*${search}*,city.ilike.*${search}*,property_title.ilike.*${search}*`)
           .limit(15),
         
+        // Search vendors by name/phone/email/company
+        supabase
+          .from("vendors")
+          .select("id, name, company_name, phone, email")
+          .or(`name.ilike.*${search}*,phone.ilike.*${search}*,email.ilike.*${search}*,company_name.ilike.*${search}*`)
+          .limit(15),
+        
         // Search leads
         supabase
           .from("leads")
@@ -101,6 +108,7 @@ export function QuickCommunicationButton() {
       const owners = ownersResult.data || [];
       const properties = propertiesResult.data || [];
       const partners = partnerResult.data || [];
+      const vendors = vendorsResult.data || [];
       const leads = leadsResult.data || [];
 
       // Build owner contacts from direct owner search
@@ -140,6 +148,15 @@ export function QuickCommunicationButton() {
         }
       });
 
+      // Build vendor contacts
+      const vendorContacts: Contact[] = vendors.map((v: any) => ({
+        id: `vendor-${v.id}`,
+        name: v.company_name ? `${v.name} (${v.company_name})` : v.name,
+        phone: v.phone,
+        email: v.email,
+        type: "vendor" as const,
+      }));
+
       // Create a set of owner phone numbers and names for deduplication
       const ownerPhones = new Set(
         ownerContacts.map(o => cleanPhoneNumber(o.phone || '')).filter(Boolean)
@@ -165,8 +182,8 @@ export function QuickCommunicationButton() {
           type: "lead" as const,
         }));
 
-      // Return owners first, then leads
-      return [...ownerContacts, ...leadContacts];
+      // Return owners first, then vendors, then leads
+      return [...ownerContacts, ...vendorContacts, ...leadContacts];
     },
     enabled: search.length >= 2,
   });
@@ -384,6 +401,8 @@ export function QuickCommunicationButton() {
                           <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                             contact.type === "owner" 
                               ? "bg-secondary text-secondary-foreground" 
+                              : contact.type === "vendor"
+                              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
                               : "bg-primary/10 text-primary"
                           }`}>
                             {contact.type}
