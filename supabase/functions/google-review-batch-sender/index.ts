@@ -300,7 +300,7 @@ serve(async (req) => {
 
         console.log(`[${i + 1}/${reviewsToContact.length}] Sending permission ask to ${formattedPhone} (${review.guest_name}) for review ${review.id}`);
 
-        // Search for existing GHL contact ONLY - do NOT create new contacts
+        // Search for existing GHL contact first
         const searchResponse = await fetch(
           `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${ghlLocationId}&phone=${encodeURIComponent(formattedPhone)}`,
           {
@@ -321,15 +321,58 @@ serve(async (req) => {
           }
         }
 
-        // Skip if no existing GHL contact - do NOT create new contacts
+        // Create GHL contact if not found - required for SMS delivery
         if (!ghlContactId) {
-          console.log(`No existing GHL contact for ${formattedPhone} - skipping (not creating contact)`);
+          console.log(`No existing GHL contact for ${formattedPhone} - creating one`);
+          
+          const createResponse = await fetch(
+            `https://services.leadconnectorhq.com/contacts/`,
+            {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${ghlApiKey}`,
+                "Version": "2021-07-28",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                phone: formattedPhone,
+                name: guestName,
+                firstName: guestName.split(' ')[0] || guestName,
+                lastName: guestName.split(' ').slice(1).join(' ') || '',
+                locationId: ghlLocationId,
+                source: "Google Review Automation",
+                tags: ["google-review-request"],
+              }),
+            }
+          );
+          
+          if (createResponse.ok) {
+            const createData = await createResponse.json();
+            ghlContactId = createData.contact?.id;
+            console.log(`Created new GHL contact: ${ghlContactId}`);
+          } else {
+            const errorText = await createResponse.text();
+            console.error(`Failed to create GHL contact: ${errorText}`);
+            results.push({ 
+              reviewId: review.id, 
+              guestName: review.guest_name, 
+              phone: formattedPhone, 
+              success: false, 
+              error: `Failed to create GHL contact: ${errorText}` 
+            });
+            continue;
+          }
+        }
+        
+        // Skip if still no GHL contact after creation attempt
+        if (!ghlContactId) {
+          console.log(`Could not create GHL contact for ${formattedPhone} - skipping`);
           results.push({ 
             reviewId: review.id, 
             guestName: review.guest_name, 
             phone: formattedPhone, 
             success: false, 
-            error: "No existing GHL contact found" 
+            error: "Failed to create GHL contact" 
           });
           continue;
         }
