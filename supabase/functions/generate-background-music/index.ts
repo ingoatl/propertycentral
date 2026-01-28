@@ -58,7 +58,7 @@ serve(async (req) => {
     // Different music prompts for each presentation
     const musicPrompt = presentation === "onboarding" 
       ? "Uplifting, inspiring corporate music. Warm piano, gentle orchestral swells, hopeful and welcoming. Professional yet friendly atmosphere. Motivational business presentation music."
-      : "Cinematic orchestral music with emotional piano melodies, soaring strings, and gentle brass. Luxurious, sophisticated, and deeply moving. Like a beautiful film soundtrack that inspires trust and confidence. Smooth transitions, no abrupt changes. Premium real estate presentation music with warmth and elegance.";
+      : "Soft acoustic guitar with gentle piano accompaniment. Warm, intimate, and peaceful. Like a cozy fireside conversation. Light strings in the background. Calm, reassuring, and trustworthy. Perfect for a premium property management presentation.";
     
     // Generate uplifting ambient music using ElevenLabs Music API
     const response = await fetch(

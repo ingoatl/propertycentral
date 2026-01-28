@@ -7,7 +7,7 @@ interface UseStoredPresentationAudioOptions {
 }
 
 // Uplifting background music URL (stored in Supabase) - with cache bust
-const BACKGROUND_MUSIC_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/message-attachments/presentation-audio/background-music.mp3?v=4";
+const BACKGROUND_MUSIC_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/message-attachments/presentation-audio/background-music.mp3?v=5";
 
 export function useStoredPresentationAudio(options: UseStoredPresentationAudioOptions) {
   const { presentation } = options;
