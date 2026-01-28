@@ -48,8 +48,9 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
     setIsLoading(true);
     try {
       const resultMap = new Map<string, PropertyOwnerResult>();
+      const searchPattern = `%${query}%`;
       
-      console.log("[DialerSearch] Searching for:", query);
+      console.log("[DialerSearch] Searching for:", query, "pattern:", searchPattern);
       
       // Run all searches in parallel for speed
       const [propertiesResult, ownersResult, onboardingResult] = await Promise.all([
@@ -70,7 +71,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
               second_owner_email
             )
           `)
-          .or(`address.ilike.%${query}%,name.ilike.%${query}%`)
+          .or(`address.ilike.${searchPattern},name.ilike.${searchPattern}`)
           .is("offboarded_at", null)
           .limit(50),
         
@@ -90,7 +91,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
               address
             )
           `)
-          .or(`name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%,second_owner_name.ilike.%${query}%`)
+          .or(`name.ilike.${searchPattern},phone.ilike.${searchPattern},email.ilike.${searchPattern},second_owner_name.ilike.${searchPattern}`)
           .limit(50),
         
         // Search 3: Onboarding projects for imported owners (midtermnation, etc.)
@@ -100,6 +101,8 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
             id,
             property_id,
             owner_name,
+            owner_phone,
+            owner_email,
             property_address,
             onboarding_tasks (
               title,
@@ -187,18 +190,19 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
         
         (onboardingData || []).forEach((project: any) => {
           const tasks = project.onboarding_tasks || [];
+          // Use project-level owner info as fallback
           let ownerName = project.owner_name || "";
-          let ownerPhone = "";
-          let ownerEmail = "";
+          let ownerPhone = project.owner_phone || "";
+          let ownerEmail = project.owner_email || "";
           let propertyAddress = project.property_address || "";
           
-          // Extract owner info from tasks
+          // Extract owner info from tasks (overrides project-level if exists)
           tasks.forEach((t: any) => {
             const title = (t.title || "").toLowerCase();
             const value = t.field_value || "";
-            if (title === "owner name" && value) ownerName = value;
-            if (title === "owner phone" && value) ownerPhone = value;
-            if (title === "owner email" && value) ownerEmail = value;
+            if ((title === "owner name" || title.includes("owner name")) && value) ownerName = value;
+            if ((title === "owner phone" || title.includes("owner phone")) && value) ownerPhone = value;
+            if ((title === "owner email" || title.includes("owner email")) && value) ownerEmail = value;
             if ((title.includes("address") || title === "property address") && value && value.length > 5) {
               propertyAddress = value;
             }
@@ -211,17 +215,18 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
             ownerEmail.toLowerCase().includes(lowerQuery) ||
             propertyAddress.toLowerCase().includes(lowerQuery);
           
-          if (matches && ownerPhone) {
+          // Include matches even without phone (will show "No phone" badge)
+          if (matches) {
             const key = `onboarding-${project.id}`;
             if (!resultMap.has(key)) {
-              console.log("[DialerSearch] Found onboarding match:", ownerName, ownerPhone, propertyAddress);
+              console.log("[DialerSearch] Found onboarding match:", ownerName, ownerPhone || "(no phone)", propertyAddress);
               resultMap.set(key, {
                 propertyId: project.property_id || project.id,
                 propertyName: ownerName || "Onboarding Owner",
                 propertyAddress: propertyAddress || "Address pending",
                 ownerId: project.id,
                 ownerName: ownerName,
-                ownerPhone: ownerPhone,
+                ownerPhone: ownerPhone || null,
                 ownerEmail: ownerEmail,
                 secondOwnerName: null,
                 secondOwnerPhone: null,
