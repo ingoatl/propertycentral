@@ -122,8 +122,13 @@ export function OverdueOnboardingSection({ userId, maxHeight = "400px" }: Overdu
   const [viewMode, setViewMode] = useState<"quick-wins" | "property" | "urgency">("quick-wins");
 
   const handleTaskClick = (task: OverdueOnboardingTask) => {
-    // Navigate to the onboarding workflow for this project
-    navigate(`/onboarding/${task.project_id}`);
+    // Navigate to properties page with the property for this task
+    if (task.property_id) {
+      navigate(`/properties?property=${task.property_id}&task=${task.id}`);
+    } else {
+      // Fallback to properties page
+      navigate(`/properties`);
+    }
   };
 
   if (isLoading) {
