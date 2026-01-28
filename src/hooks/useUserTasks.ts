@@ -21,10 +21,14 @@ export interface UserTask {
   category: string | null;
   is_pinned: boolean;
   estimated_minutes: number | null;
-  // New assignment fields
+  // Assignment fields
   assigned_to: string | null;
   assigned_by: string | null;
   assigned_at: string | null;
+  assignment_comment: string | null;
+  // Cached property context
+  property_address: string | null;
+  owner_name: string | null;
 }
 
 export interface CreateTaskInput {
@@ -128,9 +132,9 @@ export function useUserTasks() {
     },
   });
 
-  // Assign existing task to team member
+  // Assign existing task to team member with optional comment
   const assignTask = useMutation({
-    mutationFn: async ({ taskId, assignToUserId }: { taskId: string; assignToUserId: string }) => {
+    mutationFn: async ({ taskId, assignToUserId, comment }: { taskId: string; assignToUserId: string; comment?: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
@@ -140,15 +144,16 @@ export function useUserTasks() {
           assigned_to: assignToUserId,
           assigned_by: user.id,
           assigned_at: new Date().toISOString(),
+          assignment_comment: comment || null,
         })
         .eq("id", taskId)
         .select()
         .single();
 
       if (error) throw error;
-      return { task: data, assignedBy: user.id };
+      return { task: data, assignedBy: user.id, comment };
     },
-    onSuccess: async ({ task, assignedBy }) => {
+    onSuccess: async ({ task, assignedBy, comment }) => {
       queryClient.invalidateQueries({ queryKey: ["user-tasks"] });
       
       // Create notification for assignee
@@ -160,12 +165,17 @@ export function useUserTasks() {
       
       const assignerName = profile?.first_name || profile?.email || "Someone";
       
+      // Include comment in notification if provided
+      const message = comment 
+        ? `${assignerName} assigned you: "${task.title}"\n\nNote: ${comment}`
+        : `${assignerName} assigned you: "${task.title}"`;
+      
       await supabase.from("task_notifications").insert([{
         user_id: task.assigned_to,
         task_id: task.id,
         type: "assignment",
         title: "Task assigned to you",
-        message: `${assignerName} assigned you: "${task.title}"`,
+        message,
       }]);
       
       toast({ title: "Task assigned successfully" });
