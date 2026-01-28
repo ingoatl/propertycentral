@@ -37,8 +37,10 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
   // Preload audio URLs on mount
   useEffect(() => {
     const preloadUrls = async () => {
-      // Test if first slide audio exists
-      const testSlide = presentation === "onboarding" ? "title" : "intro";
+      // Test if first slide audio exists - use correct slide ID per presentation
+      const testSlide = presentation === "onboarding" ? "title" 
+        : presentation === "designer" ? "title"
+        : "intro"; // owner-portal uses "intro"
       const testUrl = getStorageUrl(testSlide);
       try {
         const response = await fetch(testUrl, { method: "HEAD" });

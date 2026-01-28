@@ -156,7 +156,7 @@ export default function OnboardingPresentation() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [hasAutoStarted, setHasAutoStarted] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false); // Click-to-start overlay
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
   const hasPlayedRef = useRef(false);
@@ -186,20 +186,13 @@ export default function OnboardingPresentation() {
     presentation: "onboarding"
   });
 
-  // Auto-start presentation when audio is preloaded
-  useEffect(() => {
-    if (isPreloaded && !hasAutoStarted) {
-      // Small delay to ensure everything is ready
-      const timer = setTimeout(() => {
-        initAudioContext();
-        setHasAutoStarted(true);
-        hasPlayedRef.current = true;
-        setIsPlaying(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isPreloaded, hasAutoStarted, initAudioContext]);
-
+  // Handle presentation start (user click required for audio)
+  const handleStart = useCallback(() => {
+    initAudioContext();
+    setHasStarted(true);
+    hasPlayedRef.current = true;
+    setIsPlaying(true);
+  }, [initAudioContext]);
   const goToSlide = useCallback((index: number) => {
     if (index >= 0 && index < SLIDES.length && !isTransitioning) {
       // Stop current audio before transitioning
@@ -415,6 +408,37 @@ export default function OnboardingPresentation() {
   };
 
   const CurrentSlideComponent = SLIDES[currentSlide].component;
+
+  // Click-to-start overlay (required by browsers for audio autoplay)
+  if (!hasStarted) {
+    return (
+      <div className="fixed inset-0 bg-[#0a0a1a] flex items-center justify-center z-50">
+        <div className="text-center px-6">
+          <img 
+            src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
+            alt="PeachHaus" 
+            className="h-16 md:h-20 mx-auto mb-6"
+          />
+          <h1 className="text-3xl md:text-5xl font-bold text-white mb-4">
+            Property Management <span className="text-amber-400">Excellence</span>
+          </h1>
+          <p className="text-white/60 text-base md:text-lg mb-8 max-w-md mx-auto">
+            Discover how PeachHaus maximizes your rental income while protecting your investment
+          </p>
+          <Button
+            onClick={handleStart}
+            className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white px-8 py-6 text-lg rounded-full"
+          >
+            <Play className="w-5 h-5 mr-2" />
+            Start Presentation
+          </Button>
+          <p className="text-white/40 text-sm mt-4">
+            Click to enable audio narration
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
