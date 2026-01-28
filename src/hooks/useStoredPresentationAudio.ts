@@ -113,7 +113,7 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
       // Even when muted, call onEnd after a short delay to allow auto-advance
       setTimeout(() => {
         onEnd?.();
-      }, 100);
+      }, 500);
       return;
     }
     

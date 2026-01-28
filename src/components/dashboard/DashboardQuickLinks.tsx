@@ -1,4 +1,4 @@
-import { Link2, Calendar, Presentation, Palette, Home, Users, UserCircle, ChevronDown, Copy, Briefcase } from "lucide-react";
+import { Link2, Copy, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -6,110 +6,62 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
-const QUICK_LINKS = {
-  presentations: [
-    {
-      label: "Owner Pitch",
-      url: "https://propertycentral.lovable.app/p/onboarding",
-      icon: Briefcase,
-      description: "Onboarding presentation for new owners"
-    },
-    {
-      label: "Designer Pitch", 
-      url: "https://propertycentral.lovable.app/p/designer",
-      icon: Palette,
-      description: "Design services presentation"
-    },
-    {
-      label: "Owner Portal",
-      url: "https://propertycentral.lovable.app/p/owner-portal",
-      icon: Home,
-      description: "Portal features overview"
-    }
-  ],
-  calendar: [
-    {
-      label: "Discovery Call",
-      url: "https://propertycentral.lovable.app/book-discovery-call",
-      icon: Users,
-      description: "For new leads and prospects"
-    },
-    {
-      label: "Owner Call",
-      url: "https://propertycentral.lovable.app/book-owner-call",
-      icon: UserCircle,
-      description: "For existing property owners"
-    }
-  ]
-};
+interface LinkItem {
+  label: string;
+  url: string;
+}
+
+interface SeparatorItem {
+  type: "separator";
+}
+
+type QuickLinkItem = LinkItem | SeparatorItem;
+
+const QUICK_LINKS: QuickLinkItem[] = [
+  { label: "Owner Pitch", url: "https://propertycentral.lovable.app/p/onboarding" },
+  { label: "Designer Pitch", url: "https://propertycentral.lovable.app/p/designer" },
+  { label: "Owner Portal", url: "https://propertycentral.lovable.app/p/owner-portal" },
+  { type: "separator" },
+  { label: "Discovery Call", url: "https://propertycentral.lovable.app/book-discovery-call" },
+  { label: "Owner Call", url: "https://propertycentral.lovable.app/book-owner-call" },
+];
+
+function isSeparator(item: QuickLinkItem): item is SeparatorItem {
+  return "type" in item && item.type === "separator";
+}
 
 export function DashboardQuickLinks() {
   const handleCopyLink = (label: string, url: string) => {
     navigator.clipboard.writeText(url);
-    toast.success(`${label} link copied!`);
+    toast.success(`${label} copied`);
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Link2 className="h-4 w-4" />
-          <span className="hidden sm:inline">Links</span>
+        <Button variant="outline" size="sm" className="h-8 gap-1 px-2">
+          <Link2 className="h-3.5 w-3.5" />
           <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 bg-background">
-        {/* Presentations Section */}
-        <DropdownMenuLabel className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <Presentation className="h-3.5 w-3.5" />
-          Presentations
-        </DropdownMenuLabel>
-        {QUICK_LINKS.presentations.map((link) => {
-          const Icon = link.icon;
-          return (
+      <DropdownMenuContent align="end" className="w-48 bg-background">
+        {QUICK_LINKS.map((item, idx) => 
+          isSeparator(item) ? (
+            <DropdownMenuSeparator key={idx} />
+          ) : (
             <DropdownMenuItem
-              key={link.label}
-              onClick={() => handleCopyLink(link.label, link.url)}
-              className="flex items-start gap-2 py-2 cursor-pointer"
+              key={item.label}
+              onClick={() => handleCopyLink(item.label, item.url)}
+              className="flex items-center justify-between py-1.5 cursor-pointer text-sm"
             >
-              <Icon className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <span className="font-medium block text-sm">{link.label}</span>
-                <span className="text-xs text-muted-foreground">{link.description}</span>
-              </div>
-              <Copy className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span>{item.label}</span>
+              <Copy className="h-3 w-3 text-muted-foreground" />
             </DropdownMenuItem>
-          );
-        })}
-
-        <DropdownMenuSeparator />
-
-        {/* Calendar Links Section */}
-        <DropdownMenuLabel className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <Calendar className="h-3.5 w-3.5" />
-          Calendar Links
-        </DropdownMenuLabel>
-        {QUICK_LINKS.calendar.map((link) => {
-          const Icon = link.icon;
-          return (
-            <DropdownMenuItem
-              key={link.label}
-              onClick={() => handleCopyLink(link.label, link.url)}
-              className="flex items-start gap-2 py-2 cursor-pointer"
-            >
-              <Icon className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <span className="font-medium block text-sm">{link.label}</span>
-                <span className="text-xs text-muted-foreground">{link.description}</span>
-              </div>
-              <Copy className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            </DropdownMenuItem>
-          );
-        })}
+          )
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
