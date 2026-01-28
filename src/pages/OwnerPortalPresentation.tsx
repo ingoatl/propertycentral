@@ -143,19 +143,21 @@ export default function OwnerPortalPresentation() {
     presentation: "owner-portal"
   });
 
-  // Auto-start presentation when audio is preloaded
+  // Auto-start presentation immediately on mount - don't wait for preload
   useEffect(() => {
-    if (isPreloaded && !hasAutoStarted) {
-      // Small delay to ensure everything is ready
-      const timer = setTimeout(() => {
-        initAudioContext();
-        setHasAutoStarted(true);
-        setHasStarted(true);
-        setIsPlaying(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isPreloaded, hasAutoStarted, initAudioContext]);
+    if (hasAutoStarted) return;
+    
+    // Start immediately with a small delay for initial render
+    const timer = setTimeout(() => {
+      console.log("Auto-starting presentation...");
+      initAudioContext();
+      setHasAutoStarted(true);
+      setHasStarted(true);
+      setIsPlaying(true);
+    }, 800); // 800ms delay to ensure page is ready
+    
+    return () => clearTimeout(timer);
+  }, [hasAutoStarted, initAudioContext]);
 
   // Advance to next slide with end-of-presentation guard
   const advanceSlide = useCallback(() => {

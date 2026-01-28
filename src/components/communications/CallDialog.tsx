@@ -7,12 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Delete, Loader2, PhoneOff, PhoneCall, User, Home, Circle } from "lucide-react";
+import { Delete, Loader2, PhoneOff, PhoneCall, User, Home, Circle, Search, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 import { formatPhoneForDisplay, cleanPhoneNumber } from "@/lib/phoneUtils";
 import { Badge } from "@/components/ui/badge";
+import { DialerPropertySearch } from "./DialerPropertySearch";
 
 interface CallDialogProps {
   open: boolean;
@@ -43,20 +44,58 @@ export function CallDialog({
   ownerId,
 }: CallDialogProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [showPropertySearch, setShowPropertySearch] = useState(false);
+  const [currentContact, setCurrentContact] = useState({
+    name: contactName,
+    phone: contactPhone,
+    address: contactAddress,
+    ownerIdOverride: ownerId,
+  });
   const isMobile = useIsMobile();
   
   const { isConnecting, isOnCall, callStatus, callDuration, makeCall, endCall, sendDigits, formatDuration } = useTwilioDevice({
     leadId,
-    ownerId,
-    contactPhone,
+    ownerId: currentContact.ownerIdOverride || ownerId,
+    contactPhone: currentContact.phone,
   });
 
-  // Set phone number when dialog opens
+  // Set phone number when dialog opens or contact changes
   useEffect(() => {
-    if (open && contactPhone) {
-      setPhoneNumber(cleanPhoneNumber(contactPhone));
+    if (open && currentContact.phone) {
+      setPhoneNumber(cleanPhoneNumber(currentContact.phone));
     }
-  }, [open, contactPhone]);
+  }, [open, currentContact.phone]);
+
+  // Reset to original contact when dialog opens
+  useEffect(() => {
+    if (open) {
+      setCurrentContact({
+        name: contactName,
+        phone: contactPhone,
+        address: contactAddress,
+        ownerIdOverride: ownerId,
+      });
+      setShowPropertySearch(false);
+    }
+  }, [open, contactName, contactPhone, contactAddress, ownerId]);
+
+  const handleSelectFromSearch = (contact: {
+    name: string;
+    phone: string;
+    type: "owner";
+    ownerId: string;
+    propertyName?: string;
+    propertyAddress?: string;
+  }) => {
+    setCurrentContact({
+      name: contact.name,
+      phone: contact.phone,
+      address: contact.propertyAddress || contact.propertyName,
+      ownerIdOverride: contact.ownerId,
+    });
+    setPhoneNumber(cleanPhoneNumber(contact.phone));
+    setShowPropertySearch(false);
+  };
 
   const handleDigitPress = (digit: string) => {
     setPhoneNumber((prev) => prev + digit);
@@ -97,13 +136,36 @@ export function CallDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <DialogHeader className="shrink-0">
-          <DialogTitle className="text-center text-xl">Call {contactName}</DialogTitle>
+          <DialogTitle className="text-center text-xl flex items-center justify-center gap-2">
+            Call {currentContact.name}
+            {!isOnCall && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setShowPropertySearch(!showPropertySearch)}
+                title="Search properties"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            )}
+          </DialogTitle>
         </DialogHeader>
         
         <div className={cn(
           "space-y-3 flex-1 flex flex-col",
           isMobile && "justify-start pb-[env(safe-area-inset-bottom)]"
         )}>
+          {/* Property Search Panel */}
+          {showPropertySearch && !isOnCall && (
+            <div className="border rounded-lg p-3 bg-muted/50">
+              <DialerPropertySearch
+                onSelectContact={handleSelectFromSearch}
+                onClose={() => setShowPropertySearch(false)}
+              />
+            </div>
+          )}
+
           {/* Contact info */}
           <div className="p-3 bg-muted rounded-xl shrink-0">
             <div className="flex items-center gap-3">
@@ -115,9 +177,9 @@ export function CallDialog({
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{contactName}</p>
-                {contactAddress && (
-                  <p className="text-xs text-muted-foreground truncate">{contactAddress}</p>
+                <p className="font-medium truncate">{currentContact.name}</p>
+                {currentContact.address && (
+                  <p className="text-xs text-muted-foreground truncate">{currentContact.address}</p>
                 )}
               </div>
             </div>
