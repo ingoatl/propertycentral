@@ -53,11 +53,18 @@ export function CallDialog({
   });
   const isMobile = useIsMobile();
   
-  const { isConnecting, isOnCall, callStatus, callDuration, makeCall, endCall, sendDigits, formatDuration } = useTwilioDevice({
+  const { isConnecting, isOnCall, callStatus, callDuration, makeCall, endCall, sendDigits, formatDuration, preInitDevice } = useTwilioDevice({
     leadId,
     ownerId: currentContact.ownerIdOverride || ownerId,
     contactPhone: currentContact.phone,
   });
+
+  // Pre-initialize Twilio device when dialog opens for faster call initiation
+  useEffect(() => {
+    if (open) {
+      preInitDevice();
+    }
+  }, [open, preInitDevice]);
 
   // Set phone number when dialog opens or contact changes
   useEffect(() => {

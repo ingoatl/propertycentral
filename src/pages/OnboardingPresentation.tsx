@@ -291,14 +291,14 @@ export default function OnboardingPresentation() {
         fallbackTimerRef.current = null;
       }
       
-      console.log(`Audio complete for ${slide.id}, advancing in 1.5s...`);
+      console.log(`Audio complete for ${slide.id}, advancing in 2s...`);
       
-      // Short pause (1.5 seconds) then advance - hasAdvanced is already true so just check isPlaying
+      // 2 second pause then advance
       setTimeout(() => {
         if (isPlayingRef.current) {
           advanceSlide();
         }
-      }, 1500);
+      }, 2000);
     };
 
     // Play audio immediately

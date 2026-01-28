@@ -1,19 +1,19 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Import new before/after images
-import whitehurstBefore from "@/assets/designer/whitehurst-before-new.jpg";
-import whitehurstAfter from "@/assets/designer/whitehurst-after-new.jpg";
-import southvaleBefore from "@/assets/designer/southvale-before-new.jpg";
-import southvaleAfter from "@/assets/designer/southvale-after-new.jpg";
-import justiceBefore from "@/assets/designer/justice-before-new.jpg";
-import justiceAfter from "@/assets/designer/justice-after-new.jpg";
-import lakewoodBefore from "@/assets/designer/lakewood-before-new.jpg";
-import lakewoodAfter from "@/assets/designer/lakewood-after-new.jpg";
-import brushyBefore from "@/assets/designer/brushy-before-new.jpg";
-import brushyAfter from "@/assets/designer/brushy-after-new.jpg";
-import tolaniBefore from "@/assets/designer/tolani-before-new.jpg";
-import tolaniAfter from "@/assets/designer/tolani-after-new.jpg";
+// Import before/after images (using working originals)
+import whitehurstBefore from "@/assets/designer/whitehurst-before.jpg";
+import whitehurstAfter from "@/assets/designer/whitehurst-after.jpg";
+import southvaleBefore from "@/assets/designer/southvale-before.jpg";
+import southvaleAfter from "@/assets/designer/southvale-after.jpg";
+import justiceBefore from "@/assets/designer/justice-before.jpg";
+import justiceAfter from "@/assets/designer/justice-after.jpg";
+import lakewoodBefore from "@/assets/designer/lakewood-before.jpg";
+import lakewoodAfter from "@/assets/designer/lakewood-after.jpg";
+import brushyBefore from "@/assets/designer/brushy-before.jpg";
+import brushyAfter from "@/assets/designer/brushy-after.jpg";
+import tolaniBefore from "@/assets/designer/tolani-before.jpg";
+import tolaniAfter from "@/assets/designer/tolani-after.jpg";
 
 interface CaseStudy {
   name: string;
