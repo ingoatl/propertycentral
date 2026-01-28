@@ -22,7 +22,12 @@ import {
   ChevronDown,
   ChevronRight,
   Pin,
-  Plus
+  Plus,
+  AlertCircle,
+  FileText,
+  Lightbulb,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,8 +37,9 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
-import { format, isToday, isTomorrow, isThisWeek, parseISO, addDays } from "date-fns";
+import { format, isToday, isTomorrow, isThisWeek, parseISO, isPast, differenceInDays } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
 
 interface NinjaFocusItem {
   priority: "critical" | "high" | "medium";
@@ -57,12 +63,14 @@ interface NinjaPlan {
 }
 
 // Source badge colors and icons
-const sourceConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-  meeting: { color: "bg-purple-100 text-purple-700", icon: MessageSquare, label: "Meeting" },
-  ninja: { color: "bg-amber-100 text-amber-700", icon: Sparkles, label: "AI Priority" },
-  onboarding: { color: "bg-blue-100 text-blue-700", icon: Building2, label: "Onboarding" },
-  manual: { color: "bg-gray-100 text-gray-700", icon: User, label: "Manual" },
-  ai: { color: "bg-green-100 text-green-700", icon: Zap, label: "AI" },
+const sourceConfig: Record<string, { color: string; bgColor: string; icon: React.ElementType; label: string }> = {
+  meeting: { color: "text-purple-700", bgColor: "bg-purple-100", icon: MessageSquare, label: "Meeting" },
+  ninja: { color: "text-amber-700", bgColor: "bg-amber-100", icon: Sparkles, label: "AI" },
+  onboarding: { color: "text-blue-700", bgColor: "bg-blue-100", icon: Building2, label: "Onboarding" },
+  manual: { color: "text-gray-700", bgColor: "bg-gray-100", icon: User, label: "Manual" },
+  ai: { color: "text-green-700", bgColor: "bg-green-100", icon: Zap, label: "AI" },
+  email: { color: "text-rose-700", bgColor: "bg-rose-100", icon: Mail, label: "Email" },
+  call: { color: "text-indigo-700", bgColor: "bg-indigo-100", icon: Phone, label: "Call" },
 };
 
 // Unified task item for display
@@ -87,18 +95,93 @@ interface UnifiedTask {
   actionType?: "call" | "email" | "sms" | "view";
   rawTask?: UserTask | OverdueOnboardingTask | NinjaFocusItem;
   taskType: "user" | "ninja" | "onboarding";
+  isOverdue?: boolean;
+  daysOverdue?: number;
 }
 
-function TaskRow({ 
+// Critical task row with larger, more prominent styling
+function CriticalTaskRow({ 
   task, 
   onComplete, 
-  onAction,
-  onPin 
+  onAction 
 }: { 
   task: UnifiedTask;
   onComplete?: () => void;
   onAction: (task: UnifiedTask) => void;
-  onPin?: () => void;
+}) {
+  const sourceInfo = sourceConfig[task.source] || sourceConfig.manual;
+  const SourceIcon = sourceInfo.icon;
+
+  return (
+    <div 
+      className="group flex items-center gap-3 p-4 rounded-lg border-2 border-red-200 bg-red-50 hover:bg-red-100 transition-all cursor-pointer"
+      onClick={() => onAction(task)}
+    >
+      {/* Checkbox for user tasks */}
+      {task.taskType === "user" && onComplete && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Checkbox 
+            className="h-5 w-5" 
+            onCheckedChange={onComplete}
+          />
+        </div>
+      )}
+
+      {/* Priority indicator */}
+      <div className="w-3 h-3 rounded-full flex-shrink-0 bg-red-500 animate-pulse" />
+
+      {/* Task content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="font-semibold text-red-900">{task.title}</p>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          {task.daysOverdue && task.daysOverdue > 0 && (
+            <span className="text-xs font-medium text-red-600">
+              {task.daysOverdue} day{task.daysOverdue !== 1 ? 's' : ''} overdue
+            </span>
+          )}
+          {task.contactName && (
+            <span className="text-xs text-red-700">{task.contactName}</span>
+          )}
+          {task.propertyName && (
+            <span className="text-xs text-red-700">• {task.propertyName}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Source badge - larger */}
+      <Badge className={cn("text-xs gap-1.5 px-3 py-1", sourceInfo.bgColor, sourceInfo.color)}>
+        <SourceIcon className="w-4 h-4" />
+        {task.sourceLabel}
+      </Badge>
+
+      {/* Action button */}
+      {task.actionType === "call" && (
+        <Button size="sm" variant="destructive" className="gap-1">
+          <Phone className="w-4 h-4" />
+          Call
+        </Button>
+      )}
+      {task.actionType === "email" && (
+        <Button size="sm" variant="destructive" className="gap-1">
+          <Mail className="w-4 h-4" />
+          Email
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// Standard task row
+function TaskRow({ 
+  task, 
+  onComplete, 
+  onAction,
+}: { 
+  task: UnifiedTask;
+  onComplete?: () => void;
+  onAction: (task: UnifiedTask) => void;
 }) {
   const sourceInfo = sourceConfig[task.source] || sourceConfig.manual;
   const SourceIcon = sourceInfo.icon;
@@ -138,25 +221,27 @@ function TaskRow({
           <p className="font-medium text-sm truncate">{task.title}</p>
           {task.isPinned && <Pin className="w-3 h-3 text-primary" />}
         </div>
-        {(task.description || task.contactName || task.propertyName) && (
-          <p className="text-xs text-muted-foreground truncate mt-0.5">
+        {(task.contactName || task.propertyName || task.dueDate) && (
+          <p className="text-xs text-muted-foreground truncate mt-0.5 flex items-center gap-1">
             {task.contactName && <span>{task.contactName}</span>}
-            {task.propertyName && <span> • {task.propertyName}</span>}
-            {!task.contactName && !task.propertyName && task.description}
+            {task.propertyName && <span>• {task.propertyName}</span>}
+            {task.dueDate && !isToday(task.dueDate) && (
+              <span className="ml-2">• {format(task.dueDate, "EEE, MMM d")}</span>
+            )}
           </p>
         )}
       </div>
 
       {/* Source badge */}
-      <Badge variant="secondary" className={cn("text-xs flex-shrink-0 gap-1", sourceInfo.color)}>
+      <Badge variant="secondary" className={cn("text-xs flex-shrink-0 gap-1", sourceInfo.bgColor, sourceInfo.color)}>
         <SourceIcon className="w-3 h-3" />
         {task.sourceLabel}
       </Badge>
 
       {/* Action indicators */}
       <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        {task.actionType === "call" && <Phone className="w-4 h-4 text-muted-foreground" />}
-        {task.actionType === "email" && <Mail className="w-4 h-4 text-muted-foreground" />}
+        {task.actionType === "call" && <Phone className="w-4 h-4 text-primary" />}
+        {task.actionType === "email" && <Mail className="w-4 h-4 text-primary" />}
         <ExternalLink className="w-4 h-4 text-muted-foreground" />
       </div>
 
@@ -170,47 +255,85 @@ function TaskRow({
   );
 }
 
-function TaskGroup({ 
+// AI Suggestion row - visually distinct
+function AISuggestionRow({ 
+  task, 
+  onAction 
+}: { 
+  task: UnifiedTask;
+  onAction: (task: UnifiedTask) => void;
+}) {
+  return (
+    <div 
+      className="group flex items-center gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-100/50 transition-all cursor-pointer"
+      onClick={() => onAction(task)}
+    >
+      <Lightbulb className="w-5 h-5 text-amber-600 flex-shrink-0" />
+      
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-amber-900">{task.title}</p>
+        {task.description && (
+          <p className="text-xs text-amber-700 mt-0.5 line-clamp-1">{task.description}</p>
+        )}
+        {task.contactName && (
+          <p className="text-xs text-amber-600 mt-0.5">{task.contactName}</p>
+        )}
+      </div>
+
+      {/* Action button */}
+      {task.actionType === "call" && task.contactPhone && (
+        <Button size="sm" variant="outline" className="gap-1 text-amber-700 border-amber-300 hover:bg-amber-100">
+          <Phone className="w-3 h-3" />
+          Call
+        </Button>
+      )}
+      {task.actionType === "email" && task.contactEmail && (
+        <Button size="sm" variant="outline" className="gap-1 text-amber-700 border-amber-300 hover:bg-amber-100">
+          <Mail className="w-3 h-3" />
+          Email
+        </Button>
+      )}
+      {!task.actionType && (
+        <ExternalLink className="w-4 h-4 text-amber-600 opacity-0 group-hover:opacity-100" />
+      )}
+    </div>
+  );
+}
+
+// Section header component
+function SectionHeader({ 
   title, 
-  tasks, 
-  icon: Icon,
-  defaultOpen = true,
-  onComplete,
-  onAction,
-  onPin
+  count, 
+  icon: Icon, 
+  isOpen, 
+  onToggle,
+  variant = "default"
 }: {
   title: string;
-  tasks: UnifiedTask[];
+  count: number;
   icon: React.ElementType;
-  defaultOpen?: boolean;
-  onComplete: (task: UnifiedTask) => void;
-  onAction: (task: UnifiedTask) => void;
-  onPin?: (task: UnifiedTask) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+  variant?: "default" | "critical" | "ai";
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  if (tasks.length === 0) return null;
+  const variantStyles = {
+    default: "text-foreground",
+    critical: "text-red-700",
+    ai: "text-amber-700",
+  };
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 hover:bg-muted/30 rounded-lg px-2 transition-colors">
-        {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        <Icon className="w-4 h-4 text-muted-foreground" />
-        <span className="font-medium text-sm">{title}</span>
-        <Badge variant="secondary" className="ml-auto">{tasks.length}</Badge>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-1 mt-1">
-        {tasks.map((task) => (
-          <TaskRow 
-            key={task.id} 
-            task={task}
-            onComplete={task.taskType === "user" ? () => onComplete(task) : undefined}
-            onAction={onAction}
-            onPin={onPin ? () => onPin(task) : undefined}
-          />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
+    <button 
+      onClick={onToggle}
+      className="flex items-center gap-2 w-full py-2 px-2 hover:bg-muted/30 rounded-lg transition-colors"
+    >
+      {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+      <Icon className={cn("w-4 h-4", variantStyles[variant])} />
+      <span className={cn("font-semibold text-sm", variantStyles[variant])}>{title}</span>
+      <Badge variant={variant === "critical" ? "destructive" : "secondary"} className="ml-auto">
+        {count}
+      </Badge>
+    </button>
   );
 }
 
@@ -218,6 +341,7 @@ export function MondayStyleTasksPanel() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAISuggestions, setShowAISuggestions] = useState(true);
   const [showCallDialog, setShowCallDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState<{
@@ -228,6 +352,13 @@ export function MondayStyleTasksPanel() {
     ownerId?: string;
     contactType?: "lead" | "owner" | "vendor";
   } | null>(null);
+
+  // Section open states
+  const [criticalOpen, setCriticalOpen] = useState(true);
+  const [todayOpen, setTodayOpen] = useState(true);
+  const [thisWeekOpen, setThisWeekOpen] = useState(true);
+  const [laterOpen, setLaterOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(true);
 
   // Fetch all data sources
   const { tasks: userTasks, isLoading: tasksLoading, completeTask } = useUserTasks();
@@ -245,21 +376,32 @@ export function MondayStyleTasksPanel() {
     refetchOnWindowFocus: false,
   });
 
-  // Combine all tasks into unified format
-  const unifiedTasks = useMemo(() => {
-    const tasks: UnifiedTask[] = [];
+  // Separate user tasks from AI suggestions
+  const { yourTasks, aiSuggestions } = useMemo(() => {
+    const yourTasks: UnifiedTask[] = [];
+    const aiSuggestions: UnifiedTask[] = [];
     const today = new Date();
 
     // Add user tasks (including transcript tasks with source_type: meeting)
     userTasks
       .filter(t => t.status !== "completed")
       .forEach(task => {
-        tasks.push({
+        const dueDate = task.due_date ? parseISO(task.due_date) : undefined;
+        const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate);
+        const daysOverdue = dueDate && isOverdue ? differenceInDays(today, dueDate) : 0;
+        
+        // Auto-escalate overdue tasks to critical
+        let priority = task.priority;
+        if (isOverdue && daysOverdue >= 1 && priority !== "urgent") {
+          priority = "urgent";
+        }
+
+        yourTasks.push({
           id: task.id,
           title: task.title,
           description: task.description || undefined,
-          priority: task.priority,
-          dueDate: task.due_date ? parseISO(task.due_date) : undefined,
+          priority,
+          dueDate,
           source: task.source_type || "manual",
           sourceLabel: sourceConfig[task.source_type || "manual"]?.label || "Task",
           isPinned: task.is_pinned,
@@ -267,19 +409,45 @@ export function MondayStyleTasksPanel() {
           propertyId: task.property_id || undefined,
           taskType: "user",
           rawTask: task,
+          isOverdue,
+          daysOverdue,
         });
       });
 
-    // Add ninja priorities
+    // Add urgent onboarding tasks to YOUR TASKS (not AI)
+    overdueData?.quickWins?.slice(0, 5).forEach(task => {
+      const dueDate = task.due_date ? parseISO(task.due_date) : undefined;
+      const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate);
+      const daysOverdue = dueDate && isOverdue ? differenceInDays(today, dueDate) : 0;
+
+      yourTasks.push({
+        id: task.id,
+        title: task.title,
+        description: undefined,
+        priority: isOverdue ? "urgent" : "high",
+        dueDate,
+        source: "onboarding",
+        sourceLabel: "Onboarding",
+        estimatedMinutes: task.estimated_minutes,
+        propertyId: task.property_id,
+        propertyName: task.property_name,
+        taskType: "onboarding",
+        rawTask: task,
+        isOverdue,
+        daysOverdue,
+      });
+    });
+
+    // Add ninja priorities as AI SUGGESTIONS (separate section)
     ninjaPlan?.topPriorities?.forEach((item, idx) => {
-      tasks.push({
+      aiSuggestions.push({
         id: `ninja-priority-${idx}`,
         title: item.action,
         description: item.reason,
         priority: item.priority === "critical" ? "urgent" : item.priority,
-        dueDate: today, // AI priorities are for today
+        dueDate: today,
         source: "ninja",
-        sourceLabel: "AI Priority",
+        sourceLabel: "AI",
         contactName: item.contactName,
         contactPhone: item.contactPhone,
         contactEmail: item.contactEmail,
@@ -292,63 +460,80 @@ export function MondayStyleTasksPanel() {
       });
     });
 
-    // Add quick onboarding tasks
-    overdueData?.quickWins?.slice(0, 5).forEach(task => {
-      tasks.push({
-        id: task.id,
-        title: task.title,
-        description: undefined,
-        priority: "high",
-        dueDate: task.due_date ? parseISO(task.due_date) : undefined,
-        source: "onboarding",
-        sourceLabel: "Onboarding",
-        estimatedMinutes: task.estimated_minutes,
-        propertyId: task.property_id,
-        propertyName: task.property_name,
-        taskType: "onboarding",
-        rawTask: task,
+    // Add quick wins as AI suggestions
+    ninjaPlan?.quickWins?.forEach((item, idx) => {
+      aiSuggestions.push({
+        id: `ninja-quickwin-${idx}`,
+        title: item.action,
+        description: item.reason,
+        priority: "medium",
+        dueDate: today,
+        source: "ninja",
+        sourceLabel: "AI",
+        contactName: item.contactName,
+        contactPhone: item.contactPhone,
+        contactEmail: item.contactEmail,
+        contactType: item.contactType,
+        contactId: item.contactId,
+        link: item.link,
+        actionType: item.actionType,
+        taskType: "ninja",
+        rawTask: item,
       });
     });
 
-    return tasks;
+    return { yourTasks, aiSuggestions };
   }, [userTasks, ninjaPlan, overdueData]);
 
   // Filter tasks by search query
-  const filteredTasks = useMemo(() => {
-    if (!searchQuery.trim()) return unifiedTasks;
+  const filteredYourTasks = useMemo(() => {
+    if (!searchQuery.trim()) return yourTasks;
     const query = searchQuery.toLowerCase();
-    return unifiedTasks.filter(task => 
+    return yourTasks.filter(task => 
       task.title.toLowerCase().includes(query) ||
       task.description?.toLowerCase().includes(query) ||
       task.contactName?.toLowerCase().includes(query) ||
       task.propertyName?.toLowerCase().includes(query)
     );
-  }, [unifiedTasks, searchQuery]);
+  }, [yourTasks, searchQuery]);
 
-  // Group tasks by time period (Monday.com style)
+  const filteredAISuggestions = useMemo(() => {
+    if (!searchQuery.trim()) return aiSuggestions;
+    const query = searchQuery.toLowerCase();
+    return aiSuggestions.filter(task => 
+      task.title.toLowerCase().includes(query) ||
+      task.description?.toLowerCase().includes(query) ||
+      task.contactName?.toLowerCase().includes(query)
+    );
+  }, [aiSuggestions, searchQuery]);
+
+  // Group YOUR TASKS by importance and time
   const groupedTasks = useMemo(() => {
-    const pinnedTasks: UnifiedTask[] = [];
+    const critical: UnifiedTask[] = [];
     const todayTasks: UnifiedTask[] = [];
-    const tomorrowTasks: UnifiedTask[] = [];
     const thisWeekTasks: UnifiedTask[] = [];
     const laterTasks: UnifiedTask[] = [];
-    const noDueDateTasks: UnifiedTask[] = [];
 
-    filteredTasks.forEach(task => {
+    filteredYourTasks.forEach(task => {
+      // Critical: overdue or urgent priority
+      if (task.isOverdue || task.priority === "urgent" || task.priority === "critical") {
+        critical.push(task);
+        return;
+      }
+
+      // Pinned tasks go to today
       if (task.isPinned) {
-        pinnedTasks.push(task);
+        todayTasks.push(task);
         return;
       }
 
       if (!task.dueDate) {
-        noDueDateTasks.push(task);
+        laterTasks.push(task);
         return;
       }
 
-      if (isToday(task.dueDate)) {
+      if (isToday(task.dueDate) || isTomorrow(task.dueDate)) {
         todayTasks.push(task);
-      } else if (isTomorrow(task.dueDate)) {
-        tomorrowTasks.push(task);
       } else if (isThisWeek(task.dueDate)) {
         thisWeekTasks.push(task);
       } else {
@@ -363,14 +548,12 @@ export function MondayStyleTasksPanel() {
     };
 
     return {
-      pinned: pinnedTasks.sort(sortByPriority),
+      critical: critical.sort(sortByPriority),
       today: todayTasks.sort(sortByPriority),
-      tomorrow: tomorrowTasks.sort(sortByPriority),
       thisWeek: thisWeekTasks.sort(sortByPriority),
       later: laterTasks.sort(sortByPriority),
-      noDueDate: noDueDateTasks.sort(sortByPriority),
     };
-  }, [filteredTasks]);
+  }, [filteredYourTasks]);
 
   const handleTaskAction = (task: UnifiedTask) => {
     if (task.actionType === "call" && task.contactPhone) {
@@ -409,7 +592,8 @@ export function MondayStyleTasksPanel() {
   };
 
   const isLoading = tasksLoading || ninjaLoading || overdueLoading;
-  const totalTasks = filteredTasks.length;
+  const totalYourTasks = filteredYourTasks.length;
+  const totalAISuggestions = filteredAISuggestions.length;
 
   return (
     <>
@@ -417,10 +601,10 @@ export function MondayStyleTasksPanel() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              My Tasks
-              {totalTasks > 0 && (
-                <Badge variant="secondary">{totalTasks}</Badge>
+              <FileText className="w-5 h-5 text-primary" />
+              Your Tasks
+              {totalYourTasks > 0 && (
+                <Badge variant="secondary">{totalYourTasks}</Badge>
               )}
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -435,6 +619,15 @@ export function MondayStyleTasksPanel() {
               </div>
               <Button
                 variant="ghost"
+                size="sm"
+                onClick={() => setShowAISuggestions(!showAISuggestions)}
+                className="gap-1 text-xs"
+              >
+                {showAISuggestions ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {showAISuggestions ? "Hide AI" : "Show AI"}
+              </Button>
+              <Button
+                variant="ghost"
                 size="icon"
                 onClick={() => refetchNinja()}
                 disabled={isFetching}
@@ -443,68 +636,150 @@ export function MondayStyleTasksPanel() {
               </Button>
             </div>
           </div>
-          {ninjaPlan?.greeting && (
-            <p className="text-sm text-muted-foreground">{ninjaPlan.greeting}</p>
-          )}
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
-          ) : totalTasks === 0 ? (
+          ) : totalYourTasks === 0 && totalAISuggestions === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm">All caught up!</p>
               <p className="text-xs">No tasks to show</p>
             </div>
           ) : (
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-              <TaskGroup
-                title="Pinned"
-                tasks={groupedTasks.pinned}
-                icon={Pin}
-                onComplete={handleCompleteTask}
-                onAction={handleTaskAction}
-              />
-              <TaskGroup
-                title="Today"
-                tasks={groupedTasks.today}
-                icon={Zap}
-                onComplete={handleCompleteTask}
-                onAction={handleTaskAction}
-              />
-              <TaskGroup
-                title="Tomorrow"
-                tasks={groupedTasks.tomorrow}
-                icon={Calendar}
-                onComplete={handleCompleteTask}
-                onAction={handleTaskAction}
-              />
-              <TaskGroup
-                title="This Week"
-                tasks={groupedTasks.thisWeek}
-                icon={Clock}
-                defaultOpen={false}
-                onComplete={handleCompleteTask}
-                onAction={handleTaskAction}
-              />
-              <TaskGroup
-                title="Later"
-                tasks={groupedTasks.later}
-                icon={Calendar}
-                defaultOpen={false}
-                onComplete={handleCompleteTask}
-                onAction={handleTaskAction}
-              />
-              <TaskGroup
-                title="No Due Date"
-                tasks={groupedTasks.noDueDate}
-                icon={Clock}
-                defaultOpen={false}
-                onComplete={handleCompleteTask}
-                onAction={handleTaskAction}
-              />
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+              {/* ===== YOUR TASKS SECTION ===== */}
+              
+              {/* CRITICAL - Always visible at top */}
+              {groupedTasks.critical.length > 0 && (
+                <div className="space-y-2">
+                  <SectionHeader
+                    title="CRITICAL - Needs Attention"
+                    count={groupedTasks.critical.length}
+                    icon={AlertCircle}
+                    isOpen={criticalOpen}
+                    onToggle={() => setCriticalOpen(!criticalOpen)}
+                    variant="critical"
+                  />
+                  {criticalOpen && (
+                    <div className="space-y-2 pl-2">
+                      {groupedTasks.critical.map((task) => (
+                        <CriticalTaskRow 
+                          key={task.id} 
+                          task={task}
+                          onComplete={task.taskType === "user" ? () => handleCompleteTask(task) : undefined}
+                          onAction={handleTaskAction}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TODAY */}
+              {groupedTasks.today.length > 0 && (
+                <div className="space-y-2">
+                  <SectionHeader
+                    title={`TODAY - ${format(new Date(), "MMM d")}`}
+                    count={groupedTasks.today.length}
+                    icon={Zap}
+                    isOpen={todayOpen}
+                    onToggle={() => setTodayOpen(!todayOpen)}
+                  />
+                  {todayOpen && (
+                    <div className="space-y-1 pl-2">
+                      {groupedTasks.today.map((task) => (
+                        <TaskRow 
+                          key={task.id} 
+                          task={task}
+                          onComplete={task.taskType === "user" ? () => handleCompleteTask(task) : undefined}
+                          onAction={handleTaskAction}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* THIS WEEK */}
+              {groupedTasks.thisWeek.length > 0 && (
+                <div className="space-y-2">
+                  <SectionHeader
+                    title="THIS WEEK"
+                    count={groupedTasks.thisWeek.length}
+                    icon={Calendar}
+                    isOpen={thisWeekOpen}
+                    onToggle={() => setThisWeekOpen(!thisWeekOpen)}
+                  />
+                  {thisWeekOpen && (
+                    <div className="space-y-1 pl-2">
+                      {groupedTasks.thisWeek.map((task) => (
+                        <TaskRow 
+                          key={task.id} 
+                          task={task}
+                          onComplete={task.taskType === "user" ? () => handleCompleteTask(task) : undefined}
+                          onAction={handleTaskAction}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* LATER */}
+              {groupedTasks.later.length > 0 && (
+                <div className="space-y-2">
+                  <SectionHeader
+                    title="LATER"
+                    count={groupedTasks.later.length}
+                    icon={Clock}
+                    isOpen={laterOpen}
+                    onToggle={() => setLaterOpen(!laterOpen)}
+                  />
+                  {laterOpen && (
+                    <div className="space-y-1 pl-2">
+                      {groupedTasks.later.map((task) => (
+                        <TaskRow 
+                          key={task.id} 
+                          task={task}
+                          onComplete={task.taskType === "user" ? () => handleCompleteTask(task) : undefined}
+                          onAction={handleTaskAction}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ===== AI SUGGESTIONS SECTION ===== */}
+              {showAISuggestions && filteredAISuggestions.length > 0 && (
+                <>
+                  <Separator className="my-4" />
+                  <div className="space-y-2">
+                    <SectionHeader
+                      title="AI SUGGESTIONS - From your Ninja Plan"
+                      count={filteredAISuggestions.length}
+                      icon={Sparkles}
+                      isOpen={aiOpen}
+                      onToggle={() => setAiOpen(!aiOpen)}
+                      variant="ai"
+                    />
+                    {aiOpen && (
+                      <div className="space-y-2 pl-2">
+                        {filteredAISuggestions.map((task) => (
+                          <AISuggestionRow 
+                            key={task.id} 
+                            task={task}
+                            onAction={handleTaskAction}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </CardContent>
