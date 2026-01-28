@@ -55,20 +55,90 @@ export function QuickCommunicationButton() {
   const { data: contacts = [] } = useQuery({
     queryKey: ["quick-contacts", search],
     queryFn: async () => {
-      // Fetch owners first (they take priority)
-      const { data: owners } = await supabase
-        .from("property_owners")
-        .select("id, name, phone, email")
-        .or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
-        .limit(10);
+      // Run all searches in parallel - using * wildcards for PostgREST .or() syntax
+      const [ownersResult, propertiesResult, partnerResult, leadsResult] = await Promise.all([
+        // Search owners by name/phone/email
+        supabase
+          .from("property_owners")
+          .select("id, name, phone, email")
+          .or(`name.ilike.*${search}*,phone.ilike.*${search}*,email.ilike.*${search}*`)
+          .limit(15),
+        
+        // Search properties by address (includes city) to find owners
+        supabase
+          .from("properties")
+          .select(`
+            id,
+            name,
+            address,
+            property_owners (
+              id,
+              name,
+              phone,
+              email
+            )
+          `)
+          .ilike('address', `%${search}%`)
+          .is("offboarded_at", null)
+          .limit(15),
+        
+        // Search partner properties (MidTermNation imports)
+        supabase
+          .from("partner_properties")
+          .select("id, property_title, address, city, contact_name, contact_phone, contact_email")
+          .or(`address.ilike.*${search}*,contact_name.ilike.*${search}*,city.ilike.*${search}*,property_title.ilike.*${search}*`)
+          .limit(15),
+        
+        // Search leads
+        supabase
+          .from("leads")
+          .select("id, name, phone, email, stage")
+          .or(`name.ilike.*${search}*,phone.ilike.*${search}*,email.ilike.*${search}*`)
+          .neq('stage', 'ops_handoff')
+          .limit(15)
+      ]);
 
-      const ownerContacts: Contact[] = (owners || []).map((o) => ({
+      const owners = ownersResult.data || [];
+      const properties = propertiesResult.data || [];
+      const partners = partnerResult.data || [];
+      const leads = leadsResult.data || [];
+
+      // Build owner contacts from direct owner search
+      const ownerContacts: Contact[] = owners.map((o) => ({
         id: o.id,
         name: o.name,
         phone: o.phone,
         email: o.email,
         type: "owner" as const,
       }));
+
+      // Add owners from property address matches
+      const ownerIds = new Set(ownerContacts.map(o => o.id));
+      properties.forEach((p: any) => {
+        if (p.property_owners && !ownerIds.has(p.property_owners.id)) {
+          ownerIds.add(p.property_owners.id);
+          ownerContacts.push({
+            id: p.property_owners.id,
+            name: p.property_owners.name || "Unknown Owner",
+            phone: p.property_owners.phone,
+            email: p.property_owners.email,
+            type: "owner" as const,
+          });
+        }
+      });
+
+      // Add partner contacts (they're like owners but from MidTermNation)
+      partners.forEach((p: any) => {
+        if (p.contact_phone) {
+          ownerContacts.push({
+            id: `partner-${p.id}`,
+            name: p.contact_name || p.property_title || "Partner Contact",
+            phone: p.contact_phone,
+            email: p.contact_email,
+            type: "owner" as const,
+          });
+        }
+      });
 
       // Create a set of owner phone numbers and names for deduplication
       const ownerPhones = new Set(
@@ -78,20 +148,11 @@ export function QuickCommunicationButton() {
         ownerContacts.map(o => o.name.toLowerCase().trim())
       );
 
-      // Fetch leads, excluding ops_handoff stage
-      const { data: leads } = await supabase
-        .from("leads")
-        .select("id, name, phone, email, stage")
-        .or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
-        .neq('stage', 'ops_handoff')
-        .limit(10);
-
       // Filter out leads that match owners by phone OR name
-      const leadContacts: Contact[] = (leads || [])
+      const leadContacts: Contact[] = leads
         .filter(l => {
           const cleanedPhone = cleanPhoneNumber(l.phone || '');
           const normalizedName = l.name.toLowerCase().trim();
-          // Exclude if phone matches OR name matches an owner
           const phoneMatch = cleanedPhone && ownerPhones.has(cleanedPhone);
           const nameMatch = ownerNames.has(normalizedName);
           return !phoneMatch && !nameMatch;
