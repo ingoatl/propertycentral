@@ -120,7 +120,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
               address
             )
           `)
-          .or(`name.ilike.${searchPattern},phone.ilike.${searchPattern},email.ilike.${searchPattern}`)
+          .or(`name.ilike.*${query}*,phone.ilike.*${query}*,email.ilike.*${query}*`)
           .limit(50),
         
         // Search 3: Onboarding projects for imported owners
@@ -152,7 +152,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
             contact_phone,
             contact_email
           `)
-          .or(`address.ilike.${searchPattern},contact_name.ilike.${searchPattern},contact_phone.ilike.${searchPattern},property_title.ilike.${searchPattern},city.ilike.${searchPattern}`)
+          .or(`address.ilike.*${query}*,contact_name.ilike.*${query}*,contact_phone.ilike.*${query}*,property_title.ilike.*${query}*,city.ilike.*${query}*`)
           .limit(50)
       ]);
       
