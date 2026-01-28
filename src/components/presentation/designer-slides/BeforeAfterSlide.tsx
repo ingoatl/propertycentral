@@ -1,19 +1,8 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Import NEW before/after images - fresh downloads from TinyURLs
-import whitehurstBefore from "@/assets/designer/whitehurst-before-new.jpg";
-import whitehurstAfter from "@/assets/designer/whitehurst-after-new.jpg";
-import southvaleBefore from "@/assets/designer/southvale-before-new.jpg";
-import southvaleAfter from "@/assets/designer/southvale-after-new.jpg";
-import justiceBefore from "@/assets/designer/justice-before-new.jpg";
-import justiceAfter from "@/assets/designer/justice-after-new.jpg";
-import lakewoodBefore from "@/assets/designer/lakewood-before-new.jpg";
-import lakewoodAfter from "@/assets/designer/lakewood-after-new.jpg";
-import brushyBefore from "@/assets/designer/brushy-before-new.jpg";
-import brushyAfter from "@/assets/designer/brushy-after-new.jpg";
-import tolaniBefore from "@/assets/designer/tolani-before-new.jpg";
-import tolaniAfter from "@/assets/designer/tolani-after-new.jpg";
+// Supabase storage base URL for designer images
+const STORAGE_BASE = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/designer";
 
 interface CaseStudy {
   name: string;
@@ -36,8 +25,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2025",
     airbnbUrl: "https://airbnb.com/h/designermarietta",
     airbnbShortUrl: "airbnb.com/h/designermarietta",
-    beforeImage: whitehurstBefore,
-    afterImage: whitehurstAfter,
+    beforeImage: `${STORAGE_BASE}/whitehurst-before.jpg`,
+    afterImage: `${STORAGE_BASE}/whitehurst-after.jpg`,
     highlights: ["Full home transformation", "Premium furnishings", "Designer touches"],
   },
   southvale: {
@@ -46,8 +35,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2025",
     airbnbUrl: "https://tinyurl.com/AirBnBSouthvale",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: southvaleBefore,
-    afterImage: southvaleAfter,
+    beforeImage: `${STORAGE_BASE}/southvale-before.jpg`,
+    afterImage: `${STORAGE_BASE}/southvale-after.jpg`,
     highlights: ["Modern aesthetic", "Cohesive design", "Guest-focused amenities"],
   },
   justice: {
@@ -56,8 +45,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2024",
     airbnbUrl: "https://tinyurl.com/AirBnBJustice",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: justiceBefore,
-    afterImage: justiceAfter,
+    beforeImage: `${STORAGE_BASE}/justice-before.jpg`,
+    afterImage: `${STORAGE_BASE}/justice-after.jpg`,
     highlights: ["Complete makeover", "Stone fireplace focal point", "High-end finishes"],
   },
   lakewood: {
@@ -66,8 +55,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2024",
     airbnbUrl: "https://tinyurl.com/AirBnBLakewood",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: lakewoodBefore,
-    afterImage: lakewoodAfter,
+    beforeImage: `${STORAGE_BASE}/lakewood-before.jpg`,
+    afterImage: `${STORAGE_BASE}/lakewood-after.jpg`,
     highlights: ["Warm tones", "Cozy atmosphere", "Functional layout"],
   },
   brushy: {
@@ -76,8 +65,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2024",
     airbnbUrl: "https://tinyurl.com/AirBnBBrushy",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: brushyBefore,
-    afterImage: brushyAfter,
+    beforeImage: `${STORAGE_BASE}/brushy-before.jpg`,
+    afterImage: `${STORAGE_BASE}/brushy-after.jpg`,
     highlights: ["Natural elements", "Inviting spaces", "Photo-ready rooms"],
   },
   tolani: {
@@ -86,8 +75,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2023",
     airbnbUrl: "https://tinyurl.com/AirBnBToLani",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: tolaniBefore,
-    afterImage: tolaniAfter,
+    beforeImage: `${STORAGE_BASE}/tolani-before.jpg`,
+    afterImage: `${STORAGE_BASE}/tolani-after.jpg`,
     highlights: ["Budget-conscious", "Signature accent wall", "Five-star reviews"],
   },
 };
@@ -128,6 +117,7 @@ export function BeforeAfterSlide({ propertyKey }: BeforeAfterSlideProps) {
               src={property.beforeImage}
               alt={`${property.name} Before`}
               className="w-full h-[40vh] object-cover rounded-xl border border-white/10"
+              loading="eager"
             />
           </div>
           {/* After */}
@@ -139,6 +129,7 @@ export function BeforeAfterSlide({ propertyKey }: BeforeAfterSlideProps) {
               src={property.afterImage}
               alt={`${property.name} After`}
               className="w-full h-[40vh] object-cover rounded-xl border border-white/10"
+              loading="eager"
             />
           </div>
         </div>
