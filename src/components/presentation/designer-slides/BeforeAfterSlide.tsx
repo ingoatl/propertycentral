@@ -1,8 +1,19 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Supabase storage base URL for designer images
-const STORAGE_BASE = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/designer";
+// Import local images from assets
+import whitehurst_before from "@/assets/designer/whitehurst-before.jpg";
+import whitehurst_after from "@/assets/designer/whitehurst-after.jpg";
+import southvale_before from "@/assets/designer/southvale-before.jpg";
+import southvale_after from "@/assets/designer/southvale-after.jpg";
+import justice_before from "@/assets/designer/justice-before.jpg";
+import justice_after from "@/assets/designer/justice-after.jpg";
+import lakewood_before from "@/assets/designer/lakewood-before.jpg";
+import lakewood_after from "@/assets/designer/lakewood-after.jpg";
+import brushy_before from "@/assets/designer/brushy-before.jpg";
+import brushy_after from "@/assets/designer/brushy-after.jpg";
+import tolani_before from "@/assets/designer/tolani-before.jpg";
+import tolani_after from "@/assets/designer/tolani-after.jpg";
 
 interface CaseStudy {
   name: string;
@@ -25,8 +36,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2025",
     airbnbUrl: "https://airbnb.com/h/designermarietta",
     airbnbShortUrl: "airbnb.com/h/designermarietta",
-    beforeImage: `${STORAGE_BASE}/whitehurst-before.jpg`,
-    afterImage: `${STORAGE_BASE}/whitehurst-after.jpg`,
+    beforeImage: whitehurst_before,
+    afterImage: whitehurst_after,
     highlights: ["Full home transformation", "Premium furnishings", "Designer touches"],
   },
   southvale: {
@@ -35,8 +46,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2025",
     airbnbUrl: "https://tinyurl.com/AirBnBSouthvale",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: `${STORAGE_BASE}/southvale-before.jpg`,
-    afterImage: `${STORAGE_BASE}/southvale-after.jpg`,
+    beforeImage: southvale_before,
+    afterImage: southvale_after,
     highlights: ["Modern aesthetic", "Cohesive design", "Guest-focused amenities"],
   },
   justice: {
@@ -45,8 +56,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2024",
     airbnbUrl: "https://tinyurl.com/AirBnBJustice",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: `${STORAGE_BASE}/justice-before.jpg`,
-    afterImage: `${STORAGE_BASE}/justice-after.jpg`,
+    beforeImage: justice_before,
+    afterImage: justice_after,
     highlights: ["Complete makeover", "Stone fireplace focal point", "High-end finishes"],
   },
   lakewood: {
@@ -55,8 +66,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2024",
     airbnbUrl: "https://tinyurl.com/AirBnBLakewood",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: `${STORAGE_BASE}/lakewood-before.jpg`,
-    afterImage: `${STORAGE_BASE}/lakewood-after.jpg`,
+    beforeImage: lakewood_before,
+    afterImage: lakewood_after,
     highlights: ["Warm tones", "Cozy atmosphere", "Functional layout"],
   },
   brushy: {
@@ -65,8 +76,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2024",
     airbnbUrl: "https://tinyurl.com/AirBnBBrushy",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: `${STORAGE_BASE}/brushy-before.jpg`,
-    afterImage: `${STORAGE_BASE}/brushy-after.jpg`,
+    beforeImage: brushy_before,
+    afterImage: brushy_after,
     highlights: ["Natural elements", "Inviting spaces", "Photo-ready rooms"],
   },
   tolani: {
@@ -75,8 +86,8 @@ const caseStudies: Record<string, CaseStudy> = {
     year: "2023",
     airbnbUrl: "https://tinyurl.com/AirBnBToLani",
     airbnbShortUrl: "View on Airbnb",
-    beforeImage: `${STORAGE_BASE}/tolani-before.jpg`,
-    afterImage: `${STORAGE_BASE}/tolani-after.jpg`,
+    beforeImage: tolani_before,
+    afterImage: tolani_after,
     highlights: ["Budget-conscious", "Signature accent wall", "Five-star reviews"],
   },
 };
