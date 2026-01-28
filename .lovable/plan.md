@@ -1,141 +1,78 @@
 
-# Fix Dialer Search: Add Partner Properties + Fix Query Syntax
 
-## The Problem
+# Fix Dialer Search: Correct PostgREST Query Syntax
 
-**Three critical issues identified:**
+## Problem Identified
 
-1. **Missing Data Source**: The `partner_properties` table (containing MidTermNation imports like Dakun Sun) is NOT being searched at all
-2. **Query Syntax Bug**: The Supabase JS client `.or()` filter with `%` wildcards requires proper URL encoding or different approach
-3. **Kennesaw Properties**: Exist in database but search returns nothing - confirms query syntax is broken
+The search fails because the `.or()` filter syntax uses `%` wildcards incorrectly. PostgREST inline filter syntax requires `*` (asterisk) for wildcards, not `%`.
+
+**Current broken code:**
+```typescript
+.or(`name.ilike.${searchPattern}`) // searchPattern = "%query%"
+```
+
+**Working approach:**
+```typescript
+.or(`name.ilike.*${query}*`) // Use * instead of %
+```
 
 ## Data Verification
 
-| Owner | Table | Phone | Address |
-|-------|-------|-------|---------|
-| Dakun Sun | `partner_properties` | 2146755844 | 10705 Plantation Bridge Dr, Johns Creek |
-| Sonia Brar | `property_owners` | 412-339-0382 | 6030 Sand Wedge Circle, Kennesaw |
-| Boatright Partners | `property_owners` | 404-697-7719 | 3384 Timber Lake Rd, Kennesaw |
+| Owner | Table | Phone | SQL Works? |
+|-------|-------|-------|------------|
+| Dakun Sun | `partner_properties` | 2146755844 | Yes |
+| Sonia Brar | `property_owners` | 412-339-0382 | Yes |
+| Boatright Partners | `property_owners` | 404-697-7719 | Yes |
+
+The database contains all records correctly. Only the JavaScript client query syntax is broken.
 
 ## Solution
 
-### 1. Fix Query Syntax (Critical)
+Fix the query syntax in `DialerPropertySearch.tsx`:
 
-The current code uses:
+### Change 1: Fix Property Owners Search (Line 123)
+**Before:**
 ```typescript
-.or(`address.ilike.${searchPattern}`) // Where searchPattern = %query%
+.or(`name.ilike.${searchPattern},phone.ilike.${searchPattern},email.ilike.${searchPattern}`)
+```
+**After:**
+```typescript
+.or(`name.ilike.*${query}*,phone.ilike.*${query}*,email.ilike.*${query}*`)
 ```
 
-**Problem**: The `%` character needs proper handling in Supabase PostgREST filters.
-
-**Fix**: Use the correct filter syntax with proper escaping or use `.ilike()` method:
+### Change 2: Fix Partner Properties Search (Line 155)
+**Before:**
 ```typescript
-.ilike('address', `%${query}%`)
-// OR use textSearch approach
-.or(`address.ilike.*${query}*`)
+.or(`address.ilike.${searchPattern},contact_name.ilike.${searchPattern},...`)
+```
+**After:**
+```typescript
+.or(`address.ilike.*${query}*,contact_name.ilike.*${query}*,contact_phone.ilike.*${query}*,property_title.ilike.*${query}*,city.ilike.*${query}*`)
 ```
 
-### 2. Add Partner Properties Search (New Query)
-
-Add a 4th parallel search to query the `partner_properties` table:
-
-```typescript
-// Search 4: Partner properties (MidTermNation imports)
-supabase
-  .from("partner_properties")
-  .select(`
-    id, 
-    property_title, 
-    address, 
-    city,
-    contact_name, 
-    contact_phone, 
-    contact_email
-  `)
-  .or(`
-    address.ilike.%${query}%,
-    contact_name.ilike.%${query}%,
-    contact_phone.ilike.%${query}%,
-    property_title.ilike.%${query}%
-  `)
-  .limit(50)
-```
-
-### 3. Process Partner Properties Results
-
-Map partner_properties to the same result format:
-
-```typescript
-(partnerData || []).forEach((p: any) => {
-  if (p.contact_phone) {
-    resultMap.set(`partner-${p.id}`, {
-      propertyId: p.id,
-      propertyName: p.property_title || "Partner Property",
-      propertyAddress: p.address || "",
-      ownerId: p.id,
-      ownerName: p.contact_name || "Unknown",
-      ownerPhone: p.contact_phone,
-      ownerEmail: p.contact_email,
-      source: "partner"
-    });
-  }
-});
-```
-
-### 4. Add Partner Badge in UI
-
-Show a visual indicator for partner/imported properties:
-
-```typescript
-{result.source === "partner" && (
-  <Badge variant="secondary" className="text-xs bg-orange-100">
-    Partner
-  </Badge>
-)}
-```
-
----
-
-## File Changes
-
-| File | Change |
-|------|--------|
-| `src/components/communications/DialerPropertySearch.tsx` | Add partner_properties query, fix ilike syntax, add partner badge |
-
----
-
-## Technical Details
-
-### Correct Supabase Filter Syntax
-
-The issue is that `%` in URL parameters can cause issues. Two valid approaches:
-
-**Option A**: Use `.filter()` with explicit operator
-```typescript
-.filter('address', 'ilike', `%${query}%`)
-```
-
-**Option B**: Use `.textSearch()` for full-text (less flexible)
-
-**Option C**: Multiple `.ilike()` chains (cleanest)
-```typescript
-.or(`address.ilike.%${query}%,name.ilike.%${query}%`)
-// Make sure query is URL-safe
-```
-
-I'll use Option A with `.filter()` for reliability.
-
----
+### Change 3: Also Search Owners by Address
+Currently property owners are only searched by name/phone/email. Add address matching through their linked properties.
 
 ## Expected Results After Fix
 
-Searching "kennesaw" will show:
-- Scandi Chic → dfg (owner) 
+**Searching "kennesaw":**
+- Scandi Chic → dfg (owner)
 - 6030 Sand Wedge → Sonia Brar
 - Timberlake → Boatright Partners
 
-Searching "dakun" or "sun" will show:
+**Searching "dakun" or "sun":**
 - Charming Home in Alpharetta → Dakun Sun (from partner_properties)
 
-Searching "plantation" or "johns creek" will show:
+**Searching "plantation" or "johns creek":**
 - Charming Home in Alpharetta → Dakun Sun
+
+## File Changes
+
+| File | Changes |
+|------|---------|
+| `src/components/communications/DialerPropertySearch.tsx` | Replace `%` with `*` in all `.or()` filter patterns for `ilike` operators |
+
+## Technical Note
+
+The Supabase JS client `.ilike('column', '%value%')` method correctly URL-encodes the `%` character. However, when using the `.or()` string syntax, PostgREST expects `*` as the wildcard character in inline filters, which it then translates to `%` for the SQL query.
+
