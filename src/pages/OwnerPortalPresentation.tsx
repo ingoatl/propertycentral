@@ -198,14 +198,13 @@ export default function OwnerPortalPresentation() {
     }
   }, [currentSlide, stopAudio]);
 
-  // Play audio and manage slide timing when slide changes - with double-play prevention
+  // Play audio and manage slide timing - ROBUST autoplay that always advances
   useEffect(() => {
     if (!isPlaying) {
       if (fallbackTimerRef.current) {
         clearTimeout(fallbackTimerRef.current);
         fallbackTimerRef.current = null;
       }
-      // Don't reset hasPlayedForSlideRef here - only reset when resuming
       return;
     }
 
@@ -216,8 +215,6 @@ export default function OwnerPortalPresentation() {
       return;
     }
     hasPlayedForSlideRef.current = slide.id;
-    
-    audioEndedRef.current = false;
 
     // Clear any existing timer
     if (fallbackTimerRef.current) {
@@ -225,55 +222,49 @@ export default function OwnerPortalPresentation() {
       fallbackTimerRef.current = null;
     }
 
-    // Callback when audio ends
+    // Track if we've already advanced from this slide
+    let hasAdvanced = false;
+
+    // Callback when audio ends - ALWAYS advances if still playing
     const onAudioComplete = () => {
-      if (audioEndedRef.current) return; // Prevent double-trigger
-      audioEndedRef.current = true;
+      if (hasAdvanced) return;
+      hasAdvanced = true;
       
-      // Clear fallback timer since audio completed
       if (fallbackTimerRef.current) {
         clearTimeout(fallbackTimerRef.current);
         fallbackTimerRef.current = null;
       }
       
-      // Pause after audio ends before advancing (3 seconds) - use ref to check current state
+      console.log(`Audio complete for ${slide.id}, advancing in 2s...`);
+      
+      // Shorter pause (2 seconds) then advance
       setTimeout(() => {
         if (isPlayingRef.current) {
           advanceSlide();
         }
-      }, 3000);
+      }, 2000);
     };
 
-    // Play audio immediately (no delay - audio is preloaded)
+    // Play audio immediately
     if (slide.script && !isMuted) {
       playAudioForSlide(slide.id, slide.script, onAudioComplete);
     }
 
-    // Fallback timer - only used if muted, with much longer durations
-    if (isMuted) {
-      // When muted, use the slide duration plus extra viewing time
-      const mutedDuration = slide.duration + 4000;
-      fallbackTimerRef.current = setTimeout(() => {
-        if (!audioEndedRef.current) {
-          advanceSlide();
-        }
-      }, mutedDuration);
-    } else {
-      // When audio is enabled, set a very long fallback (45 seconds) as safety net
-      fallbackTimerRef.current = setTimeout(() => {
-        if (!audioEndedRef.current) {
-          console.log("Fallback timer triggered for slide:", slide.id);
-          advanceSlide();
-        }
-      }, 45000);
-    }
+    // Fallback timer - ensures we ALWAYS advance even if audio fails
+    const fallbackDuration = isMuted ? slide.duration + 3000 : 40000;
+    fallbackTimerRef.current = setTimeout(() => {
+      if (!hasAdvanced && isPlayingRef.current) {
+        console.log(`Fallback advance for ${slide.id}`);
+        hasAdvanced = true;
+        advanceSlide();
+      }
+    }, fallbackDuration);
 
     return () => {
       if (fallbackTimerRef.current) {
         clearTimeout(fallbackTimerRef.current);
         fallbackTimerRef.current = null;
       }
-      // DON'T stop audio in cleanup - causes issues with autoplay
     };
   }, [currentSlide, isPlaying, isMuted, playAudioForSlide, advanceSlide]);
 
