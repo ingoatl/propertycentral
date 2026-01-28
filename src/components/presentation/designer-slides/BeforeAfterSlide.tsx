@@ -1,19 +1,19 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Import separate before/after images for side-by-side display
-import whitehurstBefore from "@/assets/designer/whitehurst-before-1.jpg";
-import whitehurstAfter from "@/assets/designer/whitehurst-after-1.jpg";
-import southvaleBefore from "@/assets/designer/southvale-before-1.jpg";
-import southvaleAfter from "@/assets/designer/southvale-after-1.jpg";
-import justiceBefore from "@/assets/designer/justice-before-1.jpg";
-import justiceAfter from "@/assets/designer/justice-after-1.jpg";
-import lakewoodBefore from "@/assets/designer/lakewood-before-1.jpg";
-import lakewoodAfter from "@/assets/designer/lakewood-after-1.jpg";
-import brushyBefore from "@/assets/designer/brushy-before.jpg";
-import brushyAfter from "@/assets/designer/brushy-after.jpg";
-import tolaniBefore from "@/assets/designer/tolani-before.jpg";
-import tolaniAfter from "@/assets/to-lani-after.jpeg";
+// Import new before/after images
+import whitehurstBefore from "@/assets/designer/whitehurst-before-new.jpg";
+import whitehurstAfter from "@/assets/designer/whitehurst-after-new.jpg";
+import southvaleBefore from "@/assets/designer/southvale-before-new.jpg";
+import southvaleAfter from "@/assets/designer/southvale-after-new.jpg";
+import justiceBefore from "@/assets/designer/justice-before-new.jpg";
+import justiceAfter from "@/assets/designer/justice-after-new.jpg";
+import lakewoodBefore from "@/assets/designer/lakewood-before-new.jpg";
+import lakewoodAfter from "@/assets/designer/lakewood-after-new.jpg";
+import brushyBefore from "@/assets/designer/brushy-before-new.jpg";
+import brushyAfter from "@/assets/designer/brushy-after-new.jpg";
+import tolaniBefore from "@/assets/designer/tolani-before-new.jpg";
+import tolaniAfter from "@/assets/designer/tolani-after-new.jpg";
 
 interface CaseStudy {
   name: string;
@@ -42,27 +42,30 @@ const caseStudies: Record<string, CaseStudy> = {
   },
   southvale: {
     name: "Southvale",
-    budgetRange: "$35K",
+    budgetRange: "$25K",
     year: "2025",
-    airbnbUrl: "https://www.airbnb.com/rooms/1394277589009252467",
+    airbnbUrl: "https://tinyurl.com/AirBnBSouthvale",
+    airbnbShortUrl: "View on Airbnb",
     beforeImage: southvaleBefore,
     afterImage: southvaleAfter,
     highlights: ["Modern aesthetic", "Cohesive design", "Guest-focused amenities"],
   },
   justice: {
     name: "Justice",
-    budgetRange: "$25K",
-    year: "2025",
-    airbnbUrl: "https://www.airbnb.com/rooms/1395677657124996447",
+    budgetRange: "$23K",
+    year: "2024",
+    airbnbUrl: "https://tinyurl.com/AirBnBJustice",
+    airbnbShortUrl: "View on Airbnb",
     beforeImage: justiceBefore,
     afterImage: justiceAfter,
-    highlights: ["Complete makeover", "Green accent wall", "High-end finishes"],
+    highlights: ["Complete makeover", "Stone fireplace focal point", "High-end finishes"],
   },
   lakewood: {
     name: "Lakewood",
     budgetRange: "$23K",
     year: "2024",
-    airbnbUrl: "https://www.airbnb.com/rooms/1399393314185549107",
+    airbnbUrl: "https://tinyurl.com/AirBnBLakewood",
+    airbnbShortUrl: "View on Airbnb",
     beforeImage: lakewoodBefore,
     afterImage: lakewoodAfter,
     highlights: ["Warm tones", "Cozy atmosphere", "Functional layout"],
@@ -71,7 +74,8 @@ const caseStudies: Record<string, CaseStudy> = {
     name: "Brushy",
     budgetRange: "$23K",
     year: "2024",
-    airbnbUrl: "https://www.airbnb.com/rooms/1108098053080240369",
+    airbnbUrl: "https://tinyurl.com/AirBnBBrushy",
+    airbnbShortUrl: "View on Airbnb",
     beforeImage: brushyBefore,
     afterImage: brushyAfter,
     highlights: ["Natural elements", "Inviting spaces", "Photo-ready rooms"],
@@ -80,10 +84,11 @@ const caseStudies: Record<string, CaseStudy> = {
     name: "To Lani",
     budgetRange: "$20K",
     year: "2023",
-    airbnbUrl: "https://www.airbnb.com/rooms/1066144648492952003",
+    airbnbUrl: "https://tinyurl.com/AirBnBToLani",
+    airbnbShortUrl: "View on Airbnb",
     beforeImage: tolaniBefore,
     afterImage: tolaniAfter,
-    highlights: ["Budget-conscious", "High impact", "Thoughtful details"],
+    highlights: ["Budget-conscious", "Signature accent wall", "Five-star reviews"],
   },
 };
 

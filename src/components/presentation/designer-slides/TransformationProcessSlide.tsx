@@ -1,5 +1,6 @@
 import { SlideLayout } from "../SlideLayout";
 import { MessageSquare, FileText, ShoppingBag, Wrench, Camera } from "lucide-react";
+import ilanaAction from "@/assets/designer/ilana-action.jpg";
 
 export function TransformationProcessSlide() {
   const steps = [
@@ -39,7 +40,7 @@ export function TransformationProcessSlide() {
     <SlideLayout overlay="gradient">
       <div className="w-full max-w-7xl mx-auto text-center">
         {/* Header */}
-        <div className="mb-10 lg:mb-14">
+        <div className="mb-8 lg:mb-10">
           <p className="text-amber-400 uppercase tracking-widest text-base lg:text-lg mb-4">The Process</p>
           <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white">
             From <span className="text-amber-400">Ordinary</span> to{" "}
@@ -50,7 +51,7 @@ export function TransformationProcessSlide() {
         </div>
 
         {/* Timeline */}
-        <div className="relative">
+        <div className="relative mb-8">
           {/* Connection Line */}
           <div className="hidden md:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400/50 to-transparent -translate-y-1/2 z-0" />
 
@@ -78,11 +79,26 @@ export function TransformationProcessSlide() {
           </div>
         </div>
 
-        {/* Bottom Note */}
-        <div className="mt-10 lg:mt-12">
-          <p className="text-white/60 text-lg lg:text-xl">
-            Average timeline: <span className="text-amber-400 font-semibold">2-6 weeks</span> depending on scope
-          </p>
+        {/* Ilana in Action + Timeline Note */}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6">
+          <div className="relative">
+            <img 
+              src={ilanaAction} 
+              alt="Ilana styling a room" 
+              className="w-40 h-40 object-cover rounded-full border-4 border-amber-400/30 shadow-lg"
+            />
+            <div className="absolute -bottom-2 -right-2 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full px-3 py-1">
+              <span className="text-white text-xs font-semibold">In Action</span>
+            </div>
+          </div>
+          <div className="text-left">
+            <p className="text-white/60 text-lg lg:text-xl">
+              Average timeline: <span className="text-amber-400 font-semibold">2-6 weeks</span> depending on scope
+            </p>
+            <p className="text-white/40 text-sm mt-1">
+              Ilana handles everything — you don't need to lift a finger!
+            </p>
+          </div>
         </div>
       </div>
     </SlideLayout>
