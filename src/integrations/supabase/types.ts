@@ -11166,6 +11166,7 @@ export type Database = {
           assigned_at: string | null
           assigned_by: string | null
           assigned_to: string | null
+          assignment_comment: string | null
           category: string | null
           completed_at: string | null
           created_at: string
@@ -11174,7 +11175,9 @@ export type Database = {
           estimated_minutes: number | null
           id: string
           is_pinned: boolean | null
+          owner_name: string | null
           priority: string | null
+          property_address: string | null
           property_id: string | null
           related_contact_id: string | null
           related_contact_type: string | null
@@ -11189,6 +11192,7 @@ export type Database = {
           assigned_at?: string | null
           assigned_by?: string | null
           assigned_to?: string | null
+          assignment_comment?: string | null
           category?: string | null
           completed_at?: string | null
           created_at?: string
@@ -11197,7 +11201,9 @@ export type Database = {
           estimated_minutes?: number | null
           id?: string
           is_pinned?: boolean | null
+          owner_name?: string | null
           priority?: string | null
+          property_address?: string | null
           property_id?: string | null
           related_contact_id?: string | null
           related_contact_type?: string | null
@@ -11212,6 +11218,7 @@ export type Database = {
           assigned_at?: string | null
           assigned_by?: string | null
           assigned_to?: string | null
+          assignment_comment?: string | null
           category?: string | null
           completed_at?: string | null
           created_at?: string
@@ -11220,7 +11227,9 @@ export type Database = {
           estimated_minutes?: number | null
           id?: string
           is_pinned?: boolean | null
+          owner_name?: string | null
           priority?: string | null
+          property_address?: string | null
           property_id?: string | null
           related_contact_id?: string | null
           related_contact_type?: string | null

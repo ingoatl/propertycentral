@@ -108,12 +108,16 @@ interface UnifiedTask {
   contactId?: string;
   propertyId?: string;
   propertyName?: string;
+  propertyAddress?: string;
+  ownerName?: string;
   link?: string;
   actionType?: "call" | "email" | "sms" | "view";
   rawTask?: UserTask | OverdueOnboardingTask | NinjaFocusItem;
   taskType: "user" | "ninja" | "onboarding";
   isOverdue?: boolean;
   daysOverdue?: number;
+  projectId?: string;
+  assignmentComment?: string;
 }
 
 // Critical task row with larger, more prominent styling
@@ -238,10 +242,13 @@ function TaskRow({
           <p className="font-medium text-sm truncate">{task.title}</p>
           {task.isPinned && <Pin className="w-3 h-3 text-primary" />}
         </div>
-        {(task.contactName || task.propertyName || task.dueDate) && (
+        {(task.contactName || task.propertyAddress || task.propertyName || task.dueDate || task.ownerName) && (
           <p className="text-xs text-muted-foreground truncate mt-0.5 flex items-center gap-1">
-            {task.contactName && <span>{task.contactName}</span>}
-            {task.propertyName && <span>• {task.propertyName}</span>}
+            {task.propertyAddress && <span className="font-medium">{task.propertyAddress}</span>}
+            {task.propertyAddress && task.ownerName && <span>•</span>}
+            {task.ownerName && <span>{task.ownerName}</span>}
+            {!task.propertyAddress && task.contactName && <span>{task.contactName}</span>}
+            {!task.propertyAddress && task.propertyName && <span>• {task.propertyName}</span>}
             {task.dueDate && !isToday(task.dueDate) && (
               <span className="ml-2">• {format(task.dueDate, "EEE, MMM d")}</span>
             )}
@@ -371,6 +378,8 @@ export function MondayStyleTasksPanel() {
   } | null>(null);
   const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [assignmentComment, setAssignmentComment] = useState("");
+  const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null);
 
   // Section open states
   const [criticalOpen, setCriticalOpen] = useState(true);
@@ -439,10 +448,13 @@ export function MondayStyleTasksPanel() {
           isPinned: task.is_pinned,
           estimatedMinutes: task.estimated_minutes || undefined,
           propertyId: task.property_id || undefined,
+          propertyAddress: task.property_address || undefined,
+          ownerName: task.owner_name || undefined,
           taskType: "user",
           rawTask: task,
           isOverdue,
           daysOverdue,
+          assignmentComment: task.assignment_comment || undefined,
         });
       });
 
@@ -463,6 +475,9 @@ export function MondayStyleTasksPanel() {
         estimatedMinutes: task.estimated_minutes,
         propertyId: task.property_id,
         propertyName: task.property_name,
+        propertyAddress: task.property_name, // property_name already contains address from hook
+        ownerName: task.owner_name,
+        projectId: task.project_id,
         taskType: "onboarding",
         rawTask: task,
         isOverdue,
@@ -1013,22 +1028,15 @@ export function MondayStyleTasksPanel() {
                 )}
               </div>
 
-              {/* Assign to Team Member */}
+              {/* Assign to Team Member with Comment */}
               {selectedTask.taskType === "user" && teamMembers.length > 0 && (
-                <div className="pt-4 border-t">
+                <div className="pt-4 border-t space-y-3">
                   <div className="flex items-center gap-3">
                     <UserPlus className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Assign to:</span>
                     <Select
-                      onValueChange={(userId) => {
-                        if (userId && selectedTask.id) {
-                          assignTask.mutate({ 
-                            taskId: selectedTask.id, 
-                            assignToUserId: userId 
-                          });
-                          setShowTaskModal(false);
-                        }
-                      }}
+                      value={selectedAssignee || ""}
+                      onValueChange={(userId) => setSelectedAssignee(userId)}
                     >
                       <SelectTrigger className="w-[200px]">
                         <SelectValue placeholder="Select team member" />
@@ -1047,6 +1055,33 @@ export function MondayStyleTasksPanel() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {selectedAssignee && (
+                    <>
+                      <Input
+                        placeholder="Add a comment for the assignee (optional)..."
+                        value={assignmentComment}
+                        onChange={(e) => setAssignmentComment(e.target.value)}
+                        className="text-sm"
+                      />
+                      <Button
+                        onClick={() => {
+                          if (selectedAssignee && selectedTask.id) {
+                            assignTask.mutate({ 
+                              taskId: selectedTask.id, 
+                              assignToUserId: selectedAssignee,
+                              comment: assignmentComment || undefined
+                            });
+                            setShowTaskModal(false);
+                            setSelectedAssignee(null);
+                            setAssignmentComment("");
+                          }
+                        }}
+                        className="w-full"
+                      >
+                        Assign Task
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
