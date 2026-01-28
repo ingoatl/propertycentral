@@ -48,21 +48,21 @@ export function ClosingSlide() {
 
         {/* Next Steps */}
         <div className="bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10 mb-6">
-          <h3 className="text-white font-bold text-lg md:text-xl mb-4">Your Next Steps</h3>
+          <h3 className="text-white font-bold text-lg md:text-xl mb-4">In Your Next Steps</h3>
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-white/70">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-400/20 flex items-center justify-center text-amber-400 font-bold text-lg">1</div>
-              <span className="text-base">Schedule Property Visit</span>
+              <span className="text-base">Schedule a Discovery Call</span>
             </div>
             <ArrowRight className="hidden md:block w-6 h-6 text-white/30" />
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-400/20 flex items-center justify-center text-amber-400 font-bold text-lg">2</div>
-              <span className="text-base">Review Custom Proposal</span>
+              <span className="text-base">Review & Sign Management Agreement</span>
             </div>
             <ArrowRight className="hidden md:block w-6 h-6 text-white/30" />
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-400/20 flex items-center justify-center text-amber-400 font-bold text-lg">3</div>
-              <span className="text-base">Go Live in 7 Days!</span>
+              <span className="text-base">Property Setup & Go Live</span>
             </div>
           </div>
         </div>

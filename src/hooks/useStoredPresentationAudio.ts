@@ -61,7 +61,7 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
       if (!musicRef.current) {
         musicRef.current = new Audio(BACKGROUND_MUSIC_URL);
         musicRef.current.loop = true;
-        musicRef.current.volume = 0.03; // Very subtle background at 3%
+        musicRef.current.volume = 0.08; // Slightly louder background music at 8%
       }
       
       // Fire and forget - don't await or handle errors that would block
