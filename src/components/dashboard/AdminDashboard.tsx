@@ -18,7 +18,7 @@ import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle } f
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { TodaysFocusCard } from "./TodaysFocusCard";
-import { UnifiedNinjaTasksPanel } from "./UnifiedNinjaTasksPanel";
+import { MondayStyleTasksPanel } from "./MondayStyleTasksPanel";
 import { ActionRequiredSection } from "@/components/admin/ActionRequiredSection";
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { SystemHealthPanel } from "@/components/admin/SystemHealthPanel";
@@ -401,8 +401,8 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* TODAY'S FOCUS - Personalized greeting and daily summary - FIRST */}
         <TodaysFocusCard />
         
-        {/* UNIFIED NINJA PLAN + MY TASKS - Combined Monday.com Style */}
-        <UnifiedNinjaTasksPanel />
+        {/* MY TASKS - Monday.com Style with all sources */}
+        <MondayStyleTasksPanel />
         
         {/* Discovery Call Calendar - THIRD */}
         <DiscoveryCallCalendar />
