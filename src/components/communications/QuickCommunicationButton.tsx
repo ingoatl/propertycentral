@@ -343,7 +343,7 @@ export function QuickCommunicationButton() {
             <span className="hidden sm:inline">Dial / Text</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80 p-0 max-h-[80vh] overflow-hidden" align="end">
+        <PopoverContent className="w-80 p-0 max-h-[70vh]" align="end">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "search" | "dialpad")}>
             <div className="border-b px-2 pt-2">
               <TabsList className="w-full">
@@ -367,7 +367,7 @@ export function QuickCommunicationButton() {
                 />
               </div>
 
-              <ScrollArea className="h-[50vh]">
+              <ScrollArea className="max-h-[45vh]">
                 {search.length < 2 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
                     Type at least 2 characters to search
@@ -377,28 +377,28 @@ export function QuickCommunicationButton() {
                     No contacts found
                   </div>
                 ) : (
-                  <div className="p-2 space-y-2">
+                  <div className="p-2 space-y-1">
                     {contacts.map((contact) => (
                       <div
                         key={`${contact.type}-${contact.id}`}
-                        className="p-3 rounded-2xl bg-card border border-border/50 hover:bg-muted/30 transition-all duration-150"
+                        className="p-2 rounded-lg bg-card border border-border/50 hover:bg-muted/30 transition-all duration-150"
                       >
-                        {/* Contact Info - Apple style */}
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                            <span className="text-sm font-semibold text-primary">
+                        {/* Compact Contact Info */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-semibold text-primary">
                               {contact.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <span className="font-medium text-sm text-foreground block truncate">{contact.name}</span>
+                            <span className="font-medium text-xs text-foreground block truncate">{contact.name}</span>
                             {contact.phone && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-[10px] text-muted-foreground">
                                 {formatPhoneForDisplay(contact.phone)}
                               </span>
                             )}
                           </div>
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                          <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                             contact.type === "owner" 
                               ? "bg-secondary text-secondary-foreground" 
                               : contact.type === "vendor"
@@ -408,71 +408,29 @@ export function QuickCommunicationButton() {
                             {contact.type}
                           </span>
                         </div>
-                        {/* Communication Buttons - Always visible */}
+                        {/* Compact Communication Buttons */}
                         {contact.phone && (
-                          <div className="space-y-2.5">
-                            {/* Apple-style action buttons */}
-                            <div className="grid grid-cols-4 gap-2">
-                              <button
-                                className="flex flex-col items-center justify-center h-14 rounded-xl bg-primary/10 hover:bg-primary/20 active:scale-95 transition-all duration-150 touch-manipulation"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCall(contact);
-                                }}
-                              >
-                                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center mb-1">
-                                  <Phone className="h-4 w-4 text-primary-foreground" />
-                                </div>
-                                <span className="text-[10px] font-medium text-foreground">Call</span>
-                              </button>
-                              <button
-                                className="flex flex-col items-center justify-center h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 touch-manipulation"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleText(contact);
-                                }}
-                              >
-                                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mb-1">
-                                  <MessageSquare className="h-4 w-4 text-secondary-foreground" />
-                                </div>
-                                <span className="text-[10px] font-medium text-foreground">Text</span>
-                              </button>
-                              <button
-                                className="flex flex-col items-center justify-center h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 touch-manipulation"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleVoicemail(contact);
-                                }}
-                              >
-                                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mb-1">
-                                  <Mic className="h-4 w-4 text-secondary-foreground" />
-                                </div>
-                                <span className="text-[10px] font-medium text-foreground">Voice</span>
-                              </button>
-                              <button
-                                className="flex flex-col items-center justify-center h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 touch-manipulation"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleVideoMessage(contact);
-                                }}
-                              >
-                                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mb-1">
-                                  <Video className="h-4 w-4 text-secondary-foreground" />
-                                </div>
-                                <span className="text-[10px] font-medium text-foreground">Video</span>
-                              </button>
-                            </div>
-                            
-                            {/* Record Meeting button - Apple style */}
+                          <div className="flex gap-1.5">
                             <button
-                              className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-muted hover:bg-muted/80 active:scale-[0.98] transition-all duration-150 touch-manipulation"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRecordMeeting(contact);
-                              }}
+                              className="flex items-center justify-center flex-1 h-8 rounded-lg bg-primary/10 hover:bg-primary/20 active:scale-95 transition-all duration-150 gap-1"
+                              onClick={(e) => { e.stopPropagation(); handleCall(contact); }}
                             >
-                              <Camera className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-xs font-medium text-foreground">Record Meeting</span>
+                              <Phone className="h-3 w-3 text-primary" />
+                              <span className="text-[10px] font-medium text-foreground">Call</span>
+                            </button>
+                            <button
+                              className="flex items-center justify-center flex-1 h-8 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 gap-1"
+                              onClick={(e) => { e.stopPropagation(); handleText(contact); }}
+                            >
+                              <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-[10px] font-medium text-foreground">Text</span>
+                            </button>
+                            <button
+                              className="flex items-center justify-center flex-1 h-8 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 gap-1"
+                              onClick={(e) => { e.stopPropagation(); handleVoicemail(contact); }}
+                            >
+                              <Mic className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-[10px] font-medium text-foreground">Voice</span>
                             </button>
                           </div>
                         )}

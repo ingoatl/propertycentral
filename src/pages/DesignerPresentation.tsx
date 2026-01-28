@@ -306,11 +306,18 @@ export default function DesignerPresentation() {
           )}
         </Button>
         
-        {/* Auto-play toggle */}
+        {/* Auto-play toggle - also controls audio */}
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+          onClick={() => {
+            const newState = !isAutoPlaying;
+            setIsAutoPlaying(newState);
+            // If pausing, also stop any playing audio
+            if (!newState) {
+              stopAudio();
+            }
+          }}
           className={cn(
             "h-9 w-9 rounded-full border backdrop-blur-sm",
             isAutoPlaying 
