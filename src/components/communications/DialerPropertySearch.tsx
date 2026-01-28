@@ -64,7 +64,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
             phone,
             email,
             second_owner_name,
-            second_owner_phone
+            second_owner_email
           )
         `)
         .or(`address.ilike.${searchTerm},name.ilike.${searchTerm}`)
@@ -72,7 +72,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
 
       if (propError) throw propError;
 
-      // Second search: directly search owners by name/phone
+      // Second search: directly search owners by name/phone/email
       const { data: ownersData, error: ownerError } = await supabase
         .from("property_owners")
         .select(`
@@ -81,7 +81,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
           phone,
           email,
           second_owner_name,
-          second_owner_phone,
+          second_owner_email,
           properties (
             id,
             name,
@@ -108,7 +108,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
             ownerPhone: p.property_owners.phone,
             ownerEmail: p.property_owners.email,
             secondOwnerName: p.property_owners.second_owner_name,
-            secondOwnerPhone: p.property_owners.second_owner_phone,
+            secondOwnerPhone: null, // Column doesn't exist in DB
           });
         }
       });
@@ -127,7 +127,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
                 ownerPhone: owner.phone,
                 ownerEmail: owner.email,
                 secondOwnerName: owner.second_owner_name,
-                secondOwnerPhone: owner.second_owner_phone,
+                secondOwnerPhone: null, // Column doesn't exist in DB
               });
             }
           });

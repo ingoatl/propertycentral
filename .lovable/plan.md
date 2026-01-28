@@ -141,14 +141,15 @@ WHERE
 
 ## Part 3: Data Quality Check
 
+### Missing "Dakun Sun" Owner
+
+**CONFIRMED**: "Dakun Sun" does NOT exist in the `property_owners` table. The dialer search cannot find this owner because they haven't been added to the database.
+
+**Action Required**: Add "Dakun Sun" as a property owner with their phone number and email, then link them to the appropriate property.
+
 ### Missing "Mid Term Nation" Properties
 
-No properties exist for "Alpharetta Mid Term" in the database. Options:
-
-1. **Add Missing Properties**: Create property records for any Mid Term Nation properties
-2. **Check External Systems**: If these exist in another system, they need syncing
-
-I'll add a visual indicator in the search when no results are found, with a quick-add option.
+No properties exist for "Alpharetta Mid Term" in the database either.
 
 ---
 
