@@ -9791,6 +9791,41 @@ export type Database = {
           },
         ]
       }
+      task_comments: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "user_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_notifications: {
         Row: {
           created_at: string | null
@@ -11175,12 +11210,14 @@ export type Database = {
           estimated_minutes: number | null
           id: string
           is_pinned: boolean | null
+          last_reminder_at: string | null
           owner_name: string | null
           priority: string | null
           property_address: string | null
           property_id: string | null
           related_contact_id: string | null
           related_contact_type: string | null
+          reminder_sent: boolean | null
           source_id: string | null
           source_type: string | null
           status: string | null
@@ -11201,12 +11238,14 @@ export type Database = {
           estimated_minutes?: number | null
           id?: string
           is_pinned?: boolean | null
+          last_reminder_at?: string | null
           owner_name?: string | null
           priority?: string | null
           property_address?: string | null
           property_id?: string | null
           related_contact_id?: string | null
           related_contact_type?: string | null
+          reminder_sent?: boolean | null
           source_id?: string | null
           source_type?: string | null
           status?: string | null
@@ -11227,12 +11266,14 @@ export type Database = {
           estimated_minutes?: number | null
           id?: string
           is_pinned?: boolean | null
+          last_reminder_at?: string | null
           owner_name?: string | null
           priority?: string | null
           property_address?: string | null
           property_id?: string | null
           related_contact_id?: string | null
           related_contact_type?: string | null
+          reminder_sent?: boolean | null
           source_id?: string | null
           source_type?: string | null
           status?: string | null

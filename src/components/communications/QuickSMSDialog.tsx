@@ -9,33 +9,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Send, User, Wand2, X, Presentation, Link2 } from "lucide-react";
+import { Loader2, Send, User, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPhoneForDisplay } from "@/lib/phoneUtils";
 import { extractFirstName } from "@/lib/nameUtils";
 import { useUnifiedAI } from "@/hooks/useUnifiedAI";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-const PRESENTATION_LINKS = {
-  designer: {
-    label: "Designer Presentation",
-    url: "https://propertycentral.lovable.app/p/designer",
-  },
-  onboarding: {
-    label: "Onboarding Presentation", 
-    url: "https://propertycentral.lovable.app/p/onboarding",
-  },
-  ownerPortal: {
-    label: "Owner Portal Presentation",
-    url: "https://propertycentral.lovable.app/p/owner-portal",
-  },
-};
+import { InsertLinksDropdown } from "./InsertLinksDropdown";
 
 interface QuickSMSDialogProps {
   open: boolean;
@@ -190,53 +170,35 @@ export function QuickSMSDialog({
 
           {/* Message input */}
           <div className="space-y-2">
+            {/* Links dropdown above the textarea */}
+            <div className="flex items-center gap-2">
+              <InsertLinksDropdown
+                onInsert={(text) => setMessage(text)}
+                recipientName={recipientName}
+                contactType={leadId ? "lead" : ownerId ? "owner" : undefined}
+                disabled={isSending || isAILoading}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-primary hover:bg-primary/10"
+                onClick={() => setShowAICompose(!showAICompose)}
+                disabled={isSending || isAILoading}
+              >
+                <Wand2 className="h-4 w-4" />
+                <span className="hidden sm:inline">AI Compose</span>
+              </Button>
+            </div>
+            
             <div className="relative">
               <Textarea
                 placeholder="Type your message..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={4}
-                className="resize-none pr-10"
+                className="resize-none"
                 disabled={isSending || isAILoading}
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute bottom-2 left-2 h-8 w-8 text-primary hover:bg-primary/10"
-                onClick={() => setShowAICompose(!showAICompose)}
-                disabled={isSending || isAILoading}
-                title="AI Compose"
-              >
-                <Wand2 className="h-4 w-4" />
-              </Button>
-              {/* Presentation Links Quick Insert */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute bottom-2 left-12 h-8 w-8 text-muted-foreground hover:bg-muted"
-                    disabled={isSending || isAILoading}
-                    title="Insert Presentation Link"
-                  >
-                    <Link2 className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {Object.entries(PRESENTATION_LINKS).map(([key, link]) => (
-                    <DropdownMenuItem
-                      key={key}
-                      onClick={() => {
-                        setMessage(prev => prev + (prev ? "\n\n" : "") + `Watch here: ${link.url}`);
-                        toast.success(`${link.label} link added!`);
-                      }}
-                    >
-                      <Presentation className="h-4 w-4 mr-2" />
-                      {link.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
             <p className="text-xs text-muted-foreground text-right">
               {message.length} / 160 characters
