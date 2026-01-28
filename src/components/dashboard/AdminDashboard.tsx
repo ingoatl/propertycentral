@@ -7,15 +7,14 @@ import { RecentActivityFeed } from "./RecentActivityFeed";
 import { EnhancedTeamPerformance } from "./EnhancedTeamPerformance";
 import { OwnedPropertiesPerformance } from "./OwnedPropertiesPerformance";
 import { DailyPerformanceEntriesList } from "./DailyPerformanceEntriesList";
-import { SendTestTeamDigestButton } from "./SendTestTeamDigestButton";
+import { RoleBasedQuickActions } from "./RoleBasedQuickActions";
 import { DiscoveryCallCalendar } from "./DiscoveryCallCalendar";
 import { OnboardingPropertiesTimeline } from "./OnboardingPropertiesTimeline";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Presentation, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Building2, DollarSign, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { TodaysFocusCard } from "./TodaysFocusCard";
 import { MondayStyleTasksPanel } from "./MondayStyleTasksPanel";
@@ -351,33 +350,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
                 Comprehensive property management overview
               </p>
             </div>
-            {/* Hide admin action buttons on mobile */}
-            <div className="hidden md:flex items-center gap-3">
-              <Link to="/onboarding-presentation">
-                <Button variant="default" size="sm" className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
-                  <Presentation className="h-4 w-4 mr-1" />
-                  <span>Owner Pitch</span>
-                </Button>
-              </Link>
-              <Link to="/designer-presentation">
-                <Button variant="default" size="sm" className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white">
-                  <Presentation className="h-4 w-4 mr-1" />
-                  <span>Designer Pitch</span>
-                </Button>
-              </Link>
-              <SendTestTeamDigestButton />
-              <Button onClick={onSendOverdueEmails} variant="outline" size="sm">
-                <AlertCircle className="h-4 w-4" />
-                <span>Overdue</span>
-              </Button>
-              <Button onClick={onExport} variant="outline" size="sm">
-                <Download className="h-4 w-4" />
-                <span>Export</span>
-              </Button>
-              <Button onClick={onSync} disabled={syncing} size="sm">
-                <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                <span>{syncing ? "Syncing..." : "Sync Data"}</span>
-              </Button>
+            {/* Role-based quick actions - hidden on mobile */}
+            <div className="hidden md:block">
+              <RoleBasedQuickActions />
             </div>
           </div>
         </div>
