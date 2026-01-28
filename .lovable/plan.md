@@ -1,274 +1,186 @@
 
-# Enhanced Task Management System: Monday.com-Style Implementation
+# Revamped Task Management + Enhanced Dialer Search
 
 ## Overview
-This plan transforms the existing task management into a comprehensive, intelligent system inspired by Monday.com and Linear. It addresses three core areas:
-1. **My Tasks Section** - Enhanced with date grouping and smart categorization
-2. **Overdue Onboarding Tasks Integration** - Broken down by day for less overwhelm
-3. **Meeting Transcript Import** - To capture and generate tasks from meetings
-4. **AI Intelligence Layer** - Smart prioritization and suggestions
+
+This plan addresses three critical issues:
+1. Task section is confusing - transcript tasks buried among AI suggestions
+2. Dialer search cannot find owners by name
+3. No intelligent prioritization to keep you focused
 
 ---
 
-## Part 1: Enhanced My Tasks Panel (Monday.com-Style)
+## Part 1: Intelligent Task Structure
 
-### Current State
-- Basic `UserTasksPanel` exists with urgent/today/upcoming groupings
-- 8 tasks from Eric Ha meeting already imported
-- Simple list view with checkboxes
+### Current Problem
+The `MondayStyleTasksPanel` mixes 3 data sources with no clear hierarchy:
+- Personal tasks (including transcript imports)
+- AI-generated Ninja priorities
+- Onboarding quick wins
 
-### Monday.com-Inspired Improvements
+This creates cognitive overload - you can't quickly see YOUR tasks.
 
-**Visual Design Changes:**
+### New Structure: Clear Hierarchy with Smart Sections
+
 ```text
-+----------------------------------------------------------+
-|  📋 My Tasks                        [+ Add] [📊 Board View] |
-+----------------------------------------------------------+
-|  📌 PINNED (2)                                            |
-|  ┌────────────────────────────────────────────────────┐  |
-|  │ 🔴 Change Wi-Fi to "Grady the best"   Today • Eric │  |
-|  │ 🟠 Send co-hosting amendment          Today • Eric │  |
-|  └────────────────────────────────────────────────────┘  |
-|                                                           |
-|  📅 TODAY - Jan 28 (4 tasks)                             |
-|  ┌────────────────────────────────────────────────────┐  |
-|  │ ○ Remove recurring call from Google Calendar       │  |
-|  │ ○ Assign Airbnb photos to rooms                   │  |
-|  └────────────────────────────────────────────────────┘  |
-|                                                           |
-|  📅 TOMORROW - Jan 29 (0 tasks)                          |
-|                                                           |
-|  📅 THU, JAN 30 (1 task)                                 |
-|  ┌────────────────────────────────────────────────────┐  |
-|  │ ○ Implement maid cabinet security solution         │  |
-|  └────────────────────────────────────────────────────┘  |
-|                                                           |
-|  📅 NEXT WEEK (3 tasks)                                  |
-|  └── Click to expand...                                  |
-|                                                           |
-|  ⚠️ FROM ONBOARDING - 93 overdue tasks                   |
-|  └── View by property →                                  |
-+----------------------------------------------------------+
++------------------------------------------------------------------+
+|  YOUR TASKS                                    [+ Add] [Import]  |
++------------------------------------------------------------------+
+|                                                                  |
+|  CRITICAL - Needs Attention Now (2)                              |
+|  ┌──────────────────────────────────────────────────────────┐    |
+|  │ 🔴 Change Wi-Fi to "Grady the best"    📝 Meeting • Today │    |
+|  │ 🟠 Send co-hosting amendment            📝 Meeting • Today │    |
+|  └──────────────────────────────────────────────────────────┘    |
+|                                                                  |
+|  TODAY - Jan 28 (3)                                              |
+|  ┌──────────────────────────────────────────────────────────┐    |
+|  │ ○ Assign Airbnb photos to rooms         📝 Meeting        │    |
+|  │ ○ Remove recurring calendar call        📝 Meeting        │    |
+|  └──────────────────────────────────────────────────────────┘    |
+|                                                                  |
+|  THIS WEEK (2)                                                   |
+|  ┌──────────────────────────────────────────────────────────┐    |
+|  │ ○ Implement maid cabinet security       📝 Meeting • Thu  │    |
+|  │ ○ Confirm AC tune-up pricing            📝 Meeting • Tue  │    |
+|  └──────────────────────────────────────────────────────────┘    |
+|                                                                  |
+|  LATER (2)                                                       |
+|  └── Collapsed - click to expand                                 |
+|                                                                  |
++------------------------------------------------------------------+
+|                                                                  |
+|  AI SUGGESTIONS - From your Ninja Plan                           |
+|  ┌──────────────────────────────────────────────────────────┐    |
+|  │ 💡 Follow up with Michael Witter          [📧 Email]      │    |
+|  │ 💡 Call Ellen Hines about documents       [📞 Call]       │    |
+|  └──────────────────────────────────────────────────────────┘    |
+|                                                                  |
++------------------------------------------------------------------+
 ```
 
-**Key Features:**
-1. **Date-based grouping**: Today, Tomorrow, This Week, Next Week, Later
-2. **Smart pinning**: Urgent tasks auto-pinned to top
-3. **Source attribution badges**: Meeting, Call, Email, Onboarding
-4. **Inline task editing**: Click to edit title, due date
-5. **Drag-to-reschedule**: Move tasks between date groups
-6. **Progress indicators**: Per-day completion rate
+### Key Changes
+
+| Current | New |
+|---------|-----|
+| Everything mixed together | Clear "YOUR TASKS" section at top |
+| Small source badges | Large, prominent source icons |
+| AI suggestions inline with tasks | Separate "AI SUGGESTIONS" section below |
+| No priority section | "CRITICAL" section always visible at top |
+| Onboarding tasks mixed in | Onboarding shown separately only if urgent |
+
+### Intelligence Features
+
+1. **Smart Priority Escalation**
+   - Tasks overdue by 1+ day auto-escalate to "Critical"
+   - Urgent tasks from transcripts always pinned to top
+
+2. **Source Recognition**
+   - Large icons: 📝 Meeting, 📧 Email, 📞 Call, 🤖 AI
+   - Color-coded backgrounds for quick scanning
+
+3. **Focus Mode**
+   - Option to hide AI suggestions
+   - "Just My Tasks" toggle for distraction-free view
 
 ---
 
-## Part 2: Overdue Onboarding Tasks Integration
+## Part 2: Enhanced Dialer Property/Owner Search
 
-### Current Analysis
-- 93+ overdue onboarding tasks found (from October 2025)
-- Most have NO `assigned_to_uuid` set
-- Existing `OverdueTasksCard` shows them grouped by property
-- Tasks span multiple properties: Canadian Way, Woodland Lane, Muirfield, Timberlake, etc.
+### Current Problem
 
-### Day-by-Day Breakdown Strategy
-
-Instead of showing all 93 tasks at once, split into manageable chunks:
-
-**New Component: `OverdueOnboardingSection`**
-```text
-+----------------------------------------------------------+
-|  ⚠️ Overdue Onboarding Tasks                              |
-|     93 tasks need attention across 8 properties           |
-+----------------------------------------------------------+
-|                                                           |
-|  🎯 FOCUS TODAY: 10 quick wins                           |
-|  AI has selected tasks you can complete in under 2 hours |
-|                                                           |
-|  ┌────────────────────────────────────────────────────┐  |
-|  │ ○ WiFi Details - Muirfield           [5 min]      │  |
-|  │ ○ Smart lock master PIN - Timberlake [5 min]      │  |
-|  │ ○ Owner Phone - Woodland Lane        [5 min]      │  |
-|  │ ○ Gate code - Muirfield              [2 min]      │  |
-|  │ ... +6 more quick wins                            │  |
-|  └────────────────────────────────────────────────────┘  |
-|                                                           |
-|  📊 BY PROPERTY                                          |
-|  ├── Canadian Way (12 tasks) ▼                           |
-|  ├── Woodland Lane (15 tasks)                            |
-|  ├── Muirfield (18 tasks)                                |
-|  └── Villa Ct SE (8 tasks)                               |
-|                                                           |
-|  📅 BY URGENCY                                           |
-|  ├── Critical (Owner info missing) - 8 tasks             |
-|  ├── High (Insurance/Legal) - 12 tasks                   |
-|  └── Standard (Setup items) - 73 tasks                   |
-+----------------------------------------------------------+
+The search query only looks at property fields:
+```javascript
+.or(`address.ilike.%${query}%,name.ilike.%${query}%`)
 ```
 
-**Intelligence Layer:**
-1. AI identifies "quick wins" (text/checkbox fields that can be filled in < 5 min)
-2. Prioritizes tasks that unblock other workflows
-3. Groups related tasks (e.g., all WiFi tasks across properties)
-4. Estimates completion time per task
+**Owner names are completely ignored.**
 
----
+### New Search Logic
 
-## Part 3: Meeting Transcript Import
-
-### Implementation: Manual Transcript Import
-
-Since the Eric Ha meeting has already ended, we need a way to manually import transcripts.
-
-**New Component: `ImportTranscriptDialog`**
 ```text
-+----------------------------------------------------------+
-|  📝 Import Meeting Transcript                             |
-+----------------------------------------------------------+
-|                                                           |
-|  Meeting Title: [Eric Ha - Property Setup Discussion   ]  |
-|                                                           |
-|  Participants:                                            |
-|  [x] Eric Ha (Owner)  [ ] Lead  [ ] Other                |
-|                                                           |
-|  Property: [Eric Ha - Grady ▼]                           |
-|                                                           |
-|  Transcript:                                              |
-|  ┌────────────────────────────────────────────────────┐  |
-|  │ [Paste your meeting transcript here...]            │  |
-|  │                                                     │  |
-|  │ The conversation covered direct bookings,          │  |
-|  │ listing photos, marketing outreach...              │  |
-|  └────────────────────────────────────────────────────┘  |
-|                                                           |
-|  [ ] Auto-extract action items using AI                  |
-|                                                           |
-|  [Cancel]                          [Import & Analyze →]  |
-+----------------------------------------------------------+
+Search: "sun"  (or "sonia", "brar", "sand wedge", "kennesaw")
+
+Results:
++------------------------------------------------------------------+
+|  🏠 6030 Sand Wedge Circle, Kennesaw, GA                         |
+|     Owner: Sonia Brar                                            |
+|     [📞 412-339-0382] [📧 snbpropertiesatlanta@gmail.com]        |
++------------------------------------------------------------------+
 ```
 
-**Edge Function: `import-meeting-transcript`**
-- Accepts transcript text + metadata
-- Creates `meeting_recordings` entry
-- Calls existing `analyze-call-transcript` for AI task extraction
-- Creates tasks in `user_tasks` table
+### Technical Implementation
+
+```sql
+-- New comprehensive search query
+SELECT p.*, po.name as owner_name, po.phone, po.email
+FROM properties p
+LEFT JOIN property_owners po ON p.owner_id = po.id
+WHERE 
+  -- Property name/address search
+  p.address ILIKE '%{query}%' 
+  OR p.name ILIKE '%{query}%'
+  -- Owner name search (NEW)
+  OR po.name ILIKE '%{query}%'
+  -- City extraction from address (NEW)
+  OR p.address ILIKE '%{query}%'
+```
+
+### Search Enhancements
+
+| Feature | Current | New |
+|---------|---------|-----|
+| Search property name | Yes | Yes |
+| Search address | Yes | Yes |
+| Search owner name | No | Yes |
+| Search city | Partial | Full (extracted from address) |
+| Search phone number | No | Yes |
+| Fuzzy matching | No | Soundex for names |
 
 ---
 
-## Part 4: AI Intelligence Layer
+## Part 3: Data Quality Check
 
-### Smart Task Suggestions
+### Missing "Mid Term Nation" Properties
 
-**Integration with Ninja Plan:**
-The existing `generate-ninja-plan` function will be enhanced to:
+No properties exist for "Alpharetta Mid Term" in the database. Options:
 
-1. **Cross-reference data sources:**
-   - User's personal tasks (`user_tasks`)
-   - Assigned onboarding tasks (`onboarding_tasks`)
-   - Pending confirmations (`pending_task_confirmations`)
-   - Upcoming calls/meetings (`discovery_calls`)
+1. **Add Missing Properties**: Create property records for any Mid Term Nation properties
+2. **Check External Systems**: If these exist in another system, they need syncing
 
-2. **Generate daily focus list:**
-   - "You have 4 tasks due today from your Eric Ha meeting"
-   - "12 onboarding tasks are blocking property go-live"
-   - "Insurance document missing for Canadian Way - critical"
-
-3. **Auto-create follow-up tasks:**
-   - When a meeting is recorded, AI suggests tasks
-   - User confirms/edits before adding to task list
-
-### Database Enhancement: Task Categories
-
-Add `category` column to `user_tasks`:
-- `meeting_followup` - From meetings/calls
-- `onboarding` - From property onboarding
-- `maintenance` - Property maintenance items
-- `communication` - Follow-up calls/emails
-- `administrative` - Internal admin tasks
+I'll add a visual indicator in the search when no results are found, with a quick-add option.
 
 ---
 
-## Technical Implementation
-
-### New Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/components/dashboard/EnhancedUserTasksPanel.tsx` | Monday.com-style task panel |
-| `src/components/dashboard/OverdueOnboardingSection.tsx` | Day-by-day overdue breakdown |
-| `src/components/dashboard/ImportTranscriptDialog.tsx` | Manual transcript import UI |
-| `src/hooks/useOverdueOnboardingTasks.ts` | Fetch and categorize overdue tasks |
-| `supabase/functions/import-meeting-transcript/index.ts` | Process manual transcripts |
-
-### Files to Modify
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/dashboard/UserTasksPanel.tsx` | Replace with enhanced version |
-| `src/hooks/useUserTasks.ts` | Add date grouping, category support |
-| `src/pages/Dashboard.tsx` | Integrate new components |
-| `supabase/functions/generate-ninja-plan/index.ts` | Include user_tasks data |
+| `MondayStyleTasksPanel.tsx` | Complete restructure with clear hierarchy |
+| `DialerPropertySearch.tsx` | Add owner name, phone, and city search |
+| `useUserTasks.ts` | Add priority escalation logic |
 
-### Database Migration
+## Database Queries
 
-```sql
--- Add category and pinned fields to user_tasks
-ALTER TABLE user_tasks 
-ADD COLUMN category TEXT DEFAULT 'general',
-ADD COLUMN is_pinned BOOLEAN DEFAULT false,
-ADD COLUMN estimated_minutes INTEGER;
-
--- Create index for efficient date-based queries
-CREATE INDEX idx_user_tasks_due_date ON user_tasks(user_id, due_date, status);
-```
+No schema changes needed - only query improvements.
 
 ---
 
-## Implementation Phases
+## Implementation Summary
 
-### Phase 1: Enhanced Task Panel (Immediate)
-- Date-based grouping (Today/Tomorrow/This Week/Next Week)
-- Visual redesign with Monday.com aesthetics
-- Source badges and priority indicators
-- Inline quick actions
+1. **Task Panel Restructure**
+   - Separate "YOUR TASKS" from "AI SUGGESTIONS"
+   - Prominent source badges (Meeting, Call, Email, Manual)
+   - Critical section always visible at top
+   - Focus mode toggle
 
-### Phase 2: Overdue Onboarding Integration
-- Create `OverdueOnboardingSection` component
-- AI-powered "Focus Today" suggestions
-- Property and urgency-based grouping
-- Link to onboarding workflow for completion
+2. **Dialer Search Enhancement**
+   - Search owner names (fixes "sun" -> "sonia brar")
+   - Search city names from addresses
+   - Search phone numbers
+   - Better no-results messaging
 
-### Phase 3: Transcript Import
-- Build `ImportTranscriptDialog` component
-- Create `import-meeting-transcript` Edge Function
-- Connect to existing AI analysis pipeline
-- Auto-generate tasks from transcripts
-
-### Phase 4: AI Intelligence
-- Enhance `generate-ninja-plan` to include all task sources
-- Add smart task suggestions based on patterns
-- Implement follow-up task auto-generation
-- Cross-property task grouping (e.g., "All WiFi setup tasks")
-
----
-
-## User Experience Flow
-
-1. **Morning Dashboard Load:**
-   - See "Today's Focus" with AI-selected priorities
-   - View personal tasks grouped by day
-   - See "Quick Wins" from overdue onboarding
-
-2. **After a Meeting:**
-   - Click "Import Transcript" 
-   - Paste meeting notes or transcript
-   - AI extracts action items
-   - Review and approve tasks
-
-3. **Task Completion:**
-   - Check off tasks inline
-   - System updates progress
-   - Related onboarding tasks auto-complete if applicable
-
-4. **Weekly Review:**
-   - See completion rate by category
-   - Review rescheduled items
-   - Plan upcoming week's focus
+3. **Quality of Life**
+   - Import transcript button in header
+   - Quick-add task from any view
+   - Clear visual feedback for task completion
