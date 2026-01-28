@@ -192,11 +192,13 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
-      if (!prev) {
+      const newMuted = !prev;
+      if (newMuted) {
+        // Muting: stop all audio immediately
         stopAudio();
         stopBackgroundMusic();
       }
-      return !prev;
+      return newMuted;
     });
   }, [stopAudio, stopBackgroundMusic]);
 
