@@ -196,7 +196,5 @@ Be thorough - extract every actionable item mentioned. If no tasks found, return
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   }
 });
