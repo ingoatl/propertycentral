@@ -23,6 +23,7 @@ import { ActionRequiredSection } from "@/components/admin/ActionRequiredSection"
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { SystemHealthPanel } from "@/components/admin/SystemHealthPanel";
 import { SyncStatusBar } from "@/components/admin/SyncStatusBar";
+import { UserTasksPanel } from "./UserTasksPanel";
 import { RoleFocusSection } from "./RoleFocusSection";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -403,6 +404,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         
         {/* AI-Powered Ninja Focus Plan (Daily Planner) - SECOND */}
         <NinjaFocusPanel />
+        
+        {/* Personal User Tasks - NEW */}
+        <UserTasksPanel />
         
         {/* Discovery Call Calendar - THIRD */}
         <DiscoveryCallCalendar />

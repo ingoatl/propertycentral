@@ -140,6 +140,7 @@ const App = () => (
                     <Route path="/lead-payment-success" element={<LeadPaymentSuccess />} />
                     <Route path="/sign/:token" element={<Suspense fallback={<SigningLoader />}><SignDocument /></Suspense>} />
                     <Route path="/onboarding-presentation" element={<OnboardingPresentation />} />
+                    <Route path="/p/onboarding" element={<OnboardingPresentation />} />
                     <Route path="/designer-presentation" element={<DesignerPresentation />} />
                     <Route path="/reschedule/:callId" element={<RescheduleCall />} />
                     <Route path="/vm/:token" element={<VoicemailPlayer />} />
@@ -149,6 +150,7 @@ const App = () => (
                     <Route path="/vendor-quote/:requestId" element={<VendorQuote />} />
                     <Route path="/vendor/w9-upload" element={<VendorW9Upload />} />
                     <Route path="/owner-portal-presentation" element={<OwnerPortalPresentation />} />
+                    <Route path="/p/owner-portal" element={<OwnerPortalPresentation />} />
                     <Route path="*" element={
                       <ErrorBoundary>
                         <Layout>

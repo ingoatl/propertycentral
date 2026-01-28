@@ -12,6 +12,7 @@ import { DailyPerformanceEntry } from "@/components/dashboard/DailyPerformanceEn
 import { DiscoveryCallCalendar } from "@/components/dashboard/DiscoveryCallCalendar";
 import { RoleFocusSection } from "@/components/dashboard/RoleFocusSection";
 import { NinjaFocusPanel } from "@/components/dashboard/NinjaFocusPanel";
+import { UserTasksPanel } from "@/components/dashboard/UserTasksPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -490,6 +491,9 @@ const Dashboard = () => {
       
       {/* AI-Powered Ninja Focus Plan (Personalized Daily Planner) */}
       <NinjaFocusPanel />
+      
+      {/* Personal User Tasks - NEW */}
+      <UserTasksPanel />
       
       {/* Discovery Call Calendar - Prominent at top */}
       <DiscoveryCallCalendar />
