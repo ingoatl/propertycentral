@@ -23,7 +23,8 @@ import { ActionRequiredSection } from "@/components/admin/ActionRequiredSection"
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { SystemHealthPanel } from "@/components/admin/SystemHealthPanel";
 import { SyncStatusBar } from "@/components/admin/SyncStatusBar";
-import { UserTasksPanel } from "./UserTasksPanel";
+import { EnhancedUserTasksPanel } from "./EnhancedUserTasksPanel";
+import { OverdueOnboardingSection } from "./OverdueOnboardingSection";
 import { RoleFocusSection } from "./RoleFocusSection";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -402,11 +403,14 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* TODAY'S FOCUS - Personalized greeting and daily summary - FIRST */}
         <TodaysFocusCard />
         
-        {/* AI-Powered Ninja Focus Plan (Daily Planner) - SECOND */}
-        <NinjaFocusPanel />
+        {/* NINJA PLAN + MY TASKS - Combined Monday.com Style */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <EnhancedUserTasksPanel />
+          <OverdueOnboardingSection />
+        </div>
         
-        {/* Personal User Tasks - NEW */}
-        <UserTasksPanel />
+        {/* AI-Powered Ninja Focus Plan (Daily Planner) */}
+        <NinjaFocusPanel />
         
         {/* Discovery Call Calendar - THIRD */}
         <DiscoveryCallCalendar />
