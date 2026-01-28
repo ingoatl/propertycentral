@@ -110,9 +110,10 @@ const slideVariants = {
 
 export default function OwnerPortalPresentation() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false); // Start paused until user clicks play
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
@@ -141,6 +142,20 @@ export default function OwnerPortalPresentation() {
   } = useStoredPresentationAudio({
     presentation: "owner-portal"
   });
+
+  // Auto-start presentation when audio is preloaded
+  useEffect(() => {
+    if (isPreloaded && !hasAutoStarted) {
+      // Small delay to ensure everything is ready
+      const timer = setTimeout(() => {
+        initAudioContext();
+        setHasAutoStarted(true);
+        setHasStarted(true);
+        setIsPlaying(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isPreloaded, hasAutoStarted, initAudioContext]);
 
   // Advance to next slide with end-of-presentation guard
   const advanceSlide = useCallback(() => {
