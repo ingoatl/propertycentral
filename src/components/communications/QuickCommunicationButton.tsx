@@ -343,7 +343,7 @@ export function QuickCommunicationButton() {
             <span className="hidden sm:inline">Dial / Text</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80 p-0" align="end">
+        <PopoverContent className="w-80 p-0 max-h-[80vh] overflow-hidden" align="end">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "search" | "dialpad")}>
             <div className="border-b px-2 pt-2">
               <TabsList className="w-full">
@@ -367,7 +367,7 @@ export function QuickCommunicationButton() {
                 />
               </div>
 
-              <ScrollArea className="max-h-[350px]">
+              <ScrollArea className="max-h-[60vh]">
                 {search.length < 2 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
                     Type at least 2 characters to search

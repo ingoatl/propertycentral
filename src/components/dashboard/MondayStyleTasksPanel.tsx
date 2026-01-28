@@ -27,7 +27,9 @@ import {
   FileText,
   Lightbulb,
   Eye,
-  EyeOff
+  EyeOff,
+  X,
+  CheckCircle
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +42,13 @@ import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 import { format, isToday, isTomorrow, isThisWeek, parseISO, isPast, differenceInDays } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface NinjaFocusItem {
   priority: "critical" | "high" | "medium";
@@ -352,6 +361,8 @@ export function MondayStyleTasksPanel() {
     ownerId?: string;
     contactType?: "lead" | "owner" | "vendor";
   } | null>(null);
+  const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
 
   // Section open states
   const [criticalOpen, setCriticalOpen] = useState(true);
@@ -541,22 +552,40 @@ export function MondayStyleTasksPanel() {
       }
     });
 
-    // Sort each group by priority
-    const sortByPriority = (a: UnifiedTask, b: UnifiedTask) => {
+    // Sort each group by creation date (newest first), then priority for ties
+    const sortByRecency = (a: UnifiedTask, b: UnifiedTask) => {
+      // Get raw task created_at for proper sorting
+      const aCreatedAt = (a.rawTask as any)?.created_at ? new Date((a.rawTask as any).created_at).getTime() : 0;
+      const bCreatedAt = (b.rawTask as any)?.created_at ? new Date((b.rawTask as any).created_at).getTime() : 0;
+      
+      // Newest first
+      if (bCreatedAt !== aCreatedAt) {
+        return bCreatedAt - aCreatedAt;
+      }
+      
+      // For ties, sort by priority
       const priorityOrder = { urgent: 0, critical: 0, high: 1, medium: 2, low: 3 };
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     };
 
     return {
-      critical: critical.sort(sortByPriority),
-      today: todayTasks.sort(sortByPriority),
-      thisWeek: thisWeekTasks.sort(sortByPriority),
-      later: laterTasks.sort(sortByPriority),
+      critical: critical.sort(sortByRecency),
+      today: todayTasks.sort(sortByRecency),
+      thisWeek: thisWeekTasks.sort(sortByRecency),
+      later: laterTasks.sort(sortByRecency),
     };
   }, [filteredYourTasks]);
 
   const handleTaskAction = (task: UnifiedTask) => {
-    if (task.actionType === "call" && task.contactPhone) {
+    // Always open the task modal first for context
+    setSelectedTask(task);
+    setShowTaskModal(true);
+  };
+
+  const executeTaskAction = (task: UnifiedTask, action: "call" | "email" | "navigate") => {
+    setShowTaskModal(false);
+    
+    if (action === "call" && task.contactPhone) {
       setSelectedContact({
         name: task.contactName || "Unknown",
         phone: task.contactPhone,
@@ -566,7 +595,7 @@ export function MondayStyleTasksPanel() {
         contactType: task.contactType as "lead" | "owner" | "vendor",
       });
       setShowCallDialog(true);
-    } else if (task.actionType === "email" && task.contactEmail) {
+    } else if (action === "email" && task.contactEmail) {
       setSelectedContact({
         name: task.contactName || "Unknown",
         email: task.contactEmail,
@@ -576,12 +605,14 @@ export function MondayStyleTasksPanel() {
         contactType: task.contactType as "lead" | "owner" | "vendor",
       });
       setShowEmailDialog(true);
-    } else if (task.link) {
-      navigate(task.link);
-    } else if (task.propertyId) {
-      navigate(`/properties?property=${task.propertyId}&task=${task.id}`);
-    } else {
-      navigate("/communications");
+    } else if (action === "navigate") {
+      if (task.link) {
+        navigate(task.link);
+      } else if (task.propertyId) {
+        navigate(`/properties?property=${task.propertyId}&task=${task.id}`);
+      } else {
+        navigate("/communications");
+      }
     }
   };
 
@@ -809,6 +840,126 @@ export function MondayStyleTasksPanel() {
           contactType={selectedContact.contactType === "vendor" ? "lead" : selectedContact.contactType || "lead"}
         />
       )}
+
+      {/* Task Execution Modal */}
+      <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              {selectedTask?.title}
+            </DialogTitle>
+            {selectedTask?.description && (
+              <DialogDescription className="mt-2">
+                {selectedTask.description}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          
+          {selectedTask && (
+            <div className="space-y-4">
+              {/* Task Details */}
+              <div className="flex flex-wrap gap-2">
+                {selectedTask.source && (
+                  <Badge variant="secondary" className="capitalize">
+                    {sourceConfig[selectedTask.source]?.label || selectedTask.source}
+                  </Badge>
+                )}
+                {selectedTask.priority && (
+                  <Badge 
+                    variant={selectedTask.priority === "urgent" || selectedTask.priority === "critical" ? "destructive" : "outline"}
+                    className="capitalize"
+                  >
+                    {selectedTask.priority}
+                  </Badge>
+                )}
+                {selectedTask.dueDate && (
+                  <Badge variant="outline" className="gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {format(selectedTask.dueDate, "MMM d, yyyy")}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Contact Info */}
+              {(selectedTask.contactName || selectedTask.propertyName) && (
+                <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+                  {selectedTask.contactName && (
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span>{selectedTask.contactName}</span>
+                    </div>
+                  )}
+                  {selectedTask.contactPhone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <span>{selectedTask.contactPhone}</span>
+                    </div>
+                  )}
+                  {selectedTask.contactEmail && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <span>{selectedTask.contactEmail}</span>
+                    </div>
+                  )}
+                  {selectedTask.propertyName && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-muted-foreground" />
+                      <span>{selectedTask.propertyName}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2 pt-2">
+                {selectedTask.contactPhone && (
+                  <Button 
+                    onClick={() => executeTaskAction(selectedTask, "call")}
+                    className="gap-2"
+                  >
+                    <Phone className="w-4 h-4" />
+                    Call
+                  </Button>
+                )}
+                {selectedTask.contactEmail && (
+                  <Button 
+                    variant="secondary"
+                    onClick={() => executeTaskAction(selectedTask, "email")}
+                    className="gap-2"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Email
+                  </Button>
+                )}
+                {(selectedTask.link || selectedTask.propertyId) && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => executeTaskAction(selectedTask, "navigate")}
+                    className="gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open
+                  </Button>
+                )}
+                {selectedTask.taskType === "user" && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      completeTask.mutate(selectedTask.id);
+                      setShowTaskModal(false);
+                    }}
+                    className="gap-2 ml-auto text-green-600 hover:text-green-700 hover:bg-green-50"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Complete
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

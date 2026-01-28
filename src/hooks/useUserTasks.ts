@@ -51,9 +51,7 @@ export function useUserTasks() {
         .select("*")
         .eq("user_id", user.id)
         .neq("status", "cancelled")
-        .order("priority", { ascending: true })
-        .order("due_date", { ascending: true, nullsFirst: false })
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false }); // Newest first
 
       if (error) throw error;
       return data as UserTask[];
