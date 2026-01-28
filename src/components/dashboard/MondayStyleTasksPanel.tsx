@@ -615,9 +615,9 @@ export function MondayStyleTasksPanel() {
   const handleTaskAction = (task: UnifiedTask) => {
     // DIRECT NAVIGATION: Navigate directly to the right location instead of modal
     
-    // If it's an onboarding task, go to the onboarding workflow
-    if (task.taskType === "onboarding" && task.propertyId) {
-      navigate(`/onboarding?project=${task.propertyId}&task=${task.id}`);
+    // If it's an onboarding task, go to the Properties page with openWorkflow param
+    if (task.taskType === "onboarding" && task.projectId) {
+      navigate(`/properties?openWorkflow=${task.projectId}&taskId=${task.id}`);
       return;
     }
     
@@ -633,10 +633,12 @@ export function MondayStyleTasksPanel() {
       const isOnboardingRelated = task.source === "onboarding" || 
         task.title.toLowerCase().includes("wifi") ||
         task.title.toLowerCase().includes("setup") ||
-        task.title.toLowerCase().includes("onboarding");
+        task.title.toLowerCase().includes("onboarding") ||
+        task.title.toLowerCase().includes("lawncare") ||
+        task.title.toLowerCase().includes("owner onboarding");
       
-      if (isOnboardingRelated) {
-        navigate(`/onboarding?property=${task.propertyId}&task=${task.id}`);
+      if (isOnboardingRelated && task.projectId) {
+        navigate(`/properties?openWorkflow=${task.projectId}&taskId=${task.id}`);
       } else {
         navigate(`/properties?property=${task.propertyId}&tab=details`);
       }
@@ -754,33 +756,7 @@ export function MondayStyleTasksPanel() {
             <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
               {/* ===== YOUR TASKS SECTION ===== */}
               
-              {/* CRITICAL - Always visible at top */}
-              {groupedTasks.critical.length > 0 && (
-                <div className="space-y-2">
-                  <SectionHeader
-                    title="CRITICAL - Needs Attention"
-                    count={groupedTasks.critical.length}
-                    icon={AlertCircle}
-                    isOpen={criticalOpen}
-                    onToggle={() => setCriticalOpen(!criticalOpen)}
-                    variant="critical"
-                  />
-                  {criticalOpen && (
-                    <div className="space-y-2 pl-2">
-                      {groupedTasks.critical.map((task) => (
-                        <CriticalTaskRow 
-                          key={task.id} 
-                          task={task}
-                          onComplete={task.taskType === "user" ? () => handleCompleteTask(task) : undefined}
-                          onAction={handleTaskAction}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TODAY */}
+              {/* TODAY - Show first as requested */}
               {groupedTasks.today.length > 0 && (
                 <div className="space-y-2">
                   <SectionHeader
@@ -844,6 +820,32 @@ export function MondayStyleTasksPanel() {
                     <div className="space-y-1 pl-2">
                       {groupedTasks.later.map((task) => (
                         <TaskRow 
+                          key={task.id} 
+                          task={task}
+                          onComplete={task.taskType === "user" ? () => handleCompleteTask(task) : undefined}
+                          onAction={handleTaskAction}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* CRITICAL - Moved to bottom as requested */}
+              {groupedTasks.critical.length > 0 && (
+                <div className="space-y-2">
+                  <SectionHeader
+                    title="CRITICAL - Needs Attention"
+                    count={groupedTasks.critical.length}
+                    icon={AlertCircle}
+                    isOpen={criticalOpen}
+                    onToggle={() => setCriticalOpen(!criticalOpen)}
+                    variant="critical"
+                  />
+                  {criticalOpen && (
+                    <div className="space-y-2 pl-2">
+                      {groupedTasks.critical.map((task) => (
+                        <CriticalTaskRow 
                           key={task.id} 
                           task={task}
                           onComplete={task.taskType === "user" ? () => handleCompleteTask(task) : undefined}
