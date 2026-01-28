@@ -155,7 +155,8 @@ export default function OnboardingPresentation() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false); // Start paused until audio is ready
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioEndedRef = useRef(false);
   const hasPlayedRef = useRef(false);
@@ -184,6 +185,20 @@ export default function OnboardingPresentation() {
   } = useStoredPresentationAudio({ 
     presentation: "onboarding"
   });
+
+  // Auto-start presentation when audio is preloaded
+  useEffect(() => {
+    if (isPreloaded && !hasAutoStarted) {
+      // Small delay to ensure everything is ready
+      const timer = setTimeout(() => {
+        initAudioContext();
+        setHasAutoStarted(true);
+        hasPlayedRef.current = true;
+        setIsPlaying(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isPreloaded, hasAutoStarted, initAudioContext]);
 
   const goToSlide = useCallback((index: number) => {
     if (index >= 0 && index < SLIDES.length && !isTransitioning) {
