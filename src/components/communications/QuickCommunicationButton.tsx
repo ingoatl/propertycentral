@@ -343,7 +343,7 @@ export function QuickCommunicationButton() {
             <span className="hidden sm:inline">Dial / Text</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80 p-0 max-h-[70vh]" align="end">
+        <PopoverContent className="w-80 p-0" align="end">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "search" | "dialpad")}>
             <div className="border-b px-2 pt-2">
               <TabsList className="w-full">
@@ -367,7 +367,7 @@ export function QuickCommunicationButton() {
                 />
               </div>
 
-              <ScrollArea className="max-h-[45vh]">
+              <ScrollArea className="h-[50vh]">
                 {search.length < 2 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
                     Type at least 2 characters to search
@@ -377,60 +377,55 @@ export function QuickCommunicationButton() {
                     No contacts found
                   </div>
                 ) : (
-                  <div className="p-2 space-y-1">
+                  <div className="p-3 space-y-3">
                     {contacts.map((contact) => (
                       <div
                         key={`${contact.type}-${contact.id}`}
-                        className="p-2 rounded-lg bg-card border border-border/50 hover:bg-muted/30 transition-all duration-150"
+                        className="p-3 rounded-lg border border-border/30 hover:bg-muted/20 transition-colors"
                       >
-                        {/* Compact Contact Info */}
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-semibold text-primary">
+                        {/* Contact Info */}
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-semibold text-primary">
                               {contact.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <span className="font-medium text-xs text-foreground block truncate">{contact.name}</span>
-                            {contact.phone && (
-                              <span className="text-[10px] text-muted-foreground">
-                                {formatPhoneForDisplay(contact.phone)}
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm truncate">{contact.name}</p>
+                              <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                                contact.type === "owner" 
+                                  ? "bg-secondary text-secondary-foreground" 
+                                  : contact.type === "vendor"
+                                  ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                                  : "bg-primary/10 text-primary"
+                              }`}>
+                                {contact.type}
                               </span>
+                            </div>
+                            {contact.phone && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatPhoneForDisplay(contact.phone)}
+                              </p>
                             )}
                           </div>
-                          <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                            contact.type === "owner" 
-                              ? "bg-secondary text-secondary-foreground" 
-                              : contact.type === "vendor"
-                              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-                              : "bg-primary/10 text-primary"
-                          }`}>
-                            {contact.type}
-                          </span>
                         </div>
-                        {/* Compact Communication Buttons */}
+                        
+                        {/* Action Buttons - Old Layout Style */}
                         {contact.phone && (
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-2">
                             <button
-                              className="flex items-center justify-center flex-1 h-8 rounded-lg bg-primary/10 hover:bg-primary/20 active:scale-95 transition-all duration-150 gap-1"
+                              className="flex-[3] h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center gap-2 transition-colors"
                               onClick={(e) => { e.stopPropagation(); handleCall(contact); }}
                             >
-                              <Phone className="h-3 w-3 text-primary" />
-                              <span className="text-[10px] font-medium text-foreground">Call</span>
+                              <Phone className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium">Call</span>
                             </button>
                             <button
-                              className="flex items-center justify-center flex-1 h-8 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 gap-1"
+                              className="flex-1 h-10 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
                               onClick={(e) => { e.stopPropagation(); handleText(contact); }}
                             >
-                              <MessageSquare className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-[10px] font-medium text-foreground">Text</span>
-                            </button>
-                            <button
-                              className="flex items-center justify-center flex-1 h-8 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 transition-all duration-150 gap-1"
-                              onClick={(e) => { e.stopPropagation(); handleVoicemail(contact); }}
-                            >
-                              <Mic className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-[10px] font-medium text-foreground">Voice</span>
+                              <MessageSquare className="h-4 w-4 text-muted-foreground" />
                             </button>
                           </div>
                         )}
