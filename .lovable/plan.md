@@ -1,71 +1,199 @@
-# Smart Follow-Up System - Call Type Aware
 
-## ✅ Completed Implementation
+# Dashboard Header Redesign: Role-Based Quick Actions
 
-### Overview
-A psychology-informed follow-up system that sends pre-call and post-call messages with:
-- **Call-Type Awareness**: Differentiates between VIDEO and PHONE calls
-- **Video Calls**: Shares the Google Meet link in follow-ups
-- **Phone Calls**: Confirms the phone number we'll call them on
-- **Presentation Embedding**: Includes Onboarding and Owner Portal presentation links
+## Overview
 
----
-
-## Follow-Up Sequences
-
-### Call Scheduled (Pre-Call) Sequence
-| Step | Timing | Channel | Content |
-|------|--------|---------|---------|
-| 1 | 48h before call | Email | Onboarding Presentation + call type details |
-| 2 | 24h before call | SMS | Owner Portal teaser + call type brief |
-| 3 | 2h before call | SMS | Final reminder with call type reminder |
-
-### Call Attended (Post-Call) Sequence
-| Step | Timing | Channel | Content |
-|------|--------|---------|---------|
-| 1 | 2h after call | Email | Owner Portal + Onboarding presentations |
-| 2 | 48h after call | SMS | Check-in about presentations |
-| 3 | 5 days after call | Email | Final value reinforcement |
+This plan restructures the dashboard header to:
+1. Remove unused/cluttered buttons (Test Team Digest, Overdue, Export, Sync Data)
+2. Create a unified "Quick Links" dropdown for copyable presentation and calendar links
+3. Implement role-based action buttons so each team member sees tools relevant to their role
 
 ---
 
-## Call-Type Dynamic Content
+## Current State Analysis
 
-### Video Calls
-- `[CALL_TYPE_DETAILS]` → "📹 Video Call: [Google Meet Link]"
-- `[CALL_TYPE_BRIEF]` → "Join here: [Google Meet Link]"
-- `[CALL_TYPE_REMINDER]` → "Join the video call here: [Link]"
+The dashboard header currently has 6 buttons visible on desktop:
+- Owner Pitch (link to presentation)
+- Designer Pitch (link to presentation)
+- Test Team Digest (test email function)
+- Overdue (send overdue emails)
+- Export (CSV export)
+- Sync Data (OwnerRez sync)
 
-### Phone Calls
-- `[CALL_TYPE_DETAILS]` → "📞 Phone Call: We'll call you at (XXX) XXX-XXXX"
-- `[CALL_TYPE_BRIEF]` → "We'll call you at (XXX) XXX-XXXX"
-- `[CALL_TYPE_REMINDER]` → "We'll be calling you at (XXX) XXX-XXXX."
-
----
-
-## Technical Implementation
-
-### Files Modified
-1. **`supabase/functions/schedule-lead-follow-ups/index.ts`**
-   - Fetches discovery call data for call_scheduled stage
-   - Calculates relative timing (48h, 24h, 2h before call)
-   - Skips steps if scheduled time already passed
-
-2. **`supabase/functions/process-scheduled-follow-ups/index.ts`**
-   - Added call-type detection from discovery_calls table
-   - Added `processCallTypePlaceholders()` function
-   - Added `processPresentationLinks()` function
-   - Fortune 500 styled email templates with CTA buttons
-
-### Database Updates
-- Replaced old follow-up steps with new call-aware steps
-- 3 steps for call_scheduled (pre-call)
-- 3 steps for call_attended (post-call)
+**Problems:**
+- Too many buttons creating visual clutter
+- Copy-only links (presentations, calendar) are hidden in communication modals
+- No role differentiation - all users see the same buttons
 
 ---
 
-## Verification
-- Tested with lead `f05f7e68-9b37-48f3-bb26-bbd8deb17f73`
-- Correctly detected video call with meet link
-- Scheduled Step 2 (24h before) and Step 3 (2h before)
-- Step 1 (48h before) skipped as time already passed
+## Proposed Solution
+
+### 1. Buttons to Remove
+| Button | Reason |
+|--------|--------|
+| Test Team Digest | Development/testing tool |
+| Overdue | Rarely used, move to admin tools |
+| Export | Rarely used, move to admin tools |
+| Sync Data | Auto-sync is already running |
+
+### 2. New "Quick Links" Dropdown
+A single dropdown button containing:
+- **Presentations** (copy link only):
+  - Owner Pitch
+  - Designer Pitch
+  - Owner Portal
+- **Calendar Links** (copy link only):
+  - Discovery Call Booking
+  - Owner Call Booking
+
+### 3. Role-Based Action Buttons
+
+| Role | Quick Actions Shown |
+|------|---------------------|
+| **Leadership** (Ingo) | Quick Links dropdown only (clean view) |
+| **Ops Manager / Cleaner Coordinator** (Alex) | Quick Links + "Open Vendors" button |
+| **Bookkeeper** (Anja) | Quick Links + "Monthly Charges" button |
+| **Marketing VA** (Catherine, Chris) | Quick Links + "Leads Pipeline" button |
+| **Sales** | Quick Links + "Leads Pipeline" button |
+
+---
+
+## Implementation Details
+
+### Files to Create
+
+#### 1. `src/hooks/useUserTeamRole.ts`
+A reusable hook to fetch the current user's team role(s):
+- Query `user_team_roles` joined with `team_roles`
+- Cache results with React Query
+- Return `roleNames[]`, `primaryRole`, and helper booleans like `isOpsManager`, `isBookkeeper`, etc.
+
+#### 2. `src/components/dashboard/DashboardQuickLinks.tsx`
+A dropdown component for copy-only links:
+- Similar to `InsertLinksDropdown` but without message insertion
+- Only copies URL to clipboard on click
+- Contains presentations and calendar booking links
+- Compact single-button design with "Links" label
+
+#### 3. `src/components/dashboard/RoleBasedQuickActions.tsx`
+Orchestration component that:
+- Uses `useUserTeamRole` hook to determine user's role
+- Renders `DashboardQuickLinks` for all users
+- Conditionally renders role-specific action buttons:
+  - Ops Manager: "Open Vendors" (navigates to /vendors)
+  - Bookkeeper: "Monthly Charges" (navigates to /monthly-charges)
+  - Marketing VA: "Leads Pipeline" (navigates to /leads-pipeline)
+
+### Files to Modify
+
+#### `src/components/dashboard/AdminDashboard.tsx`
+- Remove `SendTestTeamDigestButton` import and usage
+- Remove the Overdue, Export, Sync Data buttons
+- Remove the Owner Pitch / Designer Pitch link buttons
+- Replace with `<RoleBasedQuickActions />`
+
+---
+
+## Component Design
+
+### DashboardQuickLinks Dropdown Structure
+```text
+[Links ▼] button
+├─ Presentations (section header)
+│   ├─ Owner Pitch → Copy URL
+│   ├─ Designer Pitch → Copy URL
+│   └─ Owner Portal → Copy URL
+├─ Calendar Links (section header)
+│   ├─ Book Discovery Call → Copy URL
+│   └─ Book Owner Call → Copy URL
+```
+
+### Role-Based Buttons Layout
+```text
+Header: "PeachHaus Dashboard"           [Links ▼] [Role-Specific Button]
+
+Alex (Ops):     [Links ▼] [Open Vendors]
+Anja (Bookkeeper): [Links ▼] [Monthly Charges]
+Catherine (Marketing): [Links ▼] [Leads Pipeline]
+Ingo (Leadership): [Links ▼] (clean, no extra button)
+```
+
+---
+
+## Technical Approach
+
+### useUserTeamRole Hook Logic
+```typescript
+// Pseudocode
+1. Get current user from supabase.auth.getUser()
+2. Query user_team_roles joined with team_roles
+3. Extract role names array
+4. Determine primary role using priority order:
+   Leadership > Bookkeeper > Ops Manager > Marketing VA > Sales
+5. Return { roleNames, primaryRole, isOpsManager, isBookkeeper, isMarketingVA, isLeadership }
+```
+
+### Role Detection for Quick Actions
+```typescript
+// Pseudocode for RoleBasedQuickActions
+const { primaryRole, isOpsManager, isBookkeeper, isMarketingVA } = useUserTeamRole();
+
+return (
+  <div className="flex items-center gap-2">
+    <DashboardQuickLinks />
+    
+    {isOpsManager && (
+      <Link to="/vendors">
+        <Button>Open Vendors</Button>
+      </Link>
+    )}
+    
+    {isBookkeeper && (
+      <Link to="/monthly-charges">
+        <Button>Monthly Charges</Button>
+      </Link>
+    )}
+    
+    {isMarketingVA && (
+      <Link to="/leads-pipeline">
+        <Button>Leads Pipeline</Button>
+      </Link>
+    )}
+  </div>
+);
+```
+
+---
+
+## URL References
+
+| Link Type | URL |
+|-----------|-----|
+| Owner Pitch | `https://propertycentral.lovable.app/p/onboarding` |
+| Designer Pitch | `https://propertycentral.lovable.app/p/designer` |
+| Owner Portal | `https://propertycentral.lovable.app/p/owner-portal` |
+| Discovery Call | `https://propertycentral.lovable.app/book-discovery-call` |
+| Owner Call | `https://propertycentral.lovable.app/book-owner-call` |
+
+---
+
+## Summary of Changes
+
+| Action | Component/File |
+|--------|----------------|
+| Create | `src/hooks/useUserTeamRole.ts` |
+| Create | `src/components/dashboard/DashboardQuickLinks.tsx` |
+| Create | `src/components/dashboard/RoleBasedQuickActions.tsx` |
+| Modify | `src/components/dashboard/AdminDashboard.tsx` |
+| Cleanup | Remove `SendTestTeamDigestButton` import |
+
+---
+
+## Expected Outcome
+
+After implementation:
+- Dashboard header will be cleaner with fewer buttons
+- All team members can quickly copy presentation/calendar links from one dropdown
+- Each team member sees a role-appropriate action button for their primary workflow
+- The header uses space more efficiently and guides users to their key tools
