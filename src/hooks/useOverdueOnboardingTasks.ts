@@ -94,6 +94,7 @@ function determineUrgency(task: { title: string; phase_number: number; days_over
 export function useOverdueOnboardingTasks(userId?: string) {
   return useQuery({
     queryKey: ["overdue-onboarding-tasks", userId],
+    staleTime: 60000, // Cache for 60 seconds for performance
     queryFn: async (): Promise<OverdueTasksGrouped> => {
       const today = new Date().toISOString().split("T")[0];
 

@@ -54,17 +54,20 @@ export function useUserTasks() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Fetch tasks where user is owner OR assigned_to
+      // Fetch tasks where:
+      // 1. User is the owner AND task is NOT assigned to someone else
+      // 2. OR task is assigned TO this user
       const { data, error } = await supabase
         .from("user_tasks")
         .select("*")
-        .or(`user_id.eq.${user.id},assigned_to.eq.${user.id}`)
+        .or(`and(user_id.eq.${user.id},assigned_to.is.null),assigned_to.eq.${user.id}`)
         .neq("status", "cancelled")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as UserTask[];
     },
+    staleTime: 30000, // Cache for 30 seconds for performance
   });
 
   const createTask = useMutation({

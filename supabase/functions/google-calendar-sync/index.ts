@@ -876,6 +876,7 @@ serve(async (req) => {
       
       // IMPORTANT: When startTime/endTime are ISO strings (UTC), use timeZone: "UTC"
       // to ensure Google Calendar correctly interprets them without timezone offset errors.
+      // CRITICAL: Do NOT set recurrence - this should be a single event, not recurring
       const result = await callMCPTool(
         accessToken,
         userId,
@@ -896,6 +897,8 @@ serve(async (req) => {
           sendUpdates: "all",
           guestsCanModify: false,
           guestsCanInviteOthers: false,
+          // Explicitly NO recurrence - single event only
+          recurrence: null,
           conferenceDataVersion: addConferenceData ? 1 : undefined,
           conferenceData: addConferenceData ? {
             createRequest: {
@@ -903,7 +906,7 @@ serve(async (req) => {
               conferenceSolutionKey: { type: "hangoutsMeet" }
             }
           } : undefined,
-          instruction: `Create a Google Calendar event titled "${summary}" starting at ${startTime} (UTC timezone). ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} ${conferenceInstruction} The event should be on the primary calendar.`
+          instruction: `Create a SINGLE (non-recurring) Google Calendar event titled "${summary}" starting at ${startTime} (UTC timezone). This is a one-time event, DO NOT make it recurring. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} ${conferenceInstruction} The event should be on the primary calendar.`
         }
       );
 

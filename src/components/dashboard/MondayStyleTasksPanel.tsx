@@ -756,23 +756,32 @@ export function MondayStyleTasksPanel() {
             <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
               {/* ===== YOUR TASKS SECTION ===== */}
               
-              {/* TODAY - Show first as requested */}
-              {groupedTasks.today.length > 0 && (
+              {/* TODAY + AI SUGGESTIONS - Show first as requested */}
+              {(groupedTasks.today.length > 0 || (showAISuggestions && filteredAISuggestions.length > 0)) && (
                 <div className="space-y-2">
                   <SectionHeader
                     title={`TODAY - ${format(new Date(), "MMM d")}`}
-                    count={groupedTasks.today.length}
+                    count={groupedTasks.today.length + (showAISuggestions ? filteredAISuggestions.length : 0)}
                     icon={Zap}
                     isOpen={todayOpen}
                     onToggle={() => setTodayOpen(!todayOpen)}
                   />
                   {todayOpen && (
                     <div className="space-y-1 pl-2">
+                      {/* Regular today tasks */}
                       {groupedTasks.today.map((task) => (
                         <TaskRow 
                           key={task.id} 
                           task={task}
                           onComplete={task.taskType === "user" ? () => handleCompleteTask(task) : undefined}
+                          onAction={handleTaskAction}
+                        />
+                      ))}
+                      {/* AI Suggestions merged into today */}
+                      {showAISuggestions && filteredAISuggestions.map((task) => (
+                        <AISuggestionRow 
+                          key={task.id} 
+                          task={task}
                           onAction={handleTaskAction}
                         />
                       ))}
@@ -855,34 +864,6 @@ export function MondayStyleTasksPanel() {
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* ===== AI SUGGESTIONS SECTION ===== */}
-              {showAISuggestions && filteredAISuggestions.length > 0 && (
-                <>
-                  <Separator className="my-4" />
-                  <div className="space-y-2">
-                    <SectionHeader
-                      title="AI SUGGESTIONS - From your Ninja Plan"
-                      count={filteredAISuggestions.length}
-                      icon={Sparkles}
-                      isOpen={aiOpen}
-                      onToggle={() => setAiOpen(!aiOpen)}
-                      variant="ai"
-                    />
-                    {aiOpen && (
-                      <div className="space-y-2 pl-2">
-                        {filteredAISuggestions.map((task) => (
-                          <AISuggestionRow 
-                            key={task.id} 
-                            task={task}
-                            onAction={handleTaskAction}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
               )}
             </div>
           )}
