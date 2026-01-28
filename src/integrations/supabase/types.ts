@@ -11119,11 +11119,14 @@ export type Database = {
       }
       user_tasks: {
         Row: {
+          category: string | null
           completed_at: string | null
           created_at: string
           description: string | null
           due_date: string | null
+          estimated_minutes: number | null
           id: string
+          is_pinned: boolean | null
           priority: string | null
           property_id: string | null
           related_contact_id: string | null
@@ -11136,11 +11139,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string | null
           completed_at?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
+          estimated_minutes?: number | null
           id?: string
+          is_pinned?: boolean | null
           priority?: string | null
           property_id?: string | null
           related_contact_id?: string | null
@@ -11153,11 +11159,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string | null
           completed_at?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
+          estimated_minutes?: number | null
           id?: string
+          is_pinned?: boolean | null
           priority?: string | null
           property_id?: string | null
           related_contact_id?: string | null

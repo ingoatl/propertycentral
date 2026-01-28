@@ -18,6 +18,10 @@ export interface UserTask {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  // New fields
+  category: string | null;
+  is_pinned: boolean;
+  estimated_minutes: number | null;
 }
 
 export interface CreateTaskInput {
