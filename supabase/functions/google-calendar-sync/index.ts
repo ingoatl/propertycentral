@@ -906,7 +906,7 @@ serve(async (req) => {
               conferenceSolutionKey: { type: "hangoutsMeet" }
             }
           } : undefined,
-          instruction: `Create a SINGLE (non-recurring) Google Calendar event titled "${summary}" starting at ${startTime} (UTC timezone). This is a one-time event, DO NOT make it recurring. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} ${conferenceInstruction} The event should be on the primary calendar.`
+          instruction: `Create a SINGLE ONE-TIME Google Calendar event titled "${summary}" starting at ${startTime} (UTC timezone). THIS IS NOT A RECURRING EVENT - DO NOT ADD ANY RECURRENCE RULES. It should happen exactly once on the specified date and time only. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} ${conferenceInstruction} The event should be on the primary calendar.`
         }
       );
 
