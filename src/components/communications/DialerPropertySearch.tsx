@@ -47,38 +47,77 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
 
     setIsLoading(true);
     try {
-      const searchTerm = `%${query}%`;
       const resultMap = new Map<string, PropertyOwnerResult>();
       
       console.log("[DialerSearch] Searching for:", query);
       
-      // Search 1: Properties with owner join - search by address AND name
-      const { data: propertiesData, error: propError } = await supabase
-        .from("properties")
-        .select(`
-          id,
-          name,
-          address,
-          owner_id,
-          property_owners (
+      // Run all searches in parallel for speed
+      const [propertiesResult, ownersResult, onboardingResult] = await Promise.all([
+        // Search 1: Properties by address or name (includes city)
+        supabase
+          .from("properties")
+          .select(`
+            id,
+            name,
+            address,
+            owner_id,
+            property_owners (
+              id,
+              name,
+              phone,
+              email,
+              second_owner_name,
+              second_owner_email
+            )
+          `)
+          .or(`address.ilike.%${query}%,name.ilike.%${query}%`)
+          .is("offboarded_at", null)
+          .limit(50),
+        
+        // Search 2: Property owners directly by name/phone/email
+        supabase
+          .from("property_owners")
+          .select(`
             id,
             name,
             phone,
             email,
             second_owner_name,
-            second_owner_email
-          )
-        `)
-        .or(`address.ilike.${searchTerm},name.ilike.${searchTerm}`)
-        .limit(50);
-
+            second_owner_email,
+            properties!properties_owner_id_fkey (
+              id,
+              name,
+              address
+            )
+          `)
+          .or(`name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%,second_owner_name.ilike.%${query}%`)
+          .limit(50),
+        
+        // Search 3: Onboarding projects for imported owners (midtermnation, etc.)
+        supabase
+          .from("onboarding_projects")
+          .select(`
+            id,
+            property_id,
+            owner_name,
+            property_address,
+            onboarding_tasks (
+              title,
+              field_value
+            )
+          `)
+          .limit(200)
+      ]);
+      
+      // Process property results
+      const { data: propertiesData, error: propError } = propertiesResult;
       if (propError) {
         console.error("[DialerSearch] Property search error:", propError);
       } else {
         console.log("[DialerSearch] Found properties:", propertiesData?.length || 0);
         
         (propertiesData || []).forEach((p: any) => {
-          if (p.property_owners) {
+          if (p.property_owners && p.property_owners.phone) {
             resultMap.set(p.id, {
               propertyId: p.id,
               propertyName: p.name || "Unknown Property",
@@ -89,39 +128,24 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
               ownerEmail: p.property_owners.email,
               secondOwnerName: p.property_owners.second_owner_name,
               secondOwnerPhone: null,
+              source: "property"
             });
           }
         });
       }
 
-      // Search 2: Property owners by name/phone/email
-      const { data: ownersData, error: ownerError } = await supabase
-        .from("property_owners")
-        .select(`
-          id,
-          name,
-          phone,
-          email,
-          second_owner_name,
-          second_owner_email,
-          properties (
-            id,
-            name,
-            address
-          )
-        `)
-        .or(`name.ilike.${searchTerm},phone.ilike.${searchTerm},email.ilike.${searchTerm},second_owner_name.ilike.${searchTerm}`)
-        .limit(50);
-
+      // Process owner results
+      const { data: ownersData, error: ownerError } = ownersResult;
       if (ownerError) {
         console.error("[DialerSearch] Owner search error:", ownerError);
       } else {
         console.log("[DialerSearch] Found owners:", ownersData?.length || 0);
         
         (ownersData || []).forEach((owner: any) => {
-          if (owner.properties && Array.isArray(owner.properties)) {
-            owner.properties.forEach((prop: any) => {
-              if (!resultMap.has(prop.id)) {
+          const props = owner.properties || [];
+          if (props.length > 0) {
+            props.forEach((prop: any) => {
+              if (!resultMap.has(prop.id) && owner.phone) {
                 resultMap.set(prop.id, {
                   propertyId: prop.id,
                   propertyName: prop.name || "Unknown Property",
@@ -132,67 +156,76 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
                   ownerEmail: owner.email,
                   secondOwnerName: owner.second_owner_name,
                   secondOwnerPhone: null,
+                  source: "property"
                 });
               }
+            });
+          } else if (owner.phone) {
+            // Owner without linked property
+            resultMap.set(`owner-${owner.id}`, {
+              propertyId: owner.id,
+              propertyName: "No Property Linked",
+              propertyAddress: "",
+              ownerId: owner.id,
+              ownerName: owner.name || "Unknown Owner",
+              ownerPhone: owner.phone,
+              ownerEmail: owner.email,
+              secondOwnerName: owner.second_owner_name,
+              secondOwnerPhone: null,
+              source: "property"
             });
           }
         });
       }
 
-      // Search 3: Onboarding projects with owner data (for imported/midterm nation owners like Dakun Sun)
-      const { data: onboardingData, error: onboardingError } = await supabase
-        .from("onboarding_projects")
-        .select(`
-          id,
-          property_id,
-          status,
-          onboarding_tasks (
-            title,
-            field_value
-          )
-        `)
-        .limit(100);
-
+      // Process onboarding projects for imported owners
+      const { data: onboardingData, error: onboardingError } = onboardingResult;
       if (onboardingError) {
         console.error("[DialerSearch] Onboarding search error:", onboardingError);
       } else {
-        // Process onboarding data to find matching owner info
+        const lowerQuery = query.toLowerCase();
+        
         (onboardingData || []).forEach((project: any) => {
           const tasks = project.onboarding_tasks || [];
-          let ownerName = "";
+          let ownerName = project.owner_name || "";
           let ownerPhone = "";
           let ownerEmail = "";
-          let propertyAddress = "";
+          let propertyAddress = project.property_address || "";
           
+          // Extract owner info from tasks
           tasks.forEach((t: any) => {
             const title = (t.title || "").toLowerCase();
             const value = t.field_value || "";
             if (title === "owner name" && value) ownerName = value;
             if (title === "owner phone" && value) ownerPhone = value;
             if (title === "owner email" && value) ownerEmail = value;
-            if ((title.includes("address") || title.includes("property")) && value && value.length > 10) propertyAddress = value;
+            if ((title.includes("address") || title === "property address") && value && value.length > 5) {
+              propertyAddress = value;
+            }
           });
           
-          // Check if this project matches the search query
-          const lowerQuery = query.toLowerCase();
+          // Match against query - check owner name, phone, email, AND address/city
           const matches = 
             ownerName.toLowerCase().includes(lowerQuery) ||
             ownerPhone.includes(query) ||
             ownerEmail.toLowerCase().includes(lowerQuery) ||
             propertyAddress.toLowerCase().includes(lowerQuery);
           
-          if (matches && ownerName && ownerPhone) {
+          if (matches && ownerPhone) {
             const key = `onboarding-${project.id}`;
             if (!resultMap.has(key)) {
-              console.log("[DialerSearch] Found onboarding match:", ownerName, ownerPhone);
+              console.log("[DialerSearch] Found onboarding match:", ownerName, ownerPhone, propertyAddress);
               resultMap.set(key, {
                 propertyId: project.property_id || project.id,
-                propertyName: propertyAddress || "New Onboarding",
+                propertyName: ownerName || "Onboarding Owner",
                 propertyAddress: propertyAddress || "Address pending",
                 ownerId: project.id,
                 ownerName: ownerName,
                 ownerPhone: ownerPhone,
                 ownerEmail: ownerEmail,
+                secondOwnerName: null,
+                secondOwnerPhone: null,
+                source: "onboarding"
               });
             }
           }
