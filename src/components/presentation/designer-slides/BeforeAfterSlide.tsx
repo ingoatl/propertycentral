@@ -1,15 +1,15 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Import before/after images (using working originals)
-import whitehurstBefore from "@/assets/designer/whitehurst-before.jpg";
-import whitehurstAfter from "@/assets/designer/whitehurst-after.jpg";
-import southvaleBefore from "@/assets/designer/southvale-before.jpg";
-import southvaleAfter from "@/assets/designer/southvale-after.jpg";
-import justiceBefore from "@/assets/designer/justice-before.jpg";
-import justiceAfter from "@/assets/designer/justice-after.jpg";
-import lakewoodBefore from "@/assets/designer/lakewood-before.jpg";
-import lakewoodAfter from "@/assets/designer/lakewood-after.jpg";
+// Import before/after images - using verified existing files
+import whitehurstBefore from "@/assets/designer/whitehurst-b1.jpg";
+import whitehurstAfter from "@/assets/designer/whitehurst-a1.jpg";
+import southvaleBefore from "@/assets/designer/southvale-b.jpg";
+import southvaleAfter from "@/assets/designer/southvale-a.jpg";
+import justiceBefore from "@/assets/designer/justice-b.jpg";
+import justiceAfter from "@/assets/designer/justice-a.jpg";
+import lakewoodBefore from "@/assets/designer/lakewood-b.jpg";
+import lakewoodAfter from "@/assets/designer/lakewood-a.jpg";
 import brushyBefore from "@/assets/designer/brushy-before.jpg";
 import brushyAfter from "@/assets/designer/brushy-after.jpg";
 import tolaniBefore from "@/assets/designer/tolani-before.jpg";
