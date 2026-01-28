@@ -21,8 +21,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { VoiceDictationButton } from "./VoiceDictationButton";
-import { InsertCalendarLinkButton } from "./InsertCalendarLinkButton";
-import { InsertPresentationLinkButton } from "./InsertPresentationLinkButton";
+import { InsertLinksDropdown } from "./InsertLinksDropdown";
 import { formatReplySubject } from "@/lib/email-utils";
 
 interface SendEmailDialogProps {
@@ -316,12 +315,10 @@ export function SendEmailDialog({
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <label className="text-sm font-medium">Message</label>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <InsertCalendarLinkButton
-                    onInsert={(link) => setBody(prev => prev + link)}
+                  <InsertLinksDropdown
+                    onInsert={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}
+                    recipientName={contactName}
                     contactType={contactType}
-                  />
-                  <InsertPresentationLinkButton
-                    onInsert={(link) => setBody(prev => prev + link)}
                   />
                   <VoiceDictationButton
                     onResult={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}

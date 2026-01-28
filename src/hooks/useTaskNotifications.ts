@@ -7,7 +7,7 @@ export interface TaskNotification {
   id: string;
   user_id: string;
   task_id: string;
-  type: "assignment" | "reminder" | "mention";
+  type: "assignment" | "reminder" | "mention" | "comment";
   title: string;
   message: string | null;
   is_read: boolean;

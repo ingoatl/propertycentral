@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { CallDialog } from "@/components/communications/CallDialog";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
+import { TaskCommentsPanel } from "@/components/tasks/TaskCommentsPanel";
 import { format, isToday, isTomorrow, isThisWeek, parseISO, isPast, differenceInDays } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
@@ -57,6 +58,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface NinjaFocusItem {
   priority: "critical" | "high" | "medium";
@@ -897,8 +899,8 @@ export function MondayStyleTasksPanel() {
 
       {/* Task Execution Modal */}
       <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-primary" />
               {selectedTask?.title}
@@ -911,8 +913,8 @@ export function MondayStyleTasksPanel() {
           </DialogHeader>
           
           {selectedTask && (
+            <ScrollArea className="flex-1 pr-4">
             <div className="space-y-4">
-              {/* Task Details */}
               <div className="flex flex-wrap gap-2">
                 {selectedTask.source && (
                   <Badge variant="secondary" className="capitalize">
@@ -1067,7 +1069,15 @@ export function MondayStyleTasksPanel() {
                   )}
                 </div>
               )}
+
+              {/* Comments Section for user tasks */}
+              {selectedTask.taskType === "user" && (
+                <div className="pt-4 border-t">
+                  <TaskCommentsPanel taskId={selectedTask.id} />
+                </div>
+              )}
             </div>
+            </ScrollArea>
           )}
         </DialogContent>
       </Dialog>
