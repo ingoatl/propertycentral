@@ -343,9 +343,9 @@ export function QuickCommunicationButton() {
             <span className="hidden sm:inline">Dial / Text</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80 p-0" align="end">
+        <PopoverContent className="w-[340px] p-0 max-h-[80vh] overflow-hidden" align="end">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "search" | "dialpad")}>
-            <div className="border-b px-2 pt-2">
+            <div className="border-b px-2 pt-2 bg-background">
               <TabsList className="w-full">
                 <TabsTrigger value="search" className="flex-1 gap-2">
                   <Users className="h-4 w-4" />
@@ -359,7 +359,7 @@ export function QuickCommunicationButton() {
             </div>
 
             <TabsContent value="search" className="m-0">
-              <div className="p-3 border-b">
+              <div className="p-3 border-b bg-background">
                 <Input
                   placeholder="Search leads or owners..."
                   value={search}
@@ -377,22 +377,22 @@ export function QuickCommunicationButton() {
                     No contacts found
                   </div>
                 ) : (
-                  <div className="p-3 space-y-3">
+                  <div className="p-2 space-y-2">
                     {contacts.map((contact) => (
                       <div
                         key={`${contact.type}-${contact.id}`}
-                        className="p-3 rounded-lg border border-border/30 hover:bg-muted/20 transition-colors"
+                        className="p-3 rounded-lg border border-border/40 bg-card hover:bg-muted/30 transition-colors"
                       >
                         {/* Contact Info */}
                         <div className="flex items-start gap-3 mb-3">
-                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                             <span className="text-sm font-semibold text-primary">
                               {contact.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-sm truncate">{contact.name}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm truncate max-w-[160px]">{contact.name}</p>
                               <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                                 contact.type === "owner" 
                                   ? "bg-secondary text-secondary-foreground" 
@@ -404,28 +404,43 @@ export function QuickCommunicationButton() {
                               </span>
                             </div>
                             {contact.phone && (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground mt-0.5">
                                 {formatPhoneForDisplay(contact.phone)}
                               </p>
                             )}
                           </div>
                         </div>
                         
-                        {/* Action Buttons - Old Layout Style */}
+                        {/* 4 Action Buttons */}
                         {contact.phone && (
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-4 gap-1.5">
                             <button
-                              className="flex-[3] h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center gap-2 transition-colors"
+                              className="flex flex-col items-center justify-center h-12 rounded-lg bg-primary/10 hover:bg-primary/20 active:scale-95 transition-all"
                               onClick={(e) => { e.stopPropagation(); handleCall(contact); }}
                             >
                               <Phone className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Call</span>
+                              <span className="text-[10px] font-medium mt-0.5">Call</span>
                             </button>
                             <button
-                              className="flex-1 h-10 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
+                              className="flex flex-col items-center justify-center h-12 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 transition-all"
                               onClick={(e) => { e.stopPropagation(); handleText(contact); }}
                             >
                               <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-[10px] font-medium mt-0.5">Text</span>
+                            </button>
+                            <button
+                              className="flex flex-col items-center justify-center h-12 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 transition-all"
+                              onClick={(e) => { e.stopPropagation(); handleVoicemail(contact); }}
+                            >
+                              <Mic className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-[10px] font-medium mt-0.5">Voice</span>
+                            </button>
+                            <button
+                              className="flex flex-col items-center justify-center h-12 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 transition-all"
+                              onClick={(e) => { e.stopPropagation(); handleVideoMessage(contact); }}
+                            >
+                              <Video className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-[10px] font-medium mt-0.5">Video</span>
                             </button>
                           </div>
                         )}
