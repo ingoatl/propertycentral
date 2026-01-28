@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface UseStoredPresentationAudioOptions {
-  presentation: "onboarding" | "owner-portal";
+  presentation: "onboarding" | "owner-portal" | "designer";
   onAudioEnd?: () => void;
 }
 
