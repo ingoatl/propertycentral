@@ -55,10 +55,10 @@ serve(async (req) => {
     
     console.log(`Generating ${presentation || 'owner-portal'} background music...`);
     
-    // Different music prompts for each presentation
+    // Different music prompts for each presentation - uplifting cinematic WITHOUT vocals
     const musicPrompt = presentation === "onboarding" 
-      ? "Uplifting, inspiring corporate music. Warm piano, gentle orchestral swells, hopeful and welcoming. Professional yet friendly atmosphere. Motivational business presentation music."
-      : "Soft acoustic guitar with gentle piano accompaniment. Warm, intimate, and peaceful. Like a cozy fireside conversation. Light strings in the background. Calm, reassuring, and trustworthy. Perfect for a premium property management presentation.";
+      ? "Uplifting cinematic orchestral music. Soaring violins, warm piano melodies, gentle brass crescendos. Hopeful, inspiring, makes you feel good. Like an emotional movie soundtrack moment of triumph. No vocals, instrumental only. Professional presentation music that inspires confidence and excitement."
+      : "Beautiful cinematic instrumental music. Gentle piano with emotional string swells. Warm, uplifting, and deeply moving. Like a heartwarming film score. No vocals. Creates feelings of trust, hope and possibility. Premium elegant atmosphere.";
     
     // Generate uplifting ambient music using ElevenLabs Music API
     const response = await fetch(
