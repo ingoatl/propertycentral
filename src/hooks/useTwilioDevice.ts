@@ -39,10 +39,18 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
   }, []);
 
   const initializeDevice = async () => {
+    // Skip if already initializing or initialized
+    if (deviceRef.current) {
+      return deviceRef.current;
+    }
+
     try {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
+      
+      console.log('Fetching Twilio token...');
+      const tokenStart = performance.now();
       
       const { data, error } = await supabase.functions.invoke('twilio-token', {
         body: { 
@@ -51,6 +59,8 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
         }
       });
 
+      console.log(`Twilio token fetched in ${(performance.now() - tokenStart).toFixed(0)}ms`);
+
       if (error) {
         throw new Error(error.message || 'Failed to get call token');
       }
@@ -58,13 +68,16 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
         throw new Error('No token received from server');
       }
       
+      console.log('Initializing Twilio Device...');
+      const deviceStart = performance.now();
+      
       const device = new Device(data.token, {
         logLevel: 1,
         codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU]
       });
 
       device.on('registered', () => {
-        console.log('Twilio device registered');
+        console.log(`Twilio device registered in ${(performance.now() - deviceStart).toFixed(0)}ms`);
       });
 
       device.on('error', (err) => {
@@ -82,6 +95,17 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
       throw error;
     }
   };
+
+  // Pre-initialize device when hook mounts (for faster call initiation)
+  const preInitDevice = useCallback(async () => {
+    if (!deviceRef.current) {
+      try {
+        await initializeDevice();
+      } catch (error) {
+        console.log('Pre-init failed, will retry on call:', error);
+      }
+    }
+  }, []);
 
   const endCall = useCallback(() => {
     if (callRef.current) {
@@ -241,5 +265,6 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
     endCall,
     sendDigits,
     formatDuration,
+    preInitDevice,
   };
 }

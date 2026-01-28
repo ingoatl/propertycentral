@@ -92,10 +92,12 @@ export default function DesignerPresentation() {
       
       const timer = setTimeout(() => {
         playAudioForSlide(slideId, script, () => {
-          // Auto-advance to next slide when audio ends
-          if (currentSlide < SLIDES.length - 1 && isAutoPlaying) {
-            goToSlide(currentSlide + 1, true);
-          }
+          // Add 2 second pause before auto-advancing to next slide
+          setTimeout(() => {
+            if (currentSlide < SLIDES.length - 1 && isAutoPlaying) {
+              goToSlide(currentSlide + 1, true);
+            }
+          }, 2000);
         });
       }, 600); // Wait for slide transition
       
