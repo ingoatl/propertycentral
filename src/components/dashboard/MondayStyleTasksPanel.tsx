@@ -29,7 +29,8 @@ import {
   Eye,
   EyeOff,
   X,
-  CheckCircle
+  CheckCircle,
+  UserPlus
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +50,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface NinjaFocusItem {
   priority: "critical" | "high" | "medium";
@@ -372,8 +380,21 @@ export function MondayStyleTasksPanel() {
   const [aiOpen, setAiOpen] = useState(true);
 
   // Fetch all data sources
-  const { tasks: userTasks, isLoading: tasksLoading, completeTask } = useUserTasks();
+  const { tasks: userTasks, isLoading: tasksLoading, completeTask, assignTask } = useUserTasks();
   const { data: overdueData, isLoading: overdueLoading } = useOverdueOnboardingTasks();
+  
+  // Fetch team members for assignment
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ["team-members-for-assignment"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, email, job_title")
+        .order("first_name");
+      if (error) throw error;
+      return data;
+    },
+  });
   
   const { data: ninjaPlan, isLoading: ninjaLoading, refetch: refetchNinja, isFetching } = useQuery({
     queryKey: ["ninja-plan"],
@@ -577,7 +598,47 @@ export function MondayStyleTasksPanel() {
   }, [filteredYourTasks]);
 
   const handleTaskAction = (task: UnifiedTask) => {
-    // Always open the task modal first for context
+    // DIRECT NAVIGATION: Navigate directly to the right location instead of modal
+    
+    // If it's an onboarding task, go to the onboarding workflow
+    if (task.taskType === "onboarding" && task.propertyId) {
+      navigate(`/onboarding?project=${task.propertyId}&task=${task.id}`);
+      return;
+    }
+    
+    // If task has a specific link, navigate there
+    if (task.link) {
+      navigate(task.link);
+      return;
+    }
+    
+    // If task has a property, go to property details with onboarding context
+    if (task.propertyId) {
+      // Check if this might be an onboarding-related task based on title/source
+      const isOnboardingRelated = task.source === "onboarding" || 
+        task.title.toLowerCase().includes("wifi") ||
+        task.title.toLowerCase().includes("setup") ||
+        task.title.toLowerCase().includes("onboarding");
+      
+      if (isOnboardingRelated) {
+        navigate(`/onboarding?property=${task.propertyId}&task=${task.id}`);
+      } else {
+        navigate(`/properties?property=${task.propertyId}&tab=details`);
+      }
+      return;
+    }
+    
+    // If task has contact info, go to communications
+    if (task.contactPhone || task.contactEmail) {
+      const params = new URLSearchParams();
+      if (task.contactPhone) params.set("phone", task.contactPhone);
+      if (task.contactId) params.set(task.contactType === "owner" ? "ownerId" : "leadId", task.contactId);
+      if (task.contactName) params.set("name", task.contactName);
+      navigate(`/communications?${params.toString()}`);
+      return;
+    }
+    
+    // Fallback: show modal for context
     setSelectedTask(task);
     setShowTaskModal(true);
   };
@@ -606,13 +667,8 @@ export function MondayStyleTasksPanel() {
       });
       setShowEmailDialog(true);
     } else if (action === "navigate") {
-      if (task.link) {
-        navigate(task.link);
-      } else if (task.propertyId) {
-        navigate(`/properties?property=${task.propertyId}&task=${task.id}`);
-      } else {
-        navigate("/communications");
-      }
+      // Use same logic as handleTaskAction
+      handleTaskAction(task);
     }
   };
 
@@ -956,6 +1012,43 @@ export function MondayStyleTasksPanel() {
                   </Button>
                 )}
               </div>
+
+              {/* Assign to Team Member */}
+              {selectedTask.taskType === "user" && teamMembers.length > 0 && (
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-3">
+                    <UserPlus className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Assign to:</span>
+                    <Select
+                      onValueChange={(userId) => {
+                        if (userId && selectedTask.id) {
+                          assignTask.mutate({ 
+                            taskId: selectedTask.id, 
+                            assignToUserId: userId 
+                          });
+                          setShowTaskModal(false);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select team member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teamMembers.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.first_name || member.email}
+                            {member.job_title && (
+                              <span className="text-muted-foreground ml-1">
+                                ({member.job_title})
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

@@ -9791,6 +9791,50 @@ export type Database = {
           },
         ]
       }
+      task_notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string | null
+          read_at: string | null
+          task_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string | null
+          read_at?: string | null
+          task_id: string
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string | null
+          read_at?: string | null
+          task_id?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "user_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_reschedule_logs: {
         Row: {
           created_at: string
@@ -11119,6 +11163,9 @@ export type Database = {
       }
       user_tasks: {
         Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          assigned_to: string | null
           category: string | null
           completed_at: string | null
           created_at: string
@@ -11139,6 +11186,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
           category?: string | null
           completed_at?: string | null
           created_at?: string
@@ -11159,6 +11209,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
           category?: string | null
           completed_at?: string | null
           created_at?: string

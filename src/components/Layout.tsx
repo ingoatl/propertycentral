@@ -16,6 +16,7 @@ import { TaskConfirmationModal } from "@/components/TaskConfirmationModal";
 import { CallRecapModal } from "@/components/CallRecapModal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NotificationBell } from "@/components/team-hub/NotificationBell";
+import { TaskNotificationBell } from "@/components/dashboard/TaskNotificationBell";
 import { useInAppNotifications } from "@/hooks/useTeamHub";
 
 interface LayoutProps {
@@ -149,6 +150,9 @@ const Layout = ({ children }: LayoutProps) => {
                   </TooltipContent>
                 </Tooltip>
               )}
+              
+              {/* Task Assignment Notification Bell */}
+              {canAccessNav && <TaskNotificationBell />}
               
               {/* Team Hub Notification Bell */}
               {canAccessNav && <NotificationBell />}
