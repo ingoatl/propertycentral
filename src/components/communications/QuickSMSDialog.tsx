@@ -9,12 +9,33 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Send, User, Wand2, X } from "lucide-react";
+import { Loader2, Send, User, Wand2, X, Presentation, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPhoneForDisplay } from "@/lib/phoneUtils";
 import { extractFirstName } from "@/lib/nameUtils";
 import { useUnifiedAI } from "@/hooks/useUnifiedAI";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const PRESENTATION_LINKS = {
+  designer: {
+    label: "Designer Presentation",
+    url: "https://propertycentral.lovable.app/p/designer",
+  },
+  onboarding: {
+    label: "Onboarding Presentation", 
+    url: "https://propertycentral.lovable.app/p/onboarding",
+  },
+  ownerPortal: {
+    label: "Owner Portal Presentation",
+    url: "https://propertycentral.lovable.app/p/owner-portal",
+  },
+};
 
 interface QuickSMSDialogProps {
   open: boolean;
@@ -188,6 +209,34 @@ export function QuickSMSDialog({
               >
                 <Wand2 className="h-4 w-4" />
               </Button>
+              {/* Presentation Links Quick Insert */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute bottom-2 left-12 h-8 w-8 text-muted-foreground hover:bg-muted"
+                    disabled={isSending || isAILoading}
+                    title="Insert Presentation Link"
+                  >
+                    <Link2 className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {Object.entries(PRESENTATION_LINKS).map(([key, link]) => (
+                    <DropdownMenuItem
+                      key={key}
+                      onClick={() => {
+                        setMessage(prev => prev + (prev ? "\n\n" : "") + `Watch here: ${link.url}`);
+                        toast.success(`${link.label} link added!`);
+                      }}
+                    >
+                      <Presentation className="h-4 w-4 mr-2" />
+                      {link.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <p className="text-xs text-muted-foreground text-right">
               {message.length} / 160 characters

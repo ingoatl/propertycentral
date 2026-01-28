@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { VoiceDictationButton } from "./VoiceDictationButton";
 import { InsertCalendarLinkButton } from "./InsertCalendarLinkButton";
+import { InsertPresentationLinkButton } from "./InsertPresentationLinkButton";
 import { formatReplySubject } from "@/lib/email-utils";
 
 interface SendEmailDialogProps {
@@ -318,6 +319,9 @@ export function SendEmailDialog({
                   <InsertCalendarLinkButton
                     onInsert={(link) => setBody(prev => prev + link)}
                     contactType={contactType}
+                  />
+                  <InsertPresentationLinkButton
+                    onInsert={(link) => setBody(prev => prev + link)}
                   />
                   <VoiceDictationButton
                     onResult={(text) => setBody(prev => prev ? `${prev}\n\n${text}` : text)}
