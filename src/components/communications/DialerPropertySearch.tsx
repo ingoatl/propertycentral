@@ -46,15 +46,19 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
 
     setIsLoading(true);
     try {
-      // Search properties by address, name, city, or street
-      const { data: properties, error } = await supabase
+      // Search properties by address, name, city, street
+      // AND search owners by name, phone, email
+      const searchTerm = `%${query}%`;
+      
+      // First search: properties with owner join
+      const { data: propertiesData, error: propError } = await supabase
         .from("properties")
         .select(`
           id,
           name,
           address,
           owner_id,
-          property_owners!inner (
+          property_owners (
             id,
             name,
             phone,
@@ -63,24 +67,74 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
             second_owner_phone
           )
         `)
-        .or(`address.ilike.%${query}%,name.ilike.%${query}%`)
-        .limit(20);
+        .or(`address.ilike.${searchTerm},name.ilike.${searchTerm}`)
+        .limit(30);
 
-      if (error) throw error;
+      if (propError) throw propError;
 
-      const formattedResults: PropertyOwnerResult[] = (properties || []).map((p: any) => ({
-        propertyId: p.id,
-        propertyName: p.name || "Unknown Property",
-        propertyAddress: p.address || "",
-        ownerId: p.property_owners?.id || p.owner_id,
-        ownerName: p.property_owners?.name || "Unknown Owner",
-        ownerPhone: p.property_owners?.phone,
-        ownerEmail: p.property_owners?.email,
-        secondOwnerName: p.property_owners?.second_owner_name,
-        secondOwnerPhone: p.property_owners?.second_owner_phone,
-      }));
+      // Second search: directly search owners by name/phone
+      const { data: ownersData, error: ownerError } = await supabase
+        .from("property_owners")
+        .select(`
+          id,
+          name,
+          phone,
+          email,
+          second_owner_name,
+          second_owner_phone,
+          properties (
+            id,
+            name,
+            address
+          )
+        `)
+        .or(`name.ilike.${searchTerm},phone.ilike.${searchTerm},email.ilike.${searchTerm},second_owner_name.ilike.${searchTerm}`)
+        .limit(30);
 
-      setResults(formattedResults);
+      if (ownerError) throw ownerError;
+
+      // Combine and deduplicate results
+      const resultMap = new Map<string, PropertyOwnerResult>();
+
+      // Add property-based results
+      (propertiesData || []).forEach((p: any) => {
+        if (p.property_owners) {
+          resultMap.set(p.id, {
+            propertyId: p.id,
+            propertyName: p.name || "Unknown Property",
+            propertyAddress: p.address || "",
+            ownerId: p.property_owners.id || p.owner_id,
+            ownerName: p.property_owners.name || "Unknown Owner",
+            ownerPhone: p.property_owners.phone,
+            ownerEmail: p.property_owners.email,
+            secondOwnerName: p.property_owners.second_owner_name,
+            secondOwnerPhone: p.property_owners.second_owner_phone,
+          });
+        }
+      });
+
+      // Add owner-based results (may have multiple properties)
+      (ownersData || []).forEach((owner: any) => {
+        if (owner.properties && Array.isArray(owner.properties)) {
+          owner.properties.forEach((prop: any) => {
+            if (!resultMap.has(prop.id)) {
+              resultMap.set(prop.id, {
+                propertyId: prop.id,
+                propertyName: prop.name || "Unknown Property",
+                propertyAddress: prop.address || "",
+                ownerId: owner.id,
+                ownerName: owner.name || "Unknown Owner",
+                ownerPhone: owner.phone,
+                ownerEmail: owner.email,
+                secondOwnerName: owner.second_owner_name,
+                secondOwnerPhone: owner.second_owner_phone,
+              });
+            }
+          });
+        }
+      });
+
+      setResults(Array.from(resultMap.values()).slice(0, 20));
     } catch (err) {
       console.error("Property search error:", err);
       setResults([]);
