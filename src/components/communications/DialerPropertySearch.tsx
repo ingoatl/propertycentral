@@ -48,13 +48,21 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
     setIsLoading(true);
     try {
       const resultMap = new Map<string, PropertyOwnerResult>();
+      // URL encode the % for PostgREST ilike patterns
       const searchPattern = `%${query}%`;
       
       console.log("[DialerSearch] Searching for:", query);
       
-      // Run all 4 searches in parallel for speed
-      const [propertiesResult, ownersResult, onboardingResult, partnerResult] = await Promise.all([
-        // Search 1: Properties by address or name (includes city)
+      // Run all searches in parallel for speed
+      // Use ilike filter method which handles encoding properly
+      const [
+        propertiesByAddressResult, 
+        propertiesByNameResult,
+        ownersResult, 
+        onboardingResult, 
+        partnerResult
+      ] = await Promise.all([
+        // Search 1a: Properties by address (includes city)
         supabase
           .from("properties")
           .select(`
@@ -71,7 +79,28 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
               second_owner_email
             )
           `)
-          .filter('address', 'ilike', searchPattern)
+          .ilike('address', searchPattern)
+          .is("offboarded_at", null)
+          .limit(50),
+        
+        // Search 1b: Properties by name
+        supabase
+          .from("properties")
+          .select(`
+            id,
+            name,
+            address,
+            owner_id,
+            property_owners (
+              id,
+              name,
+              phone,
+              email,
+              second_owner_name,
+              second_owner_email
+            )
+          `)
+          .ilike('name', searchPattern)
           .is("offboarded_at", null)
           .limit(50),
         
@@ -111,7 +140,7 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
           `)
           .limit(200),
 
-        // Search 4: Partner properties (MidTermNation imports)
+        // Search 4: Partner properties (MidTermNation imports) - use multiple conditions
         supabase
           .from("partner_properties")
           .select(`
@@ -126,36 +155,15 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
           .or(`address.ilike.${searchPattern},contact_name.ilike.${searchPattern},contact_phone.ilike.${searchPattern},property_title.ilike.${searchPattern},city.ilike.${searchPattern}`)
           .limit(50)
       ]);
-
-      // Also search properties by name
-      const propertiesByNameResult = await supabase
-        .from("properties")
-        .select(`
-          id,
-          name,
-          address,
-          owner_id,
-          property_owners (
-            id,
-            name,
-            phone,
-            email,
-            second_owner_name,
-            second_owner_email
-          )
-        `)
-        .filter('name', 'ilike', searchPattern)
-        .is("offboarded_at", null)
-        .limit(50);
       
       // Process property results (by address)
-      const { data: propertiesData, error: propError } = propertiesResult;
-      if (propError) {
-        console.error("[DialerSearch] Property search error:", propError);
+      const { data: propertiesByAddress, error: propAddrError } = propertiesByAddressResult;
+      if (propAddrError) {
+        console.error("[DialerSearch] Property address search error:", propAddrError);
       } else {
-        console.log("[DialerSearch] Found properties by address:", propertiesData?.length || 0);
+        console.log("[DialerSearch] Found properties by address:", propertiesByAddress?.length || 0);
         
-        (propertiesData || []).forEach((p: any) => {
+        (propertiesByAddress || []).forEach((p: any) => {
           if (p.property_owners) {
             resultMap.set(p.id, {
               propertyId: p.id,
@@ -404,12 +412,12 @@ export function DialerPropertySearch({ onSelectContact, onClose }: DialerPropert
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-sm truncate">{result.propertyName}</p>
                       {result.source === "partner" && (
-                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                        <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
                           Partner
                         </Badge>
                       )}
                       {result.source === "onboarding" && (
-                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                        <Badge variant="secondary" className="text-xs bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
                           Onboarding
                         </Badge>
                       )}
