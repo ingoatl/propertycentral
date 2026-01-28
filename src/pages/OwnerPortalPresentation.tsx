@@ -143,21 +143,15 @@ export default function OwnerPortalPresentation() {
     presentation: "owner-portal"
   });
 
-  // Auto-start presentation immediately on mount - don't wait for preload
-  useEffect(() => {
-    if (hasAutoStarted) return;
-    
-    // Start immediately with a small delay for initial render
-    const timer = setTimeout(() => {
-      console.log("Auto-starting presentation...");
-      initAudioContext();
-      setHasAutoStarted(true);
-      setHasStarted(true);
-      setIsPlaying(true);
-    }, 800); // 800ms delay to ensure page is ready
-    
-    return () => clearTimeout(timer);
-  }, [hasAutoStarted, initAudioContext]);
+  // Handle click to start - required for browser autoplay policy
+  const handleStartClick = useCallback(() => {
+    if (hasStarted) return;
+    console.log("User clicked to start presentation");
+    initAudioContext();
+    setHasAutoStarted(true);
+    setHasStarted(true);
+    setIsPlaying(true);
+  }, [hasStarted, initAudioContext]);
 
   // Advance to next slide with end-of-presentation guard
   const advanceSlide = useCallback(() => {
@@ -378,6 +372,29 @@ export default function OwnerPortalPresentation() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      {/* Click to Start Overlay - Required for browser autoplay policy */}
+      {!hasStarted && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-[100] bg-[#0a0a1a] flex flex-col items-center justify-center cursor-pointer"
+          onClick={handleStartClick}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-center"
+          >
+            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-[#fae052]/20 flex items-center justify-center mx-auto mb-6 hover:bg-[#fae052]/30 transition-colors">
+              <Play className="w-12 h-12 md:w-16 md:h-16 text-[#fae052] ml-1" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">Owner Portal Tour</h2>
+            <p className="text-white/60 text-sm md:text-base">Tap to start the guided presentation</p>
+          </motion.div>
+        </motion.div>
+      )}
+
       {/* Single Slide with AnimatePresence */}
       <AnimatePresence mode="wait">
         <motion.div
