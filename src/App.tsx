@@ -142,6 +142,7 @@ const App = () => (
                     <Route path="/onboarding-presentation" element={<OnboardingPresentation />} />
                     <Route path="/p/onboarding" element={<OnboardingPresentation />} />
                     <Route path="/designer-presentation" element={<DesignerPresentation />} />
+                    <Route path="/p/designer" element={<DesignerPresentation />} />
                     <Route path="/reschedule/:callId" element={<RescheduleCall />} />
                     <Route path="/vm/:token" element={<VoicemailPlayer />} />
                     <Route path="/recap/:token" element={<RecapPlayer />} />

@@ -367,7 +367,7 @@ export function QuickCommunicationButton() {
                 />
               </div>
 
-              <ScrollArea className="max-h-[60vh]">
+              <ScrollArea className="h-[50vh]">
                 {search.length < 2 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
                     Type at least 2 characters to search

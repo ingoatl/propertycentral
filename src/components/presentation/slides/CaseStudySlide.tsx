@@ -7,7 +7,7 @@ interface CaseStudySlideProps {
 
 const caseStudies = {
   "Woodland Lane": {
-    address: "184 Woodland Ln SW, Mableton",
+    address: "Mableton, GA",
     before: { revenue: 1800, occupancy: 75 },
     after: { revenue: 3200, occupancy: 92 },
     strategy: "Hybrid (STR + MTR)",
@@ -15,7 +15,7 @@ const caseStudies = {
     imageUrl: "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/54536b8d-9b6f-41f8-855f-3c4eb78aaf00-1761078098901.png",
   },
   "The Berkley": {
-    address: "3419 Smoke Hollow Pl, Roswell",
+    address: "Roswell, GA",
     before: { revenue: 2100, occupancy: 80 },
     after: { revenue: 3800, occupancy: 95 },
     strategy: "Mid-Term Focus",
@@ -23,7 +23,7 @@ const caseStudies = {
     imageUrl: "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/bdb82ccb-b2fa-42fb-8c58-42aad6e2ef38-1761181004138.jpg",
   },
   "Lavish Living": {
-    address: "3069 Rita Way, Smyrna",
+    address: "Smyrna, GA",
     before: { revenue: 2400, occupancy: 70 },
     after: { revenue: 4200, occupancy: 93 },
     strategy: "Hybrid Premium",
