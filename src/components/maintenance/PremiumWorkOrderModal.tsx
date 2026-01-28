@@ -30,7 +30,8 @@ import {
   MapPin, User, Clock, DollarSign, Wrench, Send, 
   CheckCircle, AlertTriangle, Phone, Mail, Calendar,
   RotateCcw, ExternalLink, Loader2, Image, Video, Play,
-  Building2, FileText, MessageSquare, History, Settings, X, Camera, MessageCircle, Smartphone, Mic
+  Building2, FileText, MessageSquare, History, Settings, X, Camera, MessageCircle, Smartphone, Mic,
+  Pencil, Save
 } from "lucide-react";
 import { 
   WorkOrder, WorkOrderStatus, WorkOrderTimeline, MaintenanceMessage,
@@ -84,6 +85,8 @@ const PremiumWorkOrderModal = ({
   const [showVendorVoicemail, setShowVendorVoicemail] = useState(false);
   const [isRequestingRevisions, setIsRequestingRevisions] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState("");
   const queryClient = useQueryClient();
 
   // Fetch the complete work order data with property image
@@ -405,6 +408,37 @@ const PremiumWorkOrderModal = ({
     }
   };
 
+  // Update description mutation
+  const updateDescription = useMutation({
+    mutationFn: async (newDescription: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from("work_orders")
+        .update({ description: newDescription })
+        .eq("id", workOrderId);
+
+      if (error) throw error;
+
+      await supabase.from("work_order_timeline").insert({
+        work_order_id: workOrderId,
+        action: `Description updated by ${user?.email}`,
+        performed_by_type: "pm",
+        performed_by_name: user?.email,
+        performed_by_user_id: user?.id,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Description updated");
+      setIsEditingDescription(false);
+      queryClient.invalidateQueries({ queryKey: ["work-order-detail", workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrderId] });
+    },
+    onError: (error) => {
+      toast.error("Failed to update: " + error.message);
+    },
+  });
+
   const getSenderBadgeColor = (type: string) => {
     switch (type) {
       case 'vendor': return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -617,8 +651,64 @@ const PremiumWorkOrderModal = ({
                   <div className="col-span-2 space-y-6">
                     <Card className="border-border/50">
                       <CardContent className="p-5">
-                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</Label>
-                        <p className="mt-2 text-foreground leading-relaxed">{workOrder.description || 'No description provided'}</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</Label>
+                          {!isEditingDescription && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => {
+                                setEditedDescription(workOrder.description || "");
+                                setIsEditingDescription(true);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                          )}
+                        </div>
+                        
+                        {isEditingDescription ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={editedDescription}
+                              onChange={(e) => setEditedDescription(e.target.value)}
+                              placeholder="Enter job description..."
+                              className="min-h-[100px] text-sm"
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => updateDescription.mutate(editedDescription)}
+                                disabled={updateDescription.isPending}
+                                className="flex-1"
+                              >
+                                {updateDescription.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Save className="h-3 w-3 mr-1" />
+                                    Save
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setIsEditingDescription(false);
+                                  setEditedDescription("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-foreground leading-relaxed">{workOrder.description || 'No description provided'}</p>
+                        )}
                       </CardContent>
                     </Card>
 
