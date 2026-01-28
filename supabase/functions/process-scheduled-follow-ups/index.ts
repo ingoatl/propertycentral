@@ -9,6 +9,116 @@ const corsHeaders = {
 // Hosted image URLs
 const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/Gemini_Generated_Image_1rel501rel501rel.png";
 const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/Screenshot_41.jpg";
+const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
+
+// Presentation URLs
+const PRESENTATIONS = {
+  onboarding: "https://propertycentral.lovable.app/p/onboarding",
+  owner_portal: "https://propertycentral.lovable.app/p/owner-portal",
+  designer: "https://propertycentral.lovable.app/p/designer",
+};
+
+// Call type content generators
+function getCallTypeDetails(isVideoCall: boolean, meetLink: string | null, phone: string | null): string {
+  if (isVideoCall && meetLink) {
+    return `📹 <strong>Video Call:</strong> <a href="${meetLink}" style="color: #16a34a;">${meetLink}</a>`;
+  } else {
+    return `📞 <strong>Phone Call:</strong> We'll call you at ${phone || "your phone number on file"}`;
+  }
+}
+
+function getCallTypeBrief(isVideoCall: boolean, meetLink: string | null, phone: string | null): string {
+  if (isVideoCall && meetLink) {
+    return `Join here: ${meetLink}`;
+  } else {
+    return `We'll call you at ${formatPhoneForDisplay(phone)}`;
+  }
+}
+
+function getCallTypeReminder(isVideoCall: boolean, meetLink: string | null, phone: string | null): string {
+  if (isVideoCall && meetLink) {
+    return `Join the video call here: ${meetLink}`;
+  } else {
+    return `We'll be calling you at ${formatPhoneForDisplay(phone)}.`;
+  }
+}
+
+function formatPhoneForDisplay(phone: string | null): string {
+  if (!phone) return "your number";
+  let cleaned = phone.replace(/\D/g, "");
+  if (cleaned.startsWith("1") && cleaned.length === 11) {
+    cleaned = cleaned.slice(1);
+  }
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  return phone;
+}
+
+// Format date/time in EST
+function formatInEST(date: Date): { date: string; time: string; dateTime: string } {
+  const estDateFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const estTimeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  
+  return {
+    date: estDateFormatter.format(date),
+    time: estTimeFormatter.format(date) + " EST",
+    dateTime: `${estDateFormatter.format(date)} at ${estTimeFormatter.format(date)} EST`
+  };
+}
+
+// Process presentation links in template
+function processPresentationLinks(content: string, isEmail: boolean): string {
+  let processed = content;
+  
+  // Replace presentation link placeholders
+  Object.entries(PRESENTATIONS).forEach(([key, url]) => {
+    const placeholder = `[PRESENTATION_LINK:${key}]`;
+    if (isEmail) {
+      // HTML button for emails
+      const buttonHtml = `
+        <div style="text-align: center; margin: 20px 0;">
+          <a href="${url}" style="display: inline-block; background: linear-gradient(135deg, #b8956a 0%, #d4b896 100%); color: white; padding: 14px 28px; text-decoration: none; font-size: 14px; font-weight: 600; border-radius: 6px; box-shadow: 0 2px 8px rgba(184, 149, 106, 0.3);">
+            ${key === 'onboarding' ? '▶ Watch Our Process Overview' : key === 'owner_portal' ? '▶ See Your Future Owner Portal' : '▶ View Presentation'}
+          </a>
+        </div>`;
+      processed = processed.replace(placeholder, buttonHtml);
+    } else {
+      // Plain URL for SMS
+      processed = processed.replace(placeholder, url);
+    }
+  });
+  
+  return processed;
+}
+
+// Process call type placeholders
+function processCallTypePlaceholders(
+  content: string,
+  isVideoCall: boolean,
+  meetLink: string | null,
+  phone: string | null
+): string {
+  let processed = content;
+  
+  // Replace call type placeholders
+  processed = processed.replace('[CALL_TYPE_DETAILS]', getCallTypeDetails(isVideoCall, meetLink, phone));
+  processed = processed.replace('[CALL_TYPE_BRIEF]', getCallTypeBrief(isVideoCall, meetLink, phone));
+  processed = processed.replace('[CALL_TYPE_REMINDER]', getCallTypeReminder(isVideoCall, meetLink, phone));
+  
+  return processed;
+}
 
 function buildStyledEmailHtml({
   subject,
@@ -47,7 +157,7 @@ function buildStyledEmailHtml({
           <!-- Logo Header -->
           <tr>
             <td style="padding: 32px 40px 24px 40px; text-align: center; background-color: #ffffff;">
-              <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
+              <img src="${LOGO_URL}" 
                    alt="PeachHaus" 
                    style="height: 44px; width: auto;"
                    onerror="this.style.display='none'">
@@ -64,11 +174,7 @@ function buildStyledEmailHtml({
               </p>
               
               <!-- Message Body -->
-              ${message.split('\n\n').map(para => `
-              <p style="margin: 0 0 18px 0; font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.8; color: #4a4a4a; font-weight: 400; letter-spacing: 0.2px;">
-                ${para.replace(/\n/g, '<br>')}
-              </p>
-              `).join('')}
+              ${message}
               
             </td>
           </tr>
@@ -213,9 +319,32 @@ serve(async (req) => {
 
         const recipientFirstName = lead.name?.split(' ')[0] || 'there';
 
+        // Fetch discovery call data for call-type awareness
+        let isVideoCall = false;
+        let meetLink: string | null = null;
+        let callScheduledAt: Date | null = null;
+        
+        const triggerStage = sequence?.trigger_stage;
+        if (triggerStage === 'call_scheduled' || triggerStage === 'call_attended') {
+          const { data: discoveryCall } = await supabase
+            .from("discovery_calls")
+            .select("meeting_type, google_meet_link, scheduled_at")
+            .eq("lead_id", lead.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (discoveryCall) {
+            isVideoCall = discoveryCall.meeting_type === 'video';
+            meetLink = discoveryCall.google_meet_link;
+            callScheduledAt = discoveryCall.scheduled_at ? new Date(discoveryCall.scheduled_at) : null;
+            console.log(`Call type for lead ${lead.id}: ${isVideoCall ? 'VIDEO' : 'PHONE'}, meetLink: ${meetLink}`);
+          }
+        }
+
         // Process template variables (fallback)
         const processTemplate = (template: string) => {
-          return template
+          let processed = template
             .replace(/\{\{name\}\}/g, lead.name || "")
             .replace(/\{\{first_name\}\}/g, recipientFirstName)
             .replace(/\{\{email\}\}/g, lead.email || "")
@@ -224,9 +353,15 @@ serve(async (req) => {
             .replace(/\{\{opportunity_value\}\}/g, lead.opportunity_value?.toString() || "0")
             .replace(/\{\{ach_link\}\}/g, `https://peachhaus.co/payment-setup`)
             .replace(/\{\{onboarding_link\}\}/g, `https://peachhaus.co/onboard/existing-str`);
+          
+          // Process call-type placeholders
+          processed = processCallTypePlaceholders(processed, isVideoCall, meetLink, lead.phone);
+          
+          return processed;
         };
 
         const actionType = step?.action_type || "sms";
+        const isEmail = actionType === "email" || actionType === "both";
         const isFirstStep = step?.step_number === 1;
         const purpose = isFirstStep ? "first_touch" : "follow_up";
         
@@ -253,6 +388,10 @@ serve(async (req) => {
                 templateHint: step?.template_content,
                 stepNumber: step?.step_number,
                 sequenceName: sequence?.name,
+                // Pass call context for AI awareness
+                isVideoCall,
+                meetLink,
+                callScheduledAt: callScheduledAt?.toISOString(),
               }),
             }
           );
@@ -274,6 +413,8 @@ serve(async (req) => {
         // Fallback to static template if AI failed
         if (!messageBody && step?.template_content) {
           messageBody = processTemplate(step.template_content);
+          // Process presentation links for template content
+          messageBody = processPresentationLinks(messageBody, isEmail);
           console.log(`Using template fallback for lead ${lead.id}`);
         }
         

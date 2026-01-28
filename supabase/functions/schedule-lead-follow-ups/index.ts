@@ -53,6 +53,30 @@ serve(async (req) => {
       );
     }
 
+    // For call_scheduled stage, fetch the discovery call time for relative scheduling
+    let callScheduledAt: Date | null = null;
+    let discoveryCallData: { meeting_type: string; google_meet_link: string | null } | null = null;
+    
+    if (stage === 'call_scheduled') {
+      const { data: discoveryCall } = await supabase
+        .from("discovery_calls")
+        .select("scheduled_at, meeting_type, google_meet_link")
+        .eq("lead_id", leadId)
+        .eq("status", "scheduled")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (discoveryCall?.scheduled_at) {
+        callScheduledAt = new Date(discoveryCall.scheduled_at);
+        discoveryCallData = {
+          meeting_type: discoveryCall.meeting_type,
+          google_meet_link: discoveryCall.google_meet_link
+        };
+        console.log(`Discovery call scheduled for ${callScheduledAt.toISOString()}, type: ${discoveryCall.meeting_type}`);
+      }
+    }
+
     let scheduledCount = 0;
     const now = new Date();
 
@@ -69,25 +93,60 @@ serve(async (req) => {
         .eq("id", leadId);
 
       for (const step of steps) {
-        // Calculate scheduled time
-        const scheduledFor = new Date(now);
-        scheduledFor.setDate(scheduledFor.getDate() + (step.delay_days || 0));
-        scheduledFor.setHours(scheduledFor.getHours() + (step.delay_hours || 0));
+        let scheduledFor: Date;
         
-        // Set to preferred send time (default 11:00 AM)
-        if (step.send_time) {
-          const [hours, minutes] = step.send_time.split(':').map(Number);
-          scheduledFor.setHours(hours, minutes, 0, 0);
-        }
+        // For call_scheduled stage, calculate timing relative to call time (before the call)
+        if (stage === 'call_scheduled' && callScheduledAt) {
+          scheduledFor = new Date(callScheduledAt);
+          
+          // Pre-call timing based on step number:
+          // Step 1: 48h before call (email with Onboarding Presentation)
+          // Step 2: 24h before call (SMS with Owner Portal teaser)
+          // Step 3: 2h before call (SMS final reminder)
+          switch (step.step_number) {
+            case 1:
+              scheduledFor.setHours(scheduledFor.getHours() - 48);
+              break;
+            case 2:
+              scheduledFor.setHours(scheduledFor.getHours() - 24);
+              break;
+            case 3:
+              scheduledFor.setHours(scheduledFor.getHours() - 2);
+              break;
+            default:
+              // Fallback: use delay_days/delay_hours before call
+              scheduledFor.setDate(scheduledFor.getDate() - (step.delay_days || 0));
+              scheduledFor.setHours(scheduledFor.getHours() - (step.delay_hours || 0));
+          }
+          
+          // Don't schedule if the time has already passed
+          if (scheduledFor < now) {
+            console.log(`Skipping step ${step.step_number} - scheduled time ${scheduledFor.toISOString()} already passed`);
+            continue;
+          }
+          
+          console.log(`Scheduling pre-call step ${step.step_number} for ${scheduledFor.toISOString()} (${step.step_number === 1 ? '48h' : step.step_number === 2 ? '24h' : '2h'} before call)`);
+        } else {
+          // Standard scheduling: relative to now (for post-call follow-ups, etc.)
+          scheduledFor = new Date(now);
+          scheduledFor.setDate(scheduledFor.getDate() + (step.delay_days || 0));
+          scheduledFor.setHours(scheduledFor.getHours() + (step.delay_hours || 0));
+          
+          // Set to preferred send time if specified (doesn't apply to 2h before call)
+          if (step.send_time && step.step_number !== 3) {
+            const [hours, minutes] = step.send_time.split(':').map(Number);
+            scheduledFor.setHours(hours, minutes, 0, 0);
+          }
 
-        // Adjust for send_days (avoid weekends if configured)
-        const sendDays = step.send_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-        
-        let daysToAdd = 0;
-        const getDayName = (date: Date) => date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-        while (!sendDays.includes(getDayName(scheduledFor)) && daysToAdd < 7) {
-          scheduledFor.setDate(scheduledFor.getDate() + 1);
-          daysToAdd++;
+          // Adjust for send_days (avoid weekends if configured)
+          const sendDays = step.send_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+          
+          let daysToAdd = 0;
+          const getDayName = (date: Date) => date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+          while (!sendDays.includes(getDayName(scheduledFor)) && daysToAdd < 7) {
+            scheduledFor.setDate(scheduledFor.getDate() + 1);
+            daysToAdd++;
+          }
         }
 
         // Create the scheduled follow-up
@@ -110,11 +169,20 @@ serve(async (req) => {
         }
       }
 
-      // Add timeline entry
+      // Add timeline entry with call type info if available
+      const callTypeInfo = discoveryCallData 
+        ? ` (${discoveryCallData.meeting_type === 'video' ? 'Video Call' : 'Phone Call'})`
+        : '';
+      
       await supabase.from("lead_timeline").insert({
         lead_id: leadId,
-        action: `Follow-up sequence "${sequence.name}" started (${steps.length} steps scheduled)`,
-        metadata: { sequence_id: sequence.id, steps_scheduled: steps.length },
+        action: `Follow-up sequence "${sequence.name}" started${callTypeInfo} (${scheduledCount} steps scheduled)`,
+        metadata: { 
+          sequence_id: sequence.id, 
+          steps_scheduled: scheduledCount,
+          call_type: discoveryCallData?.meeting_type,
+          has_meet_link: !!discoveryCallData?.google_meet_link
+        },
       });
     }
 
