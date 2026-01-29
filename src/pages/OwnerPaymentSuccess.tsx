@@ -35,6 +35,23 @@ const OwnerPaymentSuccess = () => {
         } else {
           console.log("Payment method synced successfully for owner:", ownerId);
         }
+
+        // Also mark the payment_setup_request as completed to stop reminders immediately
+        const { error: requestError } = await supabase
+          .from("payment_setup_requests")
+          .update({ 
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq("owner_id", ownerId)
+          .eq("status", "pending");
+
+        if (requestError) {
+          console.error("Error updating payment request status:", requestError);
+        } else {
+          console.log("Payment request marked as completed - reminders stopped for owner:", ownerId);
+        }
       } catch (error) {
         console.error("Error syncing payment status:", error);
         setSyncError("An error occurred while syncing");
