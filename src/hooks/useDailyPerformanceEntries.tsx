@@ -35,58 +35,59 @@ export const useDailyPerformanceEntries = ({
       setLoading(true);
       setError(null);
 
-      // Check authentication
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error("User not authenticated");
       }
 
-      // Build query
+      // Fetch entries
       let query = supabase
         .from("daily_performance_entries")
-        .select(`
-          id,
-          date,
-          entry,
-          user_id,
-          created_at,
-          profiles!inner(first_name, last_name)
-        `)
+        .select("id, date, entry, user_id, created_at")
         .order("date", { ascending: false });
 
-      // Add filters
       if (teamId) {
         query = query.eq("team_id", teamId);
       }
-
       if (startDate) {
         query = query.gte("date", startDate);
       }
-
       if (endDate) {
         query = query.lte("date", endDate);
       }
 
       const { data, error: fetchError } = await query;
-
       if (fetchError) throw fetchError;
 
-      // Transform data to include user_name
+      // Fetch profiles for user names
+      const userIds = [...new Set((data || []).map(e => e.user_id))];
+      let profilesMap: Record<string, string> = {};
+      
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, first_name")
+          .in("id", userIds);
+        
+        (profiles as any[])?.forEach(p => {
+          profilesMap[p.id] = p.first_name || 'Unknown';
+        });
+      }
+
       const transformedEntries: DailyPerformanceEntry[] = (data || []).map((entry: any) => ({
         id: entry.id,
         date: entry.date,
         entry: entry.entry,
         user_id: entry.user_id,
-        user_name: `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.trim() || 'Unknown User',
+        user_name: profilesMap[entry.user_id] || 'Unknown User',
         created_at: entry.created_at
       }));
 
       setEntries(transformedEntries);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to fetch daily performance entries";
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch entries";
       setError(errorMessage);
       toast.error(errorMessage);
-      console.error("Error fetching daily performance entries:", err);
     } finally {
       setLoading(false);
     }
@@ -99,14 +100,9 @@ export const useDailyPerformanceEntries = ({
 
       const { error: insertError } = await supabase
         .from("daily_performance_entries")
-        .insert({
-          user_id: user.id,
-          team_id: teamId,
-          entry
-        });
+        .insert({ user_id: user.id, team_id: teamId, entry });
 
       if (insertError) throw insertError;
-
       toast.success("Entry added successfully");
       await fetchEntries();
     } catch (err) {

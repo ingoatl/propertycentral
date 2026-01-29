@@ -18,7 +18,7 @@ interface SigningRequest {
 }
 
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
-const APP_URL = "https://id-preview--9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovable.app";
+const APP_URL = "https://propertycentral.lovable.app";
 
 const generateSecureToken = (): string => {
   const array = new Uint8Array(32);
