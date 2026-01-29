@@ -58,10 +58,14 @@ serve(async (req) => {
     // Create a Stripe Checkout session for setting up a payment method
     const siteUrl = "https://propertycentral.lovable.app";
     
+    // Set expiration to 30 days from now (max allowed by Stripe)
+    const thirtyDaysFromNow = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+    
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "setup",
       currency: "usd",
+      expires_at: thirtyDaysFromNow,
       payment_method_types: ["us_bank_account", "card"],
       payment_method_options: {
         us_bank_account: {
