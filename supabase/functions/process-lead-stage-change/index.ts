@@ -1119,9 +1119,9 @@ function buildCallAttendedEmailHtml(recipientName: string, propertyAddress: stri
           </td>
         </tr>
         <tr><td style="height: 8px;"></td></tr>
-        <tr>
+         <tr>
           <td style="padding: 12px 16px; border-left: 3px solid #f59e0b; background: #f9fafb; margin-bottom: 8px;">
-            <div style="font-size: 13px; color: #111827;"><strong>2.</strong> I'll send the management agreement shortly</div>
+            <div style="font-size: 13px; color: #111827;"><strong>2.</strong> When you're ready, I'll send the management agreement</div>
           </td>
         </tr>
         <tr><td style="height: 8px;"></td></tr>
@@ -1243,7 +1243,7 @@ const STAGE_PSYCHOLOGY_TEMPLATES: Record<string, { sms?: string; email_subject?:
     principle: "Commitment + Preparation"
   },
   call_attended: {
-    sms: "Great speaking with you, {{name}}! As discussed, I'm preparing a management proposal for {{property_address}}. You'll receive it shortly.",
+    sms: "Great speaking with you, {{name}}! I've sent over some resources about {{property_address}} to help with your decision. Take your time reviewing – I'm here when you're ready!",
     email_subject: "Next Steps After Our Conversation",
     email_body: `CALL_ATTENDED_HTML_TEMPLATE`,
     principle: "Commitment + Consistency"

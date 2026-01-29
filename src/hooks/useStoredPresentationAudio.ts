@@ -144,6 +144,7 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
       audioUrlCache.current.set(slideId, audioUrl);
     }
 
+    console.log(`[Audio] Loading audio for slide: ${slideId}, URL: ${audioUrl}`);
     setIsLoading(true);
 
     // Create audio element if needed
@@ -154,16 +155,29 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     const audio = audioRef.current;
     audio.src = audioUrl;
     
+    // CRITICAL: Add loading timeout - if audio doesn't load within 5 seconds, advance anyway
+    const loadingTimeoutId = setTimeout(() => {
+      console.warn(`[Audio] Loading timeout for slide: ${slideId} - advancing anyway`);
+      if (isPlayingSlideRef.current === slideId) {
+        isPlayingSlideRef.current = null;
+        setIsLoading(false);
+        setIsPlaying(false);
+        onEnd?.();
+      }
+    }, 5000);
+    
     // Set up event handlers
     audio.oncanplaythrough = () => {
+      clearTimeout(loadingTimeoutId);
       // Verify we're still meant to play this slide
       if (isPlayingSlideRef.current !== slideId) {
         return;
       }
+      console.log(`[Audio] Ready to play slide: ${slideId}`);
       setIsLoading(false);
       setIsPlaying(true);
       audio.play().catch(err => {
-        console.error("Playback error:", err);
+        console.error("[Audio] Playback error:", err);
         setIsPlaying(false);
         isPlayingSlideRef.current = null;
         onEnd?.();
@@ -171,7 +185,8 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     };
 
     audio.onended = () => {
-      console.log("Audio ended for slide:", slideId);
+      clearTimeout(loadingTimeoutId);
+      console.log(`[Audio] Ended for slide: ${slideId}`);
       isPlayingSlideRef.current = null;
       setIsPlaying(false);
       // Call the stored callback
@@ -179,7 +194,8 @@ export function useStoredPresentationAudio(options: UseStoredPresentationAudioOp
     };
 
     audio.onerror = (e) => {
-      console.error("Audio error for slide:", slideId, e);
+      clearTimeout(loadingTimeoutId);
+      console.error(`[Audio] Error for slide: ${slideId}`, e);
       setIsLoading(false);
       setIsPlaying(false);
       isPlayingSlideRef.current = null;
