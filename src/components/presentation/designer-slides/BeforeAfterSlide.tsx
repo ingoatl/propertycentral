@@ -1,7 +1,7 @@
 import { SlideLayout } from "../SlideLayout";
 import { ExternalLink, DollarSign } from "lucide-react";
 
-// Import local images from assets
+// Import local images from assets (downloaded from Dropbox)
 import whitehurst_before from "@/assets/designer/whitehurst-before.jpg";
 import whitehurst_after from "@/assets/designer/whitehurst-after.jpg";
 import southvale_before from "@/assets/designer/southvale-before.jpg";
