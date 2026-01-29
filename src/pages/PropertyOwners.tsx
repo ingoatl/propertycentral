@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare, Eye, FileText, CheckCircle, Users, Calendar } from "lucide-react";
+import { ServiceTypeToggle } from "@/components/owners/ServiceTypeToggle";
 import { z } from "zod";
 import { AddPaymentMethod } from "@/components/AddPaymentMethod";
 import { SendOwnerPaymentRequestButton } from "@/components/owners/SendOwnerPaymentRequestButton";
@@ -759,14 +760,13 @@ const PropertyOwners = () => {
                     <div className="flex gap-2 items-center">
                       {/* Desktop: Use simplified actions dropdown */}
                       <div className="hidden md:flex gap-2 items-center">
-                        {/* Service Type Badge */}
-                        <Badge 
-                          variant={owner.service_type === 'cohosting' ? 'outline' : 'default'}
-                          className={owner.service_type === 'cohosting' ? 'border-orange-500 text-orange-600' : ''}
-                        >
-                          <Users className="w-3 h-3 mr-1" />
-                          {owner.service_type === 'cohosting' ? 'Co-Hosting' : 'Full Service'}
-                        </Badge>
+                        {/* Service Type Toggle */}
+                        <ServiceTypeToggle
+                          ownerId={owner.id}
+                          ownerName={owner.name}
+                          currentType={owner.service_type || 'cohosting'}
+                          onSuccess={loadData}
+                        />
                         
                         {/* W-9 Status indicator */}
                         {owner.owner_w9_uploaded_at ? (
