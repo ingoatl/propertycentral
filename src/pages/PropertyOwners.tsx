@@ -1172,9 +1172,20 @@ const PropertyOwners = () => {
                             key={property.id}
                             className="flex items-center justify-between p-2 border rounded-lg"
                           >
-                            <div>
-                              <p className="font-medium text-sm">{property.name}</p>
-                              <p className="text-xs text-muted-foreground">{property.address}</p>
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <p className="font-medium text-sm">{property.name}</p>
+                                <p className="text-xs text-muted-foreground">{property.address}</p>
+                              </div>
+                              <Badge 
+                                variant="outline" 
+                                className={owner.service_type === 'full_service' 
+                                  ? 'border-emerald-500 text-emerald-700 bg-emerald-50' 
+                                  : 'border-blue-500 text-blue-700 bg-blue-50'
+                                }
+                              >
+                                {owner.service_type === 'full_service' ? '💰 Full Service' : '🔒 Co-Hosting'}
+                              </Badge>
                             </div>
                             <Button
                               variant="ghost"
