@@ -469,21 +469,40 @@ serve(async (req) => {
         // Get the booking document to extract contract type and recipient info
         const { data: bookingDoc } = await supabase
           .from("booking_documents")
-          .select("id, contract_type, recipient_name, recipient_email")
+          .select("id, contract_type, template_id, recipient_name, recipient_email, field_configuration")
           .eq("id", signingToken.document_id)
           .single();
 
+        // === GET SERVICE TYPE FROM TEMPLATE (NOT from booking_document which might be NULL) ===
+        let serviceType = "cohosting"; // default
+        
+        // Priority 1: Get from TEMPLATE directly - this is the source of truth
+        if (bookingDoc?.template_id) {
+          const { data: template } = await supabase
+            .from("document_templates")
+            .select("contract_type")
+            .eq("id", bookingDoc.template_id)
+            .single();
+          
+          if (template?.contract_type === "full_service") {
+            serviceType = "full_service";
+            console.log("Service type from TEMPLATE: full_service");
+          } else if (template?.contract_type === "co_hosting") {
+            serviceType = "cohosting";
+            console.log("Service type from TEMPLATE: cohosting");
+          }
+        }
+        
+        // Priority 2: Check booking_document.contract_type as fallback
+        if (serviceType === "cohosting" && bookingDoc?.contract_type === "full_service") {
+          serviceType = "full_service";
+          console.log("Service type from booking_document: full_service");
+        }
+        
+        console.log("Final service type determined:", serviceType);
+        
         // === CREATE OWNER RECORD NOW THAT AGREEMENT IS FULLY EXECUTED ===
         console.log("Creating owner record upon full agreement execution");
-        
-        // Extract service type from contract or field values
-        const servicePackage = (fieldValues?.service_package || fieldValues?.package_selection) as string | null;
-        let serviceType = "cohosting"; // default
-        if (servicePackage?.toLowerCase().includes("full")) {
-          serviceType = "full_service";
-        } else if (bookingDoc?.contract_type === "full_service") {
-          serviceType = "full_service";
-        }
         
         // Get owner details from field values or signing token
         const finalOwnerName = ownerName || bookingDoc?.recipient_name || signingToken.signer_name;
@@ -494,7 +513,7 @@ serve(async (req) => {
         // Check if owner already exists with this email
         const { data: existingOwner } = await supabase
           .from("property_owners")
-          .select("id")
+          .select("id, service_type")
           .eq("email", finalOwnerEmail)
           .maybeSingle();
         
@@ -502,15 +521,21 @@ serve(async (req) => {
         
         if (existingOwner) {
           ownerId = existingOwner.id;
-          console.log("Found existing owner:", ownerId);
+          console.log("Found existing owner:", ownerId, "updating service_type to:", serviceType);
+          
+          // Update owner's service_type from the template (in case it was wrong before)
+          await supabase
+            .from("property_owners")
+            .update({ service_type: serviceType })
+            .eq("id", ownerId);
         } else {
-          // Create new owner record
+          // Create new owner record with correct service_type from template
           const { data: newOwner, error: ownerError } = await supabase
             .from("property_owners")
             .insert({
               name: finalOwnerName,
               email: finalOwnerEmail,
-              phone: finalOwnerPhone || lead.property_address ? null : null, // Use lead phone if available
+              phone: finalOwnerPhone,
               address: finalOwnerAddress,
               payment_method: "ach",
               service_type: serviceType,
@@ -522,9 +547,91 @@ serve(async (req) => {
             console.error("Error creating owner:", ownerError);
           } else {
             ownerId = newOwner.id;
-            console.log("Created new owner:", ownerId);
+            console.log("Created new owner with service_type:", serviceType, "owner_id:", ownerId);
           }
         }
+        
+        // === CREATE PROPERTY RECORD FROM LEAD DATA ===
+        // Property address comes from the LEAD, NOT from form fields
+        const leadPropertyAddress = lead.property_address || 
+          (bookingDoc?.field_configuration as any)?.lead_property_address;
+        
+        if (ownerId && leadPropertyAddress) {
+          console.log("Creating property from lead address:", leadPropertyAddress);
+          
+          // Check if property already exists for this owner or address
+          const { data: existingProperty } = await supabase
+            .from("properties")
+            .select("id")
+            .or(`owner_id.eq.${ownerId},address.ilike.%${leadPropertyAddress.split(',')[0]}%`)
+            .maybeSingle();
+          
+          let propertyId: string | null = null;
+          
+          if (existingProperty) {
+            propertyId = existingProperty.id;
+            console.log("Found existing property:", propertyId);
+          } else {
+            // Create new property from lead data
+            const { data: newProperty, error: propertyError } = await supabase
+              .from("properties")
+              .insert({
+                name: leadPropertyAddress.split(',')[0].trim(),
+                address: leadPropertyAddress,
+                property_type: 'Client-Managed',
+                owner_id: ownerId,
+              })
+              .select()
+              .single();
+            
+            if (propertyError) {
+              console.error("Error creating property:", propertyError);
+            } else {
+              propertyId = newProperty.id;
+              console.log("Created new property:", propertyId);
+            }
+          }
+          
+          // Link property to lead
+          if (propertyId) {
+            await supabase
+              .from("leads")
+              .update({ property_id: propertyId })
+              .eq("id", lead.id);
+            
+            // Create onboarding project linked to property (status: pending)
+            const { data: existingProject } = await supabase
+              .from("onboarding_projects")
+              .select("id")
+              .eq("property_id", propertyId)
+              .maybeSingle();
+            
+            if (!existingProject) {
+              const { data: newProject, error: projectError } = await supabase
+                .from("onboarding_projects")
+                .insert({
+                  property_id: propertyId,
+                  owner_name: finalOwnerName,
+                  property_address: leadPropertyAddress,
+                  status: 'pending', // Waiting for onboarding form
+                })
+                .select()
+                .single();
+              
+              if (projectError) {
+                console.error("Error creating onboarding project:", projectError);
+              } else {
+                console.log("Created onboarding project:", newProject.id);
+              }
+            } else {
+              console.log("Onboarding project already exists:", existingProject.id);
+            }
+          }
+        } else {
+          console.log("Skipping property creation - missing ownerId or leadPropertyAddress", 
+            { ownerId, leadPropertyAddress });
+        }
+        // === END PROPERTY CREATION ===
         
         // Link owner to lead and booking document
         if (ownerId) {

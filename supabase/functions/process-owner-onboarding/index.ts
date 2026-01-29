@@ -739,16 +739,32 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Submission saved:", submission.id);
 
-    // 2. Create or find property owner
+    // 2. Find or create property owner
+    // Priority: Find existing owner by email (may have been created at agreement signing)
     let ownerId: string;
     const { data: existingOwner } = await supabase
       .from('property_owners')
-      .select('id')
+      .select('id, name, phone')
       .eq('email', formData.owner_email)
-      .single();
+      .maybeSingle();
 
     if (existingOwner) {
       ownerId = existingOwner.id;
+      console.log("Found existing owner (from agreement signing):", ownerId);
+      
+      // Update owner with any new info from the onboarding form
+      const ownerUpdates: any = {};
+      if (formData.owner_name && formData.owner_name !== existingOwner.name) {
+        ownerUpdates.name = formData.owner_name;
+      }
+      if (formData.owner_phone && !existingOwner.phone) {
+        ownerUpdates.phone = toText(formData.owner_phone);
+      }
+      
+      if (Object.keys(ownerUpdates).length > 0) {
+        await supabase.from('property_owners').update(ownerUpdates).eq('id', ownerId);
+        console.log("Updated owner with new info:", ownerUpdates);
+      }
     } else {
       const { data: newOwner, error: ownerError } = await supabase
         .from('property_owners')
@@ -766,60 +782,104 @@ const handler = async (req: Request): Promise<Response> => {
         throw new Error("Failed to create property owner");
       }
       ownerId = newOwner.id;
+      console.log("Created new owner:", ownerId);
     }
 
-    console.log("Owner ID:", ownerId);
-
-    // 3. Create property
-    const { data: property, error: propertyError } = await supabase
+    // 3. Find or create property
+    // Priority: Find existing property by owner_id or matching address (may have been created at agreement signing)
+    let property: any;
+    const addressFirstPart = formData.property_address.split(',')[0].trim().toLowerCase();
+    
+    // Try to find by owner first
+    const { data: existingPropertyByOwner } = await supabase
       .from('properties')
-      .insert({
-        name: formData.property_address.split(',')[0],
-        address: formData.property_address,
-        property_type: 'Client-Managed',
-        owner_id: ownerId,
-      })
-      .select()
-      .single();
+      .select('id, name, address')
+      .eq('owner_id', ownerId)
+      .maybeSingle();
+    
+    // If not found by owner, try by address
+    const { data: existingPropertyByAddress } = !existingPropertyByOwner ? await supabase
+      .from('properties')
+      .select('id, name, address')
+      .ilike('address', `%${addressFirstPart}%`)
+      .maybeSingle() : { data: null };
+    
+    const existingProperty = existingPropertyByOwner || existingPropertyByAddress;
+    
+    if (existingProperty) {
+      property = existingProperty;
+      console.log("Found existing property (from agreement signing):", property.id);
+      
+      // Update property if it doesn't have an owner yet
+      if (!existingPropertyByOwner && existingPropertyByAddress) {
+        await supabase.from('properties').update({ owner_id: ownerId }).eq('id', property.id);
+        console.log("Linked existing property to owner");
+      }
+    } else {
+      const { data: newProperty, error: propertyError } = await supabase
+        .from('properties')
+        .insert({
+          name: formData.property_address.split(',')[0],
+          address: formData.property_address,
+          property_type: 'Client-Managed',
+          owner_id: ownerId,
+        })
+        .select()
+        .single();
 
-    if (propertyError) {
-      console.error("Failed to create property:", propertyError);
-      throw new Error("Failed to create property");
+      if (propertyError) {
+        console.error("Failed to create property:", propertyError);
+        throw new Error("Failed to create property");
+      }
+      property = newProperty;
+      console.log("Created new property:", property.id);
     }
 
-    console.log("Property created:", property.id);
-
-    // 4. Create property details with all available data
+    // 4. Create or update property details
     const propertyDetailsData: any = {
       property_id: property.id,
       pets_allowed: formData.pets_allowed ?? false,
     };
     
-    // Add parking spaces if provided
     if (formData.max_vehicles) {
       propertyDetailsData.parking_spaces = String(formData.max_vehicles);
     }
 
-    await supabase
+    const { data: existingDetails } = await supabase
       .from('property_details')
-      .insert(propertyDetailsData);
+      .select('id')
+      .eq('property_id', property.id)
+      .maybeSingle();
+    
+    if (existingDetails) {
+      await supabase.from('property_details').update(propertyDetailsData).eq('id', existingDetails.id);
+    } else {
+      await supabase.from('property_details').insert(propertyDetailsData);
+    }
 
-    // 5. Create property policies with pet data
+    // 5. Create or update property policies
     const propertyPoliciesData: any = {
       property_id: property.id,
       pets_allowed: formData.pets_allowed ?? false,
     };
     
-    // Add pet rules if provided
     if (formData.pet_size_restrictions) {
       propertyPoliciesData.pet_rules = formData.pet_size_restrictions;
     }
 
-    await supabase
+    const { data: existingPolicies } = await supabase
       .from('property_policies')
-      .insert(propertyPoliciesData);
+      .select('id')
+      .eq('property_id', property.id)
+      .maybeSingle();
+    
+    if (existingPolicies) {
+      await supabase.from('property_policies').update(propertyPoliciesData).eq('id', existingPolicies.id);
+    } else {
+      await supabase.from('property_policies').insert(propertyPoliciesData);
+    }
 
-    // 5b. Create property financial data
+    // 5b. Create or update property financial data
     const financialData = {
       property_id: property.id,
       submission_id: submission.id,
@@ -839,36 +899,77 @@ const handler = async (req: Request): Promise<Response> => {
       competitor_insights: toText(formData.competitor_insights),
     };
 
-    const { error: financialError } = await supabase
+    const { data: existingFinancial } = await supabase
       .from('property_financial_data')
-      .insert(financialData);
-
-    if (financialError) {
-      console.error("Failed to create financial data:", financialError);
-      // Don't throw - this is not critical
+      .select('id')
+      .eq('property_id', property.id)
+      .maybeSingle();
+    
+    if (existingFinancial) {
+      const { error: financialError } = await supabase
+        .from('property_financial_data')
+        .update(financialData)
+        .eq('id', existingFinancial.id);
+      
+      if (financialError) {
+        console.error("Failed to update financial data:", financialError);
+      } else {
+        console.log("Updated financial data for property:", property.id);
+      }
     } else {
-      console.log("Financial data saved for property:", property.id);
+      const { error: financialError } = await supabase
+        .from('property_financial_data')
+        .insert(financialData);
+
+      if (financialError) {
+        console.error("Failed to create financial data:", financialError);
+      } else {
+        console.log("Created financial data for property:", property.id);
+      }
     }
 
-    // 6. Create onboarding project - status is 'in-progress', progress starts at 0
-    const { data: project, error: projectError } = await supabase
+    // 6. Find or create onboarding project
+    // May have been created at agreement signing with status 'pending'
+    let project: any;
+    const { data: existingProject } = await supabase
       .from('onboarding_projects')
-      .insert({
-        property_id: property.id,
-        owner_name: formData.owner_name,
-        property_address: formData.property_address,
-        status: 'in-progress',
-        progress: 0,
-      })
-      .select()
-      .single();
+      .select('id, status')
+      .eq('property_id', property.id)
+      .maybeSingle();
+    
+    if (existingProject) {
+      project = existingProject;
+      console.log("Found existing onboarding project (from agreement signing):", project.id);
+      
+      // Update project status to 'in-progress' since form is now submitted
+      await supabase
+        .from('onboarding_projects')
+        .update({
+          status: 'in-progress',
+          owner_name: formData.owner_name,
+          property_address: formData.property_address,
+        })
+        .eq('id', project.id);
+    } else {
+      const { data: newProject, error: projectError } = await supabase
+        .from('onboarding_projects')
+        .insert({
+          property_id: property.id,
+          owner_name: formData.owner_name,
+          property_address: formData.property_address,
+          status: 'in-progress',
+          progress: 0,
+        })
+        .select()
+        .single();
 
-    if (projectError) {
-      console.error("Failed to create project:", projectError);
-      throw new Error("Failed to create onboarding project");
+      if (projectError) {
+        console.error("Failed to create project:", projectError);
+        throw new Error("Failed to create onboarding project");
+      }
+      project = newProject;
+      console.log("Created new onboarding project:", project.id);
     }
-
-    console.log("Project created:", project.id);
 
     // 7. PRE-CREATE ALL DEFAULT TASKS from onboarding phases
     console.log("Creating all default onboarding tasks...");
