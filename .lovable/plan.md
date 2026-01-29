@@ -1,178 +1,159 @@
 
-# Service Type Toggle: Cohosting ↔ Full-Service Management
+# Fix Agreement → Property Creation Flow with Correct Service Type
 
-## Overview
+## Problem Summary
 
-This plan adds a manual toggle button for switching between **Cohosting** and **Full-Service Management** for the four specified properties (Neely, Timberlake, 1427 Hazy Way, 1429 Hazy Way), along with a detailed explanation of how this affects reconciliation, emails, and fund flow.
+Timberlake, Neely, and Hazy Way properties all show "cohosting" even though they signed "PROPERTY MANAGEMENT AGREEMENT" (full_service template). This is because:
 
----
-
-## Current State Analysis
-
-### Properties to Enable Toggle For
-| Property | Address | Current Owner | Current Service Type |
-|----------|---------|---------------|---------------------|
-| Neely Ave | 2008 Neely Ave, East Point, GA 30344 | Chloe Greene and Eldren Keys | cohosting |
-| Timberlake | 3384 Timber Lake Rd NW, Kennesaw, GA 30144 | Boatright Partners, LLC | cohosting |
-| 1427 Hazy Way | 1427 Hazy Way SE, Atlanta, GA 30315 | Ellen K Hines | cohosting |
-| 1429 Hazy Way | 1429 Hazy Way, Atlanta, GA | Sterling Hines | cohosting |
-
-### Where Service Type is Stored
-- `property_owners.service_type` column (NOT NULL, text field)
-- Values: `'cohosting'` or `'full_service'`
+1. **contract_type is not copied** from template to booking_documents when contract is sent
+2. **submit-signature defaults to "cohosting"** when it can't find the contract_type
+3. **Property is NOT created when agreement is signed** - it only gets created later when the owner fills the onboarding form
+4. **Property address should come from the LEAD**, not from signature form fields - it's already part of the agreement when sent
 
 ---
 
-## How Service Type Affects the System
-
-### Financial Flow Differences
+## Current vs. Corrected Flow
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        CO-HOSTING MODEL                                 │
-├─────────────────────────────────────────────────────────────────────────┤
-│  Revenue Flow:  OWNER collects rent/booking revenue directly            │
-│  Monthly:       Owner PAYS PeachHaus for services rendered              │
-│                                                                         │
-│  Calculation:                                                           │
-│  Due from Owner = Management Fee + Visit Fees + Expenses + Pass-through │
-│                                                                         │
-│  Stripe Action: CHARGE owner's card/ACH                                 │
-│  Edge Function: charge-from-reconciliation                              │
-└─────────────────────────────────────────────────────────────────────────┘
+CURRENT (BROKEN):
+Lead → Send Contract → booking_documents.contract_type = NULL → Owner Signs
+→ Owner created with service_type = "cohosting" (wrong!)
+→ NO property created yet
+→ Onboarding form → Creates new property/owner (may duplicate)
 
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     FULL-SERVICE MODEL                                  │
-├─────────────────────────────────────────────────────────────────────────┤
-│  Revenue Flow:  PEACHHAUS collects all rent/booking revenue             │
-│  Monthly:       PeachHaus PAYS owner net amount after deductions        │
-│                                                                         │
-│  Calculation:                                                           │
-│  Payout to Owner = Revenue - Mgmt Fee - Visit Fees - Expenses           │
-│                                                                         │
-│  Stripe Action: PAY owner via bank transfer                             │
-│  Edge Function: process-owner-payout                                    │
-└─────────────────────────────────────────────────────────────────────────┘
+CORRECTED:
+Lead (has property_address) → Send Contract → booking_documents.contract_type = template.contract_type
+→ Owner Signs → All parties sign
+→ Owner created with service_type from TEMPLATE (correct!)
+→ Property created from LEAD.property_address
+→ Onboarding project created
+→ Onboarding form → UPDATES existing property/project
 ```
 
-### Email Statement Differences
+---
 
-| Element | Co-Hosting | Full-Service |
-|---------|------------|--------------|
-| **Header Label** | "BALANCE DUE FROM OWNER" | "NET OWNER EARNINGS" |
-| **Net Calculation** | Expenses + Fees (owner pays) | Revenue - Expenses (we pay) |
-| **Call to Action** | "Amount due: $X" | "Payout: $X" |
-| **Payment Direction** | Owner → PeachHaus | PeachHaus → Owner |
+## Implementation Steps
 
-### Reconciliation UI Differences
+### Step 1: Fix create-document-for-signing
 
-| Element | Co-Hosting | Full-Service |
-|---------|------------|--------------|
-| **Badge Color** | Blue (CreditCard icon) | Green (Banknote icon) |
-| **Settlement Label** | "Due from Owner" | "Payout to Owner" |
-| **Action Button** | "Charge Owner" | "Process Payout" |
-| **Status After** | "charged" | "charged" (with payout_status) |
+Store the template's `contract_type` when creating the booking_document, and also store the lead's property address for later use.
+
+**Key Change:**
+- Add `contract_type: template.contract_type` to the booking_documents insert
+- Store `lead_id` and `lead_property_address` in booking_documents or field_configuration for later retrieval
+
+### Step 2: Fix submit-signature to Get Service Type from Template
+
+When all signers complete, look up the template's contract_type directly rather than relying on the booking_document's potentially NULL field.
+
+**Key Change:**
+```javascript
+// Get service type from the TEMPLATE, not booking_document
+const { data: template } = await supabase
+  .from("document_templates")
+  .select("contract_type")
+  .eq("id", bookingDoc.template_id)
+  .single();
+
+let serviceType = "cohosting"; // default
+if (template?.contract_type === "full_service") {
+  serviceType = "full_service";
+} else if (template?.contract_type === "co_hosting") {
+  serviceType = "cohosting";
+}
+```
+
+### Step 3: Create Property When Agreement is Fully Signed
+
+When the document is completed (all parties signed), create:
+1. Property record using `lead.property_address` (NOT from form fields)
+2. Onboarding project linked to property
+3. Link property to lead
+
+**Key Change:**
+```javascript
+// After owner record is created, create property from LEAD data
+if (lead && lead.property_address) {
+  const { data: newProperty } = await supabase
+    .from("properties")
+    .insert({
+      name: lead.property_address.split(',')[0],
+      address: lead.property_address,
+      property_type: 'Client-Managed',
+      owner_id: ownerId,
+    })
+    .select()
+    .single();
+  
+  if (newProperty) {
+    // Link property to lead
+    await supabase.from("leads").update({ property_id: newProperty.id }).eq("id", lead.id);
+    
+    // Create onboarding project
+    await supabase.from("onboarding_projects").insert({
+      property_id: newProperty.id,
+      owner_name: finalOwnerName,
+      property_address: lead.property_address,
+      status: 'pending', // Waiting for onboarding form
+    });
+  }
+}
+```
+
+### Step 4: Fix process-owner-onboarding to Update Existing Records
+
+When the owner submits the onboarding form:
+1. Find existing property by owner email or address
+2. UPDATE existing property, owner, and project instead of creating duplicates
+
+**Key Changes:**
+- Before creating owner: Check if owner exists by email
+- Before creating property: Check if property exists for this owner or with matching address
+- Before creating project: Check if project exists for this property
+- If found, UPDATE with new data; if not, CREATE
 
 ---
 
-## Implementation Plan
+## Files to Modify
 
-### 1. Create Service Type Toggle Component
-
-**New File: `src/components/owners/ServiceTypeToggle.tsx`**
-
-A compact toggle switch component that:
-- Shows current service type with appropriate icon/color
-- Allows switching between cohosting ↔ full_service
-- Confirms before changing (shows impact explanation)
-- Updates `property_owners.service_type` in database
-- Triggers refetch of owner data
-
-### 2. Add Toggle to Property Owners Page
-
-**File: `src/pages/PropertyOwners.tsx`**
-
-Add the ServiceTypeToggle to each owner row/card, visible only for the four specified properties or all properties (admin choice).
-
-### 3. Add Toggle to Reconciliation Review Modal
-
-**File: `src/components/reconciliation/ReconciliationReviewModal.tsx`**
-
-Add a small toggle in the header area so admins can switch service type directly when reviewing a reconciliation, before sending statements.
-
-### 4. Update Reconciliation Card Display
-
-**File: `src/components/reconciliation/ReconciliationList.tsx`**
-
-Ensure the service type badge and settlement amount dynamically reflect the owner's current service_type setting.
-
----
-
-## Technical Changes Summary
-
-### New Component
 | File | Purpose |
 |------|---------|
-| `src/components/owners/ServiceTypeToggle.tsx` | Reusable toggle with confirmation dialog |
-
-### Modified Files
-| File | Changes |
-|------|---------|
-| `src/pages/PropertyOwners.tsx` | Add ServiceTypeToggle to owner cards/rows |
-| `src/components/reconciliation/ReconciliationReviewModal.tsx` | Add ServiceTypeToggle in header |
-| `src/components/reconciliation/ReconciliationList.tsx` | Ensure dynamic badge/amount display |
+| `supabase/functions/create-document-for-signing/index.ts` | Store contract_type and lead_id on booking_documents |
+| `supabase/functions/submit-signature/index.ts` | Get service_type from template; Create property from lead.property_address |
+| `supabase/functions/process-owner-onboarding/index.ts` | Find and update existing property/owner instead of creating duplicates |
+| `src/components/leads/SendContractButton.tsx` | Pass leadId to edge function (already done) |
 
 ---
 
-## UI Design for Toggle
+## Data Verification: Current State
 
-```text
-┌────────────────────────────────────────────┐
-│  Service Type                              │
-│  ┌─────────────────────────────────────┐   │
-│  │ [🏠 Co-Hosting]  ←──→  [💼 Full-Service] │
-│  └─────────────────────────────────────┘   │
-│                                            │
-│  Current: Co-Hosting                       │
-│  • Owner receives revenue directly         │
-│  • Monthly: Owner pays PeachHaus           │
-└────────────────────────────────────────────┘
-```
+The query shows these properties signed "PROPERTY MANAGEMENT AGREEMENT" (template contract_type = `full_service`) but have `service_type = "cohosting"`:
 
-### Confirmation Dialog (on switch)
+| Property | Lead's Property Address | Signed Template | Expected Service Type | Current Service Type |
+|----------|-------------------------|-----------------|----------------------|---------------------|
+| Timberlake | 3384 Timber Lake Road Northwest, Kennesaw, GA | PROPERTY MANAGEMENT AGREEMENT | full_service | cohosting ❌ |
+| Neely Ave | 2008 Neely Avenue, East Point, GA | PROPERTY MANAGEMENT AGREEMENT | full_service | cohosting ❌ |
+| 1429 Hazy Way | 1429 Hazy Way SE, Atlanta, GA 30315 | PROPERTY MANAGEMENT AGREEMENT | full_service | cohosting ❌ |
 
-```text
-┌──────────────────────────────────────────────────┐
-│  ⚠️  Switch to Full-Service Management?          │
-├──────────────────────────────────────────────────┤
-│  This will change how reconciliation works:      │
-│                                                  │
-│  ✓ PeachHaus will collect all revenue            │
-│  ✓ Monthly payouts will go TO the owner          │
-│  ✓ Existing draft reconciliations will update    │
-│                                                  │
-│  This affects future statements only.            │
-│                                                  │
-│  [Cancel]                    [Confirm Switch]    │
-└──────────────────────────────────────────────────┘
-```
+**After fix**: New agreements will correctly set service_type from template.
+
+**For existing properties**: Use the ServiceTypeToggle you requested to manually switch them to full_service.
 
 ---
 
-## Data Flow After Toggle
+## Technical Notes
 
-1. Admin clicks toggle → confirmation dialog
-2. On confirm → update `property_owners.service_type`
-3. All related reconciliations automatically reflect new type via:
-   - `ReconciliationList.tsx` reads `property_owners.service_type`
-   - `calculateDueFromOwnerFromLineItems()` accepts serviceType param
-   - Email templates check serviceType for labels/calculations
-4. When sending statement:
-   - Co-hosting: `charge-from-reconciliation` charges owner
-   - Full-service: `process-owner-payout` pays owner
+### Why NOT from signature form fields?
+The owner should NOT enter property address during signing. The address is already:
+1. On the lead record (entered when lead was created)
+2. Pre-filled in the agreement PDF (from template/lead)
+3. Part of the document name (e.g., "PROPERTY MANAGEMENT AGREEMENT - Chloe Greene and Eldren Keys")
 
----
+### What triggers property creation?
+- **Current**: Onboarding form submission only
+- **After fix**: Agreement fully signed (all parties complete) → property created immediately
 
-## No Database Migration Needed
-
-The `property_owners.service_type` column already exists and is NOT NULL with appropriate values. This is purely a UI enhancement to allow manual switching.
+### What does the onboarding form do after fix?
+- Finds the existing property created at agreement signing
+- Updates the property with additional details (WiFi, codes, utilities, etc.)
+- Populates onboarding tasks with form values
