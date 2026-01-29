@@ -124,10 +124,10 @@ const OwnerPaymentSetup = () => {
             />
           </div>
           <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold mb-3">
-            {isFullService ? "💰 PAYOUT SETUP" : "🔒 PAYMENT SETUP"}
+            {isFullService ? "💰 FULL SERVICE • PAYOUT SETUP" : "🔒 CO-HOSTING • PAYMENT SETUP"}
           </div>
           <CardTitle className="text-2xl">
-            {isFullService ? "Set Up Your Payout Account" : "Secure Payment Setup"}
+            {isFullService ? "Set Up Your Payout Account" : "Set Up Your Payment Method"}
           </CardTitle>
           <CardDescription className="text-base">
             Hi {ownerData.name.split(' ')[0]}! {isFullService 
