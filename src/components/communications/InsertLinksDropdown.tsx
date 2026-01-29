@@ -1,4 +1,4 @@
-import { Link2, Calendar, Presentation, Palette, Briefcase, Home, Users, UserCircle, ChevronDown } from "lucide-react";
+import { Link2, Calendar, Presentation, Palette, Briefcase, Home, Users, UserCircle, ChevronDown, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,6 +9,10 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+
+// Canonical presentation URLs
+const ONBOARDING_PRESENTATION_URL = "https://propertycentral.lovable.app/p/onboarding";
+const OWNER_PORTAL_PRESENTATION_URL = "https://propertycentral.lovable.app/p/owner-portal";
 
 // All available links with contextual messages
 const LINKS_CONFIG = {
@@ -72,6 +76,20 @@ export function InsertLinksDropdown({
 }: InsertLinksDropdownProps) {
   const firstName = recipientName?.split(" ")[0] || "there";
 
+  const handleInsertBothPresentations = () => {
+    const message = `Hi ${firstName}, I wanted to share two quick presentations with you:
+
+Our full-service management overview:
+${ONBOARDING_PRESENTATION_URL}
+
+And a preview of your Owner Portal where you'll track everything:
+${OWNER_PORTAL_PRESENTATION_URL}
+
+Both are about 5 minutes each and really helpful for seeing how we work!`;
+    onInsert(message);
+    toast.success("Both presentations added to message!");
+  };
+
   const handleInsertPresentation = (key: keyof typeof LINKS_CONFIG.presentations) => {
     const config = LINKS_CONFIG.presentations[key];
     const message = config.contextMessage(firstName);
@@ -114,6 +132,25 @@ export function InsertLinksDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72">
+        {/* Quick Insert: Both Presentations */}
+        <DropdownMenuLabel className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          ⚡ Quick Insert
+        </DropdownMenuLabel>
+        <DropdownMenuItem
+          onClick={handleInsertBothPresentations}
+          className="flex items-start gap-2 py-2.5 cursor-pointer bg-primary/5 hover:bg-primary/10"
+        >
+          <Gift className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="font-medium block">Both Presentations</span>
+            <span className="text-xs text-muted-foreground">
+              Onboarding + Owner Portal links
+            </span>
+          </div>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
         {/* Presentations Section */}
         <DropdownMenuLabel className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
           <Presentation className="h-3.5 w-3.5" />
