@@ -47,6 +47,7 @@ interface PropertyOwner {
   second_owner_email: string | null;
   stripe_customer_id: string | null;
   payment_method: "card" | "ach";
+  has_payment_method: boolean;
   service_type: "full_service" | "cohosting" | null;
   w9_sent_at: string | null;
   w9_uploaded_at: string | null;
@@ -1016,7 +1017,7 @@ const PropertyOwners = () => {
                           email={owner.email}
                           name={owner.name}
                           stripeCustomerId={owner.stripe_customer_id}
-                          paymentMethod={owner.payment_method}
+                          hasPaymentMethod={owner.has_payment_method}
                           variant="default"
                           size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white"
