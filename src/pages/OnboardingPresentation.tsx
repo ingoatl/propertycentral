@@ -307,12 +307,12 @@ export default function OnboardingPresentation() {
       }, slide.duration + 2000);
     }
 
-    // CRITICAL: Reduced fallback timer from 40s to slide duration + 5s for unmuted
+    // CRITICAL: Reduced fallback timer from 5s to 3s buffer for faster recovery if audio fails
     // This ensures progress if audio loading fails or takes too long
-    const fallbackDuration = slide.duration + 5000;
+    const fallbackDuration = slide.duration + 3000;
     fallbackTimerRef.current = setTimeout(() => {
       if (!hasAdvanced && isPlayingRef.current) {
-        console.log(`Fallback advance for ${slide.id} (audio may have failed)`);
+        console.warn(`[Presentation] Fallback advance for ${slide.id} (audio may have failed)`);
         hasAdvanced = true;
         advanceSlide();
       }
