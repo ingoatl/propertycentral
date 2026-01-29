@@ -82,6 +82,13 @@ function formatInEST(date: Date): { date: string; time: string; dateTime: string
 function processPresentationLinks(content: string, isEmail: boolean): string {
   let processed = content;
   
+  // Presentation button labels
+  const buttonLabels: Record<string, string> = {
+    onboarding: '▶ Watch Our Process Overview',
+    owner_portal: '▶ See Your Future Owner Portal',
+    designer: '▶ See How We Transform Properties',
+  };
+  
   // Replace presentation link placeholders
   Object.entries(PRESENTATIONS).forEach(([key, url]) => {
     const placeholder = `[PRESENTATION_LINK:${key}]`;
@@ -90,7 +97,7 @@ function processPresentationLinks(content: string, isEmail: boolean): string {
       const buttonHtml = `
         <div style="text-align: center; margin: 20px 0;">
           <a href="${url}" style="display: inline-block; background: linear-gradient(135deg, #b8956a 0%, #d4b896 100%); color: white; padding: 14px 28px; text-decoration: none; font-size: 14px; font-weight: 600; border-radius: 6px; box-shadow: 0 2px 8px rgba(184, 149, 106, 0.3);">
-            ${key === 'onboarding' ? '▶ Watch Our Process Overview' : key === 'owner_portal' ? '▶ See Your Future Owner Portal' : '▶ View Presentation'}
+            ${buttonLabels[key] || '▶ View Presentation'}
           </a>
         </div>`;
       processed = processed.replace(placeholder, buttonHtml);
