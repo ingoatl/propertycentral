@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, Loader2, RefreshCw, Zap, MessageSquare, FileText, Calendar, TrendingUp, PenLine, X, ArrowLeft } from "lucide-react";
+import { Sparkles, Loader2, RefreshCw, Zap, MessageSquare, FileText, Calendar, TrendingUp, PenLine, X, ArrowLeft, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,6 +12,8 @@ import { useUnifiedAI } from "@/hooks/useUnifiedAI";
 import { extractFirstName } from "@/lib/nameUtils";
 
 const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
+const ONBOARDING_PRESENTATION_URL = "https://propertycentral.lovable.app/p/onboarding";
+const OWNER_PORTAL_PRESENTATION_URL = "https://propertycentral.lovable.app/p/owner-portal";
 
 interface AIWritingAssistantProps {
   currentMessage: string;
@@ -166,6 +168,16 @@ export function AIWritingAssistant({
     setIsOpen(false);
   };
 
+  const handleAddBothPresentations = () => {
+    const firstName = contactName?.split(" ")[0] || "there";
+    const presentationsText = currentMessage 
+      ? `${currentMessage}\n\nI wanted to share two quick presentations with you:\n\nOur full-service management overview:\n${ONBOARDING_PRESENTATION_URL}\n\nAnd a preview of your Owner Portal where you'll track everything:\n${OWNER_PORTAL_PRESENTATION_URL}\n\nBoth are about 5 minutes each and really helpful for seeing how we work!`
+      : `Hi ${firstName}, I wanted to share two quick presentations with you:\n\nOur full-service management overview:\n${ONBOARDING_PRESENTATION_URL}\n\nAnd a preview of your Owner Portal where you'll track everything:\n${OWNER_PORTAL_PRESENTATION_URL}\n\nBoth are about 5 minutes each and really helpful for seeing how we work!`;
+    onMessageGenerated(presentationsText);
+    toast.success("Added both presentations!");
+    setIsOpen(false);
+  };
+
   const actions = [
     { type: "compose" as ActionType, label: "Compose Message", icon: PenLine, description: "Write new with context" },
     { type: "generate" as ActionType, label: "Generate Reply", icon: MessageSquare, description: "Create a contextual reply" },
@@ -284,6 +296,17 @@ export function AIWritingAssistant({
             <div>
               <p className="font-medium">+ Income Analysis</p>
               <p className="text-sm md:text-xs text-muted-foreground">Offer free report</p>
+            </div>
+          </button>
+          
+          <button
+            onClick={handleAddBothPresentations}
+            className="w-full flex items-center gap-3 px-3 py-3 md:py-2.5 text-base md:text-sm rounded-xl md:rounded-lg hover:bg-muted transition-all duration-200 text-left active:scale-[0.98]"
+          >
+            <Gift className="h-5 w-5 md:h-4 md:w-4 text-purple-500" />
+            <div>
+              <p className="font-medium">+ Both Presentations</p>
+              <p className="text-sm md:text-xs text-muted-foreground">Onboarding + Owner Portal</p>
             </div>
             </button>
           </div>
