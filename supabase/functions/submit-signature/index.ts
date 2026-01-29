@@ -15,6 +15,7 @@ interface SubmitSignatureRequest {
   signatureData: string;
   agreedToTerms: boolean;
   fieldValues?: Record<string, string | boolean>;
+  secondOwnerSignatureData?: string; // Owner 2 signature captured during Owner 1's session
 }
 
 const buildConfirmationEmailHtml = (
@@ -202,7 +203,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const resend = new Resend(resendApiKey);
 
-    const { token, signatureData, agreedToTerms, fieldValues }: SubmitSignatureRequest = await req.json();
+    const { token, signatureData, agreedToTerms, fieldValues, secondOwnerSignatureData }: SubmitSignatureRequest = await req.json();
 
     if (!agreedToTerms) {
       return new Response(
@@ -337,6 +338,53 @@ serve(async (req) => {
       })
       .eq("id", signingToken.id);
 
+    // === HANDLE SECOND OWNER SIGNATURE CAPTURED IN SAME SESSION ===
+    // If Owner 1 also captured Owner 2's signature in the same session, process it
+    if (secondOwnerSignatureData && signingToken.signer_type === "owner") {
+      console.log("Processing second owner signature captured during Owner 1's session");
+      
+      // Find the second_owner token for this document
+      const { data: secondOwnerToken } = await supabase
+        .from("signing_tokens")
+        .select("id, signer_email, signer_name")
+        .eq("document_id", signingToken.document_id)
+        .eq("signer_type", "second_owner")
+        .maybeSingle();
+      
+      if (secondOwnerToken) {
+        // Mark second owner token as signed with metadata indicating combined session
+        await supabase
+          .from("signing_tokens")
+          .update({
+            signed_at: now,
+            signature_data: secondOwnerSignatureData,
+            ip_address: ipAddress,
+            user_agent: userAgent,
+            field_values: { signed_via_primary_session: true },
+          })
+          .eq("id", secondOwnerToken.id);
+        
+        // Log audit entry for second owner
+        await supabase.from("document_audit_log").insert({
+          document_id: signingToken.document_id,
+          action: "signature_captured",
+          metadata: {
+            signer_email: secondOwnerToken.signer_email,
+            signer_name: secondOwnerToken.signer_name,
+            signer_type: "second_owner",
+            consent_given: true,
+            signed_via_primary_session: true,
+            captured_by: signingToken.signer_email,
+          },
+          ip_address: ipAddress,
+          user_agent: userAgent,
+        });
+        
+        console.log("Second owner signature recorded:", secondOwnerToken.signer_email);
+      }
+    }
+    // === END SECOND OWNER HANDLING ===
+
     // Merge field values into booking_documents.field_configuration
     // Also update signature date fields with actual signing timestamp
     if (fieldValues && Object.keys(fieldValues).length > 0) {
@@ -357,6 +405,10 @@ serve(async (req) => {
       // Update date fields based on signer type to use actual signing timestamp
       if (signingToken.signer_type === 'owner') {
         updatedFieldValues.owner_signature_date = estDateStr;
+        // Also set second owner date if their signature was captured
+        if (secondOwnerSignatureData) {
+          updatedFieldValues.second_owner_signature_date = estDateStr;
+        }
       } else if (signingToken.signer_type === 'second_owner') {
         updatedFieldValues.second_owner_signature_date = estDateStr;
       } else if (signingToken.signer_type === 'manager') {
@@ -384,6 +436,7 @@ serve(async (req) => {
         consent_given: true,
         field_values: fieldValues,
         property_address: propertyAddress,
+        second_owner_signature_included: !!secondOwnerSignatureData,
       },
       ip_address: ipAddress,
       user_agent: userAgent,
