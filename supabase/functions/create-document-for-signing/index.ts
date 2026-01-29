@@ -248,7 +248,25 @@ serve(async (req) => {
 
     if (templateError) throw templateError;
 
-    // Create booking document record
+    // Extract lead_id from preFillData if passed through
+    const leadId = preFillData?.lead_id || null;
+    let leadPropertyAddress: string | null = null;
+    
+    // If we have a leadId, fetch the property address from the lead
+    if (leadId) {
+      const { data: lead } = await supabase
+        .from("leads")
+        .select("property_address")
+        .eq("id", leadId)
+        .single();
+      
+      if (lead?.property_address) {
+        leadPropertyAddress = lead.property_address;
+        console.log("Found lead property address:", leadPropertyAddress);
+      }
+    }
+    
+    // Create booking document record with contract_type from template
     const { data: bookingDoc, error: docError } = await supabase
       .from("booking_documents")
       .insert({
@@ -260,16 +278,21 @@ serve(async (req) => {
         recipient_email: recipientEmail,
         status: "draft",
         is_draft: true,
+        contract_type: template.contract_type, // Store template's contract_type
         document_type: template.contract_type || "rental_agreement",
         field_configuration: {
           preFillData,
           detectedFields,
+          lead_id: leadId, // Store lead_id for later retrieval
+          lead_property_address: leadPropertyAddress, // Store address from lead
         },
       })
       .select()
       .single();
 
     if (docError) throw docError;
+    
+    console.log("Stored contract_type:", template.contract_type, "lead_id:", leadId);
 
     const documentId = bookingDoc.id;
     console.log("Created booking document:", documentId);
