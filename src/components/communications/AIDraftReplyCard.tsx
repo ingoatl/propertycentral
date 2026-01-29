@@ -1,10 +1,41 @@
 import { useState } from "react";
-import { Bot, Send, Pencil, X, Loader2, Sparkles } from "lucide-react";
+import { Bot, Send, Pencil, X, Loader2, Sparkles, Presentation, RefreshCw, Palette, Home, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const PRESENTATION_LINKS = {
+  designer: {
+    label: "Designer Presentation",
+    url: "https://propertycentral.lovable.app/p/designer",
+    description: "Professional design services showcase",
+    icon: Palette,
+    context: "Interior design and furnishing services by designer Ilana. Showcase successful transformations like Southvale ($25K+ revenue) and Justice ($23K+). Great for unfurnished properties or owners looking to maximize earnings."
+  },
+  onboarding: {
+    label: "Onboarding Presentation",
+    url: "https://propertycentral.lovable.app/p/onboarding",
+    description: "Full-service property management overview",
+    icon: Briefcase,
+    context: "Full-service property management by PeachHaus Group. Highlights 1400+ five-star reviews, comprehensive services, transparent pricing, and next steps for getting started."
+  },
+  ownerPortal: {
+    label: "Owner Portal Presentation",
+    url: "https://propertycentral.lovable.app/p/owner-portal",
+    description: "Owner portal features & transparency",
+    icon: Home,
+    context: "Showcase the owner portal features: real-time performance tracking, monthly statements, maintenance updates, and full transparency. Great for leads asking about reporting or tracking their investment."
+  },
+};
 
 interface AIDraftReplyCardProps {
   draftId: string;
@@ -12,7 +43,13 @@ interface AIDraftReplyCardProps {
   confidenceScore?: number;
   onSend: (message: string) => void;
   onDismiss: () => void;
+  onRegenerate?: (presentationContext?: string) => void;
   isSending?: boolean;
+  isRegenerating?: boolean;
+  leadId?: string;
+  ownerId?: string;
+  contactPhone?: string;
+  contactEmail?: string;
 }
 
 export function AIDraftReplyCard({
@@ -21,7 +58,13 @@ export function AIDraftReplyCard({
   confidenceScore,
   onSend,
   onDismiss,
+  onRegenerate,
   isSending = false,
+  isRegenerating = false,
+  leadId,
+  ownerId,
+  contactPhone,
+  contactEmail,
 }: AIDraftReplyCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(draftContent);
@@ -127,7 +170,7 @@ export function AIDraftReplyCard({
           size="sm"
           className="flex-1 bg-violet-600 hover:bg-violet-700 text-white"
           onClick={handleSend}
-          disabled={isSending || isDismissing}
+          disabled={isSending || isDismissing || isRegenerating}
         >
           {isSending ? (
             <>
@@ -142,6 +185,64 @@ export function AIDraftReplyCard({
           )}
         </Button>
         
+        {/* Regenerate with Context button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-violet-500/30 hover:bg-violet-500/10"
+          onClick={() => onRegenerate?.()}
+          disabled={isSending || isDismissing || isRegenerating || !onRegenerate}
+        >
+          {isRegenerating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3.5 w-3.5" />
+          )}
+        </Button>
+
+        {/* Presentation Links Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-violet-500/30 hover:bg-violet-500/10"
+              disabled={isSending || isDismissing || isRegenerating}
+            >
+              <Presentation className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-72">
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+              Redraft with Presentation
+            </div>
+            <DropdownMenuSeparator />
+            {Object.entries(PRESENTATION_LINKS).map(([key, link]) => {
+              const Icon = link.icon;
+              return (
+                <DropdownMenuItem
+                  key={key}
+                  onClick={() => {
+                    // Regenerate the draft with presentation context
+                    const presentationContext = `Include this presentation link in the email: ${link.url}\n\nContext about this presentation: ${link.context}\n\nMake the email persuasively introduce the presentation and encourage them to watch it. Use the context to tailor the message.`;
+                    onRegenerate?.(presentationContext);
+                  }}
+                  disabled={isRegenerating || !onRegenerate}
+                  className="flex flex-col items-start gap-1 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-primary" />
+                    <span className="font-medium">{link.label}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground pl-6">
+                    {link.description}
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
         <Button
           variant="outline"
           size="sm"
@@ -152,7 +253,7 @@ export function AIDraftReplyCard({
             }
             setIsEditing(!isEditing);
           }}
-          disabled={isSending || isDismissing}
+          disabled={isSending || isDismissing || isRegenerating}
         >
           <Pencil className="h-3.5 w-3.5 mr-1.5" />
           {isEditing ? "Reset" : "Edit"}

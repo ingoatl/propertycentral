@@ -305,9 +305,9 @@ serve(async (req) => {
   }
 
   try {
-    const { communicationId, leadId, ownerId, contactPhone, contactEmail, messageType } = await req.json();
+    const { communicationId, leadId, ownerId, contactPhone, contactEmail, messageType, presentationContext, forceRegenerate } = await req.json();
 
-    console.log("Generate draft reply request:", { communicationId, leadId, ownerId, messageType });
+    console.log("Generate draft reply request:", { communicationId, leadId, ownerId, messageType, hasPresentationContext: !!presentationContext, forceRegenerate });
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const MEM0_API_KEY = Deno.env.get("MEM0_API_KEY");
@@ -656,12 +656,23 @@ WHAT NOT TO DO:
 - NEVER use banned phrases like "just checking in" or "I hope this finds you well"
 - NEVER guess financial numbers - only use what's in the context`;
 
+    // Build presentation context instruction if provided
+    const presentationInstruction = presentationContext ? `
+
+SPECIAL INSTRUCTION - PRESENTATION TO INCLUDE:
+${presentationContext}
+
+Your email MUST incorporate this presentation link naturally. Create a compelling reason for them to watch it based on their needs and your conversation context.
+` : "";
+
     const userPrompt = `THEIR MESSAGE TO REPLY TO:
 "${inboundMessage}"
-
+${presentationInstruction}
 Generate a natural, intelligent ${messageType === "email" ? "email" : "text message"} reply that DIRECTLY addresses what they said.
 ${intent.wantsLiveDiscussion || intent.wantsToScheduleCall ? `
 REMEMBER: They want to discuss/talk/meet! YOUR RESPONSE MUST OFFER TO SCHEDULE A CALL with the calendar link!` : ""}
+${presentationContext ? `
+IMPORTANT: This is a regenerated draft specifically to include the presentation link. Make the presentation the focus of your email while still addressing their needs.` : ""}
 
 Write ONLY the reply text - no explanations or meta-commentary.`;
 

@@ -18,7 +18,14 @@ export function AIDraftReplySection({
   onSend,
   isSending,
 }: AIDraftReplySectionProps) {
-  const { pendingDraft, isLoading, dismissDraft, isDismissing } = useAIDraftReplies(
+  const { 
+    pendingDraft, 
+    isLoading, 
+    dismissDraft, 
+    isDismissing,
+    regenerateDraft,
+    isRegenerating,
+  } = useAIDraftReplies(
     contactPhone,
     contactEmail,
     leadId,
@@ -29,6 +36,13 @@ export function AIDraftReplySection({
     return null;
   }
 
+  const handleRegenerate = (presentationContext?: string) => {
+    regenerateDraft({
+      draftId: pendingDraft.id,
+      presentationContext,
+    });
+  };
+
   return (
     <AIDraftReplyCard
       draftId={pendingDraft.id}
@@ -36,7 +50,13 @@ export function AIDraftReplySection({
       confidenceScore={pendingDraft.confidence_score}
       onSend={onSend}
       onDismiss={() => dismissDraft(pendingDraft.id)}
+      onRegenerate={handleRegenerate}
       isSending={isSending}
+      isRegenerating={isRegenerating}
+      leadId={leadId}
+      ownerId={ownerId}
+      contactPhone={contactPhone}
+      contactEmail={contactEmail}
     />
   );
 }

@@ -66,10 +66,12 @@ export function useAIDraftReplies(contactPhone?: string, contactEmail?: string, 
   const generateDraftMutation = useMutation({
     mutationFn: async ({ 
       communicationId, 
-      messageType = "sms" 
+      messageType = "sms",
+      presentationContext,
     }: { 
       communicationId?: string; 
       messageType?: "sms" | "email";
+      presentationContext?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke("generate-draft-reply", {
         body: {
@@ -79,6 +81,7 @@ export function useAIDraftReplies(contactPhone?: string, contactEmail?: string, 
           contactPhone,
           contactEmail,
           messageType,
+          presentationContext,
         },
       });
 
@@ -95,6 +98,53 @@ export function useAIDraftReplies(contactPhone?: string, contactEmail?: string, 
       if (!error.message.includes("Rate limit")) {
         toast.error("Failed to generate AI draft");
       }
+    },
+  });
+
+  // Regenerate draft with new context (dismisses old one first)
+  const regenerateDraftMutation = useMutation({
+    mutationFn: async ({ 
+      draftId,
+      presentationContext,
+    }: { 
+      draftId?: string;
+      presentationContext?: string;
+    }) => {
+      // Dismiss the current draft first
+      if (draftId) {
+        await supabase
+          .from("ai_draft_replies")
+          .update({ 
+            status: "dismissed",
+            dismissed_at: new Date().toISOString(),
+          })
+          .eq("id", draftId);
+      }
+
+      // Generate new draft with presentation context
+      const { data, error } = await supabase.functions.invoke("generate-draft-reply", {
+        body: {
+          leadId,
+          ownerId,
+          contactPhone,
+          contactEmail,
+          messageType: "email",
+          presentationContext,
+          forceRegenerate: true,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ai-draft-reply"] });
+      toast.success("Draft regenerated with presentation context");
+    },
+    onError: (error: Error) => {
+      console.error("Error regenerating draft:", error);
+      toast.error("Failed to regenerate draft");
     },
   });
 
@@ -121,6 +171,8 @@ export function useAIDraftReplies(contactPhone?: string, contactEmail?: string, 
     isLoading,
     generateDraft: generateDraftMutation.mutate,
     isGenerating: generateDraftMutation.isPending,
+    regenerateDraft: regenerateDraftMutation.mutate,
+    isRegenerating: regenerateDraftMutation.isPending,
     dismissDraft: dismissDraftMutation.mutate,
     isDismissing: dismissDraftMutation.isPending,
   };
