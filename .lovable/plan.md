@@ -1,188 +1,265 @@
 
-# Comprehensive Plan: Second Owner Signature, Call Attended Follow-ups, and Contact Cleanup
+# Smart Payment Setup Follow-up Emails with Service Type Differentiation
 
-## 1. Second Owner Signature Without Separate Session
+## Overview
 
-### Current Behavior
-Currently, when there are two owners, the system creates **separate signing tokens** for each:
-- Owner 1 gets their own signing link/token
-- Owner 2 gets a separate signing link/token (via `create-signing-session`)
-
-The SignDocument.tsx already tracks Owner 2 signatures separately (`owner2SignatureData` state), but these currently only work when the actual second owner accesses their separate session.
-
-### Proposed Change: "Click-to-Sign" for Owner 2 During Owner 1's Session
-
-When Owner 1 is signing, they can optionally fill in Owner 2's signature field by clicking on it. This should:
-1. Prompt for Owner 2's signature drawing
-2. Register that signature as Owner 2's signature
-3. Mark the Owner 2 signature field as complete
-4. Upon submission, save BOTH signatures with appropriate metadata
-
-### Technical Implementation
-
-**File: `src/pages/SignDocument.tsx`**
-- Modify the signature field click handler to detect if it's an Owner 2 field being clicked by Owner 1
-- Show the signature pad popup for Owner 2 when their field is clicked
-- Store Owner 2's signature in `owner2SignatureData` state (already exists)
-- On submission, include Owner 2 signature data in the payload with clear labeling
-
-**File: `supabase/functions/submit-signature/index.ts`**
-- Accept `secondOwnerSignatureData` in the request payload
-- When Owner 1 submits with Owner 2's signature included:
-  - Record Owner 2's signature separately
-  - Mark the second_owner token as "signed" with metadata indicating "signed_via_primary_session"
-  - Log audit entry noting this was a combined signing session
-  - Set appropriate timestamp on second_owner's signing token
-
-### UI Changes
-- When Owner 1 clicks on an Owner 2 signature field, show a clear prompt: "Draw signature for Second Owner"
-- Add a visual indicator that Owner 2's signature was captured during this session
-- Show confirmation that both signatures were recorded upon submission
+This plan implements intelligent, daily follow-up emails for the payment setup stage that:
+1. Differentiate between **Co-Hosting** clients (we charge them) and **Full-Service** clients (we pay them)
+2. Use the Fortune 500 email template with psychological best practices
+3. Send daily reminders with urgency increasing as the 1st of the month approaches
+4. Correct the current inaccurate language about depositing "after each guest checkout" (actual: 5th of each month)
 
 ---
 
-## 2. Call Attended Stage Follow-up Flow Analysis
+## Current State Analysis
 
-### Current Implementation
-The system has a **"Post-Call Follow-up"** sequence for `call_attended` stage with 3 steps:
+### Existing Infrastructure
+- `payment_setup_requests` table tracks reminder state per owner (reminder_1, reminder_2, final_reminder)
+- `send-payment-setup-reminders` edge function runs via cron and sends reminders at days 3, 7, 14
+- Follow-up sequences in `lead_follow_up_steps` for "ACH Form Reminders" (3 steps over 7 days)
 
-| Step | Timing | Type | Content |
-|------|--------|------|---------|
-| 1 | 2 hours after | Email | "Great Speaking With You" - Sends Owner Portal + Onboarding presentation links |
-| 2 | 2 days after | SMS | Casual check-in asking about Owner Portal preview |
-| 3 | 5 days after | Email | "Quick Question" - Low-pressure follow-up highlighting transparency/portal |
+### Problems to Fix
+1. **Current interval (3, 7, 14 days) is too slow** - Need daily reminders as 1st approaches
+2. **Generic messaging** - No differentiation between cohosting vs full-service
+3. **Inaccurate language** - Says "deposit after each guest checkout" (wrong: we deposit on 5th of month)
+4. **Missing Fortune 500 template** - Current reminder emails are basic
+5. **Missing "1st of month" deadline framing** - No urgency anchored to billing cycle
 
-### Psychology Principles Currently Applied
-- **Commitment + Consistency** (Cialdini) - Referencing the conversation creates commitment
-- **Reciprocity** - Providing valuable presentations before asking for action
-- **Social Proof** - Mentioning "what excites our owners most"
+---
 
-### Research: Best Psychological Follow-up Practices
+## Updated Messaging Strategy
 
-Based on behavioral psychology research for B2B sales follow-ups:
+### Co-Hosting Clients (We CHARGE Them)
+**Key Psychology**: Reduce friction, emphasize convenience, minimize "cost" framing
 
-**Optimal Post-Call Sequence (Fortune 500 best practices):**
+| Day | Theme | Psychological Principle |
+|-----|-------|------------------------|
+| 1 | Initial Request | Reciprocity - "We're ready to serve you" |
+| 2 | Friendly Check-in | Social Proof - "Most owners complete in 2 mins" |
+| 3 | Convenience Focus | Loss Aversion - "Avoid billing delays" |
+| 4 | Benefits Reminder | Commitment - Reference signed agreement |
+| 5 | Soft Urgency | Scarcity - "Complete before the 1st" |
+| 6 | Final Reminder | Authority - "Required for services to continue" |
 
-1. **Immediate (2h)**: Value-first email with promised resources + summary of key points discussed
-2. **48h**: Softer touch (SMS) - acknowledges they're busy, offers quick help
-3. **5 days**: Email with new insight/value (not just "checking in")
-4. **10 days**: Optional "last chance" with scarcity element
+**Key Messaging Points**:
+- "Payment method on file for management fees and approved expenses"
+- "You'll see every charge before it posts"
+- "Bank account (1% fee) or card (3% fee)"
+- "This ensures smooth monthly reconciliation"
 
-**Recommended Improvements:**
+### Full-Service Clients (We PAY Them)
+**Key Psychology**: Emphasize receiving money, minimize any "giving" framing
 
-| Step | Timing | Type | Psychological Approach |
-|------|--------|------|----------------------|
-| 1 | 2h | Email | **Reciprocity**: Deliver on promises immediately. Use Fortune 500 email template with AI call summary. Add social proof element. |
-| 2 | 48h | SMS | **Consistency**: "Just wanted to make sure you received everything from our call" - subtle commitment reinforcement |
-| 3 | 5 days | Email | **Authority + Liking**: Share a relevant insight (market data, case study) that shows expertise. Use Ilana/Design reference per memory. |
+| Day | Theme | Psychological Principle |
+|-----|-------|------------------------|
+| 1 | Initial Request | Gain Framing - "So we can pay you" |
+| 2 | Friendly Check-in | Reciprocity - "Your earnings are waiting" |
+| 3 | Money Ready | Loss Aversion - "Don't miss your payout" |
+| 4 | Deadline Approach | Urgency - "Complete before the 5th" |
+| 5 | Last Chance | Scarcity - "Payouts process on the 5th" |
+| 6 | Final Reminder | Authority - "Required for direct deposit" |
 
-### Fortune 500 Email Template Application
+**Key Messaging Points**:
+- "Set up your bank account to receive your rental earnings"
+- "We deposit owner payouts on the 5th of each month"
+- "Bank transfer only - no fees to you"
+- "Your net earnings after expenses are deposited automatically"
 
-The system already has a Fortune 500-style template in `owner-call-notifications/index.ts`. Key elements:
+---
+
+## Corrected Language
+
+### Full-Service Payment Email - BEFORE
+```
+"We'll deposit your rental earnings directly to your bank account after each guest checkout."
+```
+
+### Full-Service Payment Email - AFTER
+```
+"We'll deposit your net rental earnings directly to your bank account on the 5th of each month, following the monthly reconciliation."
+```
+
+---
+
+## Technical Implementation
+
+### 1. Update Initial Payment Request Emails
+
+**File**: `supabase/functions/process-lead-stage-change/index.ts`
+
+Update `buildFullServicePaymentEmailHtml()` and `buildCoHostingPaymentEmailHtml()`:
+- Fix deposit timing language (5th of month)
+- Add Fortune 500 header/footer structure
+- Add deadline context ("Complete before [next 1st]")
+
+### 2. Upgrade Reminder Edge Function
+
+**File**: `supabase/functions/send-payment-setup-reminders/index.ts`
+
+Changes:
+- Change reminder schedule from (3, 7, 14 days) to daily reminders
+- Add service_type lookup for each owner
+- Create separate template sets for cohosting vs full_service
+- Add "days until 1st" urgency messaging
+- Use Fortune 500 email template structure
+
+### 3. Add Database Columns for Daily Tracking
+
+**Migration**: Add columns to `payment_setup_requests`:
+```sql
+ALTER TABLE payment_setup_requests 
+ADD COLUMN last_reminder_sent_at TIMESTAMPTZ,
+ADD COLUMN reminder_count INTEGER DEFAULT 0,
+ADD COLUMN service_type TEXT DEFAULT 'cohosting';
+```
+
+### 4. Update Lead Follow-up Steps
+
+**Database Update**: Modify "ACH Form Reminders" sequence to:
+- Change to daily cadence
+- Add service_type-aware templates
+- Add {{days_until_first}} variable
+
+---
+
+## Fortune 500 Email Template Structure
+
+All payment reminder emails will use this structure:
 
 ```text
-- Clean corporate header with logo
-- Badge/status indicator (e.g., "NEXT STEPS")
-- Structured call details table
-- Signature section with headshot
-- Professional footer
-```
-
-**Changes needed:**
-- Apply this same template structure to the `buildCallAttendedEmailHtml()` function in `process-lead-stage-change/index.ts`
-- The current template is simpler - needs upgrade to Fortune 500 style
-
-### Updated Follow-up Content (Psychology-Optimized)
-
-**Step 1 (2h email)**: 
-- Fortune 500 template styling
-- Include AI-generated call summary from `lead.ai_summary`
-- Link to both presentations (Owner Portal + Onboarding)
-- Optional: Add designer presentation link mentioning Ilana (per memory)
-
-**Step 2 (48h SMS)**:
-- Keep casual but add value: "Quick tip: Most owners find the Owner Portal walkthrough answers 80% of their questions. Did you get a chance to check it out?"
-
-**Step 3 (5d email)**:
-- Add case study/social proof element
-- Reference specific benefit discussed in call (if available from ai_summary)
-- Single clear CTA
-
----
-
-## 3. Remove Sterling Hines Duplicate Contact
-
-### Current State
-There are two owner records with "Hines" in the name:
-
-| Owner ID | Name | Email | Has Property | Has Lead |
-|----------|------|-------|--------------|----------|
-| b3d686b0-6eb2-4f57-ac12-9a389c94f534 | Ellen K Hines | ellenkhines@gmail.com | YES (2 properties: 1427 & 1429 Hazy Way) | No |
-| cd300c76-5f0b-491c-bac0-0a79a14417f5 | Sterling Hines | delta57.llc@gmail.com | NO | YES (1 lead) |
-
-### Dependencies Check for Sterling Hines (cd300c76-...)
-- **Leads**: 1 record (Sterling Hines lead for 1429 Hazy Way)
-- **Properties**: 0 records
-- **Monthly Reconciliations**: 0 records
-- **Owner Calls**: 0 records
-- **Booking Documents**: 0 records
-
-### Safe Deletion Plan
-
-**Step 1**: Reassign the lead from Sterling Hines owner to Ellen K Hines
-- The lead is for "1429 Hazy Way" which is already owned by Ellen K Hines
-- Update `leads.owner_id` from `cd300c76-...` to `b3d686b0-...`
-
-**Step 2**: Delete the orphan Sterling Hines owner record
-- No other references exist
-- Safe to delete after lead reassignment
-
-### SQL to Execute (via Cloud View > Run SQL)
-```sql
--- Step 1: Reassign lead to Ellen K Hines
-UPDATE leads 
-SET owner_id = 'b3d686b0-6eb2-4f57-ac12-9a389c94f534'
-WHERE owner_id = 'cd300c76-5f0b-491c-bac0-0a79a14417f5';
-
--- Step 2: Delete orphan owner record
-DELETE FROM property_owners 
-WHERE id = 'cd300c76-5f0b-491c-bac0-0a79a14417f5';
+┌──────────────────────────────────────────────┐
+│  [PeachHaus Logo]          [PAYMENT SETUP]   │
+│                            Status Badge      │
+├──────────────────────────────────────────────┤
+│  Property: [Address]                         │
+│  Deadline: [Next 1st of Month]               │
+├──────────────────────────────────────────────┤
+│                                              │
+│  Dear [FirstName],                           │
+│                                              │
+│  [Personalized message based on day/type]    │
+│                                              │
+│  ┌────────────────────────────────────────┐  │
+│  │  This Will Be Used For                 │  │
+│  │  [COHOSTING: Expenses & Mgmt Fees]     │  │
+│  │  [FULL-SERVICE: Monthly Payouts]       │  │
+│  └────────────────────────────────────────┘  │
+│                                              │
+│  [Payment Method Options Table]              │
+│                                              │
+│  [ Set Up Payment / Payout Account → ]       │
+│                                              │
+├──────────────────────────────────────────────┤
+│  [Ingo Signature with Headshot]              │
+│  (404) 800-5932 · ingo@peachhausgroup.com    │
+├──────────────────────────────────────────────┤
+│  © PeachHaus Group LLC · Atlanta, GA         │
+└──────────────────────────────────────────────┘
 ```
 
 ---
 
-## Summary of Changes
+## Reminder Email Templates by Day
 
-| Component | Action |
-|-----------|--------|
-| `src/pages/SignDocument.tsx` | Allow Owner 1 to capture Owner 2's signature during their session |
-| `supabase/functions/submit-signature/index.ts` | Accept and process combined owner signatures |
-| `supabase/functions/process-lead-stage-change/index.ts` | Upgrade `buildCallAttendedEmailHtml()` to use Fortune 500 template |
-| Database (lead_follow_up_steps) | Update call_attended sequence templates with psychology-optimized content |
-| Database (manual SQL) | Reassign lead and delete orphan Sterling Hines record |
+### Co-Hosting Templates
+
+**Day 1 (Initial)**: Already handled by `buildCoHostingPaymentEmailHtml`
+
+**Day 2 - Friendly Check-in**:
+> Hi [Name], just a quick follow-up on setting up your payment method. Most owners complete this in under 2 minutes. Once done, your monthly statements process automatically - no manual steps needed.
+
+**Day 3 - Convenience Focus**:
+> Hi [Name], having your payment method on file means no delays with your monthly reconciliation. You'll see every charge clearly before it processes - complete transparency, zero surprises.
+
+**Day 4 - Commitment**:
+> Hi [Name], now that your management agreement is signed, the final step is setting up payment. This ensures we can process your monthly fees and any approved property expenses seamlessly.
+
+**Day 5 - Soft Urgency**:
+> Hi [Name], just [X] days until the 1st. Complete your payment setup now to ensure your first billing cycle goes smoothly. Takes just 2 minutes.
+
+**Day 6 - Final Reminder**:
+> Hi [Name], this is a final reminder. Your payment method is required to continue property management services. Please complete setup today to avoid any service delays.
+
+### Full-Service Templates
+
+**Day 1 (Initial)**: Already handled by `buildFullServicePaymentEmailHtml`
+
+**Day 2 - Friendly Check-in**:
+> Hi [Name], just following up on setting up your payout account. Once complete, your rental earnings will be deposited directly to your bank on the 5th of each month - completely automatic.
+
+**Day 3 - Money Ready**:
+> Hi [Name], we want to make sure you receive your rental income on time. Owner payouts are processed on the 5th of each month. Set up your bank account now so you don't miss your first deposit.
+
+**Day 4 - Deadline Approach**:
+> Hi [Name], the 5th is approaching. To receive your payout this month, please complete your bank account setup. This is how we'll deposit your net rental earnings after the monthly reconciliation.
+
+**Day 5 - Last Chance**:
+> Hi [Name], payouts process on the 5th. If your bank account isn't set up by then, your payout will be delayed until next month. Please complete this 2-minute setup today.
+
+**Day 6 - Final Reminder**:
+> Hi [Name], final reminder: we can't deposit your rental earnings without your bank account on file. This is required for all full-service management clients. Please complete today to avoid payout delays.
+
+---
+
+## SMS Templates
+
+### Co-Hosting
+- Day 2: `Hi {{name}}, quick reminder to set up your payment method for monthly billing. Takes 2 min: {{link}} - PeachHaus`
+- Day 4: `{{name}}, your payment setup is still pending. Complete before the 1st for smooth billing: {{link}} - PeachHaus`
+- Day 6: `Final reminder {{name}} - payment method needed for continued service. Please complete today: {{link}} - PeachHaus`
+
+### Full-Service
+- Day 2: `Hi {{name}}, set up your bank account so we can deposit your rental earnings! Takes 2 min: {{link}} - PeachHaus`
+- Day 4: `{{name}}, payouts go out on the 5th. Complete your bank setup to receive your earnings: {{link}} - PeachHaus`
+- Day 6: `Final reminder {{name}} - bank account needed for your payout. Please complete today: {{link}} - PeachHaus`
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `supabase/functions/process-lead-stage-change/index.ts` | Fix `buildFullServicePaymentEmailHtml` - change "after each checkout" to "on the 5th of each month" |
+| `supabase/functions/send-payment-setup-reminders/index.ts` | Complete rewrite: daily reminders, service_type differentiation, Fortune 500 templates, 1st-of-month urgency |
+| `supabase/functions/send-owner-payment-request/index.ts` | Add service_type lookup, use correct template |
+| Database migration | Add columns: `last_reminder_sent_at`, `reminder_count`, `service_type` to `payment_setup_requests` |
 
 ---
 
 ## Technical Notes
 
-### Second Owner Signature Flow
-```text
-Owner 1 Session:
-├── Fill Owner 1 fields
-├── Click Owner 2 signature field → Opens signature pad
-├── Capture Owner 2 signature → Stored separately
-├── Submit → Both signatures sent to backend
-└── Backend:
-    ├── Record Owner 1 signature on owner token
-    ├── Record Owner 2 signature on second_owner token
-    └── Mark both as signed (second_owner has metadata: signed_via_primary_session=true)
+### Daily Reminder Logic
+```javascript
+const daysSinceInitial = Math.floor((now - initialSentAt) / (1000 * 60 * 60 * 24));
+const daysUntilFirst = getDaysUntilNextFirst();
+
+// Send reminder if: not sent today AND < 6 total reminders
+if (lastReminderDate !== today && reminderCount < 6) {
+  const template = getTemplateForDay(reminderCount + 1, serviceType, daysUntilFirst);
+  await sendReminder(owner, template);
+  await updateReminderCount(request.id, reminderCount + 1);
+}
 ```
 
-### Call Attended Follow-up Timing
-```text
-Call Attended Stage:
-├── Immediately: Lead updated, AI summary generated
-├── +2h: Fortune 500 email with presentations + summary
-├── +48h: SMS check-in with value tip
-└── +5d: Email with case study/social proof
+### Days Until 1st Calculator
+```javascript
+function getDaysUntilNextFirst() {
+  const now = new Date();
+  let nextFirst = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  if (now.getDate() === 1) nextFirst = now;
+  return Math.ceil((nextFirst - now) / (1000 * 60 * 60 * 24));
+}
 ```
+
+---
+
+## Summary
+
+This implementation provides:
+
+1. **Daily follow-ups** (6 total) instead of infrequent reminders
+2. **Service-type differentiation** - different messaging for charging vs paying
+3. **Corrected deposit timing** - 5th of month, not after each checkout
+4. **Fortune 500 template** - professional, corporate styling
+5. **Urgency framing** - tied to 1st of month billing cycle
+6. **Psychological optimization** - reciprocity, loss aversion, commitment
