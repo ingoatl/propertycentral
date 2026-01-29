@@ -137,7 +137,7 @@ const PaymentSetup = () => {
               <div className="flex flex-col items-center p-3 bg-green-50 border-2 border-green-200 rounded-lg">
                 <span className="text-2xl mb-1">🏦</span>
                 <span className="font-medium text-green-800">US Bank Account</span>
-                <span className="text-xs text-green-700">No fees • Recommended</span>
+                <span className="text-xs text-green-700">1% fee • Recommended</span>
               </div>
               <div className="flex flex-col items-center p-3 bg-gray-50 border-2 border-gray-200 rounded-lg">
                 <span className="text-2xl mb-1">💳</span>

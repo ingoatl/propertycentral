@@ -1,11 +1,63 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, PartyPopper } from "lucide-react";
+import { CheckCircle2, PartyPopper, Loader2 } from "lucide-react";
 
 const OwnerPaymentSuccess = () => {
   const [searchParams] = useSearchParams();
+  const [syncing, setSyncing] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  
   const ownerId = searchParams.get("owner");
+  const sessionId = searchParams.get("session_id");
+
+  useEffect(() => {
+    const syncPaymentStatus = async () => {
+      if (!ownerId) {
+        setSyncing(false);
+        return;
+      }
+
+      try {
+        // Update the owner record to mark payment method as set up
+        const { error: updateError } = await supabase
+          .from("property_owners")
+          .update({ 
+            has_payment_method: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", ownerId);
+
+        if (updateError) {
+          console.error("Error updating owner payment status:", updateError);
+          setSyncError("Failed to sync payment status");
+        } else {
+          console.log("Payment method synced successfully for owner:", ownerId);
+        }
+      } catch (error) {
+        console.error("Error syncing payment status:", error);
+        setSyncError("An error occurred while syncing");
+      } finally {
+        setSyncing(false);
+      }
+    };
+
+    syncPaymentStatus();
+  }, [ownerId, sessionId]);
+
+  if (syncing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-4">
+        <Card className="max-w-lg w-full">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mb-4" />
+            <p className="text-lg text-gray-700">Confirming your payment setup...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-4">
@@ -24,6 +76,12 @@ const OwnerPaymentSuccess = () => {
           <p className="text-lg text-gray-700">
             Thank you! Your payment method has been securely saved.
           </p>
+
+          {syncError && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+              Note: {syncError}. Your payment method was saved with Stripe, but please contact us if you experience any issues.
+            </div>
+          )}
           
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
             <p className="font-medium text-green-800">What happens next?</p>
