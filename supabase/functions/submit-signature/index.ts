@@ -594,23 +594,24 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else {
-      // Find the next signer by getting the lowest signing_order among unsigned tokens
+      // Find the next signer(s) by getting the lowest signing_order among unsigned tokens
       const nextSigningOrder = Math.min(...unsignedTokens.map(t => t.signing_order));
-      const nextSigner = unsignedTokens.find(t => t.signing_order === nextSigningOrder);
+      // Get ALL signers at this order level (e.g., both Anja and Ingo for managers)
+      const nextSigners = unsignedTokens.filter(t => t.signing_order === nextSigningOrder);
 
-      console.log("Next signer to notify:", nextSigner ? {
-        email: nextSigner.signer_email,
-        type: nextSigner.signer_type,
-        order: nextSigner.signing_order
-      } : "None found");
+      console.log("Next signers to notify:", nextSigners.map(s => ({
+        email: s.signer_email,
+        type: s.signer_type,
+        order: s.signing_order
+      })));
 
-      if (nextSigner) {
-        // Send email to next signer with property address and owner name in subject
+      // Send email to ALL next signers (both Anja and Ingo if managers)
+      const signerDisplayName = ownerName || signingToken.signer_name;
+      
+      for (const nextSigner of nextSigners) {
         const signingUrl = `${APP_URL}/sign/${nextSigner.token}`;
         
         // Build subject with owner name and property address for admin
-        // Use the current signer's name (who just signed) as the owner name for the admin
-        const signerDisplayName = ownerName || signingToken.signer_name;
         let nextSignerSubject = `Your signature is needed - ${documentName}`;
         if (propertyAddress && signerDisplayName) {
           nextSignerSubject = `Signature Needed: ${signerDisplayName} - ${propertyAddress}`;
@@ -631,11 +632,11 @@ serve(async (req) => {
             documentDisplayName,
             propertyAddress,
             signingUrl,
-            signerDisplayName || signingToken.signer_name  // Use owner name if available
+            signerDisplayName || signingToken.signer_name
           ),
         });
 
-        console.log("Sent signing request to next signer:", nextSigner.signer_email, "Result:", emailResult);
+        console.log("Sent signing request to:", nextSigner.signer_email, "Result:", emailResult);
       }
 
       return new Response(
