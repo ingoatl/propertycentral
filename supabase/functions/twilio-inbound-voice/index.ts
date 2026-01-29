@@ -9,6 +9,10 @@ const corsHeaders = {
 // Main Twilio number for AI-first routing
 const MAIN_TWILIO_NUMBER = "+17709885286";
 
+// How many times to ring before forwarding to AI (each ring ~3 seconds)
+const MAX_RING_COUNT = 2;
+const RING_TIMEOUT_SECONDS = 10; // ~2 rings worth of time
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -91,6 +95,22 @@ serve(async (req) => {
 
       const isAvailable = presence?.is_available && presence?.status !== 'offline' && presence?.status !== 'dnd';
 
+      // Create incoming call notification for the browser modal
+      await supabase.from('incoming_call_notifications').insert({
+        call_sid: callSid,
+        to_user_id: phoneAssignment.user_id,
+        from_number: fromNumber,
+        from_name: callerName !== fromNumber ? callerName : null,
+        to_number: toNumber,
+        status: 'ringing',
+        ring_count: 0,
+        metadata: { 
+          lead_id: leadId,
+          assigned_user: phoneAssignment.display_name,
+          is_available: isAvailable,
+        }
+      });
+
       // Log the inbound call
       await supabase.from('lead_communications').insert({
         communication_type: 'call',
@@ -123,6 +143,13 @@ serve(async (req) => {
       } else {
         // User not available - route to AI agent as backup
         console.log('User not available, routing to AI agent backup');
+        
+        // Update notification status
+        await supabase
+          .from('incoming_call_notifications')
+          .update({ status: 'forwarded', expired_at: new Date().toISOString() })
+          .eq('call_sid', callSid);
+        
         return await routeToAIAgent(supabase, fromNumber, toNumber, callSid, SUPABASE_URL!, statusCallbackUrl, `${phoneAssignment.display_name} is currently unavailable`);
       }
     }
@@ -150,10 +177,69 @@ serve(async (req) => {
       }
     }
 
-    // Priority 3: Main number - Route ALL calls to ElevenLabs AI Agent
-    // The AI agent will handle qualification and transfers
-    console.log('Routing to ElevenLabs AI agent (main line or fallback)');
-    return await routeToAIAgent(supabase, fromNumber, toNumber, callSid, SUPABASE_URL!, statusCallbackUrl);
+    // Priority 3: Main number - Ring briefly (2 rings), then forward to ElevenLabs AI Agent
+    console.log('Main number call - brief ring then AI agent');
+    
+    // Try to identify the caller for notification purposes
+    let callerName = fromNumber;
+    const { data: leadData } = await supabase
+      .from('leads')
+      .select('id, name')
+      .or(`phone.eq.${fromNumber},phone.ilike.%${fromNumber.replace('+1', '')}%`)
+      .maybeSingle();
+
+    if (leadData) {
+      callerName = leadData.name;
+    } else {
+      const { data: ownerData } = await supabase
+        .from('property_owners')
+        .select('id, name')
+        .or(`phone.eq.${fromNumber},phone.ilike.%${fromNumber.replace('+1', '')}%`)
+        .maybeSingle();
+      
+      if (ownerData) {
+        callerName = ownerData.name;
+      }
+    }
+
+    // Create notification for ALL available admins (brief ring on their screens)
+    const { data: admins } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'admin');
+
+    if (admins && admins.length > 0) {
+      for (const admin of admins) {
+        await supabase.from('incoming_call_notifications').insert({
+          call_sid: callSid,
+          to_user_id: admin.user_id,
+          from_number: fromNumber,
+          from_name: callerName !== fromNumber ? callerName : null,
+          to_number: toNumber,
+          status: 'ringing',
+          ring_count: 0,
+          metadata: { 
+            routing: 'main_number',
+            max_rings: MAX_RING_COUNT,
+          }
+        });
+      }
+    }
+
+    // Generate TwiML that:
+    // 1. Briefly rings available team members (10 seconds = ~2 rings)
+    // 2. If no answer, forwards to ElevenLabs AI Agent
+    const aiActionUrl = `${SUPABASE_URL}/functions/v1/twilio-forward-to-ai?from=${encodeURIComponent(fromNumber)}&callSid=${callSid}`;
+    
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial timeout="${RING_TIMEOUT_SECONDS}" action="${aiActionUrl}">
+    ${admins?.map(a => `<Client>${a.user_id}</Client>`).join('\n    ') || ''}
+  </Dial>
+</Response>`;
+
+    console.log('Returning TwiML with brief ring then AI fallback');
+    return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
 
   } catch (error: unknown) {
     console.error('Inbound voice error:', error);
@@ -205,7 +291,7 @@ async function routeToAIAgent(
     .maybeSingle();
 
   // Also check property owners
-  let ownerData = null;
+  let ownerData: any = null;
   if (!lead) {
     const { data: owner } = await supabase
       .from('property_owners')

@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { NotificationBell } from "@/components/team-hub/NotificationBell";
 import { TaskNotificationBell } from "@/components/dashboard/TaskNotificationBell";
 import { useInAppNotifications } from "@/hooks/useTeamHub";
+import { IncomingCallProvider } from "@/components/communications/IncomingCallProvider";
 
 interface LayoutProps {
   children: ReactNode;
@@ -204,6 +205,9 @@ const Layout = ({ children }: LayoutProps) => {
       
       <CallRecapModal />
       <TaskConfirmationModal />
+      
+      {/* Incoming Call Modal - listens for realtime call notifications */}
+      <IncomingCallProvider />
     </div>
   );
 };

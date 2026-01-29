@@ -3040,6 +3040,51 @@ export type Database = {
         }
         Relationships: []
       }
+      incoming_call_notifications: {
+        Row: {
+          answered_at: string | null
+          call_sid: string
+          created_at: string
+          expired_at: string | null
+          from_name: string | null
+          from_number: string
+          id: string
+          metadata: Json | null
+          ring_count: number | null
+          status: string
+          to_number: string
+          to_user_id: string | null
+        }
+        Insert: {
+          answered_at?: string | null
+          call_sid: string
+          created_at?: string
+          expired_at?: string | null
+          from_name?: string | null
+          from_number: string
+          id?: string
+          metadata?: Json | null
+          ring_count?: number | null
+          status?: string
+          to_number: string
+          to_user_id?: string | null
+        }
+        Update: {
+          answered_at?: string | null
+          call_sid?: string
+          created_at?: string
+          expired_at?: string | null
+          from_name?: string | null
+          from_number?: string
+          id?: string
+          metadata?: Json | null
+          ring_count?: number | null
+          status?: string
+          to_number?: string
+          to_user_id?: string | null
+        }
+        Relationships: []
+      }
       inspection_issues: {
         Row: {
           created_at: string
