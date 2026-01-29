@@ -24,10 +24,10 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch owner data
+    // Fetch owner data with service_type
     const { data: owner, error } = await supabase
       .from("property_owners")
-      .select("id, name, email, payment_method, stripe_customer_id")
+      .select("id, name, email, payment_method, stripe_customer_id, service_type")
       .eq("id", ownerId)
       .single();
 

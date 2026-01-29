@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CreditCard, CheckCircle2, Building2, AlertCircle } from "lucide-react";
+import { Loader2, CreditCard, CheckCircle2, Building2, AlertCircle, Shield, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 interface OwnerData {
@@ -11,6 +11,7 @@ interface OwnerData {
   email: string;
   payment_method: string;
   stripe_customer_id: string | null;
+  service_type: "full_service" | "cohosting" | null;
   properties: { name: string }[];
 }
 
@@ -23,6 +24,8 @@ const OwnerPaymentSetup = () => {
 
   const ownerId = searchParams.get("owner");
   const canceled = searchParams.get("canceled");
+
+  const isFullService = ownerData?.service_type === "full_service";
 
   useEffect(() => {
     if (canceled === "true") {
@@ -88,15 +91,15 @@ const OwnerPaymentSetup = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
       </div>
     );
   }
 
   if (!ownerId || !ownerData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="text-red-600">Invalid Link</CardTitle>
@@ -110,9 +113,9 @@ const OwnerPaymentSetup = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
-      <Card className="max-w-lg w-full">
-        <CardHeader className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <Card className="max-w-lg w-full shadow-xl border-0">
+        <CardHeader className="text-center pb-2">
           <div className="mx-auto mb-4">
             <img 
               src="/peachhaus-logo.png" 
@@ -120,9 +123,16 @@ const OwnerPaymentSetup = () => {
               className="h-12 mx-auto"
             />
           </div>
-          <CardTitle className="text-2xl">Set Up Your Payment Method</CardTitle>
+          <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold mb-3">
+            {isFullService ? "💰 PAYOUT SETUP" : "🔒 PAYMENT SETUP"}
+          </div>
+          <CardTitle className="text-2xl">
+            {isFullService ? "Set Up Your Payout Account" : "Secure Payment Setup"}
+          </CardTitle>
           <CardDescription className="text-base">
-            Hi {ownerData.name.split(' ')[0]}! Please set up a secure payment method for your account.
+            Hi {ownerData.name.split(' ')[0]}! {isFullService 
+              ? "Link your bank account to receive your rental earnings."
+              : "We're upgrading to Stripe for secure, automated payments."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -135,6 +145,19 @@ const OwnerPaymentSetup = () => {
               </div>
             </div>
           )}
+
+          {/* No Forms Banner */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Lock className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-blue-900">No Forms to Fill Out</p>
+                <p className="text-sm text-blue-700">
+                  Just securely link your {isFullService ? "bank account" : "bank or card"} through Stripe's protected portal. Takes about 2 minutes.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Properties under management */}
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
@@ -153,71 +176,89 @@ const OwnerPaymentSetup = () => {
             </ul>
           </div>
 
-          {/* Current payment method info */}
-          {ownerData.payment_method && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-700">
-                <strong>Current method:</strong> {ownerData.payment_method}
-                {ownerData.stripe_customer_id && (
-                  <span className="ml-2 text-green-600">(Already connected to Stripe ✓)</span>
-                )}
+          {/* Purpose section - different for full-service vs co-hosting */}
+          {isFullService ? (
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-green-800">Receive Your Rental Earnings</p>
+                  <p className="text-sm text-green-700">
+                    We'll deposit your net earnings on the 5th of each month via secure bank transfer. No fees for payouts.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-amber-800">Monthly Property Charges</p>
+                    <p className="text-sm text-amber-700">Management fees, property expenses, and visit fees</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-blue-800">Complete Transparency</p>
+                    <p className="text-sm text-blue-700">See every charge before it posts — no surprises</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Payment method options - only show for co-hosting */}
+          {!isFullService && (
+            <div className="border rounded-lg p-4 space-y-3">
+              <p className="font-medium text-center">Choose Your Payment Method</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col items-center p-3 bg-green-50 border-2 border-green-200 rounded-lg">
+                  <span className="text-2xl mb-1">🏦</span>
+                  <span className="font-medium text-green-800">US Bank Account</span>
+                  <span className="text-xs text-green-700">1% fee • Recommended</span>
+                </div>
+                <div className="flex flex-col items-center p-3 bg-gray-50 border-2 border-gray-200 rounded-lg">
+                  <span className="text-2xl mb-1">💳</span>
+                  <span className="font-medium text-gray-800">Credit Card</span>
+                  <span className="text-xs text-gray-600">3% processing fee</span>
+                </div>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                You'll choose your preferred method on the next screen
               </p>
             </div>
           )}
 
-          {/* What this is for */}
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <CheckCircle2 className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-amber-800">Monthly Property Charges</p>
-                <p className="text-amber-700">Management fees, property expenses, and visit fees</p>
-              </div>
+          {/* Why Stripe section */}
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Shield className="h-5 w-5 text-slate-600" />
+              <p className="font-semibold text-slate-800">Why Stripe?</p>
             </div>
-            <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-blue-800">Secure & Automatic</p>
-                <p className="text-blue-700">No more manual transfers – we handle it securely</p>
+            <div className="space-y-2 text-sm text-slate-600">
+              <div className="flex items-center gap-2">
+                <span className="text-green-500">✓</span>
+                <span><strong>Bank-level encryption</strong> — 256-bit SSL security</span>
               </div>
-            </div>
-          </div>
-
-          {/* Payment method options */}
-          <div className="border rounded-lg p-4 space-y-3">
-            <p className="font-medium text-center">Choose Your Payment Method</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col items-center p-3 bg-green-50 border-2 border-green-200 rounded-lg">
-                <span className="text-2xl mb-1">🏦</span>
-                <span className="font-medium text-green-800">US Bank Account</span>
-                <span className="text-xs text-green-700">No fees • Recommended</span>
+              <div className="flex items-center gap-2">
+                <span className="text-green-500">✓</span>
+                <span><strong>Never stored on our servers</strong> — Details in Stripe's vault</span>
               </div>
-              <div className="flex flex-col items-center p-3 bg-gray-50 border-2 border-gray-200 rounded-lg">
-                <span className="text-2xl mb-1">💳</span>
-                <span className="font-medium text-gray-800">Credit Card</span>
-                <span className="text-xs text-gray-600">3% processing fee</span>
-              </div>
-            </div>
-            <p className="text-xs text-center text-muted-foreground">
-              You'll choose your preferred method on the next screen
-            </p>
-          </div>
-
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
-              <div>
-                <p className="font-medium text-green-800">Secure & Encrypted</p>
-                <p className="text-sm text-green-700">
-                  We use Stripe, the industry leader in payment security. Your information is never stored on our servers.
-                </p>
+              <div className="flex items-center gap-2">
+                <span className="text-green-500">✓</span>
+                <span><strong>Trusted by millions</strong> — Amazon, Google, Shopify</span>
               </div>
             </div>
           </div>
 
           <Button 
             onClick={handleSetupPayment} 
-            className="w-full bg-amber-600 hover:bg-amber-700 text-white py-6 text-lg"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-6 text-lg"
             disabled={isRedirecting}
           >
             {isRedirecting ? (
@@ -228,20 +269,18 @@ const OwnerPaymentSetup = () => {
             ) : (
               <>
                 <CreditCard className="mr-2 h-5 w-5" />
-                Continue to Stripe
+                {isFullService ? "Set Up Payout Account" : "Continue to Stripe"}
               </>
             )}
           </Button>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-            <p className="text-sm text-amber-800">
-              <strong>⏰ Please complete by December 5th</strong>
-            </p>
-          </div>
+          <p className="text-center text-xs text-muted-foreground">
+            This link won't expire — complete setup whenever you're ready!
+          </p>
 
           <p className="text-center text-sm text-muted-foreground">
             Questions? Contact us at{" "}
-            <a href="mailto:info@peachhausgroup.com" className="text-amber-600 hover:underline">
+            <a href="mailto:info@peachhausgroup.com" className="text-emerald-600 hover:underline">
               info@peachhausgroup.com
             </a>
           </p>
