@@ -991,31 +991,182 @@ function buildCallScheduledEmailHtml(recipientName: string, propertyAddress: str
   ]);
 }
 
-// Build post-call email
+// Build post-call email - Fortune 500 style with psychology principles
 function buildCallAttendedEmailHtml(recipientName: string, propertyAddress: string, aiSummary: string): string {
-  return buildBrandedEmailHtml(recipientName, "Next Steps After Our Conversation", [
-    {
-      isIntro: true,
-      content: `Thank you for the great conversation today! Based on what we discussed, I'm confident PeachHaus is the right partner for your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''}.`
-    },
-    {
-      title: "📋 Key Points We Covered",
-      content: aiSummary || "We discussed your property management needs and goals."
-    },
-    {
-      title: "🚀 Next Steps",
-      content: `
-        <table style="width: 100%;">
-          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">1️⃣ Review the management agreement (coming shortly)</td></tr>
-          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">2️⃣ Sign when ready</td></tr>
-          <tr><td style="padding: 8px 0;">3️⃣ We'll begin our onboarding process</td></tr>
-        </table>
-      `
-    },
-    {
-      content: "Let me know if you have any questions!"
-    }
-  ]);
+  const firstName = recipientName.split(' ')[0];
+  const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  
+  // Fortune 500 corporate email template with Reciprocity + Commitment principles
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Next Steps After Our Conversation</title>
+</head>
+<body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
+    
+    <!-- Header - Corporate Minimal with Logo -->
+    <div style="padding: 24px 32px; border-bottom: 2px solid #111111;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: middle;">
+            <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+            <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
+          </td>
+          <td style="text-align: right; vertical-align: middle;">
+            <div style="display: inline-block; background: #10b981; color: #ffffff; font-size: 10px; font-weight: 700; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+              POST-CALL SUMMARY
+            </div>
+            <div style="font-size: 10px; color: #666666; margin-top: 4px; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+              ${issueDate}
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    ${propertyAddress ? `
+    <!-- Property Info Banner -->
+    <div style="padding: 16px 32px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-bottom: 1px solid #86efac;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: middle;">
+            <div style="font-size: 10px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Property Under Discussion</div>
+            <div style="font-size: 15px; font-weight: 700; color: #111111;">${propertyAddress}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    ` : ''}
+
+    <!-- Greeting -->
+    <div style="padding: 28px 32px 16px 32px;">
+      <p style="font-size: 15px; line-height: 1.6; color: #111111; margin: 0;">
+        Dear ${firstName},
+      </p>
+      <p style="font-size: 14px; line-height: 1.7; color: #444444; margin: 16px 0 0 0;">
+        Thank you for taking the time to speak with us today. I truly enjoyed learning about your goals and I'm confident we can help you maximize your property's potential.
+      </p>
+    </div>
+
+    <!-- Call Summary Section -->
+    <div style="padding: 0 32px 20px 32px;">
+      <div style="border: 2px solid #111111; border-radius: 0;">
+        <div style="background: #111111; padding: 12px 20px;">
+          <span style="color: #ffffff; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">📋 What We Discussed</span>
+        </div>
+        <div style="padding: 20px; background: #fafafa;">
+          <p style="margin: 0; font-size: 14px; color: #374151; line-height: 1.7; font-style: italic;">
+            "${aiSummary || 'We discussed your property management needs, revenue goals, and how PeachHaus can provide a turnkey solution for your rental property.'}"
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resources Section - Reciprocity Principle -->
+    <div style="padding: 0 32px 20px 32px;">
+      <div style="font-size: 12px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; font-weight: 600;">
+        📚 Resources For You
+      </div>
+      <table style="width: 100%; border-collapse: separate; border-spacing: 0 8px;">
+        <tr>
+          <td style="padding: 16px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 8px;">
+            <table style="width: 100%;">
+              <tr>
+                <td style="vertical-align: top; width: 40px;">
+                  <div style="width: 32px; height: 32px; background: #f59e0b; border-radius: 50%; text-align: center; line-height: 32px; font-size: 14px;">🏠</div>
+                </td>
+                <td style="vertical-align: top; padding-left: 12px;">
+                  <div style="font-weight: 700; color: #92400e; font-size: 13px; margin-bottom: 4px;">Onboarding Presentation</div>
+                  <div style="font-size: 12px; color: #78350f; margin-bottom: 8px;">See exactly how we'll transform your property</div>
+                  <a href="https://propertycentral.lovable.app/p/onboarding" style="font-size: 12px; color: #92400e; text-decoration: underline; font-weight: 600;">View Presentation →</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 16px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 8px;">
+            <table style="width: 100%;">
+              <tr>
+                <td style="vertical-align: top; width: 40px;">
+                  <div style="width: 32px; height: 32px; background: #3b82f6; border-radius: 50%; text-align: center; line-height: 32px; font-size: 14px;">📊</div>
+                </td>
+                <td style="vertical-align: top; padding-left: 12px;">
+                  <div style="font-weight: 700; color: #1e40af; font-size: 13px; margin-bottom: 4px;">Owner Portal Preview</div>
+                  <div style="font-size: 12px; color: #1e3a8a; margin-bottom: 8px;">Full transparency on performance & finances</div>
+                  <a href="https://propertycentral.lovable.app/p/owner-portal" style="font-size: 12px; color: #1e40af; text-decoration: underline; font-weight: 600;">View Portal Demo →</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Next Steps Section -->
+    <div style="padding: 0 32px 24px 32px;">
+      <div style="font-size: 12px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; font-weight: 600;">
+        🚀 Next Steps
+      </div>
+      <table style="width: 100%;">
+        <tr>
+          <td style="padding: 12px 16px; border-left: 3px solid #10b981; background: #f9fafb; margin-bottom: 8px;">
+            <div style="font-size: 13px; color: #111827;"><strong>1.</strong> Review the resources above at your convenience</div>
+          </td>
+        </tr>
+        <tr><td style="height: 8px;"></td></tr>
+        <tr>
+          <td style="padding: 12px 16px; border-left: 3px solid #f59e0b; background: #f9fafb; margin-bottom: 8px;">
+            <div style="font-size: 13px; color: #111827;"><strong>2.</strong> I'll send the management agreement shortly</div>
+          </td>
+        </tr>
+        <tr><td style="height: 8px;"></td></tr>
+        <tr>
+          <td style="padding: 12px 16px; border-left: 3px solid #3b82f6; background: #f9fafb;">
+            <div style="font-size: 13px; color: #111827;"><strong>3.</strong> Sign when ready — no pressure, take your time</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Signature Section -->
+    <div style="padding: 24px 32px; border-top: 1px solid #e5e7eb;">
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="vertical-align: top; padding-right: 16px;">
+            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover;" />
+          </td>
+          <td style="vertical-align: top; border-left: 3px solid #f59e0b; padding-left: 12px;">
+            <div style="font-weight: 700; font-size: 14px; color: #111827;">Ingo Schaer</div>
+            <div style="font-size: 12px; color: #6b7280;">Co-Founder, Operations Manager</div>
+            <div style="font-size: 12px; color: #111827; margin-top: 4px;">PeachHaus Group LLC</div>
+            <div style="font-size: 12px; margin-top: 4px;">
+              <a href="tel:+14048005932" style="color: #111827; text-decoration: none;">(404) 800-5932</a> · 
+              <a href="mailto:ingo@peachhausgroup.com" style="color: #2563eb; text-decoration: none;">ingo@peachhausgroup.com</a>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding: 20px 32px; background: #f9f9f9; border-top: 1px solid #e5e5e5;">
+      <p style="margin: 0 0 8px; color: #666666; font-size: 11px;">
+        Questions? Just reply to this email or call/text anytime.
+      </p>
+      <p style="margin: 0; color: #999999; font-size: 11px;">
+        © ${new Date().getFullYear()} PeachHaus Group LLC · Atlanta, GA
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+`;
 }
 
 // Build contract out email

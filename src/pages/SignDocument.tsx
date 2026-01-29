@@ -448,11 +448,12 @@ const SignDocument = () => {
       });
       toast.success("Signature adopted!");
     } else if (currentSignatureField && isOwner2Field(currentSignatureField)) {
-      // Owner 2 is signing - only apply to Owner 2 fields
-      console.log("Setting Owner 2 signature data");
+      // Owner 2 signature field clicked during Owner 1's session
+      // Allow Owner 1 to capture Owner 2's signature in the same session
+      console.log("Setting Owner 2 signature data (captured in Owner 1 session)");
       setOwner2SignatureData(sigData);
       setCompletedFields(prev => new Set([...prev, currentSignatureField.api_id]));
-      toast.success("Owner 2 signature adopted!");
+      toast.success("Second Owner signature captured!");
     } else {
       // Owner 1 is signing - only apply to Owner 1 signature fields
       console.log("Setting Owner 1 signature data");
@@ -555,12 +556,14 @@ const SignDocument = () => {
     setSubmitting(true);
 
     try {
+      // Include Owner 2 signature if captured during this session
       const { data: result, error } = await supabase.functions.invoke("submit-signature", {
         body: {
           token,
           signatureData,
           agreedToTerms,
           fieldValues,
+          secondOwnerSignatureData: owner2SignatureData, // Pass Owner 2 signature if captured
         },
       });
 
