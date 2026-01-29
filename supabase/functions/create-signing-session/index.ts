@@ -168,14 +168,15 @@ serve(async (req) => {
     ];
 
     // Add second owner if provided with a DIFFERENT email
+    let managerOrder = 2;
     if (secondOwnerName && secondOwnerEmail && secondOwnerEmail !== ownerEmail) {
       signers.push({ name: secondOwnerName, email: secondOwnerEmail, type: "second_owner", order: 2 });
-      // Manager comes after second owner
-      signers.push({ name: "PeachHaus Group", email: "info@peachhausgroup.com", type: "manager", order: 3 });
-    } else {
-      // No second owner, manager is order 2
-      signers.push({ name: "PeachHaus Group", email: "info@peachhausgroup.com", type: "manager", order: 2 });
+      managerOrder = 3;
     }
+    
+    // Add BOTH Anja and Ingo as managers with the same order (either can sign)
+    signers.push({ name: "Anja Haeder", email: "anja@peachhausgroup.com", type: "manager", order: managerOrder });
+    signers.push({ name: "Ingo Haeder", email: "ingo@peachhausgroup.com", type: "manager", order: managerOrder });
 
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 48);
