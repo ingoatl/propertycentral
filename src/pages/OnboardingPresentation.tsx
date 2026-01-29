@@ -297,13 +297,22 @@ export default function OnboardingPresentation() {
     // Play audio immediately
     if (slide.script && !isMuted) {
       playAudioForSlide(slide.id, slide.script!, onAudioComplete);
+    } else if (isMuted) {
+      // When muted, use slide duration to auto-advance
+      setTimeout(() => {
+        if (!hasAdvanced && isPlayingRef.current) {
+          hasAdvanced = true;
+          advanceSlide();
+        }
+      }, slide.duration + 2000);
     }
 
-    // Fallback timer - ensures we ALWAYS advance even if audio fails
-    const fallbackDuration = isMuted ? slide.duration + 3000 : 40000;
+    // CRITICAL: Reduced fallback timer from 40s to slide duration + 5s for unmuted
+    // This ensures progress if audio loading fails or takes too long
+    const fallbackDuration = slide.duration + 5000;
     fallbackTimerRef.current = setTimeout(() => {
       if (!hasAdvanced && isPlayingRef.current) {
-        console.log(`Fallback advance for ${slide.id}`);
+        console.log(`Fallback advance for ${slide.id} (audio may have failed)`);
         hasAdvanced = true;
         advanceSlide();
       }
