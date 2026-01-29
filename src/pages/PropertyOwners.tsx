@@ -1019,7 +1019,7 @@ const PropertyOwners = () => {
                           paymentMethod={owner.payment_method}
                           variant="default"
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-green-600 hover:bg-green-700 text-white"
                         />
                         <Button
                           variant="outline"
