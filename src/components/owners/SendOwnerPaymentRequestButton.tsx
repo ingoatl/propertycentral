@@ -106,7 +106,7 @@ export function SendOwnerPaymentRequestButton({
       ) : (
         <>
           <CreditCard className="w-4 h-4" />
-          Payment Request
+          📧 Payment Request
         </>
       )}
     </Button>
