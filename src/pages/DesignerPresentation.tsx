@@ -55,6 +55,18 @@ export default function DesignerPresentation() {
   const [hasStarted, setHasStarted] = useState(false);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const touchStartX = useRef<number | null>(null);
+  // Ref to hold the current slide for stable callback access
+  const currentSlideRef = useRef(currentSlide);
+  const isAutoPlayingRef = useRef(isAutoPlaying);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    currentSlideRef.current = currentSlide;
+  }, [currentSlide]);
+  
+  useEffect(() => {
+    isAutoPlayingRef.current = isAutoPlaying;
+  }, [isAutoPlaying]);
   
   // Audio hook for narration
   const {
@@ -76,6 +88,16 @@ export default function DesignerPresentation() {
     }
   }, [isTransitioning, stopAudio]);
 
+  // CRITICAL: Use ref-based advanceSlide to avoid stale closures in audio callbacks
+  const advanceSlide = useCallback(() => {
+    const slideIndex = currentSlideRef.current;
+    console.log(`[Designer] advanceSlide called, currentSlideRef: ${slideIndex}`);
+    
+    if (slideIndex < SLIDES.length - 1 && isAutoPlayingRef.current) {
+      goToSlide(slideIndex + 1, true);
+    }
+  }, [goToSlide]);
+
   const nextSlide = useCallback(() => {
     goToSlide(currentSlide + 1);
   }, [currentSlide, goToSlide]);
@@ -94,16 +116,14 @@ export default function DesignerPresentation() {
         playAudioForSlide(slideId, script, () => {
           // Add 2 second pause before auto-advancing to next slide
           setTimeout(() => {
-            if (currentSlide < SLIDES.length - 1 && isAutoPlaying) {
-              goToSlide(currentSlide + 1, true);
-            }
+            advanceSlide();
           }, 2000);
         });
       }, 600); // Wait for slide transition
       
       return () => clearTimeout(timer);
     }
-  }, [currentSlide, hasStarted, isTransitioning, isAutoPlaying, playAudioForSlide, goToSlide]);
+  }, [currentSlide, hasStarted, isTransitioning, isAutoPlaying, playAudioForSlide, advanceSlide]);
 
   // Handle presentation start
   const handleStart = useCallback(() => {

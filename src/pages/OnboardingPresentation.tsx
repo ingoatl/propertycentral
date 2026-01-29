@@ -167,11 +167,17 @@ export default function OnboardingPresentation() {
   // Touch swipe support
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
+  // Ref to hold the current slide for stable callback access
+  const currentSlideRef = useRef(currentSlide);
   
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+  
+  useEffect(() => {
+    currentSlideRef.current = currentSlide;
+  }, [currentSlide]);
 
   // Use stored audio from Supabase (pre-generated)
   const { 
@@ -205,10 +211,16 @@ export default function OnboardingPresentation() {
     }
   }, [isTransitioning, stopAudio]);
 
+  // CRITICAL: Use ref-based advanceSlide to avoid stale closures in audio callbacks
   const advanceSlide = useCallback(() => {
+    // Use ref for current slide to always have the latest value
+    const slideIndex = currentSlideRef.current;
+    console.log(`[Presentation] advanceSlide called, currentSlideRef: ${slideIndex}`);
+    
     // Guard: prevent advancing past the end
-    if (currentSlide >= SLIDES.length - 1) {
+    if (slideIndex >= SLIDES.length - 1) {
       // Clean stop at end of presentation
+      console.log(`[Presentation] At last slide, stopping`);
       setIsPlaying(false);
       stopAudio();
       if (fallbackTimerRef.current) {
@@ -218,8 +230,8 @@ export default function OnboardingPresentation() {
       audioEndedRef.current = true;
       return;
     }
-    goToSlide(currentSlide + 1);
-  }, [currentSlide, goToSlide, stopAudio]);
+    goToSlide(slideIndex + 1);
+  }, [goToSlide, stopAudio]); // NOTE: No currentSlide dependency - uses ref instead
 
   const nextSlide = useCallback(() => {
     goToSlide(currentSlide + 1);
@@ -258,12 +270,15 @@ export default function OnboardingPresentation() {
     }
 
     const slide = SLIDES[currentSlide];
+    console.log(`[Presentation] Effect running for slide: ${slide.id} (index: ${currentSlide})`);
     
     // CRITICAL: Prevent double-play for this specific slide (React Strict Mode fix)
     if (hasPlayedForSlideRef.current === slide.id) {
+      console.log(`[Presentation] Skipping - already played for slide: ${slide.id}`);
       return;
     }
     hasPlayedForSlideRef.current = slide.id;
+    console.log(`[Presentation] Starting audio for slide: ${slide.id}`);
 
     // Clear any existing timer
     if (fallbackTimerRef.current) {
@@ -276,6 +291,7 @@ export default function OnboardingPresentation() {
 
     // Callback when audio ends - ALWAYS advances if still playing
     const onAudioComplete = () => {
+      console.log(`[Presentation] onAudioComplete called for ${slide.id}, hasAdvanced: ${hasAdvanced}`);
       if (hasAdvanced) return;
       hasAdvanced = true;
       
@@ -284,10 +300,11 @@ export default function OnboardingPresentation() {
         fallbackTimerRef.current = null;
       }
       
-      console.log(`Audio complete for ${slide.id}, advancing in 2s...`);
+      console.log(`[Presentation] Audio complete for ${slide.id}, advancing in 2s...`);
       
       // 2 second pause then advance
       setTimeout(() => {
+        console.log(`[Presentation] 2s delay done, isPlayingRef: ${isPlayingRef.current}`);
         if (isPlayingRef.current) {
           advanceSlide();
         }
@@ -296,9 +313,11 @@ export default function OnboardingPresentation() {
 
     // Play audio immediately
     if (slide.script && !isMuted) {
+      console.log(`[Presentation] Calling playAudioForSlide for: ${slide.id}`);
       playAudioForSlide(slide.id, slide.script!, onAudioComplete);
     } else if (isMuted) {
       // When muted, use slide duration to auto-advance
+      console.log(`[Presentation] Muted - using duration timer for: ${slide.id}`);
       setTimeout(() => {
         if (!hasAdvanced && isPlayingRef.current) {
           hasAdvanced = true;
@@ -310,6 +329,7 @@ export default function OnboardingPresentation() {
     // CRITICAL: Reduced fallback timer from 5s to 3s buffer for faster recovery if audio fails
     // This ensures progress if audio loading fails or takes too long
     const fallbackDuration = slide.duration + 3000;
+    console.log(`[Presentation] Setting fallback timer for ${slide.id}: ${fallbackDuration}ms`);
     fallbackTimerRef.current = setTimeout(() => {
       if (!hasAdvanced && isPlayingRef.current) {
         console.warn(`[Presentation] Fallback advance for ${slide.id} (audio may have failed)`);
