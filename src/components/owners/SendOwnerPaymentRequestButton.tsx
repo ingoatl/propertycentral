@@ -9,7 +9,7 @@ interface SendOwnerPaymentRequestButtonProps {
   email: string | null;
   name: string;
   stripeCustomerId: string | null;
-  paymentMethod?: string | null; // Added to check if payment method is actually set up
+  hasPaymentMethod?: boolean; // Use has_payment_method boolean, not payment_method string
   className?: string;
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm" | "lg" | "icon";
@@ -20,15 +20,15 @@ export function SendOwnerPaymentRequestButton({
   email,
   name,
   stripeCustomerId,
-  paymentMethod,
+  hasPaymentMethod = false,
   className,
   variant = "outline",
   size = "sm",
 }: SendOwnerPaymentRequestButtonProps) {
   const [isSending, setIsSending] = useState(false);
 
-  // Check if payment method is already set up - need BOTH stripe customer AND payment method
-  const hasPaymentMethod = !!stripeCustomerId && !!paymentMethod;
+  // Check if payment method is already set up - use the boolean flag from database
+  const isPaymentSetUp = !!stripeCustomerId && hasPaymentMethod;
 
   if (!email) {
     return (
@@ -46,7 +46,7 @@ export function SendOwnerPaymentRequestButton({
   }
 
   // Show disabled state if payment method exists
-  if (hasPaymentMethod) {
+  if (isPaymentSetUp) {
     return (
       <Button
         variant="outline"
