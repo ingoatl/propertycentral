@@ -1009,20 +1009,49 @@ const PropertyOwners = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Payment Methods on File</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAddingPaymentFor(owner)}
-                      >
-                        <Wallet className="w-4 h-4 mr-2" />
-                        Add {owner.payment_method === "ach" ? "Bank Account" : "Credit Card"}
-                      </Button>
+                      <div className="flex gap-2">
+                        {/* 📧 SEND PAYMENT SETUP EMAIL - Main action for requesting Stripe setup */}
+                        <SendOwnerPaymentRequestButton
+                          ownerId={owner.id}
+                          email={owner.email}
+                          name={owner.name}
+                          stripeCustomerId={owner.stripe_customer_id}
+                          paymentMethod={owner.payment_method}
+                          variant="default"
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAddingPaymentFor(owner)}
+                        >
+                          <Wallet className="w-4 h-4 mr-2" />
+                          Add Manually
+                        </Button>
+                      </div>
                     </div>
+                    
+                    {/* Payment setup status indicator */}
+                    {!owner.stripe_customer_id && (
+                      <div className="p-3 border-2 border-dashed border-amber-300 rounded-lg bg-amber-50 text-amber-800">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4" />
+                          <span className="text-sm font-medium">Payment Setup Required</span>
+                        </div>
+                        <p className="text-xs mt-1">
+                          Click "📧 Payment Request" to email {owner.name.split(' ')[0]} a secure Stripe setup link.
+                          <br />
+                          <span className="font-medium">Reminders will auto-send for 6 days until completed.</span>
+                        </p>
+                      </div>
+                    )}
+                    
                     {paymentMethods[owner.id]?.length > 0 ? (
                       <div className="space-y-2">
                         {paymentMethods[owner.id].map((pm) => (
-                          <div key={pm.id} className="p-3 border rounded-lg flex items-center gap-3">
-                            <CreditCard className="w-4 h-4 text-muted-foreground" />
+                          <div key={pm.id} className="p-3 border rounded-lg flex items-center gap-3 bg-green-50 border-green-200">
+                            <CreditCard className="w-4 h-4 text-green-600" />
                             <div className="flex-1">
                               {pm.card && (
                                 <p className="text-sm">
@@ -1040,15 +1069,15 @@ const PropertyOwners = () => {
                                 </div>
                               )}
                             </div>
-                            <Badge variant="secondary">On File</Badge>
+                            <Badge className="bg-green-600">✓ On File</Badge>
                           </div>
                         ))}
                       </div>
-                    ) : (
+                    ) : owner.stripe_customer_id ? (
                       <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg">
-                        No payment method on file yet. Click "Add {owner.payment_method === "ach" ? "Bank Account" : "Credit Card"}" to securely add one.
+                        Stripe customer created - waiting for payment method setup.
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Tax Documents Section */}
