@@ -100,19 +100,6 @@ serve(async (req) => {
 
     logStep("Updated owner with Stripe customer ID");
 
-    // Create payment setup request record for reminder tracking
-    await supabase.from("payment_setup_requests").upsert({
-      owner_id: ownerId,
-      initial_sent_at: new Date().toISOString(),
-      status: "pending",
-      stripe_session_url: session.url,
-    }, {
-      onConflict: "owner_id",
-      ignoreDuplicates: false,
-    });
-
-    logStep("Created payment setup request for reminders");
-
     // Get owner's properties for context
     const { data: properties } = await supabase
       .from("properties")
@@ -121,7 +108,69 @@ serve(async (req) => {
 
     const propertyList = properties?.map(p => p.name || p.address).join(", ") || "your properties";
 
-    // Send email with Stripe payment setup link - improved persuasive copy
+    // Get owner's service type to customize messaging
+    const { data: ownerData } = await supabase
+      .from("property_owners")
+      .select("service_type")
+      .eq("id", ownerId)
+      .single();
+    
+    const serviceType = ownerData?.service_type || 'cohosting';
+
+    // Create payment setup request record for reminder tracking (with service_type)
+    await supabase.from("payment_setup_requests").upsert({
+      owner_id: ownerId,
+      initial_sent_at: new Date().toISOString(),
+      status: "pending",
+      stripe_session_url: session.url,
+      service_type: serviceType,
+      reminder_count: 0,
+    }, {
+      onConflict: "owner_id",
+      ignoreDuplicates: false,
+    });
+
+    logStep("Created payment setup request for reminders", { serviceType });
+
+    // Build the appropriate email based on service type
+    const purposeSection = isFullService ? `
+      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #10b981;">
+        <p style="color: #166534; font-weight: 600; margin: 0 0 12px 0; font-size: 16px;">💰 Monthly Rental Payouts</p>
+        <p style="color: #15803d; margin: 0; font-size: 14px; line-height: 1.6;">
+          We deposit your net rental earnings directly to your bank account on the <strong>5th of each month</strong>, following the monthly reconciliation.
+        </p>
+      </div>
+      <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin: 16px 0;">
+        <p style="color: #374151; font-size: 14px; margin: 0; line-height: 1.6;">
+          <strong>Payout Method:</strong> US Bank Account (ACH) — <span style="color: #166534; font-weight: 600;">No fees for payouts</span>
+        </p>
+      </div>
+    ` : `
+      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #10b981;">
+        <p style="color: #166534; font-weight: 600; margin: 0 0 16px 0; font-size: 16px;">✨ Here's what this means for you:</p>
+        <ul style="color: #15803d; margin: 0; padding: 0 0 0 20px; font-size: 15px; line-height: 2;">
+          <li><strong>One-time setup</strong> — Takes just 2 minutes, then payments happen automatically</li>
+          <li><strong>Your choice</strong> — Bank transfer (1% fee) or card (3% fee)</li>
+          <li><strong>Complete transparency</strong> — See every charge before it posts</li>
+          <li><strong>Instant receipts</strong> — Get email confirmations for every transaction</li>
+          <li><strong>Bank-level security</strong> — Your info is encrypted and never stored on our servers</li>
+        </ul>
+      </div>
+    `;
+
+    const ctaText = isFullService ? 'Set Up My Payout Account →' : 'Set Up My Payment Method →';
+    const introText = isFullService 
+      ? `We need to set up your bank account so we can deposit your rental earnings from <strong>${propertyList}</strong>.`
+      : `We've been working with you on <strong>${propertyList}</strong> for a while now, and we want to make your experience even smoother.`;
+    const subIntroText = isFullService
+      ? `<p style="color: #4a5568; line-height: 1.8; margin-bottom: 20px;">
+          As your full-service property management partner, we handle everything from guest bookings to maintenance. Setting up your bank account ensures you receive your rental income on time, every month.
+        </p>`
+      : `<p style="color: #4a5568; line-height: 1.8; margin-bottom: 20px;">
+          <strong>We do have your current payment information on file</strong>, but we're transitioning to <strong>Stripe</strong> — a bank-level secure payment system used by millions of businesses worldwide. This change offers better security and a smoother experience for both of us.
+        </p>`;
+
+    // Send email with Stripe payment setup link - service type aware
     const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -137,44 +186,33 @@ serve(async (req) => {
     </div>
     
     <div style="background: white; border-radius: 16px; padding: 40px; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-      <h2 style="margin: 0 0 20px 0; color: #1a1a2e; font-size: 24px;">Quick Update to Simplify Your Payments</h2>
+      <h2 style="margin: 0 0 20px 0; color: #1a1a2e; font-size: 24px;">${isFullService ? 'Set Up Your Payout Account' : 'Quick Update to Simplify Your Payments'}</h2>
       
       <p style="color: #4a5568; line-height: 1.8; margin-bottom: 20px;">
         Hi ${name || 'there'},
       </p>
       
       <p style="color: #4a5568; line-height: 1.8; margin-bottom: 20px;">
-        We've been working with you on <strong>${propertyList}</strong> for a while now, and we want to make your experience even smoother.
+        ${introText}
       </p>
       
-      <p style="color: #4a5568; line-height: 1.8; margin-bottom: 20px;">
-        <strong>We do have your current payment information on file</strong>, but we're transitioning to <strong>Stripe</strong> — a bank-level secure payment system used by millions of businesses worldwide. This change offers better security and a smoother experience for both of us.
-      </p>
+      ${subIntroText}
       
-      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #10b981;">
-        <p style="color: #166534; font-weight: 600; margin: 0 0 16px 0; font-size: 16px;">✨ Here's what this means for you:</p>
-        <ul style="color: #15803d; margin: 0; padding: 0 0 0 20px; font-size: 15px; line-height: 2;">
-          <li><strong>One-time setup</strong> — Takes just 2 minutes, then payments happen automatically</li>
-          <li><strong>Your choice</strong> — Bank transfer (1% fee) or card (3% fee)</li>
-          <li><strong>Complete transparency</strong> — See every charge before it posts</li>
-          <li><strong>Instant receipts</strong> — Get email confirmations for every transaction</li>
-          <li><strong>Bank-level security</strong> — Your info is encrypted and never stored on our servers</li>
-        </ul>
-      </div>
+      ${purposeSection}
       
       <p style="color: #4a5568; line-height: 1.8; margin-bottom: 24px;">
-        This small change now saves you time every month — no more manual payments or check-writing. Just set it and forget it! 📬
+        ${isFullService ? 'This quick 2-minute setup ensures your payouts arrive on time each month.' : 'This small change now saves you time every month — no more manual payments or check-writing. Just set it and forget it! 📬'}
       </p>
       
       <div style="text-align: center; margin: 32px 0;">
         <a href="${siteUrl}/owner-payment-setup?owner=${ownerId}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 18px 48px; border-radius: 10px; font-weight: 600; font-size: 17px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
-          Set Up My Payment Method →
+          ${ctaText}
         </a>
       </div>
       
       <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin: 24px 0;">
         <p style="color: #64748b; font-size: 14px; margin: 0; line-height: 1.6;">
-          <strong>💡 Why the change?</strong> Stripe provides enterprise-grade security, automatic payment retries if a charge fails, and detailed statements — all designed to make property management billing hassle-free.
+          <strong>🔒 Secure & Encrypted</strong> — We use Stripe, trusted by millions of businesses. Your information is never stored on our servers.
         </p>
       </div>
       

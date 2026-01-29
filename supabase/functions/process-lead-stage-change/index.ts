@@ -459,9 +459,9 @@ function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: stri
       content: `As mentioned in our welcome email, the next step is to set up your payout account so we can deposit your rental earnings${propertyAddress ? ` from <strong>${propertyAddress}</strong>` : ''}.`
     },
     {
-      title: "This Will Be Used For",
+      title: "Monthly Rental Payouts",
       highlight: true,
-      content: `<strong>Receiving Rental Income</strong><br>We'll deposit your rental earnings directly to your bank account after each guest checkout.`
+      content: `<strong>How Payouts Work</strong><br>We deposit your net rental earnings directly to your bank account on the <strong>5th of each month</strong>, following the monthly reconciliation. No fees for ACH transfers.`
     },
     {
       title: "Payout Method",

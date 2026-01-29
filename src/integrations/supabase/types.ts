@@ -6968,9 +6968,12 @@ export type Database = {
           final_reminder_sent_at: string | null
           id: string
           initial_sent_at: string
+          last_reminder_sent_at: string | null
           owner_id: string
           reminder_1_sent_at: string | null
           reminder_2_sent_at: string | null
+          reminder_count: number | null
+          service_type: string | null
           status: string
           stripe_session_url: string | null
           updated_at: string | null
@@ -6981,9 +6984,12 @@ export type Database = {
           final_reminder_sent_at?: string | null
           id?: string
           initial_sent_at?: string
+          last_reminder_sent_at?: string | null
           owner_id: string
           reminder_1_sent_at?: string | null
           reminder_2_sent_at?: string | null
+          reminder_count?: number | null
+          service_type?: string | null
           status?: string
           stripe_session_url?: string | null
           updated_at?: string | null
@@ -6994,9 +7000,12 @@ export type Database = {
           final_reminder_sent_at?: string | null
           id?: string
           initial_sent_at?: string
+          last_reminder_sent_at?: string | null
           owner_id?: string
           reminder_1_sent_at?: string | null
           reminder_2_sent_at?: string | null
+          reminder_count?: number | null
+          service_type?: string | null
           status?: string
           stripe_session_url?: string | null
           updated_at?: string | null
