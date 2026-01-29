@@ -124,11 +124,17 @@ export default function OwnerPortalPresentation() {
   // Touch swipe support
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
+  // Ref to hold the current slide for stable callback access
+  const currentSlideRef = useRef(currentSlide);
   
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+  
+  useEffect(() => {
+    currentSlideRef.current = currentSlide;
+  }, [currentSlide]);
 
   // Use stored audio from Supabase (pre-generated)
   const { 
@@ -153,11 +159,16 @@ export default function OwnerPortalPresentation() {
     setIsPlaying(true);
   }, [hasStarted, initAudioContext]);
 
-  // Advance to next slide with end-of-presentation guard
+  // CRITICAL: Use ref-based advanceSlide to avoid stale closures in audio callbacks
   const advanceSlide = useCallback(() => {
+    // Use ref for current slide to always have the latest value
+    const slideIndex = currentSlideRef.current;
+    console.log(`[Presentation] advanceSlide called, currentSlideRef: ${slideIndex}`);
+    
     // Guard: prevent advancing past the end
-    if (currentSlide >= SLIDES.length - 1) {
+    if (slideIndex >= SLIDES.length - 1) {
       // Clean stop at end of presentation
+      console.log(`[Presentation] At last slide, stopping`);
       setIsPlaying(false);
       stopAudio();
       if (fallbackTimerRef.current) {
@@ -167,8 +178,8 @@ export default function OwnerPortalPresentation() {
       audioEndedRef.current = true;
       return;
     }
-    setCurrentSlide(prev => prev + 1);
-  }, [currentSlide, stopAudio]);
+    setCurrentSlide(slideIndex + 1);
+  }, [stopAudio]); // NOTE: No currentSlide dependency - uses ref instead
 
   // Touch swipe handlers for mobile navigation
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
