@@ -19,6 +19,7 @@ import { calculateDueFromOwnerFromLineItems, ServiceType, getSettlementAmount, g
 import { VisitValidationPreview } from "./VisitValidationPreview";
 import { TenantPaymentReview } from "./TenantPaymentReview";
 import { DeleteExpenseDialog } from "@/components/expenses/DeleteExpenseDialog";
+import { ServiceTypeToggle } from "@/components/owners/ServiceTypeToggle";
 
 interface ReconciliationReviewModalProps {
   reconciliationId: string;
@@ -781,7 +782,18 @@ export const ReconciliationReviewModal = ({
             <span>
               Review Reconciliation - {reconciliation.properties?.name}
             </span>
-            <Badge>{format(new Date(reconciliation.reconciliation_month + 'T00:00:00'), "MMMM yyyy")}</Badge>
+            <div className="flex items-center gap-2">
+              {reconciliation.property_owners?.id && (
+                <ServiceTypeToggle
+                  ownerId={reconciliation.property_owners.id}
+                  ownerName={reconciliation.property_owners.name || "Owner"}
+                  currentType={serviceType}
+                  onSuccess={refetch}
+                  compact
+                />
+              )}
+              <Badge>{format(new Date(reconciliation.reconciliation_month + 'T00:00:00'), "MMMM yyyy")}</Badge>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
